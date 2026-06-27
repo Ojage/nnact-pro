@@ -1,0 +1,15 @@
+# Production gateway. /api → api service, /welcome → marketing landing, / → web app.
+# Swap :8080 for your domain to get automatic HTTPS from Caddy.
+:8080 {
+	handle /api/* {
+		reverse_proxy api:3001
+	}
+	handle /welcome* {
+		root * /srv/landing
+		file_server
+		try_files {path} /index.html
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

@@ -9,6 +9,11 @@ import { appointmentRoutes } from "./routes/appointments.js";
 import { lineItemRoutes } from "./routes/lineitems.js";
 import { invoiceRoutes } from "./routes/invoices.js";
 import { stripeWebhookRoute } from "./routes/stripe-webhook.js";
+import { estimateRoutes } from "./routes/estimates.js";
+import { reviewRoutes } from "./routes/reviews.js";
+import { reportRoutes } from "./routes/reports.js";
+import { recurringRoutes } from "./routes/recurring.js";
+import { publicRoutes } from "./routes/public.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -22,6 +27,11 @@ export function buildServer() {
   app.register(lineItemRoutes, { prefix: "/api" });
   app.register(invoiceRoutes, { prefix: "/api/invoices" });
   app.register(stripeWebhookRoute, { prefix: "/api" }); // encapsulated raw-body parser
+  app.register(estimateRoutes, { prefix: "/api/estimates" });
+  app.register(reviewRoutes, { prefix: "/api/reviews" });
+  app.register(reportRoutes, { prefix: "/api/reports" });
+  app.register(recurringRoutes, { prefix: "/api/recurring" });
+  app.register(publicRoutes, { prefix: "/api/public" });
   return app;
 }
 

@@ -169,6 +169,33 @@ export const payments = pgTable("payments", {
   paidAt: timestamp("paid_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Recurring job templates (e.g. quarterly maintenance). A worker materializes
+// the next concrete job from `nextRunAt`. interval is ISO-ish: days between runs.
+export const recurringJobs = pgTable("recurring_jobs", {
+  id: id(),
+  orgId: orgId(),
+  customerId: uuid("customer_id")
+    .notNull()
+    .references(() => customers.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  intervalDays: integer("interval_days").notNull(),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: ts(),
+});
+
+// Customer reviews, requested after a job completes. rating 1–5.
+export const reviews = pgTable("reviews", {
+  id: id(),
+  orgId: orgId(),
+  jobId: uuid("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  createdAt: ts(),
+});
+
 // Calendar/dispatch slots. A job can have one appointment in Phase 1.
 export const appointments = pgTable(
   "appointments",

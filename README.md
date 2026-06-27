@@ -73,12 +73,34 @@ Each row is one vertical slice on the existing spine (schema → API route → w
 | 1 ✅ | Customers, Jobs, Dashboard | done — the reference slice |
 | 2 ✅ | Auth & orgs (JWT) | done — scrypt + `@fastify/jwt`; token-scoped tenancy |
 | 2 ✅ | Scheduling / dispatch | done — appointments API + schedule view; drag-assign UI is the next polish on the existing PATCH |
-| 2 | Estimates → accept → convert to job | `estimates` table exists |
+| 2 ✅ | Estimates → accept → convert to job | done — create from job, accept advances job to scheduled |
 | 3 ✅ | Invoicing + line-item editor | done — line items recompute job totals; invoice generated from job; PDF/email is the next polish |
 | 3 ✅ | Online payments | done — offline `/pay` (cash/check/card) + Stripe-optional `/checkout` + signature-verified webhook |
-| 3 | Reminders & notifications | Redis/BullMQ workers (SMS/email) |
-| 4 | Online booking page | public org route → creates a `lead` job |
-| 4 | Recurring jobs, reviews, reporting | |
+| 3 ✅ | Reminders & notifications | done — `@ofp/worker` sends appointment reminders via pluggable `notify` (ntfy/console; SMS/email plug in) |
+| 4 ✅ | Online booking page | done — public `POST /api/public/:orgId/book` → `lead` job (no auth) |
+| 4 ✅ | Recurring jobs, reviews, reporting | done — recurring templates materialized by the worker; reviews API; `/api/reports/summary` |
+
+All roadmap modules now have a working slice. Remaining work is polish (drag-drop calendar UI,
+invoice PDF/email, an estimates/booking web page, a `reminded_at` dedupe column) rather than net-new capability.
+
+## Deploy
+
+One command builds the images, runs migrations + seed, and brings the whole stack up behind
+Caddy on `:8080` (works with podman or docker compose):
+
+```bash
+./deploy.sh           # Linux/macOS
+.\deploy.ps1          # Windows
+```
+
+Then:
+- **App** → http://localhost:8080  ·  **Landing** → http://localhost:8080/welcome
+- **API** → http://localhost:8080/api/health  ·  **Login** → `owner@demo.test` / `demo12345`
+
+For a public host, point the `:8080` block in `infra/Caddyfile.prod` at your domain (Caddy
+auto-provisions HTTPS) and set real secrets in `.env` (`JWT_SECRET`, `POSTGRES_PASSWORD`,
+and `STRIPE_*` if you want online card payments). Services: `api`, `web`, `worker`, `postgres`,
+`redis`, `minio`, `caddy` (see `infra/compose.prod.yml`).
 
 ## License
 
