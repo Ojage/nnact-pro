@@ -108,6 +108,7 @@ export const jobs = pgTable(
     status: jobStatus("status").default("lead").notNull(),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     total: integer("total").default(0).notNull(), // cents, denormalized from line items
+    laborCostCents: integer("labor_cost_cents").default(0).notNull(), // tech labor cost for margin
     createdAt: ts(),
   },
   (t) => ({
@@ -117,6 +118,8 @@ export const jobs = pgTable(
 );
 
 // Line items belong to a job; estimates and invoices reference the job.
+// `unitCost` is what the item costs the business (materials/labor) — the basis
+// for per-job margin, the thing most low-end CRMs never surface.
 export const lineItems = pgTable("line_items", {
   id: id(),
   orgId: orgId(),
@@ -125,7 +128,8 @@ export const lineItems = pgTable("line_items", {
     .references(() => jobs.id, { onDelete: "cascade" }),
   description: text("description").notNull(),
   quantity: integer("quantity").default(1).notNull(),
-  unitPrice: integer("unit_price").default(0).notNull(), // cents
+  unitPrice: integer("unit_price").default(0).notNull(), // cents charged
+  unitCost: integer("unit_cost").default(0).notNull(), // cents it costs us
   createdAt: ts(),
 });
 
@@ -195,6 +199,26 @@ export const reviews = pgTable("reviews", {
   comment: text("comment"),
   createdAt: ts(),
 });
+
+// Unified activity timeline — every meaningful touch on a customer/job in one
+// place. The thing CRMs scatter across tabs; here it's one queryable log so an
+// owner can see a customer's whole history at a glance.
+export const activities = pgTable(
+  "activities",
+  {
+    id: id(),
+    orgId: orgId(),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "cascade" }),
+    jobId: uuid("job_id").references(() => jobs.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // job.created | job.scheduled | invoice.sent | payment.received | review.left | comms.sent ...
+    summary: text("summary").notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    cust: index("activities_customer_idx").on(t.orgId, t.customerId, t.createdAt),
+    job: index("activities_job_idx").on(t.jobId),
+  }),
+);
 
 // Calendar/dispatch slots. A job can have one appointment in Phase 1.
 export const appointments = pgTable(
