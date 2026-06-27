@@ -1,4 +1,4 @@
-import type { CustomerDTO, JobDTO, ReportSummaryDTO } from "@ofp/shared";
+import type { CustomerDTO, JobDTO, ReportSummaryDTO, ActivityDTO } from "@ofp/shared";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -27,6 +27,14 @@ async function get<T>(path: string): Promise<T> {
 
 export const api = {
   customers: () => get<CustomerDTO[]>("/api/customers"),
+  customer: (id: string) => get<CustomerDTO>(`/api/customers/${id}`),
+  activities: (filter: { customerId?: string; jobId?: string }) => {
+    const params: Record<string, string> = {};
+    if (filter.customerId) params.customerId = filter.customerId;
+    if (filter.jobId) params.jobId = filter.jobId;
+    const qs = new URLSearchParams(params).toString();
+    return get<ActivityDTO[]>(`/api/activities${qs ? `?${qs}` : ""}`);
+  },
   jobs: () => get<JobDTO[]>("/api/jobs"),
   appointments: (from?: string, to?: string) => {
     const q = new URLSearchParams();

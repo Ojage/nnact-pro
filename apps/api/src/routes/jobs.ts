@@ -4,6 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { db, jobs } from "@ofp/db";
 import { JOB_STATUS } from "@ofp/shared";
 import { resolveOrgId } from "./org.js";
+import { safeEmitActivity } from "../activities.js";
 
 const createBody = z.object({
   customerId: z.string().uuid(),
@@ -46,6 +47,10 @@ export async function jobRoutes(app: FastifyInstance) {
         scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
       })
       .returning();
+    safeEmitActivity(orgId, "job.created", `Created job: ${row.title}`, {
+      customerId: row.customerId,
+      jobId: row.id,
+    });
     return reply.code(201).send(row);
   });
 

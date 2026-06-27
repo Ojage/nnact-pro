@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq, and, gte, lte, asc } from "drizzle-orm";
 import { db, appointments, jobs } from "@ofp/db";
 import { resolveOrgId } from "./org.js";
+import { safeEmitActivity } from "../activities.js";
 
 const createBody = z.object({
   jobId: z.string().uuid(),
@@ -55,6 +56,12 @@ export async function appointmentRoutes(app: FastifyInstance) {
       .returning();
     // Moving a lead onto the calendar implies it's scheduled.
     await db.update(jobs).set({ status: "scheduled" }).where(eq(jobs.id, rest.jobId));
+    safeEmitActivity(
+      orgId,
+      "appointment.scheduled",
+      `Scheduled appointment for ${new Date(startsAt).toLocaleString()}`,
+      { jobId: rest.jobId },
+    );
     return reply.code(201).send(row);
   });
 

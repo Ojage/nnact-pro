@@ -1,4 +1,5 @@
 import { api } from "../../lib/api";
+import Link from "next/link";
 
 export default async function CustomersPage() {
   let customers: Awaited<ReturnType<typeof api.customers>> = [];
@@ -21,6 +22,7 @@ export default async function CustomersPage() {
               <th style={{ padding: 8 }}>Name</th>
               <th style={{ padding: 8 }}>Email</th>
               <th style={{ padding: 8 }}>Phone</th>
+              <th style={{ padding: 8 }}>Detail</th>
             </tr>
           </thead>
           <tbody>
@@ -29,11 +31,19 @@ export default async function CustomersPage() {
                 <td style={{ padding: 8 }}>{c.name}</td>
                 <td style={{ padding: 8 }}>{c.email ?? "—"}</td>
                 <td style={{ padding: 8 }}>{c.phone ?? "—"}</td>
+                <td style={{ padding: 8 }}>
+                  <Link
+                    href={`/customers/${c.id}`}
+                    style={{ color: "#9fb0e0", textDecoration: "underline" }}
+                  >
+                    view
+                  </Link>
+                </td>
               </tr>
             ))}
             {customers.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ padding: 8 }}>
+                <td colSpan={4} style={{ padding: 8 }}>
                   No customers yet.
                 </td>
               </tr>

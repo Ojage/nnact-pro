@@ -4,6 +4,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { db, invoices, payments, jobs, lineItems } from "@ofp/db";
 import { applyPayment, invoiceNumber } from "../invoicing.js";
 import { resolveOrgId } from "./org.js";
+import { safeEmitActivity } from "../activities.js";
 
 const createBody = z.object({ jobId: z.string().uuid(), dueAt: z.string().datetime().optional() });
 const payBody = z.object({
@@ -56,6 +57,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
         dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null,
       })
       .returning();
+    safeEmitActivity(orgId, "invoice.created", `Created invoice ${row.number}`, { jobId: job.id });
     return reply.code(201).send(row);
   });
 
@@ -88,6 +90,12 @@ export async function invoiceRoutes(app: FastifyInstance) {
       reference: parsed.data.reference,
     });
     await db.update(invoices).set({ status: result.status }).where(eq(invoices.id, id));
+    safeEmitActivity(
+      orgId,
+      "payment.received",
+      `Received ${parsed.data.method} payment of $${(parsed.data.amount / 100).toFixed(2)} on ${inv.number}`,
+      { jobId: inv.jobId },
+    );
     return { status: result.status, remaining: result.remaining, overpaid: result.overpaid };
   });
 

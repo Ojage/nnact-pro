@@ -37,6 +37,16 @@ export interface JobDTO {
   createdAt: string;
 }
 
+/** One row of the unified org/customer/job activity timeline. */
+export interface ActivityDTO {
+  id: string;
+  customerId?: string | null;
+  jobId?: string | null;
+  kind: string;
+  summary: string;
+  createdAt: string;
+}
+
 /** Owner dashboard rollup returned by GET /api/reports/summary. */
 export interface ReportSummaryDTO {
   jobsByStatus: Partial<Record<JobStatus, number>>;
