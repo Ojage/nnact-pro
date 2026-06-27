@@ -41,15 +41,23 @@ Run the unit check (no database needed):
 pnpm --filter @ofp/api test
 ```
 
-## What works today (the vertical slice)
+## What works today
 
 - **Multi-tenant schema** for every core HouseCall concept: orgs, users/technicians,
   customers, properties, jobs (work orders), line items, estimates, invoices, payments,
   appointments. Money is integer cents throughout.
-- **API**: `GET/POST /api/customers`, `GET /api/customers/:id`, `GET/POST /api/jobs`,
-  `PATCH /api/jobs/:id`, `GET /api/health`. Validated with Zod, scoped by org.
-- **Web**: dashboard (open jobs, scheduled count, completed revenue) + customers table.
+- **Auth (Phase 2)**: `POST /api/auth/register` (creates org + owner), `POST /api/auth/login`,
+  `GET /api/auth/me`. JWT via `@fastify/jwt`; passwords hashed with stdlib scrypt + constant-time
+  verify. Org is resolved from the verified token (header/first-org fallback in dev only).
+  Demo login: `owner@demo.test` / `demo12345` after seeding.
+- **Scheduling/dispatch (Phase 2)**: `GET/POST /api/appointments` (with `?from&to` range),
+  `PATCH /api/appointments/:id` (reschedule/reassign — the backend for calendar drag-drop).
+  Booking a job auto-moves it to `scheduled`.
+- **API (Phase 1)**: `customers` + `jobs` CRUD, `GET /api/health`. Zod-validated, org-scoped.
+- **Web**: dashboard, customers table, **schedule view**, **sign-in form**.
 - **Mobile**: technician job list (Expo).
+- **Tests**: money math (3/3) + password hashing (4/4), both runnable with zero install via
+  `node --experimental-strip-types --test`.
 
 ## Roadmap to HouseCall Pro parity
 
@@ -58,8 +66,8 @@ Each row is one vertical slice on the existing spine (schema → API route → w
 | Phase | Module | Notes |
 |---|---|---|
 | 1 ✅ | Customers, Jobs, Dashboard | done — the reference slice |
-| 2 | Auth & orgs (JWT) | replace the `x-org-id` shim in `routes/org.ts` |
-| 2 | Scheduling / dispatch calendar | `appointments` table exists; add calendar UI + drag-assign |
+| 2 ✅ | Auth & orgs (JWT) | done — scrypt + `@fastify/jwt`; token-scoped tenancy |
+| 2 ✅ | Scheduling / dispatch | done — appointments API + schedule view; drag-assign UI is the next polish on the existing PATCH |
 | 2 | Estimates → accept → convert to job | `estimates` table exists |
 | 3 | Invoicing + line-item editor | `invoices`/`line_items` exist; add PDF + email send |
 | 3 | Online payments | Stripe keys in `.env`; add checkout + webhook → `payments` |

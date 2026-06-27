@@ -33,6 +33,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <a href="/customers" style={{ color: "#9fb0e0", textDecoration: "none" }}>
               Customers
             </a>
+            <a href="/schedule" style={{ color: "#9fb0e0", textDecoration: "none" }}>
+              Schedule
+            </a>
+            <a href="/login" style={{ color: "#9fb0e0", textDecoration: "none", marginLeft: "auto" }}>
+              Sign in
+            </a>
           </nav>
         </header>
         <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>{children}</main>

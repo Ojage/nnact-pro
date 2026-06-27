@@ -3,6 +3,14 @@
 // org named "Demo HVAC" already exists.
 import { db, orgs, users, customers, jobs, invoices } from "./index.js";
 import { eq } from "drizzle-orm";
+import { scryptSync, randomBytes } from "node:crypto";
+
+// Inline password hash (same "saltHex:hashHex" scrypt format the API verifies)
+// so the demo owner can log in with password "demo12345".
+function seedHash(pw: string): string {
+  const salt = randomBytes(16);
+  return `${salt.toString("hex")}:${scryptSync(pw, salt, 64).toString("hex")}`;
+}
 
 async function main() {
   const existing = await db.select().from(orgs).where(eq(orgs.name, "Demo HVAC"));
@@ -17,6 +25,7 @@ async function main() {
     email: "owner@demo.test",
     name: "Dana Owner",
     role: "owner",
+    passwordHash: seedHash("demo12345"),
   });
 
   const [alice, bob] = await db
