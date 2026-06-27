@@ -1,0 +1,20 @@
+{
+  "name": "openfieldpro",
+  "private": true,
+  "version": "0.1.0",
+  "description": "OpenFieldPro — open-source, self-hostable field service management (a HouseCall Pro alternative)",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./apps/* dev",
+    "dev:api": "pnpm --filter @ofp/api dev",
+    "dev:web": "pnpm --filter @ofp/web dev",
+    "build": "pnpm -r build",
+    "db:generate": "pnpm --filter @ofp/db generate",
+    "db:push": "pnpm --filter @ofp/db push",
+    "db:seed": "pnpm --filter @ofp/db seed",
+    "test": "pnpm -r test",
+    "infra:up": "podman compose -f infra/compose.yml up -d",
+    "infra:down": "podman compose -f infra/compose.yml down"
+  },
+  "engines": { "node": ">=20" }
+}

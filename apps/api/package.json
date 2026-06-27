@@ -1,0 +1,23 @@
+{
+  "name": "@ofp/api",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@ofp/db": "workspace:*",
+    "@ofp/shared": "workspace:*",
+    "drizzle-orm": "^0.36.0",
+    "fastify": "^5.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

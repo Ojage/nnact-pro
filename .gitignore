@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.next/
+.expo/
+*.tsbuildinfo
+.env
+.env.local
+drizzle/meta/_journal.json.bak
+.DS_Store
+data/minio/
+data/pg/

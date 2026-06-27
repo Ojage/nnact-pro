@@ -1,0 +1,192 @@
+// OpenFieldPro relational schema — the field-service domain.
+// Multi-tenant (org_id everywhere). Money stored as integer cents.
+//
+// Phase-1 modules covered: orgs, users/technicians, customers, properties,
+// jobs (work orders), line items, estimates, invoices, payments, appointments.
+// Each table mirrors a HouseCall Pro concept so the remaining UI is mechanical.
+
+import { sql } from "drizzle-orm";
+import {
+  pgTable,
+  uuid,
+  text,
+  integer,
+  timestamp,
+  boolean,
+  pgEnum,
+  index,
+} from "drizzle-orm/pg-core";
+
+export const jobStatus = pgEnum("job_status", [
+  "lead",
+  "scheduled",
+  "in_progress",
+  "completed",
+  "canceled",
+]);
+export const invoiceStatus = pgEnum("invoice_status", [
+  "draft",
+  "sent",
+  "paid",
+  "void",
+]);
+export const userRole = pgEnum("user_role", ["owner", "dispatcher", "technician"]);
+
+const id = () => uuid("id").primaryKey().defaultRandom();
+const orgId = () =>
+  uuid("org_id")
+    .notNull()
+    .references(() => orgs.id, { onDelete: "cascade" });
+const ts = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
+
+export const orgs = pgTable("orgs", {
+  id: id(),
+  name: text("name").notNull(),
+  timezone: text("timezone").default("America/New_York").notNull(),
+  createdAt: ts(),
+});
+
+export const users = pgTable(
+  "users",
+  {
+    id: id(),
+    orgId: orgId(),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    role: userRole("role").default("technician").notNull(),
+    passwordHash: text("password_hash"),
+    active: boolean("active").default(true).notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({ orgEmail: index("users_org_email_idx").on(t.orgId, t.email) }),
+);
+
+export const customers = pgTable(
+  "customers",
+  {
+    id: id(),
+    orgId: orgId(),
+    name: text("name").notNull(),
+    email: text("email"),
+    phone: text("phone"),
+    notes: text("notes"),
+    createdAt: ts(),
+  },
+  (t) => ({ orgIdx: index("customers_org_idx").on(t.orgId) }),
+);
+
+// Service location(s) for a customer. lat/lng kept as numerics for now;
+// PostGIS geometry is available in the image for a later routing/dispatch upgrade.
+export const properties = pgTable("properties", {
+  id: id(),
+  orgId: orgId(),
+  customerId: uuid("customer_id")
+    .notNull()
+    .references(() => customers.id, { onDelete: "cascade" }),
+  address: text("address").notNull(),
+  lat: text("lat"),
+  lng: text("lng"),
+  createdAt: ts(),
+});
+
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: id(),
+    orgId: orgId(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    propertyId: uuid("property_id").references(() => properties.id, {
+      onDelete: "set null",
+    }),
+    assignedTo: uuid("assigned_to").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: jobStatus("status").default("lead").notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    total: integer("total").default(0).notNull(), // cents, denormalized from line items
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgStatus: index("jobs_org_status_idx").on(t.orgId, t.status),
+    sched: index("jobs_scheduled_idx").on(t.scheduledAt),
+  }),
+);
+
+// Line items belong to a job; estimates and invoices reference the job.
+export const lineItems = pgTable("line_items", {
+  id: id(),
+  orgId: orgId(),
+  jobId: uuid("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  quantity: integer("quantity").default(1).notNull(),
+  unitPrice: integer("unit_price").default(0).notNull(), // cents
+  createdAt: ts(),
+});
+
+export const estimates = pgTable("estimates", {
+  id: id(),
+  orgId: orgId(),
+  jobId: uuid("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  total: integer("total").default(0).notNull(),
+  accepted: boolean("accepted").default(false).notNull(),
+  createdAt: ts(),
+});
+
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: id(),
+    orgId: orgId(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    number: text("number").notNull(),
+    status: invoiceStatus("status").default("draft").notNull(),
+    total: integer("total").default(0).notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    createdAt: ts(),
+  },
+  (t) => ({ orgStatus: index("invoices_org_status_idx").on(t.orgId, t.status) }),
+);
+
+export const payments = pgTable("payments", {
+  id: id(),
+  orgId: orgId(),
+  invoiceId: uuid("invoice_id")
+    .notNull()
+    .references(() => invoices.id, { onDelete: "cascade" }),
+  amount: integer("amount").notNull(), // cents
+  method: text("method").default("manual").notNull(), // manual | card | cash | check
+  reference: text("reference"),
+  paidAt: timestamp("paid_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Calendar/dispatch slots. A job can have one appointment in Phase 1.
+export const appointments = pgTable(
+  "appointments",
+  {
+    id: id(),
+    orgId: orgId(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    technicianId: uuid("technician_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({ window: index("appts_window_idx").on(t.orgId, t.startsAt) }),
+);
+
+// Convenience: raw SQL to enable PostGIS (run once; harmless if repeated).
+export const enablePostgis = sql`CREATE EXTENSION IF NOT EXISTS postgis`;

@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "OpenFieldPro",
+    "slug": "openfieldpro",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": { "backgroundColor": "#0b1020" },
+    "ios": { "supportsTablet": true },
+    "android": {}
+  }
+}
