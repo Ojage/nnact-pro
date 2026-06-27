@@ -36,6 +36,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <a href="/schedule" style={{ color: "#9fb0e0", textDecoration: "none" }}>
               Schedule
             </a>
+            <a href="/invoices" style={{ color: "#9fb0e0", textDecoration: "none" }}>
+              Invoices
+            </a>
             <a href="/login" style={{ color: "#9fb0e0", textDecoration: "none", marginLeft: "auto" }}>
               Sign in
             </a>

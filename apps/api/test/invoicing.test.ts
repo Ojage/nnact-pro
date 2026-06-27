@@ -1,0 +1,42 @@
+// Runnable check (no DB): node --experimental-strip-types --test test/invoicing.test.ts
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { applyPayment, invoiceNumber } from "../src/invoicing.ts";
+
+test("full payment marks the invoice paid", () => {
+  const r = applyPayment(18900, 0, 18900, "sent");
+  assert.equal(r.status, "paid");
+  assert.equal(r.remaining, 0);
+  assert.equal(r.overpaid, 0);
+});
+
+test("partial payment keeps it sent with a remaining balance", () => {
+  const r = applyPayment(18900, 0, 10000, "sent");
+  assert.equal(r.status, "sent");
+  assert.equal(r.remaining, 8900);
+});
+
+test("a second payment that clears the balance flips it to paid", () => {
+  const r = applyPayment(18900, 10000, 8900, "sent");
+  assert.equal(r.status, "paid");
+  assert.equal(r.remaining, 0);
+});
+
+test("overpayment is tracked, not lost", () => {
+  const r = applyPayment(18900, 0, 20000, "sent");
+  assert.equal(r.status, "paid");
+  assert.equal(r.overpaid, 1100);
+});
+
+test("paying a void invoice throws", () => {
+  assert.throws(() => applyPayment(100, 0, 100, "void"));
+});
+
+test("non-positive payment is rejected", () => {
+  assert.throws(() => applyPayment(100, 0, 0, "sent"));
+});
+
+test("invoice numbers are sequential and zero-padded", () => {
+  assert.equal(invoiceNumber(0), "INV-1000");
+  assert.equal(invoiceNumber(42), "INV-1042");
+});

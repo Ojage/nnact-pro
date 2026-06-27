@@ -10,6 +10,15 @@ export interface AppointmentDTO {
   endsAt: string;
 }
 
+export interface InvoiceDTO {
+  id: string;
+  number: string;
+  status: "draft" | "sent" | "paid" | "void";
+  total: number;
+  jobId: string;
+  dueAt: string | null;
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
@@ -26,6 +35,7 @@ export const api = {
     const qs = q.toString();
     return get<AppointmentDTO[]>(`/api/appointments${qs ? `?${qs}` : ""}`);
   },
+  invoices: () => get<InvoiceDTO[]>("/api/invoices"),
   health: () => get<{ ok: boolean }>("/api/health"),
 };
 

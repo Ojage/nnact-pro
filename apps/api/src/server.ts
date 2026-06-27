@@ -6,6 +6,9 @@ import { authRoutes } from "./routes/auth.js";
 import { customerRoutes } from "./routes/customers.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { appointmentRoutes } from "./routes/appointments.js";
+import { lineItemRoutes } from "./routes/lineitems.js";
+import { invoiceRoutes } from "./routes/invoices.js";
+import { stripeWebhookRoute } from "./routes/stripe-webhook.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -16,6 +19,9 @@ export function buildServer() {
   app.register(customerRoutes, { prefix: "/api/customers" });
   app.register(jobRoutes, { prefix: "/api/jobs" });
   app.register(appointmentRoutes, { prefix: "/api/appointments" });
+  app.register(lineItemRoutes, { prefix: "/api" });
+  app.register(invoiceRoutes, { prefix: "/api/invoices" });
+  app.register(stripeWebhookRoute, { prefix: "/api" }); // encapsulated raw-body parser
   return app;
 }
 

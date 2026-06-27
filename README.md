@@ -53,6 +53,11 @@ pnpm --filter @ofp/api test
 - **Scheduling/dispatch (Phase 2)**: `GET/POST /api/appointments` (with `?from&to` range),
   `PATCH /api/appointments/:id` (reschedule/reassign — the backend for calendar drag-drop).
   Booking a job auto-moves it to `scheduled`.
+- **Invoicing + payments (Phase 3)**: line items (`/api/jobs/:id/line-items`) recompute the job
+  total; `POST /api/invoices` generates a numbered invoice from a job; `POST /api/invoices/:id/pay`
+  records offline payments (cash/check/card) and flips status to `paid` when covered (partials and
+  overpayment handled). Online card via `POST /api/invoices/:id/checkout` (Stripe-optional, returns
+  501 with guidance when unconfigured) + a **signature-verified** `/api/stripe/webhook`. Web invoices view.
 - **API (Phase 1)**: `customers` + `jobs` CRUD, `GET /api/health`. Zod-validated, org-scoped.
 - **Web**: dashboard, customers table, **schedule view**, **sign-in form**.
 - **Mobile**: technician job list (Expo).
@@ -69,8 +74,8 @@ Each row is one vertical slice on the existing spine (schema → API route → w
 | 2 ✅ | Auth & orgs (JWT) | done — scrypt + `@fastify/jwt`; token-scoped tenancy |
 | 2 ✅ | Scheduling / dispatch | done — appointments API + schedule view; drag-assign UI is the next polish on the existing PATCH |
 | 2 | Estimates → accept → convert to job | `estimates` table exists |
-| 3 | Invoicing + line-item editor | `invoices`/`line_items` exist; add PDF + email send |
-| 3 | Online payments | Stripe keys in `.env`; add checkout + webhook → `payments` |
+| 3 ✅ | Invoicing + line-item editor | done — line items recompute job totals; invoice generated from job; PDF/email is the next polish |
+| 3 ✅ | Online payments | done — offline `/pay` (cash/check/card) + Stripe-optional `/checkout` + signature-verified webhook |
 | 3 | Reminders & notifications | Redis/BullMQ workers (SMS/email) |
 | 4 | Online booking page | public org route → creates a `lead` job |
 | 4 | Recurring jobs, reviews, reporting | |
