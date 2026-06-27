@@ -12,6 +12,7 @@ const createBody = z.object({
   status: z.enum(JOB_STATUS).optional(),
   scheduledAt: z.string().datetime().optional(),
   total: z.number().int().nonnegative().optional(),
+  laborCostCents: z.number().int().nonnegative().optional().default(0),
 });
 
 const patchBody = z.object({
@@ -19,6 +20,7 @@ const patchBody = z.object({
   scheduledAt: z.string().datetime().nullable().optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   total: z.number().int().nonnegative().optional(),
+  laborCostCents: z.number().int().nonnegative().optional().default(0),
 });
 
 export async function jobRoutes(app: FastifyInstance) {

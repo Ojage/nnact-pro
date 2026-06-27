@@ -2,24 +2,36 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { db, lineItems, jobs } from "@ofp/db";
-import { sumLines } from "../totals.js";
+import { sumLines, jobCost, jobMargin } from "../totals.js";
 import { resolveOrgId } from "./org.js";
 
 const createBody = z.object({
   description: z.string().min(1),
   quantity: z.number().int().positive().default(1),
-  unitPrice: z.number().int().nonnegative(), // cents
+  unitPrice: z.number().int().nonnegative(), // cents charged
+  unitCost: z.number().int().nonnegative().default(0), // cents it costs us
 });
 
-// Recompute and persist the job's denormalized total from its line items.
-async function recomputeJobTotal(orgId: string, jobId: string): Promise<number> {
+// Recompute the job's revenue (jobs.total) plus its cost and margin. Persists
+// only `total` — cost and margin are derived fields surfaced in API responses,
+// not denormalized. Reads jobs.laborCostCents so labor participates in margin.
+async function recomputeJobTotals(orgId: string, jobId: string) {
+  const [job] = await db
+    .select({ laborCostCents: jobs.laborCostCents })
+    .from(jobs)
+    .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+  const laborCents = job?.laborCostCents ?? 0;
+
   const items = await db
     .select()
     .from(lineItems)
     .where(and(eq(lineItems.orgId, orgId), eq(lineItems.jobId, jobId)));
-  const total = sumLines(items.map((i) => ({ quantity: i.quantity, unitPrice: i.unitPrice })));
+  const total = sumLines(items);
+  const cost = jobCost(items, laborCents);
+  const margin = jobMargin(total, cost);
+
   await db.update(jobs).set({ total }).where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
-  return total;
+  return { total, cost, margin };
 }
 
 export async function lineItemRoutes(app: FastifyInstance) {
@@ -45,8 +57,8 @@ export async function lineItemRoutes(app: FastifyInstance) {
     if (!job) return reply.code(404).send({ error: "job not found" });
 
     const [row] = await db.insert(lineItems).values({ orgId, jobId, ...parsed.data }).returning();
-    const total = await recomputeJobTotal(orgId, jobId);
-    return reply.code(201).send({ lineItem: row, jobTotal: total });
+    const { total, cost, margin } = await recomputeJobTotals(orgId, jobId);
+    return reply.code(201).send({ lineItem: row, jobTotal: total, jobCostCents: cost, jobMarginCents: margin });
   });
 
   app.delete("/line-items/:id", async (req, reply) => {
@@ -57,7 +69,7 @@ export async function lineItemRoutes(app: FastifyInstance) {
       .where(and(eq(lineItems.orgId, orgId), eq(lineItems.id, id)))
       .returning();
     if (!removed) return reply.code(404).send({ error: "not found" });
-    const total = await recomputeJobTotal(orgId, removed.jobId);
-    return { ok: true, jobTotal: total };
+    const { total, cost, margin } = await recomputeJobTotals(orgId, removed.jobId);
+    return { ok: true, jobTotal: total, jobCostCents: cost, jobMarginCents: margin };
   });
 }
