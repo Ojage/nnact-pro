@@ -1,4 +1,4 @@
-import type { CustomerDTO, JobDTO } from "@ofp/shared";
+import type { CustomerDTO, JobDTO, ReportSummaryDTO } from "@ofp/shared";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -36,6 +36,7 @@ export const api = {
     return get<AppointmentDTO[]>(`/api/appointments${qs ? `?${qs}` : ""}`);
   },
   invoices: () => get<InvoiceDTO[]>("/api/invoices"),
+  reports: () => get<ReportSummaryDTO>("/api/reports/summary"),
   health: () => get<{ ok: boolean }>("/api/health"),
 };
 

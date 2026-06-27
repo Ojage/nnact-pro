@@ -36,3 +36,17 @@ export interface JobDTO {
   total: Money;
   createdAt: string;
 }
+
+/** Owner dashboard rollup returned by GET /api/reports/summary. */
+export interface ReportSummaryDTO {
+  jobsByStatus: Partial<Record<JobStatus, number>>;
+  revenueCollectedCents: Money;
+  accountsReceivableCents: Money;
+  rating: { average: number; count: number };
+  /** Gross margin sum per status (cents; negative = loss). */
+  marginByStatus: Partial<Record<JobStatus, Money>>;
+  /** Margin on `completed` jobs only — the realized P&L. Sign-preserving. */
+  realizedMarginCents: Money;
+  /** Margin on every job except `canceled` — the in-flight opportunity. */
+  pipelineMarginCents: Money;
+}

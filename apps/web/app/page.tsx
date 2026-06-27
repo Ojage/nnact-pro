@@ -1,13 +1,23 @@
 import { api } from "../lib/api";
 import { formatMoney } from "@ofp/shared";
+import type { ReportSummaryDTO } from "@ofp/shared";
 
 export default async function Dashboard() {
   let jobs: Awaited<ReturnType<typeof api.jobs>> = [];
+  let summary: ReportSummaryDTO | null = null;
   let error: string | null = null;
+  // Two independent fetches so a failing /reports endpoint degrades the page
+  // to "no margin row" instead of blanking the whole dashboard. `jobs` is
+  // the source of truth for the existing 3 cards; its failure still surfaces.
   try {
     jobs = await api.jobs();
   } catch (e) {
     error = (e as Error).message;
+  }
+  try {
+    summary = await api.reports();
+  } catch {
+    // Non-fatal: existing cards still render.
   }
 
   const scheduled = jobs.filter((j) => j.status === "scheduled").length;
@@ -25,6 +35,26 @@ export default async function Dashboard() {
         </p>
       ) : (
         <>
+          {summary && (
+            <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+              <Stat
+                label="Realized margin"
+                value={formatMoney(summary.realizedMarginCents)}
+                color={
+                  summary.realizedMarginCents < 0
+                    ? "#ff8080"
+                    : summary.realizedMarginCents > 0
+                      ? "#86e29a"
+                      : "#e6e9f0"
+                }
+              />
+              <Stat
+                label="Pipeline margin"
+                value={formatMoney(summary.pipelineMarginCents)}
+                color={summary.pipelineMarginCents < 0 ? "#ff8080" : "#e6e9f0"}
+              />
+            </div>
+          )}
           <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
             <Stat label="Open jobs" value={String(jobs.length)} />
             <Stat label="Scheduled" value={String(scheduled)} />
@@ -45,7 +75,7 @@ export default async function Dashboard() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div
       style={{
@@ -57,7 +87,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       }}
     >
       <div style={{ fontSize: 12, color: "#8a97c2" }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color: color ?? "#e6e9f0" }}>{value}</div>
     </div>
   );
 }
