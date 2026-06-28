@@ -18,6 +18,7 @@ import { publicRoutes } from "./routes/public.js";
 import { activityRoutes } from "./routes/activities.js";
 import { syncRoutes } from "./routes/sync.js";
 import { userRoutes } from "./routes/users.js";
+import { photoRoutes } from "./routes/photos.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -35,6 +36,7 @@ export function buildServer() {
   app.register(reviewRoutes, { prefix: "/api/reviews" });
   app.register(reportRoutes, { prefix: "/api/reports" });
   app.register(recurringRoutes, { prefix: "/api/recurring" });
+  app.register(photoRoutes, { prefix: "/api/photos" });
   app.register(publicRoutes, { prefix: "/api/public" });
   app.register(activityRoutes, { prefix: "/api/activities" });
   app.register(syncRoutes);

@@ -13,6 +13,7 @@
     "@fastify/jwt": "^9.0.1",
     "@ofp/db": "workspace:*",
     "@ofp/shared": "workspace:*",
+    "@fastify/multipart": "^9.0.1",
     "drizzle-orm": "^0.36.0",
     "fastify": "^5.1.0",
     "zod": "^3.23.8"

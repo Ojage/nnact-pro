@@ -277,5 +277,26 @@ export const appointments = pgTable(
   (t) => ({ window: index("appts_window_idx").on(t.orgId, t.startsAt) }),
 );
 
+// Photo uploads linked to jobs. `object_key` is the unique storage path
+// (e.g. "ofp/{orgId}/{uuid}.{ext}"). Files live on local disk in Phase-5a;
+// upgrading to S3/R2 requires swapping the uploads module, not the schema.
+export const photos = pgTable(
+  "photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgId(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    objectKey: text("object_key").notNull(),
+    contentType: text("content_type").notNull(),
+    fileName: text("file_name"),
+    fileSize: integer("file_size"),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({ orgJob: index("photos_org_job_idx").on(t.orgId, t.jobId) }),
+);
+
 // Convenience: raw SQL to enable PostGIS (run once; harmless if repeated).
 export const enablePostgis = sql`CREATE EXTENSION IF NOT EXISTS postgis`;
