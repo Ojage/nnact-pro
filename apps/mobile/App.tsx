@@ -1,6 +1,6 @@
 // OpenFieldPro technician app — dashboard with stat cards, appointments, and job cards.
 // Run: pnpm --filter @ofp/mobile dev  (requires Expo Go or a simulator).
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { StatusBar } from "expo-status-bar";
 import {
   StyleSheet,
@@ -14,6 +14,7 @@ import { formatMoney } from "@ofp/shared";
 import { StatCard } from "./components/StatCard";
 import { JobCard } from "./components/JobCard";
 import { AppointmentCard } from "./components/AppointmentCard";
+import { SyncService } from "./src/sync";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -39,6 +40,8 @@ export default function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const syncRef = useRef<SyncService | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +64,30 @@ export default function App() {
       }
     }
     load();
-    return () => { cancelled = true; };
+
+    // Init sync service and pull on mount + every 30s
+    const token = process.env.EXPO_PUBLIC_AUTH_TOKEN ?? "";
+    const orgId = process.env.EXPO_PUBLIC_ORG_ID ?? "";
+    syncRef.current = new SyncService({ apiUrl: API, orgId, token });
+
+    const doSync = () => {
+      syncRef.current
+        ?.pull()
+        .then((_res) => {
+          setLastSync(new Date().toLocaleTimeString());
+          // ponytail: results are logged but not applied to local mirror yet
+          // Ceiling: when we add a real SQLite mirror, pipe res.results here
+          // Upgrade: connect Mirror to expo-sqlite and upsert each result row
+        })
+        .catch((e) => setErr(String(e)));
+    };
+
+    doSync();
+    const interval = setInterval(doSync, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // ── Computed metrics ──
@@ -123,6 +149,7 @@ export default function App() {
           <Text style={styles.headerTitle}>Dashboard</Text>
           <Text style={styles.headerSub}>
             {jobs.length} jobs · {stats.active} active
+            {lastSync && ` · synced ${lastSync}`}
           </Text>
         </View>
 
