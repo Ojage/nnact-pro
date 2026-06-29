@@ -10,17 +10,9 @@ import { and, eq } from "drizzle-orm";
 import { db, plugins, pluginInstalls, pluginEvents } from "@ofp/db";
 import { signWebhook } from "./crypto.js";
 
-// Canonical event vocabulary. Keep manifest `events` arrays drawn from this set.
-export const PLUGIN_EVENTS = [
-  "job.created",
-  "job.updated",
-  "invoice.created",
-  "invoice.paid",
-  "payment.received",
-  "customer.created",
-  "estimate.accepted",
-] as const;
-export type PluginEventKind = (typeof PLUGIN_EVENTS)[number];
+// Canonical event vocabulary lives in the SDK so emitter and receivers share one
+// contract; re-exported for internal callers.
+export { PLUGIN_EVENTS, type PluginEventKind } from "@ofp/plugin-sdk";
 
 const DELIVERY_TIMEOUT_MS = 8_000;
 
