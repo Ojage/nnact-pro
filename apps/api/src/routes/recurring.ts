@@ -9,6 +9,8 @@ const createBody = z.object({
   title: z.string().min(1),
   intervalDays: z.number().int().positive(),
   startAt: z.string().datetime().optional(),
+  rrule: z.string().optional(),
+  scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
 });
 
 export async function recurringRoutes(app: FastifyInstance) {
@@ -34,6 +36,8 @@ export async function recurringRoutes(app: FastifyInstance) {
         title: parsed.data.title,
         intervalDays: parsed.data.intervalDays,
         nextRunAt: parsed.data.startAt ? new Date(parsed.data.startAt) : new Date(),
+        rrule: parsed.data.rrule ?? null,
+        scheduledTime: parsed.data.scheduledTime ?? null,
       })
       .returning();
     return reply.code(201).send(row);

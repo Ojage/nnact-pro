@@ -1,68 +1,144 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OpenFieldPro — field service software you own</title>
-    <meta name="description" content="Open-source, self-hostable field service management. Scheduling, invoicing, and payments for home-service businesses — without the per-seat SaaS bill." />
-    <style>
-      :root { --bg:#0b1020; --card:#141b33; --line:#1d2440; --ink:#e6e9f0; --mut:#8a97c2; --acc:#5b76e0; --ok:#86e29a; }
-      * { box-sizing: border-box; }
-      body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--ink); line-height:1.5; }
-      .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
-      header { padding: 20px 0; display:flex; align-items:center; gap:12px; }
-      header strong { font-size: 20px; }
-      .hero { padding: 64px 0 40px; text-align:center; }
-      .hero h1 { font-size: clamp(32px, 6vw, 56px); margin: 0 0 16px; letter-spacing:-1px; }
-      .hero p { font-size: 20px; color: var(--mut); max-width: 640px; margin: 0 auto 28px; }
-      .cta { display:inline-block; background:var(--acc); color:#fff; padding:14px 28px; border-radius:10px; text-decoration:none; font-weight:600; }
-      .cta.ghost { background:transparent; border:1px solid var(--line); color:var(--ink); margin-left:12px; }
-      .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:16px; margin:48px 0; }
-      .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; }
-      .card h3 { margin:0 0 8px; font-size:17px; }
-      .card p { margin:0; color:var(--mut); font-size:14px; }
-      .pricing { text-align:center; margin:56px 0; }
-      .price { font-size:44px; font-weight:700; }
-      .price small { font-size:16px; color:var(--mut); font-weight:400; }
-      .check { color:var(--ok); }
-      footer { color:var(--mut); font-size:13px; padding:40px 0; border-top:1px solid var(--line); text-align:center; }
-      ul.feat { list-style:none; padding:0; max-width:420px; margin:20px auto; text-align:left; }
-      ul.feat li { padding:6px 0; }
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <header>
-        <strong>⊹ OpenFieldPro</strong>
-      </header>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenFieldPro — Field service management, open-source</title>
+<style>
+  :root{
+    --bg:#0b1020;--bg-elevated:#111834;--card:#141b33;--card-hover:#1a2340;
+    --line:#1d2440;--line-light:#2a3460;
+    --ink:#e6e9f0;--ink-dim:#b0bae0;--mut:#8a97c2;--muted:#5a6a9a;
+    --acc:#5b76e0;--acc-hover:#4a65d0;--acc-soft:#2a3470;
+    --ok:#86e29a;--warn:#e0b34f;--err:#ff8080;
+    --ff:system-ui,-apple-system,sans-serif;
+    --fs-sm:12px;--fs-body:14px;--fs-lg:17px;--fs-xl:20px;--fs-h2:26px;--fs-h1:clamp(28px,5vw,44px);
+    --space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--space-8:32px;--space-12:48px;--space-16:64px;
+    --r-md:8px;--r-lg:12px;--r-xl:16px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{font-family:var(--ff);background:var(--bg);color:var(--ink);font-size:var(--fs-body);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--acc);text-decoration:none}
+  a:hover{color:var(--acc-hover)}
+  body{display:flex;flex-direction:column;min-height:100vh}
 
-      <section class="hero">
-        <h1>Field service software you actually own.</h1>
-        <p>Scheduling, dispatch, estimates, invoicing, and card payments for HVAC, plumbing, electrical, and cleaning businesses — self-hosted, no per-seat bill, your data stays yours.</p>
-        <a class="cta" href="/">Open the app</a>
-        <a class="cta ghost" href="https://github.com/niko4244/openfieldpro">View source</a>
-      </section>
+  .wrap{max-width:960px;margin:0 auto;padding:0 var(--space-6)}
 
-      <section class="grid">
-        <div class="card"><h3>Customers &amp; jobs</h3><p>A clean CRM and work-order pipeline from lead to paid.</p></div>
-        <div class="card"><h3>Scheduling &amp; dispatch</h3><p>Calendar with technician assignment and reschedule.</p></div>
-        <div class="card"><h3>Estimates → invoices</h3><p>Quote, get it accepted, convert to a job, bill it.</p></div>
-        <div class="card"><h3>Online &amp; offline payments</h3><p>Stripe checkout or record cash/check on the spot.</p></div>
-        <div class="card"><h3>Online booking</h3><p>A public request form that drops straight into your leads.</p></div>
-        <div class="card"><h3>Recurring jobs &amp; reviews</h3><p>Maintenance plans on autopilot; collect ratings after each job.</p></div>
-      </section>
+  /* header */
+  .header{display:flex;align-items:center;gap:var(--space-6);padding:14px var(--space-6);border-bottom:1px solid var(--line);background:var(--bg-elevated)}
+  .logo{font-size:var(--fs-xl);font-weight:700;letter-spacing:-.3px;color:var(--ink)}
+  .header nav{margin-left:auto}
+  .header nav a{color:var(--mut);margin-left:var(--space-4);font-size:var(--fs-body)}
+  .header nav a:hover{color:var(--ink)}
 
-      <section class="pricing">
-        <div class="price">$0 <small>/ self-hosted, forever</small></div>
-        <ul class="feat">
-          <li><span class="check">✓</span> Unlimited users and jobs</li>
-          <li><span class="check">✓</span> Your own server, your own database</li>
-          <li><span class="check">✓</span> No vendor lock-in — it's open source</li>
-        </ul>
-        <a class="cta" href="/">Get started</a>
-      </section>
+  /* hero */
+  .hero{text-align:center;padding:var(--space-16) 0 var(--space-12)}
+  .hero h1{font-size:var(--fs-h1);font-weight:800;letter-spacing:-1px;line-height:1.15;margin-bottom:var(--space-4)}
+  .hero h1 span{background:linear-gradient(135deg,var(--acc),var(--ok));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero p{font-size:var(--fs-lg);color:var(--mut);max-width:580px;margin:0 auto var(--space-6)}
+  .hero-actions{display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap}
+  .hero-actions a{display:inline-flex;align-items:center;gap:var(--space-2);padding:12px 24px;border-radius:var(--r-md);font-weight:600;font-size:var(--fs-body);transition:all .15s}
+  .btn-primary{background:var(--acc);color:#fff}
+  .btn-primary:hover{background:var(--acc-hover);color:#fff}
+  .btn-ghost{border:1px solid var(--line);color:var(--mut)}
+  .btn-ghost:hover{background:var(--card-hover);border-color:var(--line-light);color:var(--ink)}
 
-      <footer>OpenFieldPro · self-hostable field service management · MIT-style license</footer>
+  /* features */
+  .features{padding:var(--space-12) 0}
+  .features h2{text-align:center;font-size:var(--fs-h2);margin-bottom:var(--space-8)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--space-4)}
+  .feature{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--space-6);transition:border-color .2s,transform .2s}
+  .feature:hover{border-color:var(--line-light);transform:translateY(-2px)}
+  .feature-icon{font-size:24px;margin-bottom:var(--space-3)}
+  .feature h3{font-size:var(--fs-lg);margin-bottom:var(--space-2)}
+  .feature p{color:var(--mut);font-size:var(--fs-body)}
+
+  /* status section */
+  .status-section{padding:var(--space-12) 0;text-align:center;border-top:1px solid var(--line)}
+  .status-section p{color:var(--mut);margin-bottom:var(--space-4);font-size:var(--fs-lg)}
+  .stack{display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap}
+  .stack span{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 16px;font-size:var(--fs-sm);color:var(--ink-dim)}
+
+  /* footer */
+  footer{text-align:center;padding:var(--space-6);color:var(--muted);font-size:var(--fs-sm);border-top:1px solid var(--line);margin-top:auto}
+
+  @media(max-width:600px){
+    .hero{padding:var(--space-8) 0}
+    .features{padding:var(--space-6) 0}
+    .grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+  <header class="header">
+    <span class="logo">⊹ OpenFieldPro</span>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="https://github.com/niko4244/openfieldpro-app" target="_blank" rel="noopener">GitHub</a>
+      <a href="/login" class="btn-primary" style="padding:7px 16px;border-radius:var(--r-md)">Sign in</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Run your field service<br><span>without the lock-in</span></h1>
+    <p>Open-source scheduling, invoicing, and customer management — self-hosted or in the cloud.</p>
+    <div class="hero-actions">
+      <a href="https://github.com/niko4244/openfieldpro-app" class="btn-primary" target="_blank" rel="noopener">View on GitHub</a>
+      <a href="/login" class="btn-ghost">Dashboard →</a>
     </div>
-  </body>
+  </section>
+
+  <section class="features" id="features">
+    <div class="wrap">
+      <h2>Everything a service business needs</h2>
+      <div class="grid">
+        <div class="feature">
+          <div class="feature-icon">📋</div>
+          <h3>Scheduling</h3>
+          <p>Drag-and-drop calendar, route optimization, and crew assignments.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📄</div>
+          <h3>Invoicing</h3>
+          <p>Generate, send, and track invoices. Accept card payments on-site.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">👥</div>
+          <h3>CRM</h3>
+          <p>Customer profiles, job history, communication logs in one place.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📊</div>
+          <h3>Reporting</h3>
+          <p>Real-time P&L, margin tracking, and field crew performance.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📱</div>
+          <h3>Mobile app</h3>
+          <p>Field crew gets job details, navigation, and photo capture on site.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔌</div>
+          <h3>API-first</h3>
+          <p>Full REST API. Extend, integrate, or build your own front-end.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="status-section">
+    <div class="wrap">
+      <p>Built with modern, battle-tested tooling</p>
+      <div class="stack">
+        <span>Next.js 15</span><span>Fastify</span><span>Drizzle ORM</span>
+        <span>PostgreSQL</span><span>React Native</span><span>TypeScript</span>
+        <span>Docker</span><span>Podman</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>OpenFieldPro — MIT license. Not affiliated with HouseCall Pro.</p>
+  </footer>
+</body>
 </html>

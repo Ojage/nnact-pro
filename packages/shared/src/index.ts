@@ -33,7 +33,31 @@ export interface JobDTO {
   title: string;
   status: JobStatus;
   scheduledAt?: string | null;
+  assignedTo?: string | null;
   total: Money;
+  createdAt: string;
+}
+
+export interface RecurringJobDTO {
+  id: string;
+  orgId: string;
+  customerId: string;
+  title: string;
+  intervalDays: number;
+  nextRunAt: string;
+  active: boolean;
+  rrule: string | null;
+  scheduledTime: string | null;
+  createdAt: string;
+}
+
+export interface UserDTO {
+  id: string;
+  orgId: string;
+  email: string;
+  name: string;
+  role: "owner" | "dispatcher" | "technician";
+  active: boolean;
   createdAt: string;
 }
 

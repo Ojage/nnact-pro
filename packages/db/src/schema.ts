@@ -213,6 +213,12 @@ export const recurringJobs = pgTable("recurring_jobs", {
   intervalDays: integer("interval_days").notNull(),
   nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
   active: boolean("active").default(true).notNull(),
+  /* ponytail: RRULE is stored as raw RFC 5545 string (e.g. FREQ=WEEKLY;BYDAY=MO,WE).
+     SDKs parse it on read. No client library — clients get the raw string and do
+     lightweight parsing.  Ceiling: no recurrence-id support for exceptions.
+     Upgrade: store exdates array for individual instance cancellation. */
+  rrule: text("rrule"),
+  scheduledTime: text("scheduled_time"), /* HH:MM in org timezone, e.g. "14:00" */
   createdAt: ts(),
 });
 

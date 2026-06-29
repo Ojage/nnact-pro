@@ -1,19 +1,17 @@
-import { api } from "../../../lib/api";
+import Link from "next/link";
+import { api } from "@/lib/api";
 import { formatMoney } from "@ofp/shared";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
+import { JobStatusBadge } from "@/components/status-badge";
 
 export default async function CustomerDetailPage({
   params,
 }: {
-  // Next 15+ passes params as a Promise. Await it for the future-proof shape;
-  // Next 14 also tolerates the await.
   params: Promise<{ id: string }>;
 }) {
   const { id: customerId } = await params;
 
-  // Two independent fetches. The customer fetch is the source of truth for
-  // "exists vs. failed to load": if it throws, render a degraded timeline +
-  // jobs page so the user isn't told their own link is invalid. If it returns
-  // undefined, the customer is genuinely missing.
   let customer: Awaited<ReturnType<typeof api.customer>> | null = null;
   let customerLoadFailed = false;
   try {
@@ -31,81 +29,73 @@ export default async function CustomerDetailPage({
   return (
     <div>
       {customerLoadFailed ? (
-        <>
-          <h1>Customer (couldn’t load)</h1>
-          <p style={{ color: "#8a97c2" }}>
-            The customer service is unreachable, but here is what we know about{" "}
-            <code>{customerId}</code>.
-          </p>
-        </>
+        <PageHeader
+          title="Customer (couldn't load)"
+          description={`ID: ${customerId}`}
+        />
       ) : customer ? (
-        <>
-          <h1>{customer.name}</h1>
-          <p style={{ color: "#8a97c2", marginTop: 0 }}>
-            {customer.email ?? "—"} · {customer.phone ?? "—"} ·{" "}
-            added {new Date(customer.createdAt).toLocaleDateString()}
-          </p>
-        </>
+        <PageHeader
+          title={customer.name}
+          description={`${customer.email ?? "—"} · ${customer.phone ?? "—"} · added ${new Date(customer.createdAt).toLocaleDateString()}`}
+        />
       ) : (
-        <>
-          <h1>Customer not found</h1>
-          <p style={{ color: "#8a97c2" }}>No customer with id {customerId} in this org.</p>
-        </>
+        <PageHeader title="Customer not found" description={`No customer with id ${customerId} in this org.`} />
       )}
 
-      <div style={{ display: "flex", gap: 32, marginTop: 24 }}>
-        <section style={{ flex: 1 }}>
-          <h2>Activity timeline</h2>
-          {timeline.length === 0 ? (
-            <p style={{ color: "#8a97c2" }}>No activity yet.</p>
-          ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {timeline.map((a) => (
-                <li
-                  key={a.id}
-                  style={{
-                    borderLeft: "2px solid #1d2440",
-                    paddingLeft: 12,
-                    marginBottom: 12,
-                  }}
-                >
-                  <div style={{ fontSize: 12, color: "#8a97c2" }}>
-                    {new Date(a.createdAt).toLocaleString()} ·{" "}
-                    <span style={{ color: "#9fb0e0" }}>{a.kind}</span>
-                  </div>
-                  <div>{a.summary}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Jobs */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Jobs ({customerJobs.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {customerJobs.length === 0 ? (
+              <p className="text-sm text-fg-muted py-6 text-center">No jobs for this customer.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {customerJobs.map((j) => (
+                  <Link
+                    key={j.id}
+                    href={`/jobs/${j.id}`}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-surface-200 hover:bg-surface-400 transition-colors no-underline hover:no-underline"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <JobStatusBadge status={j.status} />
+                      <span className="text-sm text-fg truncate">{j.title}</span>
+                    </div>
+                    <span className="text-sm text-fg-muted shrink-0">
+                      {formatMoney(j.total)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        <section style={{ flex: 1 }}>
-          <h2>Jobs ({customerJobs.length})</h2>
-          {customerJobs.length === 0 ? (
-            <p style={{ color: "#8a97c2" }}>No jobs yet.</p>
-          ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {customerJobs.map((j) => (
-                <li
-                  key={j.id}
-                  style={{
-                    background: "#141b33",
-                    border: "1px solid #1d2440",
-                    borderRadius: 8,
-                    padding: 12,
-                    marginBottom: 8,
-                  }}
-                >
-                  <div style={{ fontWeight: 600 }}>{j.title}</div>
-                  <div style={{ fontSize: 12, color: "#8a97c2" }}>
-                    {j.status} · {formatMoney(j.total)}
+        {/* Activity timeline */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {timeline.length === 0 ? (
+              <p className="text-sm text-fg-muted py-6 text-center">No activity yet.</p>
+            ) : (
+              <div className="relative pl-4 border-l-2 border-surface-400 space-y-4">
+                {timeline.map((a) => (
+                  <div key={a.id} className="relative">
+                    <div className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-surface-500 border-2 border-surface-300" />
+                    <p className="text-sm text-fg">{a.summary}</p>
+                    <p className="text-xs text-fg-dim mt-0.5">
+                      {new Date(a.createdAt).toLocaleString()}
+                    </p>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
