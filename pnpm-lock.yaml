@@ -17,7 +17,7 @@ importers:
         specifier: ^9.0.1
         version: 9.1.0
       '@fastify/multipart':
-        specifier: ^9.0.1
+        specifier: ^9.4.0
         version: 9.4.0
       '@ofp/db':
         specifier: workspace:*
@@ -39,6 +39,9 @@ importers:
         specifier: ^17.4.0
         version: 17.7.0
     devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
       tsx:
         specifier: ^4.19.0
         version: 4.22.4
