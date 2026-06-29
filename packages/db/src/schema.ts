@@ -232,6 +232,7 @@ export const reviews = pgTable("reviews", {
     .references(() => jobs.id, { onDelete: "cascade" }),
   rating: integer("rating").notNull(),
   comment: text("comment"),
+  reply: text("reply"),
   createdAt: ts(),
 });
 
@@ -300,3 +301,83 @@ export const photos = pgTable(
 
 // Convenience: raw SQL to enable PostGIS (run once; harmless if repeated).
 export const enablePostgis = sql`CREATE EXTENSION IF NOT EXISTS postgis`;
+
+// ── Price-book catalog ──
+export const catalogCategories = pgTable("catalog_categories", {
+  id: id(),
+  orgId: orgId(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: ts(),
+});
+
+export const catalogItems = pgTable(
+  "catalog_items",
+  {
+    id: id(),
+    orgId: orgId(),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => catalogCategories.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    priceCents: integer("price_cents").default(0).notNull(),
+    costCents: integer("cost_cents").default(0).notNull(),
+    taxable: boolean("taxable").default(true).notNull(),
+    active: boolean("active").default(true).notNull(),
+    version: version(),
+    updatedAt: updatedAt(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgCategory: index("catalog_org_category_idx").on(t.orgId, t.categoryId),
+  }),
+);
+
+// Customer-owned equipment (HVAC units, water heaters, etc). Linked to a customer
+// so techs can see install history, warranty, and service notes at a glance.
+// ponytail: no property_id — single-address assumption. Ceiling: some customers
+// have multiple properties. Upgrade: add a properties table and link equipment to it.
+export const equipment = pgTable(
+  "equipment",
+  {
+    id: id(),
+    orgId: orgId(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // e.g. "furnace", "ac_unit", "water_heater"
+    make: text("make"),
+    model: text("model"),
+    serialNumber: text("serial_number"),
+    installDate: timestamp("install_date", { withTimezone: true }),
+    warrantyExpiry: timestamp("warranty_expiry", { withTimezone: true }),
+    notes: text("notes"),
+    createdAt: ts(),
+  },
+  (t) => ({
+    cust: index("equipment_customer_idx").on(t.orgId, t.customerId),
+  }),
+);
+
+// In-app notifications for users (job assigned, invoice paid, review received, etc).
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: id(),
+    orgId: orgId(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // e.g. "job.assigned", "invoice.paid", "review.received"
+    title: text("title").notNull(),
+    body: text("body"),
+    link: text("link"), // optional deep-link to the relevant page
+    read: boolean("read").default(false).notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    user: index("notif_user_idx").on(t.orgId, t.userId, t.createdAt),
+    unread: index("notif_unread_idx").on(t.orgId, t.userId, t.read),
+  }),
+);

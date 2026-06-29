@@ -27,11 +27,16 @@ const patchBody = z.object({
 export async function jobRoutes(app: FastifyInstance) {
   app.get("/", async (req) => {
     const orgId = await resolveOrgId(req);
+    const { skip, take } = req.query as { skip?: string; take?: string };
+    const s = skip ? parseInt(skip, 10) : 0;
+    const t = take ? parseInt(take, 10) : 50;
     return db
       .select()
       .from(jobs)
       .where(eq(jobs.orgId, orgId))
-      .orderBy(desc(jobs.createdAt));
+      .orderBy(desc(jobs.createdAt))
+      .limit(t)
+      .offset(s);
   });
 
   app.post("/", async (req, reply) => {

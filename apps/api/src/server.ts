@@ -19,6 +19,10 @@ import { activityRoutes } from "./routes/activities.js";
 import { syncRoutes } from "./routes/sync.js";
 import { userRoutes } from "./routes/users.js";
 import { photoRoutes } from "./routes/photos.js";
+import { catalogRoutes } from "./routes/catalog.js";
+import { equipmentRoutes } from "./routes/equipment.js";
+import { notificationRoutes } from "./routes/notifications.js";
+import { searchRoutes } from "./routes/search.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -37,10 +41,14 @@ export function buildServer() {
   app.register(reportRoutes, { prefix: "/api/reports" });
   app.register(recurringRoutes, { prefix: "/api/recurring" });
   app.register(photoRoutes, { prefix: "/api/photos" });
+  app.register(catalogRoutes, { prefix: "/api/catalog" });
   app.register(publicRoutes, { prefix: "/api/public" });
   app.register(activityRoutes, { prefix: "/api/activities" });
   app.register(syncRoutes);
   app.register(userRoutes, { prefix: "/api/users" });
+  app.register(equipmentRoutes, { prefix: "/api/equipment" });
+  app.register(notificationRoutes, { prefix: "/api/notifications" });
+  app.register(searchRoutes, { prefix: "/api/search" });
   return app;
 }
 

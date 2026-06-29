@@ -29,6 +29,13 @@
       "when": 1783000000000,
       "tag": "0003_add_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784500000000,
+      "tag": "0004_equipment_notifications",
+      "breakpoints": true
     }
   ]
 }

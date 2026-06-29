@@ -16,7 +16,16 @@ const payBody = z.object({
 export async function invoiceRoutes(app: FastifyInstance) {
   app.get("/", async (req) => {
     const orgId = await resolveOrgId(req);
-    return db.select().from(invoices).where(eq(invoices.orgId, orgId)).orderBy(desc(invoices.createdAt));
+    const { skip, take } = req.query as { skip?: string; take?: string };
+    const s = skip ? parseInt(skip, 10) : 0;
+    const t = take ? parseInt(take, 10) : 50;
+    return db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.orgId, orgId))
+      .orderBy(desc(invoices.createdAt))
+      .limit(t)
+      .offset(s);
   });
 
   app.get("/:id", async (req, reply) => {

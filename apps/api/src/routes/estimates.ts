@@ -9,7 +9,16 @@ const createBody = z.object({ jobId: z.string().uuid() });
 export async function estimateRoutes(app: FastifyInstance) {
   app.get("/", async (req) => {
     const orgId = await resolveOrgId(req);
-    return db.select().from(estimates).where(eq(estimates.orgId, orgId)).orderBy(desc(estimates.createdAt));
+    const { skip, take } = req.query as { skip?: string; take?: string };
+    const s = skip ? parseInt(skip, 10) : 0;
+    const t = take ? parseInt(take, 10) : 50;
+    return db
+      .select()
+      .from(estimates)
+      .where(eq(estimates.orgId, orgId))
+      .orderBy(desc(estimates.createdAt))
+      .limit(t)
+      .offset(s);
   });
 
   // Create an estimate snapshotting the current job total.

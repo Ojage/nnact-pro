@@ -11,14 +11,26 @@ const createBody = z.object({
   notes: z.string().optional(),
 });
 
+const patchBody = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
 export async function customerRoutes(app: FastifyInstance) {
   app.get("/", async (req) => {
     const orgId = await resolveOrgId(req);
+    const { skip, take } = req.query as { skip?: string; take?: string };
+    const s = skip ? parseInt(skip, 10) : 0;
+    const t = take ? parseInt(take, 10) : 50;
     return db
       .select()
       .from(customers)
       .where(eq(customers.orgId, orgId))
-      .orderBy(desc(customers.createdAt));
+      .orderBy(desc(customers.createdAt))
+      .limit(t)
+      .offset(s);
   });
 
   app.get("/:id", async (req, reply) => {
@@ -41,5 +53,19 @@ export async function customerRoutes(app: FastifyInstance) {
       .values({ orgId, ...parsed.data })
       .returning();
     return reply.code(201).send(row);
+  });
+
+  app.patch("/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const parsed = patchBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const [row] = await db
+      .update(customers)
+      .set(parsed.data)
+      .where(and(eq(customers.orgId, orgId), eq(customers.id, id)))
+      .returning();
+    if (!row) return reply.code(404).send({ error: "not found" });
+    return row;
   });
 }
