@@ -17,11 +17,19 @@ interface CatalogEntry {
   version: string;
   events: string[];
   scopes: string[];
+  transform: string;
   firstParty: boolean;
   installed: boolean;
   installId: string | null;
   enabled: boolean;
 }
+
+// Tailored placeholder so notifier installs know exactly what URL to paste.
+const WEBHOOK_PLACEHOLDER: Record<string, string> = {
+  slack: "https://hooks.slack.com/services/…",
+  discord: "https://discord.com/api/webhooks/…",
+  ntfy: "https://ntfy.sh/your-topic",
+};
 
 interface DeliveryEvent {
   id: string;
@@ -153,7 +161,7 @@ export default function IntegrationsPage() {
               {p.installed && (
                 <div className="flex gap-2">
                   <Input
-                    placeholder="https://your-endpoint/webhook (optional)"
+                    placeholder={WEBHOOK_PLACEHOLDER[p.transform] ?? "https://your-endpoint/webhook (optional)"}
                     value={webhookDraft[p.id] ?? ""}
                     onChange={(e) => setWebhookDraft((d) => ({ ...d, [p.id]: e.target.value }))}
                     className="text-xs"

@@ -9,13 +9,20 @@ import { scryptSync, randomBytes } from "node:crypto";
 // the Integrations tab is populated on a fresh DB and refreshed on reseed. These
 // describe what each plugin subscribes to and the scopes it requests — webhook
 // URLs are supplied per-org at install time.
+const NOTIFY_EVENTS = ["job.created", "invoice.created", "invoice.paid", "payment.received"];
 const FIRST_PARTY_PLUGINS = [
-  { slug: "google-maps", name: "Google Maps & Routing", description: "Geocode service addresses and optimize tech routes.", events: [], scopes: ["jobs:read", "customers:read"] },
-  { slug: "twilio-sms", name: "Twilio SMS", description: "Text customers on job and payment events.", events: ["job.created", "invoice.created", "payment.received"], scopes: ["jobs:read", "customers:read"] },
-  { slug: "resend-email", name: "Resend Email", description: "Send transactional email for invoices and estimates.", events: ["invoice.created", "estimate.accepted"], scopes: ["invoices:read", "customers:read"] },
-  { slug: "mailchimp", name: "Mailchimp", description: "Sync customers into a marketing audience.", events: ["customer.created"], scopes: ["customers:read"] },
-  { slug: "quickbooks", name: "QuickBooks Online", description: "Push paid invoices and payments into accounting.", events: ["invoice.paid", "payment.received"], scopes: ["invoices:read"] },
-  { slug: "zapier", name: "Zapier", description: "Fan every event out to thousands of apps.", events: ["job.created", "job.updated", "invoice.created", "invoice.paid", "payment.received", "customer.created", "estimate.accepted"], scopes: ["*"] },
+  // Native notifiers — install, paste an incoming-webhook URL, get pinged. OFP
+  // formats the message into the target's shape (no separate service needed).
+  { slug: "slack-notifier", name: "Slack", description: "Post job, invoice, and payment alerts to a Slack channel.", events: NOTIFY_EVENTS, scopes: [], transform: "slack" },
+  { slug: "discord-notifier", name: "Discord", description: "Post job, invoice, and payment alerts to a Discord channel.", events: NOTIFY_EVENTS, scopes: [], transform: "discord" },
+  { slug: "ntfy-notifier", name: "ntfy", description: "Push job, invoice, and payment alerts to your phone via ntfy.", events: NOTIFY_EVENTS, scopes: [], transform: "ntfy" },
+  // Generic plugins — receive the signed event envelope (build with @ofp/plugin-sdk).
+  { slug: "google-maps", name: "Google Maps & Routing", description: "Geocode service addresses and optimize tech routes.", events: [], scopes: ["jobs:read", "customers:read"], transform: "generic" },
+  { slug: "twilio-sms", name: "Twilio SMS", description: "Text customers on job and payment events.", events: ["job.created", "invoice.created", "payment.received"], scopes: ["jobs:read", "customers:read"], transform: "generic" },
+  { slug: "resend-email", name: "Resend Email", description: "Send transactional email for invoices and estimates.", events: ["invoice.created", "estimate.accepted"], scopes: ["invoices:read", "customers:read"], transform: "generic" },
+  { slug: "mailchimp", name: "Mailchimp", description: "Sync customers into a marketing audience.", events: ["customer.created"], scopes: ["customers:read"], transform: "generic" },
+  { slug: "quickbooks", name: "QuickBooks Online", description: "Push paid invoices and payments into accounting.", events: ["invoice.paid", "payment.received"], scopes: ["invoices:read"], transform: "generic" },
+  { slug: "zapier", name: "Zapier", description: "Fan every event out to thousands of apps.", events: ["job.created", "job.updated", "invoice.created", "invoice.paid", "payment.received", "customer.created", "estimate.accepted"], scopes: ["*"], transform: "generic" },
 ] as const;
 
 async function seedPlugins(): Promise<void> {

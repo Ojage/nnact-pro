@@ -9,6 +9,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, plugins, pluginInstalls, pluginEvents } from "@ofp/db";
 import { signWebhook } from "./crypto.js";
+import { isNotifyTransform, toNotificationDelivery } from "./notify-transform.js";
 
 // Canonical event vocabulary lives in the SDK so emitter and receivers share one
 // contract; re-exported for internal callers.
@@ -22,6 +23,7 @@ interface InstallRow {
   manifestWebhook: string | null;
   secret: string;
   events: string[];
+  transform: string;
 }
 
 /**
@@ -41,6 +43,7 @@ export async function safeEmitEvent(
         manifestWebhook: plugins.webhookUrl,
         secret: pluginInstalls.webhookSecret,
         events: plugins.events,
+        transform: plugins.transform,
       })
       .from(pluginInstalls)
       .innerJoin(plugins, eq(pluginInstalls.pluginId, plugins.id))
@@ -80,15 +83,26 @@ async function deliver(
     return;
   }
 
-  const body = JSON.stringify({ kind, orgId, data: payload, ts: Date.now() });
+  // Native notifiers (Slack/Discord/ntfy) get a human message in their own shape
+  // and no signature — the secret webhook URL is the credential. Everything else
+  // gets the signed OFP event envelope.
+  let headers: Record<string, string>;
+  let body: string;
+  if (isNotifyTransform(install.transform)) {
+    ({ headers, body } = toNotificationDelivery(install.transform, kind, payload));
+  } else {
+    body = JSON.stringify({ kind, orgId, data: payload, ts: Date.now() });
+    headers = {
+      "content-type": "application/json",
+      "x-ofp-event": kind,
+      "x-ofp-signature": signWebhook(install.secret, body),
+    };
+  }
+
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-ofp-event": kind,
-        "x-ofp-signature": signWebhook(install.secret, body),
-      },
+      headers,
       body,
       signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
     });

@@ -194,6 +194,7 @@ interface PluginCatalogEntry {
   iconUrl: string | null;
   events: string[];
   scopes: string[];
+  transform: string;
   firstParty: boolean;
   installed: boolean;
   installId: string | null;

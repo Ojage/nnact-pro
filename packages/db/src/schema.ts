@@ -410,6 +410,9 @@ export const plugins = pgTable(
     scopes: text("scopes").array().notNull().default(sql`'{}'`),
     // Default webhook URL from the manifest; an install may override it.
     webhookUrl: text("webhook_url"),
+    // Delivery shaper: "generic" POSTs the signed event envelope (default);
+    // "slack"/"discord"/"ntfy" format a human message into that target's shape.
+    transform: text("transform").default("generic").notNull(),
     firstParty: boolean("first_party").default(false).notNull(),
     createdAt: ts(),
   },
