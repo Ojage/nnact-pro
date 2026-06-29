@@ -8,14 +8,11 @@
 // integration must never break the user-visible action that triggered it.
 import { and, eq } from "drizzle-orm";
 import { db, plugins, pluginInstalls, pluginEvents } from "@ofp/db";
-import { signWebhook } from "./crypto.js";
-import { isNotifyTransform, toNotificationDelivery } from "./notify-transform.js";
+import { buildDeliveryRequest, attemptDelivery, backoffMs, MAX_ATTEMPTS } from "./delivery.js";
 
 // Canonical event vocabulary lives in the SDK so emitter and receivers share one
 // contract; re-exported for internal callers.
 export { PLUGIN_EVENTS, type PluginEventKind } from "@ofp/plugin-sdk";
-
-const DELIVERY_TIMEOUT_MS = 8_000;
 
 interface InstallRow {
   installId: string;
@@ -83,43 +80,28 @@ async function deliver(
     return;
   }
 
-  // Native notifiers (Slack/Discord/ntfy) get a human message in their own shape
-  // and no signature — the secret webhook URL is the credential. Everything else
-  // gets the signed OFP event envelope.
-  let headers: Record<string, string>;
-  let body: string;
-  if (isNotifyTransform(install.transform)) {
-    ({ headers, body } = toNotificationDelivery(install.transform, kind, payload));
-  } else {
-    body = JSON.stringify({ kind, orgId, data: payload, ts: Date.now() });
-    headers = {
-      "content-type": "application/json",
-      "x-ofp-event": kind,
-      "x-ofp-signature": signWebhook(install.secret, body),
-    };
-  }
-
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body,
-      signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
-    });
-    await db
-      .update(pluginEvents)
-      .set({
-        status: res.ok ? "delivered" : "failed",
-        attempts: 1,
-        responseStatus: res.status,
-        deliveredAt: res.ok ? new Date() : null,
-        error: res.ok ? null : `HTTP ${res.status}`,
-      })
-      .where(eq(pluginEvents.id, evt.id));
-  } catch (e) {
-    await db
-      .update(pluginEvents)
-      .set({ status: "failed", attempts: 1, error: (e as Error).message })
-      .where(eq(pluginEvents.id, evt.id));
-  }
+  // First attempt happens inline so notifications are instant. On failure we set
+  // next_attempt_at; the retry worker (plugins/retry.ts) takes it from there.
+  const { headers, body } = buildDeliveryRequest({
+    transform: install.transform,
+    kind,
+    orgId,
+    payload,
+    secret: install.secret,
+  });
+  const res = await attemptDelivery(url, headers, body);
+  await db
+    .update(pluginEvents)
+    .set(
+      res.ok
+        ? { status: "delivered", attempts: 1, responseStatus: res.status, deliveredAt: new Date(), error: null }
+        : {
+            status: 1 >= MAX_ATTEMPTS ? "dead" : "failed",
+            attempts: 1,
+            responseStatus: res.status,
+            error: res.error,
+            nextAttemptAt: 1 >= MAX_ATTEMPTS ? null : new Date(Date.now() + backoffMs(1)),
+          },
+    )
+    .where(eq(pluginEvents.id, evt.id));
 }

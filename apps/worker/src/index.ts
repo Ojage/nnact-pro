@@ -5,6 +5,7 @@
 import { and, eq, lte, gte } from "drizzle-orm";
 import { db, recurringJobs, jobs, appointments } from "@ofp/db";
 import { catchUp } from "../../api/src/recurrence.ts";
+import { retryDueDeliveries } from "../../api/src/plugins/retry.ts";
 import { notify } from "./notify.ts";
 
 const INTERVAL = Number(process.env.WORKER_INTERVAL_MS ?? 60_000);
@@ -47,6 +48,8 @@ async function tick() {
   try {
     await materializeRecurring(now);
     await sendReminders(now);
+    const r = await retryDueDeliveries(now);
+    if (r.due > 0) console.log(`[worker] webhook retries: ${r.delivered} delivered, ${r.dead} dead of ${r.due} due`);
   } catch (e) {
     console.error(`[worker] tick error: ${(e as Error).message}`);
   }

@@ -481,15 +481,19 @@ export const pluginEvents = pgTable(
       .references(() => pluginInstalls.id, { onDelete: "cascade" }),
     kind: text("kind").notNull(), // domain event name, e.g. "invoice.paid"
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
-    status: text("status").default("pending").notNull(), // pending | delivered | failed | skipped
+    status: text("status").default("pending").notNull(), // pending | delivered | failed | skipped | dead
     attempts: integer("attempts").default(0).notNull(),
     responseStatus: integer("response_status"),
     error: text("error"),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    // When the retry worker should next attempt this delivery. NULL = terminal
+    // (delivered/skipped/dead) or not yet scheduled. See plugins/retry.ts.
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     createdAt: ts(),
   },
   (t) => ({
     install: index("plugin_events_install_idx").on(t.installId, t.createdAt),
     status: index("plugin_events_status_idx").on(t.orgId, t.status),
+    due: index("plugin_events_due_idx").on(t.status, t.nextAttemptAt),
   }),
 );
