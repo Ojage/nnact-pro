@@ -23,6 +23,8 @@ import { catalogRoutes } from "./routes/catalog.js";
 import { equipmentRoutes } from "./routes/equipment.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { searchRoutes } from "./routes/search.js";
+import { pluginRoutes } from "./routes/plugins.js";
+import { pluginApiRoutes } from "./routes/plugin-api.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -49,6 +51,8 @@ export function buildServer() {
   app.register(equipmentRoutes, { prefix: "/api/equipment" });
   app.register(notificationRoutes, { prefix: "/api/notifications" });
   app.register(searchRoutes, { prefix: "/api/search" });
+  app.register(pluginRoutes, { prefix: "/api/plugins" }); // owner-facing mgmt
+  app.register(pluginApiRoutes, { prefix: "/api/plugin" }); // scoped-token surface
   return app;
 }
 

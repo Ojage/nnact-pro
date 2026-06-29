@@ -18,8 +18,10 @@ import {
   integer,
   timestamp,
   boolean,
+  jsonb,
   pgEnum,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const jobStatus = pgEnum("job_status", [
@@ -379,5 +381,112 @@ export const notifications = pgTable(
   (t) => ({
     user: index("notif_user_idx").on(t.orgId, t.userId, t.createdAt),
     unread: index("notif_unread_idx").on(t.orgId, t.userId, t.read),
+  }),
+);
+
+// ── Plugin portal (Phase E foundation) ──
+// Open integration architecture, the differentiator vs HCP's closed store. A
+// plugin is a manifest (`plugins`) an org activates (`plugin_installs`).
+// Activation mints a per-install scoped token (`api_tokens`) the plugin uses for
+// INBOUND calls; OUTBOUND domain events are delivered to the install's webhook
+// as HMAC-signed POSTs and journaled in `plugin_events`.
+
+// Manifest registry. ponytail: global catalog (no org_id) — v1 ships first-party
+// plugins shared across orgs. Ceiling: no org-private/custom plugins yet.
+// Upgrade: add a nullable org_id (NULL = first-party, set = org-private).
+export const plugins = pgTable(
+  "plugins",
+  {
+    id: id(),
+    slug: text("slug").notNull(), // stable manifest id, e.g. "twilio-sms"
+    name: text("name").notNull(),
+    description: text("description"),
+    version: text("version").default("1.0.0").notNull(), // semver from plugin.json
+    author: text("author"),
+    iconUrl: text("icon_url"),
+    // Domain events this plugin subscribes to (see PLUGIN_EVENTS in plugins/bus.ts).
+    events: text("events").array().notNull().default(sql`'{}'`),
+    // OAuth-style scopes the plugin requests, e.g. ["customers:read","jobs:read"].
+    scopes: text("scopes").array().notNull().default(sql`'{}'`),
+    // Default webhook URL from the manifest; an install may override it.
+    webhookUrl: text("webhook_url"),
+    firstParty: boolean("first_party").default(false).notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({ slug: uniqueIndex("plugins_slug_idx").on(t.slug) }),
+);
+
+// An org's activation of a plugin. Holds per-install config (external API keys,
+// prefs), the receiving webhook URL, and the HMAC secret used to sign outbound
+// deliveries to THIS install.
+export const pluginInstalls = pgTable(
+  "plugin_installs",
+  {
+    id: id(),
+    orgId: orgId(),
+    pluginId: uuid("plugin_id")
+      .notNull()
+      .references(() => plugins.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").default(true).notNull(),
+    config: jsonb("config").$type<Record<string, unknown>>().default({}).notNull(),
+    webhookUrl: text("webhook_url"), // overrides the manifest default
+    webhookSecret: text("webhook_secret").notNull(), // whsec_… signing key
+    installedAt: ts(),
+  },
+  (t) => ({
+    orgPlugin: uniqueIndex("plugin_installs_org_plugin_idx").on(t.orgId, t.pluginId),
+  }),
+);
+
+// Scoped API tokens for INBOUND plugin calls. Only the SHA-256 hash is stored;
+// the plaintext (ofp_…) is shown exactly once at creation. `prefix` is the first
+// chars, kept for display so an owner can identify a token without seeing it.
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: id(),
+    orgId: orgId(),
+    installId: uuid("install_id").references(() => pluginInstalls.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    prefix: text("prefix").notNull(),
+    scopes: text("scopes").array().notNull().default(sql`'{}'`),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: ts(),
+  },
+  (t) => ({
+    hash: uniqueIndex("api_tokens_hash_idx").on(t.tokenHash),
+    org: index("api_tokens_org_idx").on(t.orgId),
+  }),
+);
+
+// Outbound webhook delivery journal — one row per (install, event) attempt.
+// ponytail: fire-and-forget, no retry queue. Ceiling: failed deliveries are
+// recorded but not retried. Upgrade: a worker that re-delivers `failed`/`pending`
+// rows with exponential backoff (transactional outbox).
+export const pluginEvents = pgTable(
+  "plugin_events",
+  {
+    id: id(),
+    orgId: orgId(),
+    installId: uuid("install_id")
+      .notNull()
+      .references(() => pluginInstalls.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // domain event name, e.g. "invoice.paid"
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: text("status").default("pending").notNull(), // pending | delivered | failed | skipped
+    attempts: integer("attempts").default(0).notNull(),
+    responseStatus: integer("response_status"),
+    error: text("error"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    createdAt: ts(),
+  },
+  (t) => ({
+    install: index("plugin_events_install_idx").on(t.installId, t.createdAt),
+    status: index("plugin_events_status_idx").on(t.orgId, t.status),
   }),
 );

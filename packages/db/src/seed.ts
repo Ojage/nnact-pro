@@ -1,9 +1,30 @@
 // Minimal seed: one org, an owner, two customers, one scheduled job with an
 // invoice. Enough to render a non-empty dashboard. Idempotent-ish: skips if an
 // org named "Demo HVAC" already exists.
-import { db, orgs, users, customers, jobs, invoices, equipment, notifications } from "./index.js";
+import { db, orgs, users, customers, jobs, invoices, equipment, notifications, plugins } from "./index.js";
 import { eq } from "drizzle-orm";
 import { scryptSync, randomBytes } from "node:crypto";
+
+// First-party plugin manifests (global catalog). Seeded idempotently by slug so
+// the Integrations tab is populated on a fresh DB and refreshed on reseed. These
+// describe what each plugin subscribes to and the scopes it requests — webhook
+// URLs are supplied per-org at install time.
+const FIRST_PARTY_PLUGINS = [
+  { slug: "google-maps", name: "Google Maps & Routing", description: "Geocode service addresses and optimize tech routes.", events: [], scopes: ["jobs:read", "customers:read"] },
+  { slug: "twilio-sms", name: "Twilio SMS", description: "Text customers on job and payment events.", events: ["job.created", "invoice.created", "payment.received"], scopes: ["jobs:read", "customers:read"] },
+  { slug: "resend-email", name: "Resend Email", description: "Send transactional email for invoices and estimates.", events: ["invoice.created", "estimate.accepted"], scopes: ["invoices:read", "customers:read"] },
+  { slug: "mailchimp", name: "Mailchimp", description: "Sync customers into a marketing audience.", events: ["customer.created"], scopes: ["customers:read"] },
+  { slug: "quickbooks", name: "QuickBooks Online", description: "Push paid invoices and payments into accounting.", events: ["invoice.paid", "payment.received"], scopes: ["invoices:read"] },
+  { slug: "zapier", name: "Zapier", description: "Fan every event out to thousands of apps.", events: ["job.created", "job.updated", "invoice.created", "invoice.paid", "payment.received", "customer.created", "estimate.accepted"], scopes: ["*"] },
+] as const;
+
+async function seedPlugins(): Promise<void> {
+  await db
+    .insert(plugins)
+    .values(FIRST_PARTY_PLUGINS.map((p) => ({ ...p, events: [...p.events], scopes: [...p.scopes], firstParty: true })))
+    .onConflictDoNothing({ target: plugins.slug });
+  console.log(`seed: ${FIRST_PARTY_PLUGINS.length} first-party plugin manifests ensured`);
+}
 
 // Inline password hash (same "saltHex:hashHex" scrypt format the API verifies)
 // so the demo owner can log in with password "demo12345".
@@ -13,9 +34,12 @@ function seedHash(pw: string): string {
 }
 
 async function main() {
+  // Plugin catalog is global and idempotent — seed it regardless of org state.
+  await seedPlugins();
+
   const existing = await db.select().from(orgs).where(eq(orgs.name, "Demo HVAC"));
   if (existing.length) {
-    console.log("seed: Demo HVAC already exists, skipping");
+    console.log("seed: Demo HVAC already exists, skipping demo data");
     process.exit(0);
   }
 

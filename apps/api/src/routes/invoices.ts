@@ -5,6 +5,7 @@ import { db, invoices, payments, jobs, lineItems } from "@ofp/db";
 import { applyPayment, invoiceNumber } from "../invoicing.js";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
+import { safeEmitEvent } from "../plugins/bus.js";
 
 const createBody = z.object({ jobId: z.string().uuid(), dueAt: z.string().datetime().optional() });
 const payBody = z.object({
@@ -67,6 +68,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
       })
       .returning();
     safeEmitActivity(orgId, "invoice.created", `Created invoice ${row.number}`, { jobId: job.id });
+    void safeEmitEvent(orgId, "invoice.created", { id: row.id, number: row.number, jobId: job.id, total: row.total });
     return reply.code(201).send(row);
   });
 
@@ -105,6 +107,13 @@ export async function invoiceRoutes(app: FastifyInstance) {
       `Received ${parsed.data.method} payment of $${(parsed.data.amount / 100).toFixed(2)} on ${inv.number}`,
       { jobId: inv.jobId },
     );
+    void safeEmitEvent(orgId, "payment.received", {
+      invoiceId: id, number: inv.number, amount: parsed.data.amount, method: parsed.data.method, status: result.status,
+    });
+    // The whole invoice just cleared — a distinct event accounting/CRM plugins care about.
+    if (result.status === "paid") {
+      void safeEmitEvent(orgId, "invoice.paid", { invoiceId: id, number: inv.number, total: inv.total, jobId: inv.jobId });
+    }
     return { status: result.status, remaining: result.remaining, overpaid: result.overpaid };
   });
 

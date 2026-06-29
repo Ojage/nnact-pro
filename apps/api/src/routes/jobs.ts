@@ -5,6 +5,7 @@ import { db, jobs } from "@ofp/db";
 import { JOB_STATUS } from "@ofp/shared";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
+import { safeEmitEvent } from "../plugins/bus.js";
 
 const createBody = z.object({
   customerId: z.string().uuid(),
@@ -56,6 +57,7 @@ export async function jobRoutes(app: FastifyInstance) {
       customerId: row.customerId,
       jobId: row.id,
     });
+    void safeEmitEvent(orgId, "job.created", { id: row.id, title: row.title, customerId: row.customerId, status: row.status });
     return reply.code(201).send(row);
   });
 

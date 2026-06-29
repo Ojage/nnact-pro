@@ -184,6 +184,46 @@ interface EquipmentDTO {
   createdAt: string;
 }
 
+interface PluginCatalogEntry {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  version: string;
+  author: string | null;
+  iconUrl: string | null;
+  events: string[];
+  scopes: string[];
+  firstParty: boolean;
+  installed: boolean;
+  installId: string | null;
+  enabled: boolean;
+}
+
+interface PluginInstall {
+  id: string;
+  pluginId: string;
+  slug?: string;
+  name?: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  webhookUrl: string | null;
+  installedAt?: string;
+}
+
+interface PluginEvent {
+  id: string;
+  orgId: string;
+  installId: string;
+  kind: string;
+  status: string;
+  attempts: number;
+  responseStatus: number | null;
+  error: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+}
+
 export const api = {
   health: () => request<{ ok: boolean }>("/api/health"),
 
@@ -290,6 +330,22 @@ export const api = {
     request<EquipmentDTO>(`/api/equipment/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteEquipment: (id: string) =>
     request<void>(`/api/equipment/${id}`, { method: "DELETE" }),
+
+  // ── Plugins / Integrations ──
+  plugins: () => request<PluginCatalogEntry[]>("/api/plugins"),
+  pluginInstalls: () => request<PluginInstall[]>("/api/plugins/installs"),
+  installPlugin: (body: { pluginId: string; webhookUrl?: string; config?: Record<string, unknown> }) =>
+    request<{ install: PluginInstall; token: string; scopes: string[] }>("/api/plugins/installs", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  patchPluginInstall: (id: string, body: { enabled?: boolean; webhookUrl?: string | null; config?: Record<string, unknown> }) =>
+    request<PluginInstall>(`/api/plugins/installs/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  uninstallPlugin: (id: string) => request<void>(`/api/plugins/installs/${id}`, { method: "DELETE" }),
+  pluginEvents: (installId?: string) => {
+    const qs = installId ? `?installId=${installId}` : "";
+    return request<PluginEvent[]>(`/api/plugins/events${qs}`);
+  },
 
   // ── Catalog / Price Book ──
   catalogCategories: () => request<{ id: string; name: string; description?: string | null }[]>("/api/catalog/categories"),
