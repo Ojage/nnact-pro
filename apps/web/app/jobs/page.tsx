@@ -13,6 +13,7 @@ import { JobStatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Pagination } from "@/components/pagination";
 
 type SortField = "title" | "status" | "total" | "customer";
 type SortDir = "asc" | "desc";
@@ -36,6 +37,11 @@ export default function JobsPage() {
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [skip, setSkip] = useState(0);
+  const take = 50;
+
+  // Reset pagination when filters change
+  useEffect(() => { setSkip(0); }, [search, statusFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +172,8 @@ export default function JobsPage() {
   }
 
   // ── No results state ──
+  const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
+
   const noResults =
     (jobs.length > 0 && search.trim() && filteredSorted.length === 0) ||
     (statusFilter !== "all" && filteredSorted.length === 0);
@@ -268,7 +276,7 @@ export default function JobsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSorted.map((j) => (
+                  paginated.map((j) => (
                     <TableRow key={j.id}>
                       <TableCell className="font-medium text-fg">
                         {j.title}
@@ -313,7 +321,7 @@ export default function JobsPage() {
                 </div>
               </Card>
             ) : (
-              filteredSorted.map((j) => {
+              paginated.map((j) => {
                 const cust = customerMap.get(j.customerId);
                 return (
                   <Link
@@ -347,8 +355,9 @@ export default function JobsPage() {
               })
             )}
           </div>
-        </>
-      )}
+        </>)}
+
+        <Pagination skip={skip} take={take} total={filteredSorted.length} onSkipChange={setSkip} />
     </div>
   );
 }

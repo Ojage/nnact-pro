@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { InvoiceStatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Pagination } from "@/components/pagination";
 
 interface Invoice {
   id: string;
@@ -46,6 +47,11 @@ export default function InvoicesPage() {
   const [sortField, setSortField] = useState<SortField>("number");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [skip, setSkip] = useState(0);
+  const take = 50;
+
+  // Reset pagination when filters change
+  useEffect(() => { setSkip(0); }, [search, statusFilter]);
 
   // ── Create invoice modal ──
   const [showCreate, setShowCreate] = useState(false);
@@ -174,6 +180,8 @@ export default function InvoicesPage() {
 
     return list;
   }, [invoices, search, sortField, sortDir, jobMap, customers, statusFilter]);
+
+  const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
 
   // ── Sort helpers ──
   const handleSort = (field: SortField) => {
@@ -398,7 +406,7 @@ export default function InvoicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSorted.length === 0 ? (
+                {paginated.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-10">
                       <p className="text-sm text-fg-muted">
@@ -413,13 +421,18 @@ export default function InvoicesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSorted.map((inv) => {
+                  paginated.map((inv) => {
                     const job = jobMap.get(inv.jobId);
                     const cust = job ? customerMap.get(job.customerId) : undefined;
                     return (
                       <TableRow key={inv.id}>
                         <TableCell className="font-medium text-fg font-mono text-xs">
-                          {inv.number}
+                          <Link
+                            href={`/invoices/${inv.id}`}
+                            className="hover:text-fg-link transition-colors"
+                          >
+                            {inv.number}
+                          </Link>
                         </TableCell>
                         <TableCell className="text-fg-muted">
                           {cust ?? "—"}
@@ -450,7 +463,7 @@ export default function InvoicesPage() {
 
           {/* ═══ Mobile cards ═══ */}
           <div className="md:hidden flex flex-col gap-3">
-            {filteredSorted.length === 0 ? (
+            {paginated.length === 0 ? (
               <Card>
                 <div className="text-center py-10">
                   <p className="text-sm text-fg-muted">
@@ -465,16 +478,19 @@ export default function InvoicesPage() {
                 </div>
               </Card>
             ) : (
-                  filteredSorted.map((inv) => {
+                  paginated.map((inv) => {
                     const job = jobMap.get(inv.jobId);
                     const cust = job ? customerMap.get(job.customerId) : undefined;
                     return (
                   <Card key={inv.id} className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-fg font-medium">
+                        <Link
+                        href={`/invoices/${inv.id}`}
+                        className="font-mono text-xs text-fg font-medium hover:text-fg-link transition-colors no-underline"
+                      >
                           {inv.number}
-                        </span>
+                      </Link>
                         <InvoiceStatusBadge status={inv.status} />
                       </div>
                       <span className="text-base font-bold text-fg tabular-nums">
@@ -512,6 +528,8 @@ export default function InvoicesPage() {
           </div>
         </>
       )}
+
+      <Pagination skip={skip} take={take} total={filteredSorted.length} onSkipChange={setSkip} />
     </div>
   );
 }

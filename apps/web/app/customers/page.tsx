@@ -10,6 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/pagination";
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import type { ActivityDTO, CustomerDTO } from "@ofp/shared";
 
 type SortField = "name" | "createdAt" | "lastActivity";
@@ -20,9 +23,23 @@ export default function CustomersPage() {
   const [activities, setActivities] = useState<ActivityDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [skip, setSkip] = useState(0);
+  const take = 50;
+
+  // ── Create-customer dialog ──
+  const [showCreate, setShowCreate] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
+  const [createPhone, setCreatePhone] = useState("");
+  const [createNotes, setCreateNotes] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  // Reset pagination when search changes
+  useEffect(() => { setSkip(0); }, [search]);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +117,8 @@ export default function CustomersPage() {
     return list;
   }, [customers, search, sortField, sortDir, lastActivityMap]);
 
+  const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
+
   // ── Sort header helper ──
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -107,6 +126,31 @@ export default function CustomersPage() {
     } else {
       setSortField(field);
       setSortDir("asc");
+    }
+  };
+
+  // ── Create customer handler ──
+  const handleCreateCustomer = async () => {
+    if (!createName.trim()) return;
+    setCreating(true);
+    setCreateErr(null);
+    try {
+      const created = await api.createCustomer({
+        name: createName.trim(),
+        email: createEmail.trim() || undefined,
+        phone: createPhone.trim() || undefined,
+        notes: createNotes.trim() || undefined,
+      });
+      setCustomers((prev) => [created, ...prev]);
+      setShowCreate(false);
+      setCreateName("");
+      setCreateEmail("");
+      setCreatePhone("");
+      setCreateNotes("");
+    } catch {
+      setCreateErr("Failed to create customer");
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -175,7 +219,36 @@ export default function CustomersPage() {
             ? `${filteredSorted.length} of ${customers.length} total`
             : undefined
         }
+        actions={
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            + New Customer
+          </Button>
+        }
       />
+
+      {/* ── Quick stats ── */}
+      {customers.length > 0 && (
+        <div className="flex items-center gap-6 mb-4 text-xs">
+          <div>
+            <span className="text-fg-dim">Total</span>
+            <span className="ml-1.5 font-semibold text-fg">{customers.length}</span>
+          </div>
+          <div>
+            <span className="text-fg-dim">With activity</span>
+            <span className="ml-1.5 font-semibold text-fg">
+              {lastActivityMap.size}
+            </span>
+          </div>
+          <div>
+            <span className="text-fg-dim">New (30d)</span>
+            <span className="ml-1.5 font-semibold text-fg">
+              {customers.filter(
+                (c) => new Date(c.createdAt).getTime() > Date.now() - 30 * 86400000
+              ).length}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Error ── */}
       {error && (
@@ -202,8 +275,13 @@ export default function CustomersPage() {
         <Card>
           <EmptyState
             title="No customers yet"
-            description="Add a customer via POST /api/customers to get started"
+            description="Add your first customer to get started"
           />
+          <div className="flex justify-center pb-6">
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              + New Customer
+            </Button>
+          </div>
         </Card>
       ) : (
         <>
@@ -236,7 +314,7 @@ export default function CustomersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSorted.map((c) => {
+                  paginated.map((c) => {
                     const last = lastActivityMap.get(c.id);
                     return (
                       <TableRow key={c.id}>
@@ -299,7 +377,7 @@ export default function CustomersPage() {
                 </div>
               </Card>
             ) : (
-              filteredSorted.map((c) => {
+              paginated.map((c) => {
                 const last = lastActivityMap.get(c.id);
                 return (
                   <Link
@@ -345,6 +423,88 @@ export default function CustomersPage() {
           </div>
         </>
       )}
+
+      {/* ── Create customer dialog ── */}
+      <Dialog
+        open={showCreate}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateName("");
+            setCreateEmail("");
+            setCreatePhone("");
+            setCreateNotes("");
+            setCreateErr(null);
+          }
+          setShowCreate(open);
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>New Customer</DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreateCustomer();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-fg-muted">Name *</label>
+              <input
+                className="h-10 px-3 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="Jane Smith"
+                autoFocus
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-fg-muted">Email</label>
+              <input
+                className="h-10 px-3 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                type="email"
+                value={createEmail}
+                onChange={(e) => setCreateEmail(e.target.value)}
+                placeholder="jane@example.com"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-fg-muted">Phone</label>
+              <input
+                className="h-10 px-3 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                type="tel"
+                value={createPhone}
+                onChange={(e) => setCreatePhone(e.target.value)}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-fg-muted">Notes</label>
+              <textarea
+                className="min-h-[80px] px-3 py-2 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
+                value={createNotes}
+                onChange={(e) => setCreateNotes(e.target.value)}
+                placeholder="Optional notes..."
+              />
+            </div>
+            {createErr && (
+              <p className="text-xs text-red">{createErr}</p>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="ghost" size="sm" disabled={creating} onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={!createName.trim() || creating}>
+                {creating ? "Creating..." : "Create"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Pagination skip={skip} take={take} total={filteredSorted.length} onSkipChange={setSkip} />
     </div>
   );
 }

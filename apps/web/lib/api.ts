@@ -60,6 +60,19 @@ type ReportSummaryDTO = import("@ofp/shared").ReportSummaryDTO;
 type UserDTO = import("@ofp/shared").UserDTO;
 type RecurringJobDTO = import("@ofp/shared").RecurringJobDTO;
 
+interface CatalogItemDTO {
+  id: string;
+  orgId: string;
+  categoryId: string;
+  name: string;
+  description?: string | null;
+  priceCents: number;
+  costCents: number;
+  taxable: boolean;
+  active: boolean;
+  createdAt: string;
+}
+
 interface Appointment {
   id: string;
   jobId: string;
@@ -112,6 +125,18 @@ interface ReviewList {
   count: number;
 }
 
+interface PhotoRecord {
+  id: string;
+  orgId: string;
+  jobId: string;
+  objectKey: string;
+  contentType: string;
+  fileName: string | null;
+  fileSize: number | null;
+  uploadedAt: string;
+  createdAt: string;
+}
+
 interface Payment {
   id: string;
   orgId: string;
@@ -127,8 +152,45 @@ interface InvoiceDetail extends Invoice {
   payments: Payment[];
 }
 
+interface NotificationDTO {
+  id: string;
+  orgId: string;
+  userId: string;
+  type: string;
+  title: string;
+  body?: string | null;
+  link?: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+interface SearchResults {
+  jobs: { id: string; title: string; status: string }[];
+  customers: { id: string; name: string }[];
+  invoices: { id: string; number: string; status: string }[];
+}
+
+interface EquipmentDTO {
+  id: string;
+  orgId: string;
+  customerId: string;
+  type: string;
+  make?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  installDate?: string | null;
+  warrantyExpiry?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
 export const api = {
   health: () => request<{ ok: boolean }>("/api/health"),
+
+  // ── Public (no auth) ──
+  publicOrg: () => request<{ org: { id: string; name: string } }>("/api/public/org/default"),
+  publicBook: (orgId: string, body: { name: string; email?: string; phone?: string; title?: string; description?: string }) =>
+    request<{ ok: boolean }>(`/api/public/${orgId}/book`, { method: "POST", body: JSON.stringify(body) }),
 
   jobs: () => request<JobDTO[]>("/api/jobs"),
   job: (id: string) => request<JobDTO>(`/api/jobs/${id}`),
@@ -137,6 +199,10 @@ export const api = {
 
   customers: () => request<CustomerDTO[]>("/api/customers"),
   customer: (id: string) => request<CustomerDTO>(`/api/customers/${id}`),
+  createCustomer: (body: { name: string; email?: string; phone?: string; notes?: string }) =>
+    request<CustomerDTO>("/api/customers", { method: "POST", body: JSON.stringify(body) }),
+  patchCustomer: (id: string, body: { name?: string; email?: string | null; phone?: string | null; notes?: string | null }) =>
+    request<CustomerDTO>(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
 
   activities: (q?: { customerId?: string; jobId?: string }) => {
     const params = new URLSearchParams();
@@ -147,6 +213,8 @@ export const api = {
   },
 
   appointments: () => request<Appointment[]>("/api/appointments"),
+  createAppointment: (body: { jobId: string; technicianId?: string; startsAt: string; endsAt: string }) =>
+    request<Appointment>("/api/appointments", { method: "POST", body: JSON.stringify(body) }),
   invoices: () => request<Invoice[]>("/api/invoices"),
   invoice: (id: string) => request<InvoiceDetail>(`/api/invoices/${id}`),
   createInvoice: (body: { jobId: string; dueAt?: string }) =>
@@ -168,9 +236,77 @@ export const api = {
     request<Estimate>("/api/estimates", { method: "POST", body: JSON.stringify(body) }),
 
   reviews: () => request<ReviewList>("/api/reviews"),
+  patchReview: (id: string, body: { reply?: string }) =>
+    request<{ id: string; reply: string | null }>(`/api/reviews/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  jobPhotos: (jobId: string) => request<PhotoRecord[]>(`/api/photos/job/${jobId}`),
+  uploadJobPhoto: async (jobId: string, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const token = typeof window !== "undefined" ? localStorage.getItem("ofp_token") : null;
+    const res = await fetch(`${BASE}/api/photos/upload/${jobId}`, {
+      method: "POST",
+      headers: { ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: fd,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new ApiError(res.status, body);
+    }
+    return res.json() as Promise<PhotoRecord>;
+  },
 
   lineItems: (jobId: string) => request<LineItem[]>(`/api/jobs/${jobId}/line-items`),
 
   users: () => request<UserDTO[]>("/api/users"),
   recurring: () => request<RecurringJobDTO[]>("/api/recurring"),
+
+  // ── Settings / Users ──
+  patchUser: (id: string, body: { role?: string }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteUser: (id: string) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
+
+  // ── Notifications ──
+  notifications: () => request<NotificationDTO[]>("/api/notifications"),
+  unreadNotificationCount: () => request<{ count: number }>("/api/notifications/unread-count"),
+  markNotificationRead: (id: string) => request<void>(`/api/notifications/${id}/read`, { method: "PATCH" }),
+  markAllNotificationsRead: () => request<void>("/api/notifications/read-all", { method: "POST" }),
+
+  // ── Search ──
+  search: (q: string) => {
+    const params = new URLSearchParams({ q });
+    return request<SearchResults>(`/api/search?${params}`);
+  },
+
+  // ── Equipment ──
+  equipment: (q?: { customerId?: string }) => {
+    const params = new URLSearchParams();
+    if (q?.customerId) params.set("customerId", q.customerId);
+    const qs = params.toString();
+    return request<EquipmentDTO[]>(`/api/equipment${qs ? `?${qs}` : ""}`);
+  },
+  createEquipment: (body: { customerId: string; type: string; make?: string; model?: string; serialNumber?: string; installDate?: string; warrantyExpiry?: string; notes?: string }) =>
+    request<EquipmentDTO>("/api/equipment", { method: "POST", body: JSON.stringify(body) }),
+  patchEquipment: (id: string, body: Record<string, unknown>) =>
+    request<EquipmentDTO>(`/api/equipment/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteEquipment: (id: string) =>
+    request<void>(`/api/equipment/${id}`, { method: "DELETE" }),
+
+  // ── Catalog / Price Book ──
+  catalogCategories: () => request<{ id: string; name: string; description?: string | null }[]>("/api/catalog/categories"),
+  createCatalogCategory: (body: { name: string; description?: string }) =>
+    request<{ id: string; name: string; description?: string | null }>("/api/catalog/categories", { method: "POST", body: JSON.stringify(body) }),
+  catalogItems: (q?: { search?: string; categoryId?: string; active?: string }) => {
+    const params = new URLSearchParams();
+    if (q?.search) params.set("search", q.search);
+    if (q?.categoryId) params.set("categoryId", q.categoryId);
+    if (q?.active) params.set("active", q.active);
+    const qs = params.toString();
+    return request<CatalogItemDTO[]>(`/api/catalog/items${qs ? `?${qs}` : ""}`);
+  },
+  createCatalogItem: (body: { categoryId: string; name: string; description?: string; priceCents: number; costCents: number; taxable?: boolean; active?: boolean }) =>
+    request<CatalogItemDTO>("/api/catalog/items", { method: "POST", body: JSON.stringify(body) }),
+  patchCatalogItem: (id: string, body: Partial<{ name: string; description: string; priceCents: number; costCents: number; taxable: boolean; active: boolean; categoryId: string }>) =>
+    request<CatalogItemDTO>(`/api/catalog/items/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteCatalogItem: (id: string) =>
+    request<void>(`/api/catalog/items/${id}`, { method: "DELETE" }),
 };

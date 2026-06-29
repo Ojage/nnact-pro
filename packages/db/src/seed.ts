@@ -1,7 +1,7 @@
 // Minimal seed: one org, an owner, two customers, one scheduled job with an
 // invoice. Enough to render a non-empty dashboard. Idempotent-ish: skips if an
 // org named "Demo HVAC" already exists.
-import { db, orgs, users, customers, jobs, invoices } from "./index.js";
+import { db, orgs, users, customers, jobs, invoices, equipment, notifications } from "./index.js";
 import { eq } from "drizzle-orm";
 import { scryptSync, randomBytes } from "node:crypto";
 
@@ -55,6 +55,37 @@ async function main() {
       number: "INV-1001",
       status: "sent",
       total: 18900,
+    });
+
+    // Demo equipment
+    await tx.insert(equipment).values([
+      {
+        orgId: org.id, customerId: alice.id, type: "furnace",
+        make: "Carrier", model: "59TP6A", serialNumber: "CRR-48291",
+        installDate: new Date("2023-11-15"), warrantyExpiry: new Date("2033-11-15"),
+      },
+      {
+        orgId: org.id, customerId: alice.id, type: "ac_unit",
+        make: "Trane", model: "XV18", serialNumber: "TRN-73920",
+        installDate: new Date("2024-06-01"), warrantyExpiry: new Date("2034-06-01"),
+        notes: "Dual-stage compressor, uses R-410A",
+      },
+      {
+        orgId: org.id, customerId: bob.id, type: "water_heater",
+        make: "Rheem", model: "PROE50", serialNumber: "RHM-10482",
+        installDate: new Date("2022-03-20"), warrantyExpiry: new Date("2032-03-20"),
+      },
+    ]);
+
+    // Demo notification for the owner
+    const [owner] = await tx.select().from(users).where(eq(users.orgId, org.id));
+    await tx.insert(notifications).values({
+      orgId: org.id,
+      userId: owner.id,
+      type: "job.scheduled",
+      title: `Job "${job.title}" scheduled for Alice Johnson`,
+      body: "AC tune-up scheduled for tomorrow. Please confirm with the customer.",
+      link: `/jobs/${job.id}`,
     });
 
     console.log(`seed: created org ${org.id} with customers ${alice.id}, ${bob.id}`);

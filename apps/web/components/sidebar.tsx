@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { NAV_LINKS, decodeJwt } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
+import { NotificationsPopover } from "@/components/notifications-popover";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -23,9 +24,12 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-56 flex-col bg-surface-50 border-r border-border z-40">
       {/* Brand */}
-      <div className="h-14 flex items-center gap-2.5 px-5 border-b border-border shrink-0">
-        <span className="text-lg">⊹</span>
-        <span className="font-semibold text-sm text-fg">OpenFieldPro</span>
+      <div className="h-14 flex items-center justify-between px-5 border-b border-border shrink-0">
+        <div className="flex items-center gap-2.5">
+          <span className="text-lg">⊹</span>
+          <span className="font-semibold text-sm text-fg">OpenFieldPro</span>
+        </div>
+        <NotificationsPopover />
       </div>
 
       {/* Navigation */}

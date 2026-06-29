@@ -11,6 +11,7 @@ export const NAV_LINKS = [
   { href: "/price-book", label: "Price Book", icon: "⊡" },
   { href: "/reviews", label: "Reviews", icon: "★" },
   { href: "/reports", label: "Reports", icon: "◫" },
+  { href: "/settings", label: "Settings", icon: "⚙" },
 ] as const;
 
 export function decodeJwt(token: string): { name?: string; email?: string } | null {

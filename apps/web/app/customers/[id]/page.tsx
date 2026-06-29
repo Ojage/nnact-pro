@@ -4,6 +4,8 @@ import { formatMoney } from "@ofp/shared";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { JobStatusBadge } from "@/components/status-badge";
+import { EditCustomerDialog } from "./edit-dialog";
+import { CustomerEquipment } from "./customer-equipment";
 
 export default async function CustomerDetailPage({
   params,
@@ -37,6 +39,7 @@ export default async function CustomerDetailPage({
         <PageHeader
           title={customer.name}
           description={`${customer.email ?? "—"} · ${customer.phone ?? "—"} · added ${new Date(customer.createdAt).toLocaleDateString()}`}
+          actions={<EditCustomerDialog customer={customer} />}
         />
       ) : (
         <PageHeader title="Customer not found" description={`No customer with id ${customerId} in this org.`} />
@@ -96,6 +99,11 @@ export default async function CustomerDetailPage({
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Equipment */}
+      <div className="mt-6">
+        <CustomerEquipment customerId={customerId} />
       </div>
     </div>
   );
