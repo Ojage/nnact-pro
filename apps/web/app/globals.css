@@ -1,79 +1,100 @@
 @import "tailwindcss";
 
-/* ── Design tokens (dark theme — default) ── */
+/* ── OpenFieldPro Field Command brand tokens ── */
 @theme {
-  --color-surface-50: #0a0f1e;
-  --color-surface-100: #0b1020;
-  --color-surface-200: #0e1530;
-  --color-surface-300: #141b33;
-  --color-surface-400: #1a2340;
-  --color-surface-500: #1d2440;
-  --color-surface-600: #2a3355;
+  --color-surface-50: #0b1115;
+  --color-surface-100: #101820;
+  --color-surface-200: #132026;
+  --color-surface-300: #162a2f;
+  --color-surface-400: #1d3439;
+  --color-surface-500: #28464c;
+  --color-surface-600: #355a61;
 
-  --color-border: #1d2440;
-  --color-border-light: #2a3355;
+  --color-border: #24383d;
+  --color-border-light: #355a61;
 
-  --color-fg: #e6e9f0;
-  --color-fg-muted: #8a97c2;
-  --color-fg-dim: #6b7aa8;
-  --color-fg-link: #9fb0e0;
+  --color-fg: #f5f7f2;
+  --color-fg-muted: #a9b7ae;
+  --color-fg-dim: #728179;
+  --color-fg-link: #7ee7f2;
 
-  --color-accent: #3b56b0;
-  --color-accent-hover: #4a6ad0;
-  --color-accent-muted: #2a3570;
+  --color-accent: #22c55e;
+  --color-accent-hover: #16a34a;
+  --color-accent-muted: #123826;
 
-  --color-green: #86e29a;
-  --color-yellow: #e0b34f;
-  --color-red: #ff8080;
-  --color-blue: #7ab8ff;
+  --color-green: #22c55e;
+  --color-yellow: #f59e0b;
+  --color-red: #ef4444;
+  --color-blue: #06b6d4;
 }
 
 /* ── Light theme ── */
 [data-theme="light"] {
   color-scheme: light;
-  --color-surface-50: #f8f9fc;
-  --color-surface-100: #f0f2f8;
-  --color-surface-200: #e8eaf2;
-  --color-surface-300: #dfe2ec;
-  --color-surface-400: #d4d8e4;
-  --color-surface-500: #c8cde0;
-  --color-surface-600: #aeb4cc;
+  --color-surface-50: #ffffff;
+  --color-surface-100: #f7f3ea;
+  --color-surface-200: #ede8dc;
+  --color-surface-300: #e3ddcf;
+  --color-surface-400: #d5cebd;
+  --color-surface-500: #c2baa8;
+  --color-surface-600: #9d9584;
 
-  --color-border: #d4d8e4;
-  --color-border-light: #c8cde0;
+  --color-border: #d1c9b8;
+  --color-border-light: #bcb39f;
 
-  --color-fg: #1a1d2e;
-  --color-fg-muted: #5a6080;
-  --color-fg-dim: #8a90a8;
-  --color-fg-link: #3b56b0;
+  --color-fg: #111827;
+  --color-fg-muted: #526257;
+  --color-fg-dim: #7a887f;
+  --color-fg-link: #047481;
 
-  --color-accent: #3b56b0;
-  --color-accent-hover: #2a3d80;
-  --color-accent-muted: #e0e4f2;
+  --color-accent: #16a34a;
+  --color-accent-hover: #15803d;
+  --color-accent-muted: #dff7e8;
 
-  --color-green: #1a7f3a;
-  --color-yellow: #b8860b;
-  --color-red: #c41e3a;
-  --color-blue: #2563eb;
+  --color-green: #15803d;
+  --color-yellow: #b7791f;
+  --color-red: #dc2626;
+  --color-blue: #0891b2;
 }
 
-/* ── Base layer ── */
 @layer base {
   * { @apply border-border; }
+
+  html {
+    background: #101820;
+  }
+
   body {
     @apply bg-surface-100 text-fg antialiased;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
+
   ::selection { @apply bg-accent/30; }
 
-  /* Scrollbar styling */
-  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { @apply bg-surface-500 rounded-full; }
 
-  /* Code blocks */
   code { @apply text-fg-dim text-xs; }
-
-  /* Links */
   a { @apply text-fg-link no-underline hover:underline; }
+}
+
+@layer components {
+  .ofp-brand-mark {
+    @apply inline-grid place-items-center rounded-xl border border-accent/40 bg-accent text-surface-100 font-black tracking-tight shadow-sm;
+  }
+
+  .ofp-command-gradient {
+    background:
+      radial-gradient(circle at 20% 10%, rgba(34, 197, 94, 0.18), transparent 34%),
+      radial-gradient(circle at 80% 20%, rgba(6, 182, 212, 0.14), transparent 28%),
+      linear-gradient(135deg, #101820 0%, #12332a 48%, #0f4c5c 100%);
+  }
+
+  .ofp-grid-surface {
+    background-image:
+      linear-gradient(rgba(126, 231, 242, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126, 231, 242, 0.07) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
 }
