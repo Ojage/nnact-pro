@@ -1,12 +1,13 @@
 # OpenFieldPro
 
-Open-source, self-hostable **field service management** — a HouseCall Pro alternative.
-CRM, scheduling/dispatch, work orders, estimates, invoicing, and payments for home-service
-businesses (HVAC, plumbing, electrical, cleaning, etc.).
+Open-source, self-hostable **field service management** for service businesses.
+CRM, scheduling/dispatch, work orders, estimates, invoicing, payments, reminders,
+reviews, reporting, and mobile technician workflows for home-service businesses
+(HVAC, plumbing, electrical, cleaning, appliance repair, and adjacent trades).
 
 > **Status: Phase 1 — Foundation.** The full-stack spine is in place and runs end-to-end
 > (Postgres → Drizzle → Fastify API → Next web, plus an Expo technician app and the infra
-> compose). The remaining HouseCall Pro modules are built by following the same vertical
+> compose). The remaining field-service suite modules are built by following the same vertical
 > slice — see the roadmap below.
 
 ## Stack
@@ -43,7 +44,7 @@ pnpm --filter @ofp/api test
 
 ## What works today
 
-- **Multi-tenant schema** for every core HouseCall concept: orgs, users/technicians,
+- **Multi-tenant schema** for core field-service concepts: orgs, users/technicians,
   customers, properties, jobs (work orders), line items, estimates, invoices, payments,
   appointments. Money is integer cents throughout.
 - **Auth (Phase 2)**: `POST /api/auth/register` (creates org + owner), `POST /api/auth/login`,
@@ -59,12 +60,12 @@ pnpm --filter @ofp/api test
   overpayment handled). Online card via `POST /api/invoices/:id/checkout` (Stripe-optional, returns
   501 with guidance when unconfigured) + a **signature-verified** `/api/stripe/webhook`. Web invoices view.
 - **API (Phase 1)**: `customers` + `jobs` CRUD, `GET /api/health`. Zod-validated, org-scoped.
-- **Web**: dashboard, customers table, **schedule view**, **sign-in form**.
+- **Web**: dashboard, customers table, **schedule view**, **sign-in form**, **branded landing page**.
 - **Mobile**: technician job list (Expo).
 - **Tests**: money math (3/3) + password hashing (4/4), both runnable with zero install via
   `node --experimental-strip-types --test`.
 
-## Roadmap to HouseCall Pro parity
+## Roadmap to full field-service suite parity
 
 Each row is one vertical slice on the existing spine (schema → API route → web page).
 
@@ -94,6 +95,7 @@ Caddy on `:8080` (works with podman or docker compose):
 ```
 
 Then:
+
 - **App** → http://localhost:8080  ·  **Landing** → http://localhost:8080/welcome
 - **API** → http://localhost:8080/api/health  ·  **Login** → `owner@demo.test` / `demo12345`
 
