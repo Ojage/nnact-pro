@@ -3,142 +3,548 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenFieldPro — Field service management, open-source</title>
+<meta name="description" content="OpenFieldPro is a free, open-source, self-hostable field service command center for scheduling, dispatch, CRM, estimates, invoices, mobile technicians, memberships, and sponsor-supported growth.">
+<title>OpenFieldPro — Own your field operations</title>
 <style>
   :root{
-    --bg:#0b1020;--bg-elevated:#111834;--card:#141b33;--card-hover:#1a2340;
-    --line:#1d2440;--line-light:#2a3460;
-    --ink:#e6e9f0;--ink-dim:#b0bae0;--mut:#8a97c2;--muted:#5a6a9a;
-    --acc:#5b76e0;--acc-hover:#4a65d0;--acc-soft:#2a3470;
-    --ok:#86e29a;--warn:#e0b34f;--err:#ff8080;
-    --ff:system-ui,-apple-system,sans-serif;
-    --fs-sm:12px;--fs-body:14px;--fs-lg:17px;--fs-xl:20px;--fs-h2:26px;--fs-h1:clamp(28px,5vw,44px);
-    --space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--space-8:32px;--space-12:48px;--space-16:64px;
-    --r-md:8px;--r-lg:12px;--r-xl:16px;
+    color-scheme:dark;
+
+    --command:#101820;
+    --command-2:#0b1118;
+    --command-3:#14242a;
+    --field:#22c55e;
+    --field-2:#16a34a;
+    --cyan:#06b6d4;
+    --amber:#f59e0b;
+    --fault:#ef4444;
+    --cream:#f7f3ea;
+    --paper:#ffffff;
+    --ink:#f8fafc;
+    --ink-dark:#111827;
+    --muted:#a7b4c4;
+    --dim:#687789;
+    --line:rgba(255,255,255,.12);
+    --line-strong:rgba(255,255,255,.2);
+    --surface:rgba(255,255,255,.065);
+    --surface-2:rgba(255,255,255,.095);
+
+    --radius-xs:10px;
+    --radius-sm:14px;
+    --radius:22px;
+    --radius-lg:32px;
+    --pill:999px;
+
+    --shadow:0 26px 80px rgba(0,0,0,.35);
+    --shadow-soft:0 16px 44px rgba(16,24,32,.16);
+    --max:1180px;
+
+    --font:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-display:"Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html{font-family:var(--ff);background:var(--bg);color:var(--ink);font-size:var(--fs-body);line-height:1.6;-webkit-font-smoothing:antialiased}
-  a{color:var(--acc);text-decoration:none}
-  a:hover{color:var(--acc-hover)}
-  body{display:flex;flex-direction:column;min-height:100vh}
 
-  .wrap{max-width:960px;margin:0 auto;padding:0 var(--space-6)}
-
-  /* header */
-  .header{display:flex;align-items:center;gap:var(--space-6);padding:14px var(--space-6);border-bottom:1px solid var(--line);background:var(--bg-elevated)}
-  .logo{font-size:var(--fs-xl);font-weight:700;letter-spacing:-.3px;color:var(--ink)}
-  .header nav{margin-left:auto}
-  .header nav a{color:var(--mut);margin-left:var(--space-4);font-size:var(--fs-body)}
-  .header nav a:hover{color:var(--ink)}
-
-  /* hero */
-  .hero{text-align:center;padding:var(--space-16) 0 var(--space-12)}
-  .hero h1{font-size:var(--fs-h1);font-weight:800;letter-spacing:-1px;line-height:1.15;margin-bottom:var(--space-4)}
-  .hero h1 span{background:linear-gradient(135deg,var(--acc),var(--ok));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .hero p{font-size:var(--fs-lg);color:var(--mut);max-width:580px;margin:0 auto var(--space-6)}
-  .hero-actions{display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap}
-  .hero-actions a{display:inline-flex;align-items:center;gap:var(--space-2);padding:12px 24px;border-radius:var(--r-md);font-weight:600;font-size:var(--fs-body);transition:all .15s}
-  .btn-primary{background:var(--acc);color:#fff}
-  .btn-primary:hover{background:var(--acc-hover);color:#fff}
-  .btn-ghost{border:1px solid var(--line);color:var(--mut)}
-  .btn-ghost:hover{background:var(--card-hover);border-color:var(--line-light);color:var(--ink)}
-
-  /* features */
-  .features{padding:var(--space-12) 0}
-  .features h2{text-align:center;font-size:var(--fs-h2);margin-bottom:var(--space-8)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--space-4)}
-  .feature{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--space-6);transition:border-color .2s,transform .2s}
-  .feature:hover{border-color:var(--line-light);transform:translateY(-2px)}
-  .feature-icon{font-size:24px;margin-bottom:var(--space-3)}
-  .feature h3{font-size:var(--fs-lg);margin-bottom:var(--space-2)}
-  .feature p{color:var(--mut);font-size:var(--fs-body)}
-
-  /* status section */
-  .status-section{padding:var(--space-12) 0;text-align:center;border-top:1px solid var(--line)}
-  .status-section p{color:var(--mut);margin-bottom:var(--space-4);font-size:var(--fs-lg)}
-  .stack{display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap}
-  .stack span{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 16px;font-size:var(--fs-sm);color:var(--ink-dim)}
-
-  /* footer */
-  footer{text-align:center;padding:var(--space-6);color:var(--muted);font-size:var(--fs-sm);border-top:1px solid var(--line);margin-top:auto}
-
-  @media(max-width:600px){
-    .hero{padding:var(--space-8) 0}
-    .features{padding:var(--space-6) 0}
-    .grid{grid-template-columns:1fr}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 76% 0%, rgba(6,182,212,.16), transparent 34rem),
+      radial-gradient(circle at 15% 8%, rgba(34,197,94,.18), transparent 30rem),
+      linear-gradient(180deg, var(--command-2) 0%, var(--command) 42%, #0d1319 100%);
+    color:var(--ink);
+    font:15px/1.6 var(--font);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:geometricPrecision;
   }
+  img,svg{max-width:100%;display:block}
+  a{color:inherit;text-decoration:none}
+  button,input{font:inherit}
+  button{color:inherit}
+  h1,h2,h3,p{margin:0}
+  .wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
+
+  .topbar{
+    position:sticky;
+    top:0;
+    z-index:30;
+    background:rgba(11,17,24,.78);
+    backdrop-filter:blur(18px);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar .wrap{height:72px;display:flex;align-items:center;gap:22px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:900;letter-spacing:-.03em;color:var(--ink)}
+  .brand-mark{
+    width:34px;height:34px;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--field),#8df8b4);
+    color:var(--command);font-weight:950;font-size:12px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.16),0 12px 28px rgba(34,197,94,.18);
+  }
+  nav{margin-left:auto;display:flex;align-items:center;gap:22px;color:var(--muted);font-size:13px;font-weight:700}
+  nav a:hover{color:var(--ink)}
+  .button{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    min-height:44px;padding:0 18px;border-radius:var(--pill);
+    border:1px solid var(--line-strong);
+    background:rgba(255,255,255,.055);
+    color:var(--ink);font-weight:850;letter-spacing:-.01em;
+    transition:transform .18s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease;
+  }
+  .button:hover,.button:focus-visible{border-color:rgba(34,197,94,.75);transform:translateY(-1px);outline:none;background:rgba(255,255,255,.08)}
+  .button.primary{background:var(--field);border-color:var(--field);color:var(--command);box-shadow:0 14px 34px rgba(34,197,94,.22)}
+  .button.primary:hover{background:#31dc6d}
+  .button.dark{background:var(--command);border-color:rgba(16,24,32,.16);color:#fff}
+
+  .hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+  .hero:before{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.34;
+    background-image:
+      linear-gradient(rgba(126,231,242,.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126,231,242,.09) 1px, transparent 1px);
+    background-size:42px 42px;
+    mask-image:linear-gradient(180deg,#000,transparent 72%);
+  }
+  .hero .wrap{position:relative;display:grid;grid-template-columns:minmax(0,.92fr) minmax(440px,1.08fr);gap:48px;align-items:center;padding:62px 0 54px}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;margin-bottom:18px;border:1px solid rgba(34,197,94,.34);background:rgba(34,197,94,.09);color:#95f7b8;border-radius:var(--pill);padding:7px 11px;font:800 11px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--field);box-shadow:0 0 0 6px rgba(34,197,94,.14)}
+  h1{font-family:var(--font-display);font-size:clamp(56px,7.6vw,112px);line-height:.86;letter-spacing:-.085em;max-width:760px}
+  .lead{margin-top:24px;max-width:640px;color:var(--muted);font-size:clamp(17px,2vw,21px);line-height:1.48}
+  .lead strong{color:var(--ink)}
+  .hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:31px}
+  .proof{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:36px;max-width:660px}
+  .proof div{border:1px solid var(--line);border-radius:var(--radius-sm);background:rgba(255,255,255,.045);padding:14px;color:var(--dim);font-size:12px;min-height:86px}
+  .proof strong{display:block;color:var(--ink);font-size:18px;letter-spacing:-.03em;margin-bottom:3px}
+
+  .command-stage{
+    position:relative;height:520px;border:1px solid var(--line-strong);border-radius:var(--radius-lg);
+    overflow:hidden;box-shadow:var(--shadow);
+    background:
+      radial-gradient(circle at 30% 15%,rgba(34,197,94,.18),transparent 18rem),
+      radial-gradient(circle at 80% 22%,rgba(6,182,212,.18),transparent 19rem),
+      linear-gradient(135deg,#0f171f,#102127 48%,#0d1318);
+  }
+  .stage-grid{position:absolute;inset:0;opacity:.62;background-image:linear-gradient(rgba(126,231,242,.1) 1px, transparent 1px),linear-gradient(90deg, rgba(126,231,242,.1) 1px, transparent 1px);background-size:34px 34px}
+  .route-svg{position:absolute;inset:0;width:100%;height:100%;opacity:.92}
+  .route-path{fill:none;stroke:url(#routeGrad);stroke-width:5;stroke-linecap:round;filter:drop-shadow(0 0 14px rgba(6,182,212,.28))}
+  .route-path.secondary{stroke:rgba(255,255,255,.22);stroke-width:1.3;stroke-dasharray:7 10;filter:none}
+  .pin-dot{fill:var(--command);stroke:var(--field);stroke-width:3}
+  .pin-label{fill:var(--ink);font:900 12px var(--font-mono)}
+  .stage-card{position:absolute;border:1px solid var(--line);border-radius:18px;background:rgba(11,17,24,.78);backdrop-filter:blur(18px);box-shadow:0 20px 50px rgba(0,0,0,.22);padding:16px}
+  .stage-card h3{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);font-weight:900;margin-bottom:12px}
+  .stage-card h3 span{color:var(--field)}
+  .dispatch-card{left:24px;top:28px;width:245px}
+  .jobs-card{left:38px;bottom:34px;width:300px}
+  .money-card{right:28px;top:34px;width:230px}
+  .tech-card{right:36px;bottom:48px;width:min(285px,44%)}
+  .metric{display:flex;justify-content:space-between;gap:16px;border-top:1px solid rgba(255,255,255,.08);padding:10px 0;color:var(--muted)}
+  .metric:first-of-type{border-top:0;padding-top:0}
+  .metric b{color:var(--ink);font-size:19px}
+  .job-row,.tech-row{display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.08);padding:10px 0}
+  .job-row:first-of-type,.tech-row:first-of-type{border-top:0;padding-top:0}
+  .job-row small,.tech-row small{color:var(--dim)}
+  .status{display:inline-flex;align-items:center;border-radius:var(--pill);padding:4px 8px;font-size:11px;font-weight:900;background:rgba(6,182,212,.12);color:#83edf8;border:1px solid rgba(6,182,212,.22)}
+  .status.done{background:rgba(34,197,94,.12);color:#91f5b8;border-color:rgba(34,197,94,.22)}
+  .status.warn{background:rgba(245,158,11,.12);color:#ffd48a;border-color:rgba(245,158,11,.24)}
+  .cash{font-size:42px;font-family:var(--font-display);line-height:1;letter-spacing:-.06em;color:var(--ink)}
+  .cash small{display:block;margin-top:8px;font:600 12px var(--font);letter-spacing:0;color:var(--muted)}
+  .avatar{display:flex;align-items:center;gap:10px;min-width:0}
+  .avatar i{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:rgba(34,197,94,.15);color:#a2f7bf;font-style:normal;font-size:11px;font-weight:950;border:1px solid rgba(34,197,94,.24)}
+  .avatar b{font-size:13px}
+
+  section{padding:88px 0;border-bottom:1px solid var(--line)}
+  .section-head{display:flex;justify-content:space-between;gap:28px;align-items:end;margin-bottom:32px}
+  .section-head h2{font-family:var(--font-display);font-size:clamp(38px,5vw,70px);line-height:.93;letter-spacing:-.065em;max-width:760px}
+  .section-head p{max-width:410px;color:var(--muted);font-size:16px}
+
+  .command-map{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent)}
+  .world-grid{display:grid;grid-template-columns:1.18fr .82fr;gap:22px;align-items:stretch}
+  .world-art{position:relative;min-height:560px;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius-lg);background:linear-gradient(135deg,#0c1319,#102126)}
+  .world-art:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(126,231,242,.08) 1px, transparent 1px),linear-gradient(90deg, rgba(126,231,242,.08) 1px, transparent 1px);background-size:32px 32px}
+  .world-art svg{position:absolute;inset:0;width:100%;height:100%}
+  .zone{position:absolute;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.045);backdrop-filter:blur(12px);padding:14px;box-shadow:0 18px 40px rgba(0,0,0,.16)}
+  .zone b{display:block;color:var(--ink);font-size:14px}.zone small{color:var(--muted)}
+  .z1{left:8%;top:11%;width:180px}.z2{right:12%;top:12%;width:175px}.z3{left:16%;bottom:15%;width:175px}.z4{right:9%;bottom:20%;width:188px}.z5{left:41%;top:43%;width:160px}
+  .pin{position:absolute;width:46px;height:46px;border-radius:16px;border:1px solid rgba(255,255,255,.28);background:rgba(6,182,212,.14);color:#bdf8ff;font-weight:950;cursor:pointer;box-shadow:0 12px 32px rgba(0,0,0,.28);transition:.18s ease;z-index:3}
+  .pin:hover,.pin[aria-pressed="true"]{background:var(--field);border-color:var(--field);color:var(--command);transform:scale(1.06)}
+  .p1{left:21%;top:26%}.p2{left:61%;top:23%}.p3{left:67%;top:54%}.p4{left:28%;top:65%}.p5{left:48%;top:49%}.p6{left:82%;top:76%}
+  .panel{border:1px solid var(--line);border-radius:var(--radius-lg);background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.04));padding:26px;box-shadow:0 18px 50px rgba(0,0,0,.18)}
+  .panel .tag{display:inline-flex;color:#fff;background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.28);border-radius:var(--pill);padding:6px 10px;font:900 11px var(--font-mono);letter-spacing:.09em;text-transform:uppercase;color:#ffd18a}
+  .panel h3{font-family:var(--font-display);font-size:38px;line-height:.96;letter-spacing:-.055em;margin:18px 0 12px}
+  .panel p{color:var(--muted)}
+  .mini-list{display:grid;gap:10px;margin:24px 0 0;padding:0}
+  .mini-list li{list-style:none;border-top:1px solid var(--line);padding-top:11px;color:var(--muted)}
+  .mini-list b{color:var(--ink)}
+
+  .showreel{background:var(--cream);color:var(--ink-dark);border-color:rgba(17,24,39,.12)}
+  .showreel .section-head p{color:#526257}.showreel .section-head h2{color:var(--ink-dark)}
+  .reel-grid{display:grid;grid-template-columns:.78fr 1.22fr;gap:22px}
+  .scene-list{display:grid;gap:10px}
+  .scene-btn{width:100%;text-align:left;border:1px solid #d9d4c6;background:#fffdf7;border-radius:20px;padding:18px;cursor:pointer;color:#647067;transition:.18s ease}
+  .scene-btn strong{display:block;color:#111827;font-size:18px;letter-spacing:-.03em}
+  .scene-btn[aria-pressed="true"]{background:#101820;color:#b9c6d5;border-color:#101820;transform:translateX(4px);box-shadow:var(--shadow-soft)}
+  .scene-btn[aria-pressed="true"] strong{color:#fff}
+  .screen{position:relative;min-height:520px;border-radius:var(--radius-lg);overflow:hidden;background:#101820;box-shadow:0 28px 70px rgba(32,43,34,.22)}
+  .screen:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(126,231,242,.09) 1px, transparent 1px),linear-gradient(90deg, rgba(126,231,242,.09) 1px, transparent 1px);background-size:34px 34px;opacity:.55}
+  .screen-card{position:absolute;inset:34px;display:grid;align-content:end;gap:16px}
+  .screen-card h3{font-family:var(--font-display);font-size:clamp(38px,5vw,68px);line-height:.9;letter-spacing:-.065em;color:#f5f7f2}
+  .screen-card p{max-width:540px;color:#c7d2df;font-size:18px}
+  .progress{height:8px;border-radius:var(--pill);background:rgba(255,255,255,.14);overflow:hidden}
+  .progress i{display:block;height:100%;width:16%;background:linear-gradient(90deg,var(--field),var(--cyan));border-radius:inherit;animation:bar 6s linear infinite}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+  .tile{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);border-radius:18px;padding:15px;color:#d5decf}
+  .tile b{display:block;color:#fff;font-size:24px;letter-spacing:-.04em}
+
+  .loyalty{background:#101820}
+  .loyalty-grid,.sponsor-grid,.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .club-card{display:grid;gap:14px;border:1px solid var(--line);border-radius:var(--radius-lg);padding:24px;background:linear-gradient(180deg,rgba(34,197,94,.1),rgba(255,255,255,.045))}
+  .club-card h3{font-family:var(--font-display);font-size:36px;letter-spacing:-.055em}
+  .meter{height:12px;border-radius:var(--pill);background:rgba(255,255,255,.12);overflow:hidden}
+  .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--field));border-radius:inherit}
+  .reward-row{display:flex;justify-content:space-between;gap:16px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted)}
+  .reward-row b{color:var(--ink)}
+  .sponsors{background:#0d1318}
+  .sponsor-strip{display:grid;gap:12px}
+  .sponsor-line{border:1px dashed rgba(245,158,11,.44);border-radius:20px;padding:18px;background:rgba(245,158,11,.08);color:var(--muted)}
+  .sponsor-line b{color:var(--ink)}
+  .rate-card{background:#f7f3ea;color:#111827;border:0}
+  .rate-card p,.rate-card li{color:#536055}.rate-card h3,.rate-card b{color:#111827}
+  .rate-card .tag{color:#101820;background:rgba(245,158,11,.55);border-color:rgba(245,158,11,.35)}
+  .price{font-family:var(--font-display);font-size:60px;letter-spacing:-.07em;line-height:1;margin-top:18px}
+  .price small{font:600 16px var(--font);letter-spacing:0;color:#60705b}
+  .config{background:linear-gradient(180deg,#101820,#0d1318)}
+  .controls{display:grid;gap:18px}
+  .group{display:grid;gap:9px}
+  .group label{color:var(--dim);font:900 11px var(--font-mono);text-transform:uppercase;letter-spacing:.11em}
+  .choices{display:flex;flex-wrap:wrap;gap:8px}
+  .choice{border:1px solid var(--line);border-radius:var(--pill);background:rgba(255,255,255,.055);color:var(--muted);padding:10px 13px;cursor:pointer;font-weight:800}
+  .choice[aria-pressed="true"]{border-color:var(--field);background:rgba(34,197,94,.15);color:#9ff7bc}
+  .config-output{display:grid;gap:12px}
+  .module{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);background:rgba(255,255,255,.055);border-radius:22px;padding:17px}
+  .module span{flex:0 0 34px;height:34px;border-radius:12px;display:grid;place-items:center;background:var(--field);color:var(--command);font-weight:950}
+  .module h3{font-size:18px}.module p{color:var(--muted)}
+  .final-cta{text-align:center;padding:92px 0;background:var(--cream);color:var(--ink-dark)}
+  .final-cta h2{font-family:var(--font-display);font-size:clamp(44px,7vw,96px);line-height:.88;letter-spacing:-.08em;max-width:960px;margin:auto}
+  .final-cta p{max-width:650px;margin:22px auto 30px;color:#526257;font-size:18px}
+  footer{padding:30px 0;color:var(--dim);font-size:13px}
+  footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  @keyframes bar{from{width:6%}to{width:100%}}
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .55s ease}
+  .reveal.in{opacity:1;transform:none}
+  #command-map.reveal{opacity:1;transform:none}
+
+  @media(max-width:980px){
+    nav{display:none}
+    .hero .wrap,.world-grid,.reel-grid,.loyalty-grid,.sponsor-grid,.config-grid{grid-template-columns:1fr}
+    .command-stage{height:490px}.world-art{min-height:430px}.screen{min-height:420px}
+    .section-head{display:grid}
+  }
+  @media(max-width:640px){
+    .wrap{width:min(100% - 28px,var(--max))}.topbar .wrap{height:62px}.hero-actions{display:grid}
+    h1{font-size:50px}.lead{font-size:17px}.section-head h2,.final-cta h2{font-size:42px}
+    .hero .wrap{padding:34px 0 18px;gap:24px}.command-stage{height:620px}
+    .dispatch-card,.jobs-card,.money-card,.tech-card{width:auto;left:18px;right:18px}
+    .dispatch-card{top:80px}.jobs-card{top:216px}.money-card{display:none}.tech-card{bottom:18px}
+    .proof,.tiles{grid-template-columns:1fr}.proof div{min-height:auto}
+    section{padding:58px 0}.world-art{min-height:420px}.zone{display:none}.pin{width:40px;height:40px;border-radius:14px}.price{font-size:46px}
+  }
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.reveal{opacity:1;transform:none}}
 </style>
 </head>
 <body>
-  <header class="header">
-    <span class="logo">⊹ OpenFieldPro</span>
-    <nav>
-      <a href="#features">Features</a>
-      <a href="https://github.com/niko4244/openfieldpro-app" target="_blank" rel="noopener">GitHub</a>
-      <a href="/login" class="btn-primary" style="padding:7px 16px;border-radius:var(--r-md)">Sign in</a>
-    </nav>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="#top" aria-label="OpenFieldPro home"><span class="brand-mark">OF</span><span>OpenFieldPro</span></a>
+      <nav aria-label="Primary navigation">
+        <a href="#command-map">Command Map</a>
+        <a href="#showreel">Showreel</a>
+        <a href="#configure">Configure</a>
+        <a href="#sponsors">Sponsor space</a>
+        <a href="https://github.com/niko4244/openfieldpro" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <a class="button primary" href="https://github.com/niko4244/openfieldpro" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
   </header>
 
-  <section class="hero">
-    <h1>Run your field service<br><span>without the lock-in</span></h1>
-    <p>Open-source scheduling, invoicing, and customer management — self-hosted or in the cloud.</p>
-    <div class="hero-actions">
-      <a href="https://github.com/niko4244/openfieldpro-app" class="btn-primary" target="_blank" rel="noopener">View on GitHub</a>
-      <a href="/login" class="btn-ghost">Dashboard →</a>
-    </div>
-  </section>
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <div>
+          <div class="eyebrow"><span class="dot"></span>Open-source field command center</div>
+          <h1>Own your field operations.</h1>
+          <p class="lead"><strong>OpenFieldPro</strong> is a free, self-hostable field service platform for dispatch, CRM, estimates, invoices, mobile technicians, memberships, and sponsor-supported growth — without telemetry, phone-home licensing, or artificial core limits.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/niko4244/openfieldpro" target="_blank" rel="noopener">Get the code</a>
+            <a class="button" href="#configure">Build your setup</a>
+          </div>
+          <div class="proof" aria-label="Product proof points">
+            <div><strong>AGPL-3.0</strong>Self-hosted, inspectable, and built for ownership.</div>
+            <div><strong>Field-ready</strong>Mobile tech views and practical job flow.</div>
+            <div><strong>No telemetry</strong>Sponsor space stays local and transparent.</div>
+          </div>
+        </div>
 
-  <section class="features" id="features">
-    <div class="wrap">
-      <h2>Everything a service business needs</h2>
-      <div class="grid">
-        <div class="feature">
-          <div class="feature-icon">📋</div>
-          <h3>Scheduling</h3>
-          <p>Drag-and-drop calendar, route optimization, and crew assignments.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">📄</div>
-          <h3>Invoicing</h3>
-          <p>Generate, send, and track invoices. Accept card payments on-site.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">👥</div>
-          <h3>CRM</h3>
-          <p>Customer profiles, job history, communication logs in one place.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">📊</div>
-          <h3>Reporting</h3>
-          <p>Real-time P&L, margin tracking, and field crew performance.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">📱</div>
-          <h3>Mobile app</h3>
-          <p>Field crew gets job details, navigation, and photo capture on site.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔌</div>
-          <h3>API-first</h3>
-          <p>Full REST API. Extend, integrate, or build your own front-end.</p>
+        <div class="command-stage" aria-label="OpenFieldPro command board preview">
+          <div class="stage-grid" aria-hidden="true"></div>
+          <svg class="route-svg" viewBox="0 0 760 520" aria-hidden="true">
+            <defs>
+              <linearGradient id="routeGrad" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stop-color="#22c55e"/>
+                <stop offset="100%" stop-color="#06b6d4"/>
+              </linearGradient>
+            </defs>
+            <path class="route-path secondary" d="M116 400 C 180 190, 276 330, 360 250 S 520 100, 640 180"/>
+            <path class="route-path" d="M116 400 C 180 190, 276 330, 360 250 S 520 100, 640 180"/>
+            <g><circle class="pin-dot" cx="116" cy="400" r="18"/><text class="pin-label" x="116" y="405" text-anchor="middle">A</text></g>
+            <g><circle class="pin-dot" cx="232" cy="248" r="18"/><text class="pin-label" x="232" y="253" text-anchor="middle">B</text></g>
+            <g><circle class="pin-dot" cx="360" cy="250" r="18"/><text class="pin-label" x="360" y="255" text-anchor="middle">C</text></g>
+            <g><circle class="pin-dot" cx="528" cy="126" r="18"/><text class="pin-label" x="528" y="131" text-anchor="middle">D</text></g>
+            <g><circle class="pin-dot" cx="640" cy="180" r="18"/><text class="pin-label" x="640" y="185" text-anchor="middle">E</text></g>
+          </svg>
+
+          <div class="stage-card dispatch-card">
+            <h3>Dispatch <span>Live</span></h3>
+            <div class="metric"><span>Active routes</span><b>18</b></div>
+            <div class="metric"><span>Techs online</span><b>6</b></div>
+            <div class="metric"><span>Open calls</span><b>11</b></div>
+          </div>
+          <div class="stage-card jobs-card">
+            <h3>Job board</h3>
+            <div class="job-row"><div><b>AC no cool</b><br><small>Maple Ave · 10:30</small></div><span class="status">Scheduled</span></div>
+            <div class="job-row"><div><b>Leak under sink</b><br><small>Oak Street · now</small></div><span class="status warn">Parts</span></div>
+            <div class="job-row"><div><b>Panel inspection</b><br><small>West Loop · done</small></div><span class="status done">Invoice</span></div>
+          </div>
+          <div class="stage-card money-card">
+            <h3>Cashflow</h3>
+            <div class="cash">$12.4k<small>ready to invoice from completed work</small></div>
+          </div>
+          <div class="stage-card tech-card">
+            <h3>Technicians <span>Live</span></h3>
+            <div class="tech-row">
+              <div class="avatar"><i>TR</i><div><b>Tech Rowan</b><br><small>On site · 22 min</small></div></div>
+              <span class="status done">OK</span>
+            </div>
+            <div class="tech-row">
+              <div class="avatar"><i>TM</i><div><b>Tech Mira</b><br><small>Parts pickup</small></div></div>
+              <span class="status warn">Hold</span>
+            </div>
+            <div class="tech-row">
+              <div class="avatar"><i>TL</i><div><b>Tech Lane</b><br><small>Dispatch desk</small></div></div>
+              <span class="status">Office</span>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="status-section">
-    <div class="wrap">
-      <p>Built with modern, battle-tested tooling</p>
-      <div class="stack">
-        <span>Next.js 15</span><span>Fastify</span><span>Drizzle ORM</span>
-        <span>PostgreSQL</span><span>React Native</span><span>TypeScript</span>
-        <span>Docker</span><span>Podman</span>
+    <section id="command-map" class="command-map reveal">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>A field command map users can move through.</h2>
+          <p>Every product area becomes an operational station: route board, customer record, job-to-cash, inventory, service club, and sponsor line.</p>
+        </div>
+        <div class="world-grid">
+          <div class="world-art">
+            <svg viewBox="0 0 900 560" aria-hidden="true">
+              <path d="M120 120 C 240 70, 320 190, 430 160 S 630 90, 760 170" fill="none" stroke="rgba(6,182,212,.42)" stroke-width="5" stroke-linecap="round"/>
+              <path d="M170 420 C 260 330, 370 480, 492 330 S 660 300, 768 410" fill="none" stroke="rgba(34,197,94,.38)" stroke-width="5" stroke-linecap="round"/>
+              <path d="M430 160 L492 330" fill="none" stroke="rgba(245,158,11,.38)" stroke-width="4" stroke-dasharray="9 10" stroke-linecap="round"/>
+            </svg>
+            <div class="zone z1"><b>Route yard</b><small>Dispatch and schedule pressure</small></div>
+            <div class="zone z2"><b>Customer porch</b><small>CRM, properties, equipment</small></div>
+            <div class="zone z3"><b>Parts shelf</b><small>Inventory and price book</small></div>
+            <div class="zone z4"><b>Invoice counter</b><small>Payments and reviews</small></div>
+            <div class="zone z5"><b>Service club</b><small>Memberships and retention</small></div>
+            <button class="pin p1" data-world="dispatch" aria-pressed="true" aria-label="Dispatch station">1</button>
+            <button class="pin p2" data-world="crm" aria-pressed="false" aria-label="Customer CRM station">2</button>
+            <button class="pin p3" data-world="invoice" aria-pressed="false" aria-label="Invoice station">3</button>
+            <button class="pin p4" data-world="inventory" aria-pressed="false" aria-label="Inventory station">4</button>
+            <button class="pin p5" data-world="membership" aria-pressed="false" aria-label="Membership station">5</button>
+            <button class="pin p6" data-world="sponsor" aria-pressed="false" aria-label="Sponsor station">6</button>
+          </div>
+          <aside class="panel" aria-live="polite">
+            <span class="tag" id="worldTag">Station 1</span>
+            <h3 id="worldTitle">Dispatch becomes the map.</h3>
+            <p id="worldCopy">A scheduler sees live techs, scheduled jobs, stale locations, and the work that needs attention before the phone rings again.</p>
+            <ul class="mini-list" id="worldList">
+              <li><b>Play:</b> Move from map to job in one click.</li>
+              <li><b>Memory:</b> The route yard is the mental model.</li>
+              <li><b>Revenue:</b> Premium routing and automation packs can live here later.</li>
+            </ul>
+          </aside>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+
+    <section id="showreel" class="showreel reveal">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>A product showreel for screens, booths, and the repo page.</h2>
+          <p>The page loops through operational moments like a command display: visual, useful, and easy to remember.</p>
+        </div>
+        <div class="reel-grid">
+          <div class="scene-list" role="tablist" aria-label="Showreel scenes">
+            <button class="scene-btn" data-scene="0" aria-pressed="true"><strong>Start the day</strong>Dispatch sees jobs, techs, and route pressure.</button>
+            <button class="scene-btn" data-scene="1" aria-pressed="false"><strong>Win the work</strong>Estimate options, approvals, and conversion.</button>
+            <button class="scene-btn" data-scene="2" aria-pressed="false"><strong>Finish the ticket</strong>Mobile notes, photos, parts, and signature.</button>
+            <button class="scene-btn" data-scene="3" aria-pressed="false"><strong>Close the loop</strong>Invoice, payment, review, and follow-up.</button>
+          </div>
+          <div class="screen" aria-live="polite">
+            <div class="screen-card">
+              <div class="progress" aria-hidden="true"><i></i></div>
+              <h3 id="sceneTitle">Start the day with the route yard.</h3>
+              <p id="sceneCopy">OpenFieldPro turns the morning scramble into a dispatch surface people can read at a glance.</p>
+              <div class="tiles">
+                <div class="tile"><b id="sceneA">Map</b><span id="sceneASub">Live techs</span></div>
+                <div class="tile"><b id="sceneB">Board</b><span id="sceneBSub">Job states</span></div>
+                <div class="tile"><b id="sceneC">Pulse</b><span id="sceneCSub">Freshness</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="loyalty reveal">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Service plans become a branded retention system.</h2>
+          <p>Memberships should feel like an active customer relationship, not a buried discount table.</p>
+        </div>
+        <div class="loyalty-grid">
+          <div class="club-card">
+            <h3>Comfort Club</h3>
+            <p>Track tune-ups, included visits, renewal timing, priority windows, and customer-facing service history in one flow.</p>
+            <div>
+              <div class="reward-row"><b>Included visits this year</b><span>1 of 2 completed</span></div>
+              <div class="meter" aria-label="Service plan progress"><i style="width:50%"></i></div>
+            </div>
+            <div class="reward-row"><b>Next included visit</b><span>Fall tune-up</span></div>
+            <div class="reward-row"><b>Renewal trigger</b><span>30 days before term end</span></div>
+          </div>
+          <div class="panel">
+            <span class="tag">Why it sells</span>
+            <h3>Members remember the brand between jobs.</h3>
+            <p>Service history, reminders, included visits, renewal timing, and booking all share the same customer story. That gives Pro and Business tiers premium territory without locking the core field-service workflow behind a paywall.</p>
+            <ul class="mini-list">
+              <li><b>Free:</b> Core CRM, jobs, invoices, and scheduling.</li>
+              <li><b>Pro:</b> Branded memberships, themes, exports, packs.</li>
+              <li><b>Business:</b> Connectors, accounting, partner workflows.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sponsors" class="sponsors reveal">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Monetize sponsor space without selling user data.</h2>
+          <p>OpenFieldPro should sell local, vertical sponsorships the way a stadium sells a tasteful banner: clearly labeled, useful, and never sneaky.</p>
+        </div>
+        <div class="sponsor-grid">
+          <div class="sponsor-strip">
+            <div class="sponsor-line"><b>Sponsored by Metro Supply Co.</b> Parts delivered same-day in the service area.</div>
+            <div class="sponsor-line"><b>Sponsored by FleetFuel.</b> Fuel cards and route savings for service vans.</div>
+            <div class="sponsor-line"><b>Sponsored by HomeTrade Finance.</b> Financing offers for high-ticket repairs.</div>
+          </div>
+          <div class="panel rate-card">
+            <span class="tag">Direct sponsor model</span>
+            <h3>No network. No pixel. No creepy targeting.</h3>
+            <p>Start with one static sponsor line in Free, then add rotation by trade or region from a local JSON file. Pro removes it. Business can unlock partner connectors.</p>
+            <div class="price">$250<small> / month pilot slot</small></div>
+            <ul class="mini-list">
+              <li><b>Audience:</b> HVAC, plumbing, electrical, cleaning, trades.</li>
+              <li><b>Inventory:</b> Dashboard line, mobile line, later vendor guide.</li>
+              <li><b>Control:</b> Self-hosting admin owns the message.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="configure" class="config reveal">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Configure the OpenFieldPro experience.</h2>
+          <p>Pick a trade and a growth motion. The page rewrites the product path so visitors see their own version of the system.</p>
+        </div>
+        <div class="config-grid">
+          <div class="controls">
+            <div class="group">
+              <label>Trade focus</label>
+              <div class="choices" role="group" aria-label="Trade focus">
+                <button class="choice trade" data-value="hvac" aria-pressed="true">HVAC</button>
+                <button class="choice trade" data-value="plumbing" aria-pressed="false">Plumbing</button>
+                <button class="choice trade" data-value="electrical" aria-pressed="false">Electrical</button>
+                <button class="choice trade" data-value="cleaning" aria-pressed="false">Cleaning</button>
+              </div>
+            </div>
+            <div class="group">
+              <label>Growth motion</label>
+              <div class="choices" role="group" aria-label="Growth motion">
+                <button class="choice goal" data-value="dispatch" aria-pressed="true">Tighter dispatch</button>
+                <button class="choice goal" data-value="membership" aria-pressed="false">Memberships</button>
+                <button class="choice goal" data-value="sponsor" aria-pressed="false">Sponsor revenue</button>
+                <button class="choice goal" data-value="integrations" aria-pressed="false">Integrations</button>
+              </div>
+            </div>
+            <a class="button primary" href="https://github.com/niko4244/openfieldpro" target="_blank" rel="noopener">Fork the product</a>
+          </div>
+          <div class="config-output" aria-live="polite">
+            <div class="module"><span>1</span><div><h3 id="configTitle">HVAC dispatch cockpit</h3><p id="configCopy">Prioritize route visibility, equipment history, capacitor and filter inventory, and one-tap invoice closeout.</p></div></div>
+            <div class="module"><span>2</span><div><h3 id="configPack">Recommended pack</h3><p id="configPackCopy">Install the HVAC pack with maintenance checklists, estimate templates, and seasonal reminder flows.</p></div></div>
+            <div class="module"><span>3</span><div><h3 id="configMoney">Monetization path</h3><p id="configMoneyCopy">Use the free sponsor line for supply-house sponsors, then convert serious shops to Pro to remove the slot and add branded customer flows.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div class="wrap">
+        <h2>Turn field service software into a place people remember.</h2>
+        <p>OpenFieldPro can be the repo, the product, the showreel, the sponsor surface, and the configurable command center for every home-service trade.</p>
+        <a class="button dark" href="https://github.com/niko4244/openfieldpro" target="_blank" rel="noopener">Open the GitHub repo</a>
+      </div>
+    </section>
+  </main>
 
   <footer>
-    <p>OpenFieldPro — MIT license. Not affiliated with HouseCall Pro.</p>
+    <div class="wrap">
+      <span>OpenFieldPro - AGPL-3.0. Self-host freely.</span>
+      <span>Independent open-source field service software.</span>
+    </div>
   </footer>
+
+<script>
+  const world = {
+    dispatch:["Station 1","Dispatch becomes the map.","A scheduler sees live techs, scheduled jobs, stale locations, and the work that needs attention before the phone rings again.",["Play: Move from map to job in one click.","Memory: The route yard is the mental model.","Revenue: Premium routing and automation packs can live here later."]],
+    crm:["Station 2","The customer porch remembers.","Properties, equipment, service history, and job notes live where the customer story starts, not scattered across tabs.",["Play: Click from home to history.","Memory: Each account has a place.","Revenue: Branded customer portals and memberships extend the surface."]],
+    invoice:["Station 3","Job-to-cash is a closing scene.","Line items, approvals, payments, and reviews become the end of the same journey, not a separate accounting chore.",["Play: Preview, mark sent, record payment.","Memory: The ticket finishes visibly.","Revenue: Pro removes OpenFieldPro attribution on customer docs."]],
+    inventory:["Station 4","Inventory follows the route.","Parts, reorder points, and job consumption appear beside real work so missing parts do not become lost afternoons.",["Play: Stock changes follow jobs.","Memory: The shelf is tied to the truck.","Revenue: Vendor workflows and parts packs fit naturally."]],
+    membership:["Station 5","Loyalty becomes a service club.","Customers can see included visits, plan benefits, tune-ups, renewals, and priority windows in one branded flow.",["Play: Schedule, complete, renew.","Memory: The brand exists between calls.","Revenue: Membership packs belong in Pro."]],
+    sponsor:["Station 6","Sponsor space stays honest.","A clearly labeled, local sponsor line funds the free product without tracking, scripts, or ad-network creep.",["Play: One tasteful line, locally configured.","Memory: Useful vendors, not spam.","Revenue: Sponsors pay, Pro users remove it."]]
+  };
+  const scenes = [
+    ["Start the day with the route yard.","OpenFieldPro turns the morning scramble into a dispatch surface people can read at a glance.","Map","Live techs","Board","Job states","Pulse","Freshness"],
+    ["Turn estimates into decisions.","Good, better, best options help customers choose without forcing the office into copy-paste work.","Options","Price paths","Approval","Signature","Convert","New job"],
+    ["Give techs the full job in pocket.","Photos, notes, parts, equipment, and customer context move with the person doing the work.","Mobile","Job notes","Parts","Inventory","Photos","Proof"],
+    ["Close the loop before the truck leaves.","Invoices, payments, reviews, and follow-ups connect the last five minutes of the visit to the next job.","Invoice","Preview","Pay","Offline cash","Review","Follow-up"]
+  ];
+  const configs = {
+    hvac:{dispatch:["HVAC dispatch cockpit","Prioritize route visibility, equipment history, capacitor and filter inventory, and one-tap invoice closeout."],membership:["HVAC membership engine","Build seasonal tune-up clubs with reminders, included visits, renewal prompts, and customer-visible maintenance history."],sponsor:["HVAC sponsor surface","Pitch supply houses, financing partners, filter vendors, and parts distributors with a clearly labeled sponsor line."],integrations:["HVAC business stack","Pair field ops with QuickBooks, Zapier, email/SMS providers, and later warranty plugins."],pack:"Install the HVAC pack with maintenance checklists, estimate templates, and seasonal reminder flows."},
+    plumbing:{dispatch:["Plumbing route board","Handle emergency calls, drain jobs, return visits, and job photos without losing the invoice thread."],membership:["Plumbing protection plan","Turn annual inspections, water-heater checks, and priority booking into a branded service club."],sponsor:["Plumbing sponsor lane","Sell tasteful placement to supply houses, water-treatment partners, financing vendors, and local tool shops."],integrations:["Plumbing business stack","Connect accounting, call intake, reminders, reviews, and purchase orders around one job record."],pack:"Use the plumbing pack for leak diagnostics, fixture templates, and emergency dispatch scripts."},
+    electrical:{dispatch:["Electrical work board","Coordinate panel upgrades, inspections, service calls, and permits with technician visibility."],membership:["Electrical safety club","Package annual safety checks, surge protection reminders, and priority windows into a premium plan."],sponsor:["Electrical sponsor lane","Offer direct sponsor placement to distributors, lighting vendors, generator dealers, and financing partners."],integrations:["Electrical business stack","Connect estimates, forms, accounting, review requests, and inspection workflows."],pack:"Use the electrical pack for panel checklists, breaker templates, and inspection follow-ups."},
+    cleaning:{dispatch:["Cleaning crew planner","Plan recurring routes, team assignments, property notes, and repeat visit history in one surface."],membership:["Cleaning member club","Track recurring cleanings, bonuses, referrals, and seasonal add-ons with a customer-friendly flow."],sponsor:["Cleaning sponsor lane","Sell placement to supply vendors, equipment providers, local partners, and commercial service buyers."],integrations:["Cleaning business stack","Connect booking, reminders, payments, reviews, and repeat scheduling to reduce office churn."],pack:"Use the cleaning pack for recurring visit templates, checklist flows, and referral rewards."}
+  };
+  let trade="hvac", goal="dispatch", scene=0;
+  function setPressed(nodes, active){nodes.forEach(n=>n.setAttribute("aria-pressed",String(n.dataset.value===active||n.dataset.scene==active||n.dataset.world===active)))}
+  document.querySelectorAll(".pin").forEach(btn=>btn.addEventListener("click",()=>{const d=world[btn.dataset.world];setPressed(document.querySelectorAll(".pin"),btn.dataset.world);worldTag.textContent=d[0];worldTitle.textContent=d[1];worldCopy.textContent=d[2];worldList.innerHTML=d[3].map(x=>{const [b,t]=x.split(": ");return `<li><b>${b}:</b> ${t}</li>`}).join("")}));
+  function setScene(i){scene=i;setPressed(document.querySelectorAll(".scene-btn"),i);const s=scenes[i];sceneTitle.textContent=s[0];sceneCopy.textContent=s[1];sceneA.textContent=s[2];sceneASub.textContent=s[3];sceneB.textContent=s[4];sceneBSub.textContent=s[5];sceneC.textContent=s[6];sceneCSub.textContent=s[7]}
+  document.querySelectorAll(".scene-btn").forEach(btn=>btn.addEventListener("click",()=>setScene(+btn.dataset.scene)));
+  if(!matchMedia("(prefers-reduced-motion: reduce)").matches) setInterval(()=>setScene((scene+1)%scenes.length),6200);
+  function renderConfig(){const c=configs[trade], main=c[goal];configTitle.textContent=main[0];configCopy.textContent=main[1];configPackCopy.textContent=c.pack;configMoneyCopy.textContent=goal==="sponsor"?"Start with direct local sponsors, then sell Pro as the clean removal and branding path.":"Use the free sponsor line as funding, then convert serious shops to Pro for branding, packs, and polish."}
+  document.querySelectorAll(".trade,.goal").forEach(btn=>btn.addEventListener("click",()=>{const kind=btn.classList.contains("trade")?"trade":"goal";if(kind==="trade")trade=btn.dataset.value;else goal=btn.dataset.value;setPressed(document.querySelectorAll("."+kind),btn.dataset.value);renderConfig()}));
+  const io=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add("in")}),{threshold:.16});
+  document.querySelectorAll(".reveal").forEach(el=>io.observe(el));
+</script>
 </body>
 </html>
