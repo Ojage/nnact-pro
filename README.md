@@ -8,7 +8,7 @@ reviews, reporting, service plans, and mobile technician workflows for home-serv
 > **Status: Product foundation.** The full-stack spine is in place and runs end-to-end
 > (Postgres → Drizzle → Fastify API → Next web, plus an Expo technician app and the infra
 > compose). The branded landing page, service-plan foundation, sponsor-config foundation,
-> branded document renderer, and self-hosting operator scripts are now part of the repo.
+> organization branding settings, branded document renderer, and self-hosting operator scripts are now part of the repo.
 
 ## Stack
 
@@ -59,10 +59,11 @@ pnpm --filter @ofp/api test
   records offline payments (cash/check/card) and flips status to `paid` when covered (partials and
   overpayment handled). Online card via `POST /api/invoices/:id/checkout` (Stripe-optional, returns
   501 with guidance when unconfigured) + a **signature-verified** `/api/stripe/webhook`. Web invoices view.
-- **Documents**: shared branded HTML renderer, `/documents` hub, invoice/estimate previews, and direct HTML export routes for print/save-as-PDF workflows.
+- **Documents**: shared branded HTML renderer, `/documents` hub, invoice/estimate previews, organization branding, and direct HTML export routes for print/save-as-PDF workflows.
+- **Organization branding**: `/settings` includes company name, brand color, logo URL, public contact details, document footer, and attribution removal settings.
 - **Service plans**: schema, API routes, shared DTOs, navigation, and a starter web page at `/service-plans`.
 - **API**: `customers` + `jobs` CRUD, `GET /api/health`. Zod-validated, org-scoped.
-- **Web**: dashboard, customers table, schedule view, sign-in form, branded landing page, documents, and service plans.
+- **Web**: dashboard, customers table, schedule view, sign-in form, branded landing page, documents, settings, and service plans.
 - **Mobile**: technician job list (Expo).
 - **Plugins/integrations**: plugin registry, installs, scoped API tokens, outbound event journal, and plugin API surface.
 - **Sponsor config**: local static sponsor configuration example with no tracking/ad-network dependency.
@@ -85,7 +86,7 @@ Each row is one vertical slice on the existing spine (schema → API route → w
 | 3 ✅ | Reminders & notifications | done — `@ofp/worker` sends appointment reminders via pluggable `notify` (ntfy/console; SMS/email plug in) |
 | 4 ✅ | Online booking page | done — public `POST /api/public/:orgId/book` → `lead` job (no auth) |
 | 4 ✅ | Recurring jobs, reviews, reporting | done — recurring templates materialized by the worker; reviews API; `/api/reports/summary` |
-| 5 ◐ | Documents | branded HTML preview/export done — server-side PDF and email delivery remain |
+| 5 ◐ | Documents + branding | branded HTML preview/export and org branding done — server-side PDF and email delivery remain |
 | 5 ◐ | Service plans | foundation done — customer profile integration, renewal worker, and customer portal view remain |
 | 5 ◐ | Sponsor slot | config foundation done — dashboard/mobile components and Pro removal toggle remain |
 | 5 ◐ | Self-hosting polish | scripts added — permissions, platform testing, and release packaging remain |
