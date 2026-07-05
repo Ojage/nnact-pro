@@ -1,4 +1,5 @@
 export * from "./sponsors.js";
+export * from "./documents.js";
 
 // Shared domain enums + DTO types used by api, web, and mobile.
 
