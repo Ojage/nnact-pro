@@ -1,5 +1,5 @@
 export type FieldDocumentKind = "estimate" | "invoice" | "receipt" | "work_order" | "service_plan";
-export type Money = number;
+type DocumentMoney = number;
 
 export interface FieldDocumentBranding {
   companyName: string;
@@ -12,7 +12,7 @@ export interface FieldDocumentBranding {
 export interface FieldDocumentLineItem {
   description: string;
   quantity: number;
-  unitPriceCents: Money;
+  unitPriceCents: DocumentMoney;
 }
 
 export interface FieldDocumentData {
@@ -27,7 +27,7 @@ export interface FieldDocumentData {
   jobTitle?: string;
   notes?: string | null;
   lineItems: FieldDocumentLineItem[];
-  paymentsCents?: Money;
+  paymentsCents?: DocumentMoney;
   branding: FieldDocumentBranding;
 }
 
@@ -119,7 +119,7 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
 </html>`;
 }
 
-function formatCents(cents: Money): string {
+function formatCents(cents: DocumentMoney): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
