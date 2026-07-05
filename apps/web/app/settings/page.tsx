@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, type OrgSettingsDTO } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 type Tab = "team" | "general";
@@ -22,14 +23,13 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Settings" description="Manage your team and organization" />
+      <PageHeader title="Settings" description="Manage your team, organization, and document branding" />
 
-      {/* Tab bar */}
       <div className="flex gap-1 mb-6 bg-surface-200 rounded-lg p-1 w-fit">
         <button
           onClick={() => setTab("team")}
           className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer border-none ${
-            tab === "team" ? "bg-accent text-white" : "text-fg-muted hover:text-fg"
+            tab === "team" ? "bg-accent text-surface-100" : "text-fg-muted hover:text-fg"
           }`}
         >
           Team
@@ -37,10 +37,10 @@ export default function SettingsPage() {
         <button
           onClick={() => setTab("general")}
           className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer border-none ${
-            tab === "general" ? "bg-accent text-white" : "text-fg-muted hover:text-fg"
+            tab === "general" ? "bg-accent text-surface-100" : "text-fg-muted hover:text-fg"
           }`}
         >
-          General
+          General & Branding
         </button>
       </div>
 
@@ -136,9 +136,8 @@ function TeamTab() {
                     className="h-8 rounded-md border border-border bg-surface-300 px-2 text-xs text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer disabled:opacity-50"
                   >
                     <option value="owner">Owner</option>
-                    <option value="admin">Admin</option>
-                    <option value="tech">Tech</option>
                     <option value="dispatcher">Dispatcher</option>
+                    <option value="technician">Technician</option>
                   </select>
                 </TableCell>
                 <TableCell>
@@ -184,18 +183,59 @@ function TeamTab() {
 }
 
 function GeneralTab() {
-  const [org, setOrg] = useState<{ id: string; name: string } | null>(null);
+  const [org, setOrg] = useState<OrgSettingsDTO | null>(null);
+  const [form, setForm] = useState<Partial<OrgSettingsDTO>>({});
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    api.publicOrg().then((r) => {
-      if (!cancelled) setOrg(r.org);
-    }).catch(() => {}).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+    api.org()
+      .then((row) => {
+        if (cancelled) return;
+        setOrg(row);
+        setForm(row);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load organization info");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => { cancelled = true; };
   }, []);
+
+  const setField = <K extends keyof OrgSettingsDTO>(key: K, value: OrgSettingsDTO[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const row = await api.patchOrg({
+        name: form.name,
+        timezone: form.timezone,
+        logoUrl: form.logoUrl || null,
+        brandColor: form.brandColor || "#22C55E",
+        documentFooter: form.documentFooter || null,
+        publicEmail: form.publicEmail || null,
+        publicPhone: form.publicPhone || null,
+        publicAddress: form.publicAddress || null,
+        removeOpenFieldProAttribution: !!form.removeOpenFieldProAttribution,
+      });
+      setOrg(row);
+      setForm(row);
+      setMessage("Organization branding saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save organization settings");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -208,28 +248,107 @@ function GeneralTab() {
     );
   }
 
+  if (!org) {
+    return (
+      <Card className="border-red/30 bg-red/5">
+        <CardContent className="p-4">
+          <p className="text-sm text-red">{error ?? "Could not load organization info."}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader><CardTitle>Organization</CardTitle></CardHeader>
-      <CardContent>
-        {org ? (
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-semibold text-fg-muted mb-1">Name</p>
-              <p className="text-sm text-fg">{org.name}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-fg-muted mb-1">ID</p>
-              <p className="text-sm text-fg-muted font-mono text-xs">{org.id}</p>
-            </div>
-            {/* ponytail: read-only org info. Ceiling: no org settings/update API yet.
-                Upgrade: add PATCH /api/org/:id endpoint and editable fields. */}
-            <p className="text-xs text-fg-dim mt-4">Organization settings are read-only for now.</p>
+    <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Organization & document branding</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="grid gap-1.5 text-sm text-fg-muted">
+              Company name
+              <Input value={form.name ?? ""} onChange={(e) => setField("name", e.target.value)} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-fg-muted">
+              Timezone
+              <Input value={form.timezone ?? ""} onChange={(e) => setField("timezone", e.target.value)} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-fg-muted">
+              Brand color
+              <div className="flex gap-2">
+                <Input value={form.brandColor ?? "#22C55E"} onChange={(e) => setField("brandColor", e.target.value)} />
+                <input
+                  aria-label="Brand color picker"
+                  type="color"
+                  value={form.brandColor ?? "#22C55E"}
+                  onChange={(e) => setField("brandColor", e.target.value)}
+                  className="h-10 w-14 rounded-lg border border-border bg-surface-200 p-1"
+                />
+              </div>
+            </label>
+            <label className="grid gap-1.5 text-sm text-fg-muted">
+              Logo URL
+              <Input value={form.logoUrl ?? ""} onChange={(e) => setField("logoUrl", e.target.value || null)} placeholder="https://..." />
+            </label>
+            <label className="grid gap-1.5 text-sm text-fg-muted">
+              Public email
+              <Input value={form.publicEmail ?? ""} onChange={(e) => setField("publicEmail", e.target.value || null)} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-fg-muted">
+              Public phone
+              <Input value={form.publicPhone ?? ""} onChange={(e) => setField("publicPhone", e.target.value || null)} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-fg-muted md:col-span-2">
+              Public address
+              <Input value={form.publicAddress ?? ""} onChange={(e) => setField("publicAddress", e.target.value || null)} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-fg-muted md:col-span-2">
+              Document footer
+              <Input value={form.documentFooter ?? ""} onChange={(e) => setField("documentFooter", e.target.value || null)} placeholder="Licensed, insured, locally owned..." />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-fg-muted md:col-span-2">
+              <input
+                type="checkbox"
+                checked={!!form.removeOpenFieldProAttribution}
+                onChange={(e) => setField("removeOpenFieldProAttribution", e.target.checked)}
+              />
+              Remove OpenFieldPro attribution on customer-facing documents
+            </label>
           </div>
-        ) : (
-          <p className="text-sm text-fg-muted">Could not load organization info.</p>
-        )}
-      </CardContent>
-    </Card>
+
+          {(message || error) && (
+            <p className={`mt-4 text-sm ${error ? "text-red" : "text-green"}`}>{error ?? message}</p>
+          )}
+
+          <div className="mt-6 flex gap-2">
+            <Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save branding"}</Button>
+            <Button variant="secondary" onClick={() => setForm(org)} disabled={saving}>Reset</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Document preview style</CardTitle></CardHeader>
+        <CardContent>
+          <div className="rounded-2xl border border-border bg-surface-200 p-5">
+            <div className="flex items-center gap-3 border-b border-border pb-4">
+              <div className="h-10 w-10 rounded-xl" style={{ background: form.brandColor ?? "#22C55E" }} />
+              <div>
+                <p className="text-sm font-bold text-fg">{form.name ?? org.name}</p>
+                <p className="text-xs text-fg-muted">Customer document header</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 text-xs text-fg-muted">
+              <p>Email: {form.publicEmail || "—"}</p>
+              <p>Phone: {form.publicPhone || "—"}</p>
+              <p>Address: {form.publicAddress || "—"}</p>
+              <p>Footer: {form.documentFooter || "Field service command center document"}</p>
+              <p>Attribution: {form.removeOpenFieldProAttribution ? "Hidden" : "Powered by OpenFieldPro"}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
