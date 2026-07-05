@@ -1,0 +1,33 @@
+{
+  "enabled": true,
+  "placementPolicy": "free-tier-only",
+  "privacy": {
+    "tracking": false,
+    "remoteAdNetwork": false,
+    "behavioralTargeting": false
+  },
+  "slots": [
+    {
+      "id": "dashboard-line",
+      "label": "Sponsored",
+      "surface": "dashboard",
+      "trade": "all",
+      "region": "default",
+      "sponsorName": "Metro Supply Co.",
+      "message": "Same-day parts pickup for service businesses.",
+      "url": "https://example.com/metro-supply",
+      "active": true
+    },
+    {
+      "id": "mobile-line",
+      "label": "Sponsored",
+      "surface": "mobile",
+      "trade": "all",
+      "region": "default",
+      "sponsorName": "FleetFuel",
+      "message": "Fuel cards and route savings for service vans.",
+      "url": "https://example.com/fleetfuel",
+      "active": true
+    }
+  ]
+}
