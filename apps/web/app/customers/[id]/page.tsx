@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { JobStatusBadge } from "@/components/status-badge";
 import { EditCustomerDialog } from "./edit-dialog";
 import { CustomerEquipment } from "./customer-equipment";
+import { CustomerServicePlans } from "./customer-service-plans";
 
 export default async function CustomerDetailPage({
   params,
@@ -101,8 +102,8 @@ export default async function CustomerDetailPage({
         </Card>
       </div>
 
-      {/* Equipment */}
-      <div className="mt-6">
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CustomerServicePlans customerId={customerId} />
         <CustomerEquipment customerId={customerId} />
       </div>
     </div>
