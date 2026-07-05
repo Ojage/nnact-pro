@@ -110,6 +110,10 @@ interface LineItem {
   createdAt: string;
 }
 
+interface EstimateDetail extends Estimate {
+  lineItems: LineItem[];
+}
+
 interface Review {
   id: string;
   orgId: string;
@@ -273,6 +277,7 @@ export const api = {
   reports: () => request<ReportSummaryDTO>("/api/reports/summary"),
 
   estimates: () => request<Estimate[]>("/api/estimates"),
+  estimate: (id: string) => request<EstimateDetail>(`/api/estimates/${id}`),
   createEstimate: (body: { jobId: string }) =>
     request<Estimate>("/api/estimates", { method: "POST", body: JSON.stringify(body) }),
 
