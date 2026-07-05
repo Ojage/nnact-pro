@@ -13,10 +13,11 @@ export default async function InvoicePreviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [invoice, jobs, customers] = await Promise.all([
+  const [invoice, jobs, customers, org] = await Promise.all([
     api.invoice(id).catch(() => null),
     api.jobs().catch(() => []),
     api.customers().catch(() => []),
+    api.org().catch(() => null),
   ]);
 
   if (!invoice) {
@@ -32,7 +33,7 @@ export default async function InvoicePreviewPage({
 
   const job = jobs.find((row) => row.id === invoice.jobId) ?? null;
   const customer = job ? customers.find((row) => row.id === job.customerId) ?? null : null;
-  const html = invoiceDocumentHtml({ invoice, customer, job, lineItems: invoice.lineItems });
+  const html = invoiceDocumentHtml({ invoice, customer, job, lineItems: invoice.lineItems, org });
 
   return (
     <div>
@@ -42,6 +43,9 @@ export default async function InvoicePreviewPage({
         actions={
           <div className="flex flex-wrap gap-2">
             <DocumentActions html={html} fileName={`${invoice.number}.html`} />
+            <Link href={`/invoices/${invoice.id}/document.html`} target="_blank">
+              <Button size="sm" variant="secondary">Open HTML</Button>
+            </Link>
             <Link href={`/invoices/${invoice.id}`}>
               <Button size="sm" variant="secondary">Back to invoice</Button>
             </Link>
@@ -50,7 +54,7 @@ export default async function InvoicePreviewPage({
       />
       <Card className="mb-5 border-accent/30 bg-accent/5">
         <p className="text-sm text-fg-muted">
-          This uses the shared document renderer with real invoice, payment, job, customer, and line-item data. Use Print / Save as PDF for now; a server-side PDF/email pipeline can plug into the same renderer.
+          This uses the shared document renderer with real invoice, payment, job, customer, line-item, and organization-branding data. Use Print / Save as PDF for now; a server-side PDF/email pipeline can plug into the same renderer.
         </p>
       </Card>
       <iframe
