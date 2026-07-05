@@ -13,10 +13,11 @@ export default async function EstimatePreviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [estimate, jobs, customers] = await Promise.all([
+  const [estimate, jobs, customers, org] = await Promise.all([
     api.estimate(id).catch(() => null),
     api.jobs().catch(() => []),
     api.customers().catch(() => []),
+    api.org().catch(() => null),
   ]);
 
   if (!estimate) {
@@ -32,7 +33,7 @@ export default async function EstimatePreviewPage({
 
   const job = jobs.find((row) => row.id === estimate.jobId) ?? null;
   const customer = job ? customers.find((row) => row.id === job.customerId) ?? null : null;
-  const html = estimateDocumentHtml({ estimate, customer, job, lineItems: estimate.lineItems });
+  const html = estimateDocumentHtml({ estimate, customer, job, lineItems: estimate.lineItems, org });
   const estimateNumber = `EST-${estimate.id.slice(0, 8).toUpperCase()}`;
 
   return (
@@ -43,6 +44,9 @@ export default async function EstimatePreviewPage({
         actions={
           <div className="flex flex-wrap gap-2">
             <DocumentActions html={html} fileName={`${estimateNumber}.html`} />
+            <Link href={`/estimates/${estimate.id}/document.html`} target="_blank">
+              <Button size="sm" variant="secondary">Open HTML</Button>
+            </Link>
             {job && (
               <Link href={`/jobs/${job.id}`}>
                 <Button size="sm" variant="secondary">Back to job</Button>
@@ -53,7 +57,7 @@ export default async function EstimatePreviewPage({
       />
       <Card className="mb-5 border-accent/30 bg-accent/5">
         <p className="text-sm text-fg-muted">
-          This estimate preview uses real estimate, job, customer, and line-item data. A later PDF/email workflow can reuse the same shared renderer.
+          This estimate preview uses real estimate, job, customer, line-item, and organization-branding data. A later PDF/email workflow can reuse the same shared renderer.
         </p>
       </Card>
       <iframe
