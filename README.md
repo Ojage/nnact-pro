@@ -2,13 +2,13 @@
 
 Open-source, self-hostable **field service management** for service businesses.
 CRM, scheduling/dispatch, work orders, estimates, invoicing, payments, reminders,
-reviews, reporting, and mobile technician workflows for home-service businesses
+reviews, reporting, service plans, and mobile technician workflows for home-service businesses
 (HVAC, plumbing, electrical, cleaning, appliance repair, and adjacent trades).
 
-> **Status: Phase 1 — Foundation.** The full-stack spine is in place and runs end-to-end
+> **Status: Product foundation.** The full-stack spine is in place and runs end-to-end
 > (Postgres → Drizzle → Fastify API → Next web, plus an Expo technician app and the infra
-> compose). The remaining field-service suite modules are built by following the same vertical
-> slice — see the roadmap below.
+> compose). The branded landing page, service-plan foundation, sponsor-config foundation,
+> and self-hosting operator scripts are now part of the repo.
 
 ## Stack
 
@@ -46,22 +46,26 @@ pnpm --filter @ofp/api test
 
 - **Multi-tenant schema** for core field-service concepts: orgs, users/technicians,
   customers, properties, jobs (work orders), line items, estimates, invoices, payments,
-  appointments. Money is integer cents throughout.
-- **Auth (Phase 2)**: `POST /api/auth/register` (creates org + owner), `POST /api/auth/login`,
+  appointments, service plans, plan enrollments, and plan visits. Money is integer cents throughout.
+- **Auth**: `POST /api/auth/register` (creates org + owner), `POST /api/auth/login`,
   `GET /api/auth/me`. JWT via `@fastify/jwt`; passwords hashed with stdlib scrypt + constant-time
   verify. Org is resolved from the verified token (header/first-org fallback in dev only).
   Demo login: `owner@demo.test` / `demo12345` after seeding.
-- **Scheduling/dispatch (Phase 2)**: `GET/POST /api/appointments` (with `?from&to` range),
+- **Scheduling/dispatch**: `GET/POST /api/appointments` (with `?from&to` range),
   `PATCH /api/appointments/:id` (reschedule/reassign — the backend for calendar drag-drop).
   Booking a job auto-moves it to `scheduled`.
-- **Invoicing + payments (Phase 3)**: line items (`/api/jobs/:id/line-items`) recompute the job
+- **Invoicing + payments**: line items (`/api/jobs/:id/line-items`) recompute the job
   total; `POST /api/invoices` generates a numbered invoice from a job; `POST /api/invoices/:id/pay`
   records offline payments (cash/check/card) and flips status to `paid` when covered (partials and
   overpayment handled). Online card via `POST /api/invoices/:id/checkout` (Stripe-optional, returns
   501 with guidance when unconfigured) + a **signature-verified** `/api/stripe/webhook`. Web invoices view.
-- **API (Phase 1)**: `customers` + `jobs` CRUD, `GET /api/health`. Zod-validated, org-scoped.
-- **Web**: dashboard, customers table, **schedule view**, **sign-in form**, **branded landing page**.
+- **Service plans**: schema, API routes, shared DTOs, navigation, and a starter web page at `/service-plans`.
+- **API**: `customers` + `jobs` CRUD, `GET /api/health`. Zod-validated, org-scoped.
+- **Web**: dashboard, customers table, schedule view, sign-in form, branded landing page, and service plans.
 - **Mobile**: technician job list (Expo).
+- **Plugins/integrations**: plugin registry, installs, scoped API tokens, outbound event journal, and plugin API surface.
+- **Sponsor config**: local static sponsor configuration example with no tracking/ad-network dependency.
+- **Self-hosting**: install, update, backup, and restore helper scripts under `scripts/`.
 - **Tests**: money math (3/3) + password hashing (4/4), both runnable with zero install via
   `node --experimental-strip-types --test`.
 
@@ -80,9 +84,11 @@ Each row is one vertical slice on the existing spine (schema → API route → w
 | 3 ✅ | Reminders & notifications | done — `@ofp/worker` sends appointment reminders via pluggable `notify` (ntfy/console; SMS/email plug in) |
 | 4 ✅ | Online booking page | done — public `POST /api/public/:orgId/book` → `lead` job (no auth) |
 | 4 ✅ | Recurring jobs, reviews, reporting | done — recurring templates materialized by the worker; reviews API; `/api/reports/summary` |
+| 5 ◐ | Service plans | foundation done — customer profile integration, renewal worker, and customer portal view remain |
+| 5 ◐ | Sponsor slot | config foundation done — dashboard/mobile components and Pro removal toggle remain |
+| 5 ◐ | Self-hosting polish | scripts added — permissions, platform testing, and release packaging remain |
 
-All roadmap modules now have a working slice. Remaining work is polish (drag-drop calendar UI,
-invoice PDF/email, an estimates/booking web page, a `reminded_at` dedupe column) rather than net-new capability.
+See `docs/release/final-product-roadmap.md` for the full final-product checklist.
 
 ## Deploy
 
@@ -92,6 +98,15 @@ Caddy on `:8080` (works with podman or docker compose):
 ```bash
 ./deploy.sh           # Linux/macOS
 .\deploy.ps1          # Windows
+```
+
+Operator scripts:
+
+```bash
+scripts/install.sh
+scripts/update.sh
+scripts/backup.sh
+scripts/restore.sh backups/YYYYMMDD-HHMMSS
 ```
 
 Then:
