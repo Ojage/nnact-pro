@@ -12,6 +12,12 @@ export type JobStatus = (typeof JOB_STATUS)[number];
 export const INVOICE_STATUS = ["draft", "sent", "paid", "void"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUS)[number];
 
+export const SERVICE_PLAN_STATUS = ["active", "paused", "canceled", "expired"] as const;
+export type ServicePlanStatus = (typeof SERVICE_PLAN_STATUS)[number];
+
+export const SERVICE_VISIT_STATUS = ["planned", "scheduled", "completed", "skipped"] as const;
+export type ServiceVisitStatus = (typeof SERVICE_VISIT_STATUS)[number];
+
 export type Money = number; // cents, integer
 
 /** Render integer cents as a dollar string. Canonical formatter for web/mobile. */
@@ -58,6 +64,48 @@ export interface UserDTO {
   name: string;
   role: "owner" | "dispatcher" | "technician";
   active: boolean;
+  createdAt: string;
+}
+
+export interface ServicePlanDTO {
+  id: string;
+  orgId: string;
+  name: string;
+  description?: string | null;
+  includedVisitsPerTerm: number;
+  termMonths: number;
+  priceCents: Money;
+  priorityScheduling: boolean;
+  benefits: string[];
+  active: boolean;
+  createdAt: string;
+}
+
+export interface CustomerServicePlanDTO {
+  id: string;
+  orgId: string;
+  customerId: string;
+  servicePlanId: string;
+  status: ServicePlanStatus;
+  startsAt: string;
+  renewsAt?: string | null;
+  renewalReminderAt?: string | null;
+  visitsIncluded: number;
+  visitsCompleted: number;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface ServicePlanVisitDTO {
+  id: string;
+  orgId: string;
+  customerServicePlanId: string;
+  jobId?: string | null;
+  title: string;
+  status: ServiceVisitStatus;
+  dueAt?: string | null;
+  completedAt?: string | null;
+  notes?: string | null;
   createdAt: string;
 }
 
