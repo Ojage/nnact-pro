@@ -26,6 +26,7 @@ import { searchRoutes } from "./routes/search.js";
 import { pluginRoutes } from "./routes/plugins.js";
 import { pluginApiRoutes } from "./routes/plugin-api.js";
 import { servicePlanRoutes } from "./routes/service-plans.js";
+import { orgSettingsRoutes } from "./routes/org-settings.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -55,6 +56,7 @@ export function buildServer() {
   app.register(pluginRoutes, { prefix: "/api/plugins" }); // owner-facing mgmt
   app.register(pluginApiRoutes, { prefix: "/api/plugin" }); // scoped-token surface
   app.register(servicePlanRoutes, { prefix: "/api/service-plans" });
+  app.register(orgSettingsRoutes, { prefix: "/api/org" });
   return app;
 }
 
