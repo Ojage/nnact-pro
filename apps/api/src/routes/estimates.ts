@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
-import { db, estimates, jobs } from "@ofp/db";
+import { db, estimates, jobs, lineItems } from "@ofp/db";
 import { resolveOrgId } from "./org.js";
 
 const createBody = z.object({ jobId: z.string().uuid() });
@@ -19,6 +19,18 @@ export async function estimateRoutes(app: FastifyInstance) {
       .orderBy(desc(estimates.createdAt))
       .limit(t)
       .offset(s);
+  });
+
+  app.get("/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const [estimate] = await db
+      .select()
+      .from(estimates)
+      .where(and(eq(estimates.orgId, orgId), eq(estimates.id, id)));
+    if (!estimate) return reply.code(404).send({ error: "not found" });
+    const items = await db.select().from(lineItems).where(eq(lineItems.jobId, estimate.jobId));
+    return { ...estimate, lineItems: items };
   });
 
   // Create an estimate snapshotting the current job total.
