@@ -6,10 +6,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const [estimate, jobs, customers] = await Promise.all([
+  const [estimate, jobs, customers, org] = await Promise.all([
     api.estimate(id).catch(() => null),
     api.jobs().catch(() => []),
     api.customers().catch(() => []),
+    api.org().catch(() => null),
   ]);
 
   if (!estimate) {
@@ -18,7 +19,7 @@ export async function GET(
 
   const job = jobs.find((row) => row.id === estimate.jobId) ?? null;
   const customer = job ? customers.find((row) => row.id === job.customerId) ?? null : null;
-  const html = estimateDocumentHtml({ estimate, customer, job, lineItems: estimate.lineItems });
+  const html = estimateDocumentHtml({ estimate, customer, job, lineItems: estimate.lineItems, org });
   const estimateNumber = `EST-${estimate.id.slice(0, 8).toUpperCase()}`;
 
   return new Response(html, {
