@@ -1,6 +1,5 @@
-import { formatMoney, type Money } from "./index.js";
-
 export type FieldDocumentKind = "estimate" | "invoice" | "receipt" | "work_order" | "service_plan";
+export type Money = number;
 
 export interface FieldDocumentBranding {
   companyName: string;
@@ -74,8 +73,8 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
         <tr>
           <td>${escapeHtml(item.description)}</td>
           <td class=\"num\">${item.quantity}</td>
-          <td class=\"num\">${formatMoney(item.unitPriceCents)}</td>
-          <td class=\"num\">${formatMoney(item.quantity * item.unitPriceCents)}</td>
+          <td class=\"num\">${formatCents(item.unitPriceCents)}</td>
+          <td class=\"num\">${formatCents(item.quantity * item.unitPriceCents)}</td>
         </tr>`,
     )
     .join("");
@@ -109,15 +108,19 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
       <tbody>${rows}</tbody>
     </table>
     <section class=\"totals\">
-      <div class=\"total-row\"><span>Subtotal</span><strong>${formatMoney(totals.subtotalCents)}</strong></div>
-      <div class=\"total-row\"><span>Paid</span><strong>${formatMoney(totals.paidCents)}</strong></div>
-      <div class=\"total-row strong\"><span>Balance</span><strong>${formatMoney(totals.balanceCents)}</strong></div>
+      <div class=\"total-row\"><span>Subtotal</span><strong>${formatCents(totals.subtotalCents)}</strong></div>
+      <div class=\"total-row\"><span>Paid</span><strong>${formatCents(totals.paidCents)}</strong></div>
+      <div class=\"total-row strong\"><span>Balance</span><strong>${formatCents(totals.balanceCents)}</strong></div>
     </section>
     ${data.notes ? `<section class=\"notes\">${escapeHtml(data.notes)}</section>` : ""}
     <footer class=\"footer\">${attribution}</footer>
   </main>
 </body>
 </html>`;
+}
+
+function formatCents(cents: Money): string {
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
 function escapeHtml(value: string): string {
