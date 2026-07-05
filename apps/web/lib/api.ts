@@ -32,12 +32,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.text().catch(() => "");
     throw new ApiError(res.status, body);
   }
-  // Some endpoints return 204 or empty body
   const text = await res.text();
   return text ? (JSON.parse(text) as T) : (undefined as T);
 }
-
-// ── Public helpers ──
 
 export interface LoginResult {
   token: string;
@@ -51,14 +48,27 @@ export async function login(email: string, password: string): Promise<LoginResul
   });
 }
 
-// ── Resource wrappers ──
-
 type JobDTO = import("@ofp/shared").JobDTO;
 type CustomerDTO = import("@ofp/shared").CustomerDTO;
 type ActivityDTO = import("@ofp/shared").ActivityDTO;
 type ReportSummaryDTO = import("@ofp/shared").ReportSummaryDTO;
 type UserDTO = import("@ofp/shared").UserDTO;
 type RecurringJobDTO = import("@ofp/shared").RecurringJobDTO;
+
+export interface OrgSettingsDTO {
+  id: string;
+  name: string;
+  timezone: string;
+  logoUrl?: string | null;
+  brandColor: string;
+  documentFooter?: string | null;
+  publicEmail?: string | null;
+  publicPhone?: string | null;
+  publicAddress?: string | null;
+  removeOpenFieldProAttribution: boolean;
+  updatedAt?: string;
+  createdAt?: string;
+}
 
 interface CatalogItemDTO {
   id: string;
@@ -237,6 +247,11 @@ export const api = {
   publicBook: (orgId: string, body: { name: string; email?: string; phone?: string; title?: string; description?: string }) =>
     request<{ ok: boolean }>(`/api/public/${orgId}/book`, { method: "POST", body: JSON.stringify(body) }),
 
+  // ── Organization settings ──
+  org: () => request<OrgSettingsDTO>("/api/org/me"),
+  patchOrg: (body: Partial<Pick<OrgSettingsDTO, "name" | "timezone" | "logoUrl" | "brandColor" | "documentFooter" | "publicEmail" | "publicPhone" | "publicAddress" | "removeOpenFieldProAttribution">>) =>
+    request<OrgSettingsDTO>("/api/org/me", { method: "PATCH", body: JSON.stringify(body) }),
+
   jobs: () => request<JobDTO[]>("/api/jobs"),
   job: (id: string) => request<JobDTO>(`/api/jobs/${id}`),
   patchJob: (id: string, data: Record<string, unknown>) =>
@@ -260,6 +275,7 @@ export const api = {
   appointments: () => request<Appointment[]>("/api/appointments"),
   createAppointment: (body: { jobId: string; technicianId?: string; startsAt: string; endsAt: string }) =>
     request<Appointment>("/api/appointments", { method: "POST", body: JSON.stringify(body) }),
+
   invoices: () => request<Invoice[]>("/api/invoices"),
   invoice: (id: string) => request<InvoiceDetail>(`/api/invoices/${id}`),
   createInvoice: (body: { jobId: string; dueAt?: string }) =>
@@ -307,23 +323,19 @@ export const api = {
   users: () => request<UserDTO[]>("/api/users"),
   recurring: () => request<RecurringJobDTO[]>("/api/recurring"),
 
-  // ── Settings / Users ──
   patchUser: (id: string, body: { role?: string }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteUser: (id: string) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
 
-  // ── Notifications ──
   notifications: () => request<NotificationDTO[]>("/api/notifications"),
   unreadNotificationCount: () => request<{ count: number }>("/api/notifications/unread-count"),
   markNotificationRead: (id: string) => request<void>(`/api/notifications/${id}/read`, { method: "PATCH" }),
   markAllNotificationsRead: () => request<void>("/api/notifications/read-all", { method: "POST" }),
 
-  // ── Search ──
   search: (q: string) => {
     const params = new URLSearchParams({ q });
     return request<SearchResults>(`/api/search?${params}`);
   },
 
-  // ── Equipment ──
   equipment: (q?: { customerId?: string }) => {
     const params = new URLSearchParams();
     if (q?.customerId) params.set("customerId", q.customerId);
@@ -337,7 +349,6 @@ export const api = {
   deleteEquipment: (id: string) =>
     request<void>(`/api/equipment/${id}`, { method: "DELETE" }),
 
-  // ── Plugins / Integrations ──
   plugins: () => request<PluginCatalogEntry[]>("/api/plugins"),
   pluginInstalls: () => request<PluginInstall[]>("/api/plugins/installs"),
   installPlugin: (body: { pluginId: string; webhookUrl?: string; config?: Record<string, unknown> }) =>
@@ -353,7 +364,6 @@ export const api = {
     return request<PluginEvent[]>(`/api/plugins/events${qs}`);
   },
 
-  // ── Catalog / Price Book ──
   catalogCategories: () => request<{ id: string; name: string; description?: string | null }[]>("/api/catalog/categories"),
   createCatalogCategory: (body: { name: string; description?: string }) =>
     request<{ id: string; name: string; description?: string | null }>("/api/catalog/categories", { method: "POST", body: JSON.stringify(body) }),
