@@ -9,6 +9,7 @@ import { StatCard } from "@/components/stat-card";
 import { JobStatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { SponsorSlot } from "@/components/sponsor-slot";
 
 export default async function Dashboard() {
   // Fetch all data in parallel, degrade gracefully on failures
@@ -109,6 +110,8 @@ export default async function Dashboard() {
           </div>
         </Card>
       )}
+
+      <SponsorSlot />
 
       {/* ── Stat cards ── */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 mb-8">
