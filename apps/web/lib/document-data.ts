@@ -1,4 +1,5 @@
 import { renderFieldDocumentHtml, type FieldDocumentData } from "@ofp/shared";
+import type { OrgSettingsDTO } from "@/lib/api";
 
 interface CustomerLike {
   name: string;
@@ -35,6 +36,16 @@ function issuedDate(value?: string | null) {
   return value ? new Date(value).toLocaleDateString() : new Date().toLocaleDateString();
 }
 
+function brandingForDocument(org?: OrgSettingsDTO | null, fallbackFooter = "Field service command center document"): FieldDocumentData["branding"] {
+  return {
+    companyName: org?.name ?? "OpenFieldPro Demo Co.",
+    logoUrl: org?.logoUrl ?? undefined,
+    brandColor: org?.brandColor ?? "#22C55E",
+    footerText: org?.documentFooter ?? fallbackFooter,
+    removeOpenFieldProAttribution: org?.removeOpenFieldProAttribution ?? false,
+  };
+}
+
 function lineItemsForDocument(lineItems: LineItemLike[], fallbackTotalCents: number): FieldDocumentData["lineItems"] {
   if (lineItems.length > 0) {
     return lineItems.map((item) => ({
@@ -51,11 +62,13 @@ export function invoiceDocumentHtml({
   customer,
   job,
   lineItems,
+  org,
 }: {
   invoice: InvoiceLike & { total: number };
   customer: CustomerLike | null;
   job: JobLike | null;
   lineItems: LineItemLike[];
+  org?: OrgSettingsDTO | null;
 }) {
   const paid = invoice.payments?.reduce((sum, payment) => sum + payment.amount, 0) ?? 0;
   return renderFieldDocumentHtml({
@@ -71,12 +84,7 @@ export function invoiceDocumentHtml({
     notes: job?.description ?? null,
     lineItems: lineItemsForDocument(lineItems, invoice.total),
     paymentsCents: paid,
-    branding: {
-      companyName: "OpenFieldPro Demo Co.",
-      brandColor: "#22C55E",
-      footerText: "Field service command center document",
-      removeOpenFieldProAttribution: false,
-    },
+    branding: brandingForDocument(org),
   });
 }
 
@@ -85,11 +93,13 @@ export function estimateDocumentHtml({
   customer,
   job,
   lineItems,
+  org,
 }: {
   estimate: EstimateLike & { total: number };
   customer: CustomerLike | null;
   job: JobLike | null;
   lineItems: LineItemLike[];
+  org?: OrgSettingsDTO | null;
 }) {
   return renderFieldDocumentHtml({
     kind: "estimate",
@@ -103,11 +113,6 @@ export function estimateDocumentHtml({
     notes: job?.description ?? "Estimate is valid pending final service conditions and customer approval.",
     lineItems: lineItemsForDocument(lineItems, estimate.total),
     paymentsCents: 0,
-    branding: {
-      companyName: "OpenFieldPro Demo Co.",
-      brandColor: "#22C55E",
-      footerText: "Estimate generated from OpenFieldPro",
-      removeOpenFieldProAttribution: false,
-    },
+    branding: brandingForDocument(org, "Estimate generated from OpenFieldPro"),
   });
 }
