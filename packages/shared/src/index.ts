@@ -1,3 +1,5 @@
+export * from "./sponsors.js";
+
 // Shared domain enums + DTO types used by api, web, and mobile.
 
 export const JOB_STATUS = [
