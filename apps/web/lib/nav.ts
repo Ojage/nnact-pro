@@ -9,7 +9,7 @@ export const NAV_LINKS = [
   { href: "/estimates", label: "Estimates", icon: "◷" },
   { href: "/invoices", label: "Invoices", icon: "◎" },
   { href: "/service-plans", label: "Service Plans", icon: "◌" },
-  { href: "/documents/preview", label: "Documents", icon: "▤" },
+  { href: "/documents", label: "Documents", icon: "▤" },
   { href: "/price-book", label: "Price Book", icon: "⊡" },
   { href: "/reviews", label: "Reviews", icon: "★" },
   { href: "/reports", label: "Reports", icon: "◫" },
