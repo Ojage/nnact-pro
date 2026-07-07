@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch src/dev.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test": "node --import tsx --experimental-test-module-mocks --test test/*.test.ts"
+    "test": "node --import tsx --experimental-test-module-mocks --test test/*.test.ts",
+    "license:generate": "tsx scripts/make-license-key.ts",
+    "license:verify": "tsx scripts/verify-license-key.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
@@ -17,12 +19,15 @@
     "@ofp/shared": "workspace:*",
     "drizzle-orm": "^0.36.0",
     "fastify": "^5.1.0",
+    "file-type": "^19.6.0",
+    "mustache": "^4.2.0",
     "zod": "^3.23.8"
   },
   "optionalDependencies": {
     "stripe": "^17.4.0"
   },
   "devDependencies": {
+    "@types/mustache": "^4.2.5",
     "@types/node": "^20",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
