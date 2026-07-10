@@ -30,11 +30,13 @@ import { orgSettingsRoutes } from "./routes/org-settings.js";
 import { diagnosticRoutes } from "./routes/diagnostics.js";
 import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
 import { diagnosticOutputRoutes } from "./routes/diagnostic-outputs.js";
+import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
   app.register(cors, { origin: true });
   app.register(jwt, { secret: process.env.JWT_SECRET ?? "change-me-in-production" });
+  app.addHook("preHandler", diagnosticAuthoringGuard);
   app.register(healthRoutes);
   app.register(authRoutes, { prefix: "/api/auth" });
   app.register(customerRoutes, { prefix: "/api/customers" });
