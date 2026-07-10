@@ -2,7 +2,18 @@
 // OpenFieldPro keeps the complete field-service operations core while making
 // appliance diagnostic execution the primary field workflow.
 
-export const NAV_SECTIONS = [
+export interface NavLink {
+  href: string;
+  label: string;
+  icon: string;
+}
+
+export interface NavSection {
+  label: string;
+  links: NavLink[];
+}
+
+export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Field",
     links: [
@@ -40,9 +51,9 @@ export const NAV_SECTIONS = [
       { href: "/settings", label: "Settings", icon: "⚙" },
     ],
   },
-] as const;
+];
 
-export const NAV_LINKS = NAV_SECTIONS.flatMap((section) => section.links);
+export const NAV_LINKS: NavLink[] = NAV_SECTIONS.flatMap((section) => section.links);
 
 export function decodeJwt(token: string): { name?: string; email?: string; role?: string } | null {
   try {
