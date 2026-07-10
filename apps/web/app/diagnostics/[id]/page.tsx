@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { diagnosticsApi } from "@/lib/diagnostics-api";
+import { diagnosticsApi, type DiagnosticSessionDetail } from "@/lib/diagnostics-api";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { DiagnosticSessionClient } from "./session-client";
+import { CompletionPanel } from "./completion-panel";
 
 export default async function DiagnosticSessionPage({
   params,
@@ -11,7 +12,7 @@ export default async function DiagnosticSessionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  let detail;
+  let detail: DiagnosticSessionDetail;
   try {
     detail = await diagnosticsApi.session(id);
   } catch {
@@ -29,7 +30,9 @@ export default async function DiagnosticSessionPage({
         description={
           <span>
             {detail.job.title} · {detail.session.status.replaceAll("_", " ")}
-            {detail.workflow ? ` · ${detail.workflow.name} v${detail.session.workflowVersion ?? detail.workflow.versionNumber}` : " · coverage required"}
+            {detail.workflow
+              ? ` · ${detail.workflow.name} v${detail.session.workflowVersion ?? detail.workflow.versionNumber}`
+              : " · coverage required"}
           </span>
         }
         actions={
@@ -44,6 +47,12 @@ export default async function DiagnosticSessionPage({
         }
       />
       <DiagnosticSessionClient initialDetail={detail} />
+      <CompletionPanel
+        sessionId={detail.session.id}
+        initialStatus={detail.session.status}
+        initialDisposition={detail.session.disposition}
+        initialSummary={detail.session.summary}
+      />
     </div>
   );
 }
