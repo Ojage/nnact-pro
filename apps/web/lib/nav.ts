@@ -27,6 +27,7 @@ export const NAV_SECTIONS = [
   {
     label: "Quality",
     links: [
+      { href: "/diagnostic-library", label: "Diagnostic Library", icon: "⌘" },
       { href: "/coverage", label: "Coverage & Quality", icon: "◇" },
       { href: "/reviews", label: "Reviews", icon: "★" },
       { href: "/reports", label: "Reports", icon: "◫" },
