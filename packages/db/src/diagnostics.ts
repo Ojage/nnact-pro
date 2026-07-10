@@ -167,11 +167,11 @@ export const diagnosticSteps = pgTable(
     passInterpretation: text("pass_interpretation"),
     failInterpretation: text("fail_interpretation"),
     branchRules: jsonb("branch_rules")
-      .$type<{ passStepKey?: string; failStepKey?: string; ranges?: Array<Record<string, unknown>> }>()
+      .$type<Record<string, unknown>>()
       .default(sql`'{}'::jsonb`)
       .notNull(),
     sourceRefs: jsonb("source_refs")
-      .$type<Array<{ document: string; revision?: string; page?: number; note?: string }>>()
+      .$type<Array<Record<string, unknown>>>()
       .default(sql`'[]'::jsonb`)
       .notNull(),
     accessibilityNote: text("accessibility_note"),
