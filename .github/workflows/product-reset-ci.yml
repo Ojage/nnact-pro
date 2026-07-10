@@ -10,36 +10,60 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  api:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-
+          node-version: 22
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
-
       - name: Install workspace
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Build database package
+        run: pnpm install --no-frozen-lockfile --reporter=silent
+      - name: Generate database schema
         run: pnpm --filter @ofp/db generate
         env:
           DATABASE_URL: postgres://ofp:ofp@localhost:5432/ofp
-
       - name: Build API
         run: pnpm --filter @ofp/api build
-
       - name: Run API tests
         run: pnpm --filter @ofp/api test
 
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Install workspace
+        run: pnpm install --no-frozen-lockfile --reporter=silent
       - name: Build web application
-        run: pnpm --filter @ofp/web build
+        run: |
+          set +e
+          pnpm --filter @ofp/web build > /tmp/openfieldpro-web-build.log 2>&1
+          code=$?
+          tail -n 140 /tmp/openfieldpro-web-build.log
+          exit $code
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Install workspace
+        run: pnpm install --no-frozen-lockfile --reporter=silent
+      - name: Type-check technician app
+        run: pnpm --filter @ofp/mobile typecheck
