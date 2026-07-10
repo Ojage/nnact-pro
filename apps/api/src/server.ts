@@ -28,6 +28,7 @@ import { pluginApiRoutes } from "./routes/plugin-api.js";
 import { servicePlanRoutes } from "./routes/service-plans.js";
 import { orgSettingsRoutes } from "./routes/org-settings.js";
 import { diagnosticRoutes } from "./routes/diagnostics.js";
+import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -53,6 +54,7 @@ export function buildServer() {
   app.register(userRoutes, { prefix: "/api/users" });
   app.register(equipmentRoutes, { prefix: "/api/equipment" });
   app.register(diagnosticRoutes, { prefix: "/api/diagnostics" });
+  app.register(diagnosticOfflineRoutes, { prefix: "/api/diagnostics" });
   app.register(notificationRoutes, { prefix: "/api/notifications" });
   app.register(searchRoutes, { prefix: "/api/search" });
   app.register(pluginRoutes, { prefix: "/api/plugins" }); // owner-facing mgmt
