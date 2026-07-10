@@ -14,15 +14,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     pathname === "/portal" ||
     pathname.startsWith("/portal/");
 
-  if (isPublicSurface) {
-    return <>{children}</>;
-  }
+  if (isPublicSurface) return <>{children}</>;
 
   return (
     <>
       <Sidebar />
       <MobileNav />
-      <main className="ml-0 md:ml-56 min-h-screen p-4 pt-16 md:p-8">{children}</main>
+      <main className="ml-0 md:ml-64 min-h-screen p-4 pt-16 md:p-8">{children}</main>
       <CommandPalette />
     </>
   );
