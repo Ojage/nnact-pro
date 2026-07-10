@@ -1,25 +1,50 @@
 # OpenFieldPro
 
-Open-source, self-hostable **field service management** for service businesses.
-CRM, scheduling/dispatch, work orders, estimates, invoicing, payments, reminders,
-reviews, reporting, service plans, and mobile technician workflows for home-service businesses
-(HVAC, plumbing, electrical, cleaning, appliance repair, and adjacent trades).
+Open-source, self-hostable **field service operations with appliance diagnostic execution**.
 
-> **Status: Product foundation.** The full-stack spine is in place and runs end-to-end
-> (Postgres → Drizzle → Fastify API → Next web, plus an Expo technician app and the infra
-> compose). The branded landing page, service-plan foundation, sponsor-config foundation,
-> organization branding settings, branded document renderer, and self-hosting operator scripts are now part of the repo.
+OpenFieldPro keeps the complete operations workflow service businesses expect—CRM, scheduling and dispatch, work orders, estimates, invoicing, payments, reminders, reviews, reporting, service plans, documents, and mobile technician workflows—then adds an appliance-specific diagnostic layer that connects the exact equipment record, complaint, meter points, measured results, and validated wiring evidence.
+
+> **Status: product foundation with diagnostic-core implementation in progress.**
+> The full-stack operations spine runs end-to-end. The diagnostic domain, API,
+> technician command center, workflow intake, measurement capture, coverage dashboard,
+> publication gates, and field correction loop are now part of the product direction.
+
+## Product architecture
+
+### Operations core
+
+- Customers, properties, equipment, and service history
+- Scheduling, dispatch, jobs, and return visits
+- Price book, estimates, approvals, invoices, and payments
+- Photos, documents, organization branding, reviews, and service plans
+- Reporting, integrations, self-hosting, backup, and restore
+
+### Diagnostic core
+
+- Job-to-appliance binding
+- Explicit validated, pilot, experimental, unsupported, suspended, and retired states
+- Diagnostic sessions separate from commercial job status
+- Field Mode for direct component and circuit checks
+- Guided Mode for symptom- and error-code-led diagnosis
+- Exact meter points, operating conditions, expected readings, and interpretations
+- Actual measurement capture before branching
+- Validated trace routes with continuity, island, branch, and visual-audit gates
+- Diagnostic completion, inconclusive, unsupported, and escalation dispositions
+- Field correction reports, including safety-critical workflow suspension
+- Coverage and quality reporting
+
+OpenFieldPro does not claim to replace a qualified technician. It makes diagnostic reasoning visible, executable, recordable, and auditable inside the work-order lifecycle.
 
 ## Stack
 
-| Layer | Tech |
+| Layer | Technology |
 |---|---|
 | Backend | Fastify 5 + TypeScript + Drizzle ORM + Zod |
 | Frontend | Next.js 15 (App Router, RSC) |
 | Mobile | React Native (Expo) |
 | Database | PostgreSQL 16 + PostGIS |
-| Queue | Redis + BullMQ *(wired in Phase 2 for reminders)* |
-| Storage | MinIO (S3-compatible) |
+| Queue | Redis + BullMQ |
+| Storage | MinIO / S3-compatible storage |
 | Infra | Podman/Docker Compose + Caddy |
 
 Monorepo via pnpm workspaces: `apps/{api,web,mobile}`, `packages/{db,shared}`.
@@ -29,14 +54,15 @@ Monorepo via pnpm workspaces: `apps/{api,web,mobile}`, `packages/{db,shared}`.
 ```bash
 cp .env.example .env
 pnpm install
-pnpm infra:up        # postgres + redis + minio + caddy (podman or docker)
-pnpm db:push         # create tables from the Drizzle schema
-pnpm db:seed         # demo org + customers + a job + invoice
-pnpm dev             # api on :3001, web on :3000
-# open http://localhost:3000  (or http://localhost:8080 via Caddy)
+pnpm infra:up
+pnpm db:push
+pnpm db:seed
+pnpm dev
+# Web: http://localhost:3000
+# API: http://localhost:3001
 ```
 
-Run the unit check (no database needed):
+Run the API unit tests:
 
 ```bash
 pnpm --filter @ofp/api test
@@ -44,66 +70,85 @@ pnpm --filter @ofp/api test
 
 ## What works today
 
-- **Multi-tenant schema** for core field-service concepts: orgs, users/technicians,
-  customers, properties, jobs (work orders), line items, estimates, invoices, payments,
-  appointments, service plans, plan enrollments, and plan visits. Money is integer cents throughout.
-- **Auth**: `POST /api/auth/register` (creates org + owner), `POST /api/auth/login`,
-  `GET /api/auth/me`. JWT via `@fastify/jwt`; passwords hashed with stdlib scrypt + constant-time
-  verify. Org is resolved from the verified token (header/first-org fallback in dev only).
-  Demo login: `owner@demo.test` / `demo12345` after seeding.
-- **Scheduling/dispatch**: `GET/POST /api/appointments` (with `?from&to` range),
-  `PATCH /api/appointments/:id` (reschedule/reassign — the backend for calendar drag-drop).
-  Booking a job auto-moves it to `scheduled`.
-- **Invoicing + payments**: line items (`/api/jobs/:id/line-items`) recompute the job
-  total; `POST /api/invoices` generates a numbered invoice from a job; `POST /api/invoices/:id/pay`
-  records offline payments (cash/check/card) and flips status to `paid` when covered (partials and
-  overpayment handled). Online card via `POST /api/invoices/:id/checkout` (Stripe-optional, returns
-  501 with guidance when unconfigured) + a **signature-verified** `/api/stripe/webhook`. Web invoices view.
-- **Documents**: shared branded HTML renderer, `/documents` hub, invoice/estimate previews, organization branding, and direct HTML export routes for print/save-as-PDF workflows.
-- **Organization branding**: `/settings` includes company name, brand color, logo URL, public contact details, document footer, and attribution removal settings.
-- **Service plans**: schema, API routes, shared DTOs, navigation, and a starter web page at `/service-plans`.
-- **API**: `customers` + `jobs` CRUD, `GET /api/health`. Zod-validated, org-scoped.
-- **Web**: dashboard, customers table, schedule view, sign-in form, branded landing page, documents, settings, and service plans.
-- **Mobile**: technician job list (Expo).
-- **Plugins/integrations**: plugin registry, installs, scoped API tokens, outbound event journal, and plugin API surface.
-- **Sponsor config**: local static sponsor configuration example with no tracking/ad-network dependency.
-- **Self-hosting**: install, update, backup, and restore helper scripts under `scripts/`.
-- **Tests**: money math (3/3) + password hashing (4/4), both runnable with zero install via
-  `node --experimental-strip-types --test`.
+### Operations
 
-## Roadmap to full field-service suite parity
+- Multi-tenant organizations, users, roles, customers, properties, equipment, and jobs
+- JWT authentication and org-scoped APIs
+- Appointment scheduling and reassignment
+- Estimates, line items, invoices, offline payments, and optional Stripe checkout
+- Branded invoice and estimate previews/exports
+- Reviews, recurring work, service-plan foundation, reporting, notifications, and search
+- Technician mobile application foundation
+- Plugin registry, scoped API tokens, outbound events, and integration surface
+- Self-hosting install, update, backup, and restore helpers
 
-Each row is one vertical slice on the existing spine (schema → API route → web page).
+### Diagnostic foundation
 
-| Phase | Module | Notes |
-|---|---|---|
-| 1 ✅ | Customers, Jobs, Dashboard | done — the reference slice |
-| 2 ✅ | Auth & orgs (JWT) | done — scrypt + `@fastify/jwt`; token-scoped tenancy |
-| 2 ✅ | Scheduling / dispatch | done — appointments API + schedule view; drag-assign UI is the next polish on the existing PATCH |
-| 2 ✅ | Estimates → accept → convert to job | done — create from job, accept advances job to scheduled |
-| 3 ✅ | Invoicing + line-item editor | done — line items recompute job totals; invoice generated from job; PDF/email is the next polish |
-| 3 ✅ | Online payments | done — offline `/pay` (cash/check/card) + Stripe-optional `/checkout` + signature-verified webhook |
-| 3 ✅ | Reminders & notifications | done — `@ofp/worker` sends appointment reminders via pluggable `notify` (ntfy/console; SMS/email plug in) |
-| 4 ✅ | Online booking page | done — public `POST /api/public/:orgId/book` → `lead` job (no auth) |
-| 4 ✅ | Recurring jobs, reviews, reporting | done — recurring templates materialized by the worker; reviews API; `/api/reports/summary` |
-| 5 ◐ | Documents + branding | branded HTML preview/export and org branding done — server-side PDF and email delivery remain |
-| 5 ◐ | Service plans | foundation done — customer profile integration, renewal worker, and customer portal view remain |
-| 5 ◐ | Sponsor slot | config foundation done — dashboard/mobile components and Pro removal toggle remain |
-| 5 ◐ | Self-hosting polish | scripts added — permissions, platform testing, and release packaging remain |
+- Diagnostic workflow, step, trace-route, session, measurement, and correction schemas
+- Job-to-equipment link model
+- Diagnostic API for workflow authoring, publishing, sessions, measurements, coverage, and corrections
+- Publication guard requiring field-ready labels and validated checks
+- Automatic suspension of workflows receiving safety-critical correction reports
+- Web diagnostic command center
+- Diagnostic session intake that requires an exact job and appliance
+- Explicit coverage-required fallback when no workflow applies
+- Field/Guided execution surface with actual measurement capture
+- Wiring-evidence panel showing route endpoints and validation status
+- Coverage and quality dashboard
+- Technician-first Today dashboard
+- Technician mobile home centered on next appointment and diagnostic attention
 
-See `docs/release/final-product-roadmap.md` for the full final-product checklist.
+## Diagnostic trust model
 
-## Deploy
+A workflow cannot be published merely because content exists. Executable checks must include:
 
-One command builds the images, runs migrations + seed, and brings the whole stack up behind
-Caddy on `:8080` (works with podman or docker compose):
+1. Technician-facing label
+2. Meter or tool mode
+3. Exact Point 1 and Point 2
+4. Operating condition
+5. Expected result
+6. Validated step status
+7. At least one attached trace route
+8. Route continuity
+9. No disconnected islands
+10. No unintended branches
+11. Passed visual trace audit
+
+Unsupported or unresolved equipment remains explicitly unsupported. OpenFieldPro must not invent a field path from unreviewed output.
+
+## Product surfaces
+
+- `/` — technician-first Today dashboard with operations snapshot
+- `/diagnostics` — active diagnostic command center
+- `/diagnostics/new` — job, appliance, complaint, and workflow intake
+- `/diagnostics/:id` — Field/Guided execution and measurement capture
+- `/coverage` — workflow coverage, demand, and quality state
+- Existing operations pages remain available for schedule, pipeline, customers, estimates, invoices, documents, service plans, price book, reviews, reporting, integrations, and settings.
+
+## Database setup
+
+Drizzle includes:
+
+```text
+packages/db/src/schema.ts
+packages/db/src/service-plans.ts
+packages/db/src/diagnostics.ts
+```
+
+Apply the schema after pulling diagnostic-core changes:
+
+```bash
+pnpm db:push
+```
+
+## Deployment
 
 ```bash
 ./deploy.sh           # Linux/macOS
 .\deploy.ps1          # Windows
 ```
 
-Operator scripts:
+Operator helpers:
 
 ```bash
 scripts/install.sh
@@ -112,16 +157,17 @@ scripts/backup.sh
 scripts/restore.sh backups/YYYYMMDD-HHMMSS
 ```
 
-Then:
+For a public host, configure the production Caddyfile and real values for `JWT_SECRET`, `POSTGRES_PASSWORD`, storage, and payment credentials.
 
-- **App** → http://localhost:8080  ·  **Landing** → http://localhost:8080/welcome
-- **API** → http://localhost:8080/api/health  ·  **Login** → `owner@demo.test` / `demo12345`
+## Product roadmap
 
-For a public host, point the `:8080` block in `infra/Caddyfile.prod` at your domain (Caddy
-auto-provisions HTTPS) and set real secrets in `.env` (`JWT_SECRET`, `POSTGRES_PASSWORD`,
-and `STRIPE_*` if you want online card payments). Services: `api`, `web`, `worker`, `postgres`,
-`redis`, `minio`, `caddy` (see `infra/compose.prod.yml`).
+The roadmap deliberately advances two connected tracks:
+
+1. **Operations parity:** complete the customer portal, technician job completion, dispatch polish, communication, accounting export, and release packaging.
+2. **Diagnostic differentiation:** deliver real diagram rendering, offline workflow packages, authoring and review tools, workflow version immutability, escalation packets, and validated model-family pilots.
+
+See `docs/release/final-product-roadmap.md` and `docs/product/openfieldpro-v2-spec.md`.
 
 ## License
 
-See [LICENSE]. Self-host freely.
+See [LICENSE]. Self-host according to the repository license terms.
