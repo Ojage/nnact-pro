@@ -27,9 +27,21 @@ jobs:
         env:
           DATABASE_URL: postgres://ofp:ofp@localhost:5432/ofp
       - name: Build API
-        run: pnpm --filter @ofp/api build
+        run: |
+          set +e
+          pnpm --filter @ofp/api build > /tmp/openfieldpro-api-build.log 2>&1
+          code=$?
+          tail -n 120 /tmp/openfieldpro-api-build.log
+          exit $code
       - name: Run API tests
         run: pnpm --filter @ofp/api test
+      - name: Upload API compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-compiler-log
+          path: /tmp/openfieldpro-api-build.log
+          if-no-files-found: ignore
 
   web:
     runs-on: ubuntu-latest
@@ -52,6 +64,13 @@ jobs:
           exit $code
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001
+      - name: Upload web compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-compiler-log
+          path: /tmp/openfieldpro-web-build.log
+          if-no-files-found: ignore
 
   mobile:
     runs-on: ubuntu-latest
@@ -66,4 +85,16 @@ jobs:
       - name: Install workspace
         run: pnpm install --no-frozen-lockfile --reporter=silent
       - name: Type-check technician app
-        run: pnpm --filter @ofp/mobile typecheck
+        run: |
+          set +e
+          pnpm --filter @ofp/mobile typecheck > /tmp/openfieldpro-mobile-typecheck.log 2>&1
+          code=$?
+          tail -n 120 /tmp/openfieldpro-mobile-typecheck.log
+          exit $code
+      - name: Upload mobile compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-typecheck-log
+          path: /tmp/openfieldpro-mobile-typecheck.log
+          if-no-files-found: ignore
