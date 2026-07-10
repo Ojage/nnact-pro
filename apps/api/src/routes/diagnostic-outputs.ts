@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   activities,
   db,
@@ -80,7 +80,9 @@ async function loadOutput(orgId: string, sessionId: string) {
         : null,
       readings: readings.map(({ measurement, step }) => ({
         check: step.publicLabel,
-        points: [step.point1Label, step.point2Label].filter(Boolean),
+        points: [step.point1Label, step.point2Label].filter(
+          (value): value is string => Boolean(value),
+        ),
         operatingCondition: step.operatingCondition,
         expected: step.expectedText,
         actual:
@@ -131,7 +133,7 @@ export async function diagnosticOutputRoutes(app: FastifyInstance) {
         summary: parsed.data.summary,
         status: parsed.data.status,
         ...(parsed.data.status === "completed" ? { completedAt: new Date() } : {}),
-        version: diagnosticSessions.version,
+        version: sql`${diagnosticSessions.version} + 1`,
         updatedAt: new Date(),
       })
       .where(
