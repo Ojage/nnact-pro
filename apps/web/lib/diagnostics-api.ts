@@ -135,6 +135,7 @@ export interface DiagnosticSession {
   serviceTests: Array<{ name: string; result?: string; note?: string }>;
   disposition?: string | null;
   summary?: string | null;
+  version: number;
   startedAt: string;
   completedAt?: string | null;
   updatedAt: string;
@@ -174,6 +175,44 @@ export interface CoverageResponse {
   };
 }
 
+export interface DiagnosticOutput {
+  sessionId: string;
+  jobId: string;
+  technician: {
+    appliance: string;
+    serialNumber?: string | null;
+    complaint?: string | null;
+    observation?: string | null;
+    errorCodes: string[];
+    workflow: {
+      name: string;
+      version: number;
+      supportStatus: string;
+      sourceRevision?: string | null;
+    } | null;
+    readings: Array<{
+      check: string;
+      points: string[];
+      operatingCondition?: string | null;
+      expected?: string | null;
+      actual: string;
+      result: string;
+      note?: string | null;
+      recordedAt: string;
+    }>;
+    disposition: string;
+    summary: string;
+    status: string;
+  };
+  customer: {
+    appliance: string;
+    concern: string;
+    finding: string;
+    recommendation: string;
+    limitation?: string | null;
+  };
+}
+
 export const diagnosticsApi = {
   overview: () => diagnosticRequest<DiagnosticOverview>("/api/diagnostics/overview"),
   coverage: () => diagnosticRequest<CoverageResponse>("/api/diagnostics/coverage"),
@@ -182,6 +221,78 @@ export const diagnosticsApi = {
     diagnosticRequest<{ workflow: DiagnosticWorkflow; steps: DiagnosticStep[] }>(
       `/api/diagnostics/workflows/${id}`,
     ),
+  createWorkflow: (body: {
+    name: string;
+    productType: string;
+    make?: string;
+    modelFamily?: string;
+    sourceRevision?: string;
+    supportStatus?: DiagnosticWorkflow["supportStatus"];
+    lifecycleStatus?: string;
+    applicability?: { models?: string[]; excludedModels?: string[]; notes?: string[] };
+    limitations?: string[];
+  }) =>
+    diagnosticRequest<DiagnosticWorkflow>("/api/diagnostics/workflows", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  addStep: (
+    workflowId: string,
+    body: {
+      stepKey: string;
+      publicLabel: string;
+      sequence?: number;
+      mode?: "field" | "guided" | "both";
+      stepType?: "check" | "decision" | "reference" | "stop";
+      purpose?: string;
+      safetyState?: string;
+      powerState?: string;
+      operatingCondition?: string;
+      meterMode?: string;
+      point1Label?: string;
+      point1Endpoint?: string;
+      point2Label?: string;
+      point2Endpoint?: string;
+      connector?: string;
+      pin?: string;
+      wireColor?: string;
+      expectedText?: string;
+      unit?: string;
+      passInterpretation?: string;
+      failInterpretation?: string;
+      branchRules?: Record<string, unknown>;
+      sourceRefs?: Array<Record<string, unknown>>;
+      accessibilityNote?: string;
+      validationStatus?: string;
+    },
+  ) =>
+    diagnosticRequest<DiagnosticStep>(`/api/diagnostics/workflows/${workflowId}/steps`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  addRoute: (
+    stepId: string,
+    body: {
+      label: string;
+      routeKind: string;
+      endpoint1?: string;
+      endpoint2?: string;
+      segmentIds?: string[];
+      continuityValid?: boolean;
+      disconnectedIslands?: number;
+      unintendedBranches?: number;
+      visualAuditStatus?: string;
+      validationNotes?: string;
+    },
+  ) =>
+    diagnosticRequest<TraceRoute>(`/api/diagnostics/steps/${stepId}/routes`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  publishWorkflow: (workflowId: string) =>
+    diagnosticRequest<DiagnosticWorkflow>(`/api/diagnostics/workflows/${workflowId}/publish`, {
+      method: "POST",
+    }),
   sessions: (query?: { jobId?: string; equipmentId?: string; status?: string }) => {
     const params = new URLSearchParams();
     if (query?.jobId) params.set("jobId", query.jobId);
@@ -209,6 +320,25 @@ export const diagnosticsApi = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+  completeSession: (
+    id: string,
+    body: {
+      disposition: string;
+      summary: string;
+      status: "diagnosed" | "inconclusive" | "escalated" | "completed";
+    },
+  ) =>
+    diagnosticRequest<DiagnosticOutput>(`/api/diagnostics/sessions/${id}/complete`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  output: (id: string) =>
+    diagnosticRequest<DiagnosticOutput>(`/api/diagnostics/sessions/${id}/output`),
+  estimateHandoff: (id: string) =>
+    diagnosticRequest<{ estimate: { id: string; jobId: string }; created: boolean }>(
+      `/api/diagnostics/sessions/${id}/estimate-handoff`,
+      { method: "POST" },
+    ),
   recordMeasurement: (
     sessionId: string,
     body: {
