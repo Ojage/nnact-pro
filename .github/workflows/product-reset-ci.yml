@@ -1,0 +1,45 @@
+name: Product reset CI
+
+on:
+  pull_request:
+    branches: [ofp-monorepo]
+  push:
+    branches: [product-reset-diagnostic-core]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+      - name: Install workspace
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build database package
+        run: pnpm --filter @ofp/db generate
+        env:
+          DATABASE_URL: postgres://ofp:ofp@localhost:5432/ofp
+
+      - name: Build API
+        run: pnpm --filter @ofp/api build
+
+      - name: Run API tests
+        run: pnpm --filter @ofp/api test
+
+      - name: Build web application
+        run: pnpm --filter @ofp/web build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
