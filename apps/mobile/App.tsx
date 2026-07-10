@@ -1,6 +1,5 @@
-// OpenFieldPro technician app — next-action field dashboard.
-// The operations core stays complete; mobile prioritizes the appointment,
-// appliance, diagnostic state, and work that must be completed in the field.
+// OpenFieldPro technician app — next-action field dashboard with a durable
+// diagnostic-package fallback for low-signal service locations.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -12,7 +11,7 @@ import {
   View,
 } from "react-native";
 import type { JobDTO } from "@ofp/shared";
-import { SyncService } from "./src/sync";
+import { SyncService, type FieldPackage } from "./src/sync";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
 const AUTH_TOKEN = process.env.EXPO_PUBLIC_AUTH_TOKEN ?? "";
@@ -64,10 +63,35 @@ function humanize(value: string) {
 }
 
 function statusColor(status: string) {
-  if (["blocked", "escalated"].includes(status)) return "#ff8080";
+  if (["blocked", "escalated", "suspended"].includes(status)) return "#ff8080";
   if (["diagnosed", "completed"].includes(status)) return "#86e29a";
   if (["testing", "workflow_ready"].includes(status)) return "#7ab8ff";
   return "#e0b34f";
+}
+
+function packageToDiagnostic(fieldPackage: FieldPackage): DiagnosticListItem | null {
+  if (!fieldPackage.session || !fieldPackage.equipment) return null;
+  return {
+    session: fieldPackage.session as unknown as DiagnosticListItem["session"],
+    equipment: fieldPackage.equipment as unknown as DiagnosticListItem["equipment"],
+    workflow: fieldPackage.workflow
+      ? (fieldPackage.workflow as unknown as DiagnosticListItem["workflow"])
+      : null,
+  };
+}
+
+function packageToAppointment(fieldPackage: FieldPackage): Appointment | null {
+  const job = fieldPackage.job as Partial<JobDTO> & { scheduledAt?: string | null };
+  if (!job.id || !job.scheduledAt) return null;
+  const start = new Date(job.scheduledAt);
+  if (Number.isNaN(start.getTime())) return null;
+  return {
+    id: `cached-${job.id}`,
+    jobId: job.id,
+    technicianId: null,
+    startsAt: start.toISOString(),
+    endsAt: new Date(start.getTime() + 90 * 60 * 1000).toISOString(),
+  };
 }
 
 export default function App() {
@@ -76,9 +100,33 @@ export default function App() {
   const [diagnostics, setDiagnostics] = useState<DiagnosticListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [queuedWrites, setQueuedWrites] = useState(0);
   const syncRef = useRef<SyncService | null>(null);
+
+  const loadCached = useCallback(async (): Promise<boolean> => {
+    const packages = await syncRef.current?.listCachedPackages();
+    if (!packages?.length) return false;
+
+    setJobs(packages.map((item) => item.job as unknown as JobDTO));
+    setAppointments(
+      packages.flatMap((item) => {
+        const appointment = packageToAppointment(item);
+        return appointment ? [appointment] : [];
+      }),
+    );
+    setDiagnostics(
+      packages.flatMap((item) => {
+        const diagnostic = packageToDiagnostic(item);
+        return diagnostic ? [diagnostic] : [];
+      }),
+    );
+    setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
+    setOffline(true);
+    return true;
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -91,29 +139,43 @@ export default function App() {
       setJobs(jobRows);
       setAppointments(appointmentRows);
       setDiagnostics(diagnosticRows);
+      setOffline(false);
+      setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      const restored = await loadCached();
+      setError(
+        restored
+          ? "Offline mode — showing downloaded field packages. New readings remain queued until synchronization succeeds."
+          : caught instanceof Error
+            ? caught.message
+            : String(caught),
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [loadCached]);
 
   useEffect(() => {
+    const service = new SyncService({ apiUrl: API, orgId: ORG_ID, token: AUTH_TOKEN });
+    syncRef.current = service;
     void load();
-    syncRef.current = new SyncService({ apiUrl: API, orgId: ORG_ID, token: AUTH_TOKEN });
 
-    const doSync = () => {
-      syncRef.current
-        ?.pull()
-        .then(() => setLastSync(new Date().toLocaleTimeString()))
-        .catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)));
+    const synchronize = async () => {
+      try {
+        const result = await service.pull();
+        setLastSync(new Date().toLocaleTimeString());
+        setQueuedWrites(Math.max(0, result.queuedBeforeFlush - result.flushed));
+        await load();
+      } catch {
+        await loadCached();
+      }
     };
 
-    doSync();
-    const interval = setInterval(doSync, 30_000);
+    void synchronize();
+    const interval = setInterval(() => void synchronize(), 30_000);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [load, loadCached]);
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -127,9 +189,7 @@ export default function App() {
           const starts = new Date(appointment.startsAt);
           return starts >= todayStart && starts < tomorrowStart;
         })
-        .sort(
-          (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
-        ),
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
     [appointments, todayStart.getTime(), tomorrowStart.getTime()],
   );
 
@@ -181,17 +241,25 @@ export default function App() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>OPENFIELDPRO FIELD</Text>
+          <View style={styles.headerStatusRow}>
+            <Text style={styles.eyebrow}>OPENFIELDPRO FIELD</Text>
+            <Text style={[styles.connectivity, { color: offline ? "#e0b34f" : "#86e29a" }]}>
+              {offline ? "OFFLINE" : "ONLINE"}
+            </Text>
+          </View>
           <Text style={styles.headerTitle}>Today</Text>
           <Text style={styles.headerSub}>
             {todayAppointments.length} visit{todayAppointments.length === 1 ? "" : "s"} · {activeDiagnostics.length} active diagnostic{activeDiagnostics.length === 1 ? "" : "s"}
+            {queuedWrites ? ` · ${queuedWrites} queued` : ""}
             {lastSync ? ` · synced ${lastSync}` : ""}
           </Text>
         </View>
 
         {error && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorTitle}>Field data needs attention</Text>
+          <View style={[styles.errorBanner, offline && styles.offlineBanner]}>
+            <Text style={[styles.errorTitle, offline && styles.offlineTitle]}>
+              {offline ? "Working from downloaded field packages" : "Field data needs attention"}
+            </Text>
             <Text style={styles.errorMessage}>{error}</Text>
           </View>
         )}
@@ -212,7 +280,9 @@ export default function App() {
                 </View>
                 <View style={styles.flexOne}>
                   <Text style={styles.cardTitle}>{nextJob?.title ?? "Assigned service job"}</Text>
-                  <Text style={styles.cardMeta}>{nextJob?.status ? humanize(nextJob.status) : "scheduled"}</Text>
+                  <Text style={styles.cardMeta}>
+                    {nextJob?.status ? humanize(nextJob.status) : "scheduled"}
+                  </Text>
                 </View>
               </View>
 
@@ -261,7 +331,9 @@ export default function App() {
           ) : (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>No remaining appointments today</Text>
-              <Text style={styles.emptyText}>Check Jobs for unscheduled work, parts returns, and incomplete diagnostic sessions.</Text>
+              <Text style={styles.emptyText}>
+                Check Jobs for unscheduled work, parts returns, and incomplete diagnostic sessions.
+              </Text>
             </View>
           )}
         </View>
@@ -274,7 +346,9 @@ export default function App() {
           {activeDiagnostics.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>No active diagnostic sessions</Text>
-              <Text style={styles.emptyText}>New sessions will appear after the work order is linked to the exact appliance.</Text>
+              <Text style={styles.emptyText}>
+                New sessions appear after the work order is linked to the exact appliance.
+              </Text>
             </View>
           ) : (
             activeDiagnostics.slice(0, 8).map((item) => (
@@ -282,9 +356,12 @@ export default function App() {
                 <View style={styles.rowBetween}>
                   <View style={styles.flexOne}>
                     <Text style={styles.listTitle}>
-                      {[item.equipment.make, item.equipment.model].filter(Boolean).join(" ") || item.equipment.type}
+                      {[item.equipment.make, item.equipment.model].filter(Boolean).join(" ") ||
+                        item.equipment.type}
                     </Text>
-                    <Text style={styles.cardMeta}>{item.workflow?.name ?? "Unsupported / unresolved"}</Text>
+                    <Text style={styles.cardMeta}>
+                      {item.workflow?.name ?? "Unsupported / unresolved"}
+                    </Text>
                   </View>
                   <Text style={[styles.smallStatus, { color: statusColor(item.session.status) }]}>
                     {humanize(item.session.status)}
@@ -324,7 +401,6 @@ export default function App() {
             );
           })}
         </View>
-
         <View style={{ height: 48 }} />
       </ScrollView>
       <StatusBar style="light" />
@@ -339,30 +415,20 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   loadingText: { color: "#8a97c2", fontSize: 14 },
   header: { paddingHorizontal: 20, marginBottom: 22 },
+  headerStatusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   eyebrow: { color: "#22c55e", fontSize: 10, fontWeight: "800", letterSpacing: 2 },
+  connectivity: { fontSize: 9, fontWeight: "900", letterSpacing: 1.4 },
   headerTitle: { color: "#e6e9f0", fontSize: 32, fontWeight: "800", letterSpacing: -0.8, marginTop: 4 },
   headerSub: { color: "#8a97c2", fontSize: 12, marginTop: 5 },
-  errorBanner: {
-    marginHorizontal: 20,
-    marginBottom: 18,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,128,128,.28)",
-    backgroundColor: "rgba(255,128,128,.08)",
-    padding: 14,
-  },
+  errorBanner: { marginHorizontal: 20, marginBottom: 18, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,128,128,.28)", backgroundColor: "rgba(255,128,128,.08)", padding: 14 },
+  offlineBanner: { borderColor: "rgba(224,179,79,.28)", backgroundColor: "rgba(224,179,79,.08)" },
   errorTitle: { color: "#ff8080", fontSize: 13, fontWeight: "700" },
+  offlineTitle: { color: "#e0b34f" },
   errorMessage: { color: "#8a97c2", fontSize: 11, marginTop: 4 },
   section: { paddingHorizontal: 20, marginBottom: 24 },
   sectionTitle: { color: "#e6e9f0", fontSize: 16, fontWeight: "700", marginBottom: 11 },
   sectionCount: { color: "#6b7aa8", fontSize: 12, fontWeight: "700", marginBottom: 11 },
-  primaryCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(34,197,94,.35)",
-    backgroundColor: "#141b33",
-    padding: 16,
-  },
+  primaryCard: { borderRadius: 18, borderWidth: 1, borderColor: "rgba(34,197,94,.35)", backgroundColor: "#141b33", padding: 16 },
   rowBetween: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   flexOne: { flex: 1, minWidth: 0 },
   timeBlock: { width: 72, borderRadius: 12, backgroundColor: "#0f1630", paddingVertical: 9, alignItems: "center" },
