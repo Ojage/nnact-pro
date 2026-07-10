@@ -1,477 +1,241 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/utils";
+import { diagnosticsApi, type DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import { formatMoney } from "@ofp/shared";
-import type { ActivityDTO, ReportSummaryDTO } from "@ofp/shared";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { StatCard } from "@/components/stat-card";
-import { JobStatusBadge } from "@/components/status-badge";
-import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { SponsorSlot } from "@/components/sponsor-slot";
+import { JobStatusBadge } from "@/components/status-badge";
 
-export default async function Dashboard() {
-  // Fetch all data in parallel, degrade gracefully on failures
-  const [jobsResult, summaryResult, activitiesResult, appointmentsResult, invoicesResult, customersResult] =
+function sessionTone(status: string) {
+  if (status === "blocked") return "bg-yellow/10 text-yellow";
+  if (status === "escalated") return "bg-red/10 text-red";
+  if (["diagnosed", "completed"].includes(status)) return "bg-green/10 text-green";
+  return "bg-blue/10 text-blue";
+}
+
+export default async function TodayPage() {
+  const [jobsResult, appointmentsResult, invoicesResult, customersResult, diagnosticsResult] =
     await Promise.allSettled([
       api.jobs(),
-      api.reports(),
-      api.activities(),
       api.appointments(),
       api.invoices(),
       api.customers(),
+      diagnosticsApi.sessions(),
     ]);
 
   const jobs = jobsResult.status === "fulfilled" ? jobsResult.value : [];
-  const summary: ReportSummaryDTO | null =
-    summaryResult.status === "fulfilled" ? summaryResult.value : null;
-  const activities: ActivityDTO[] =
-    activitiesResult.status === "fulfilled" ? activitiesResult.value : [];
-  const appointments =
-    appointmentsResult.status === "fulfilled" ? appointmentsResult.value : [];
-  const invoices =
-    invoicesResult.status === "fulfilled" ? invoicesResult.value : [];
-  const customers =
-    customersResult.status === "fulfilled" ? customersResult.value : [];
+  const appointments = appointmentsResult.status === "fulfilled" ? appointmentsResult.value : [];
+  const invoices = invoicesResult.status === "fulfilled" ? invoicesResult.value : [];
+  const customers = customersResult.status === "fulfilled" ? customersResult.value : [];
+  const diagnosticSessions: DiagnosticSessionListItem[] =
+    diagnosticsResult.status === "fulfilled" ? diagnosticsResult.value : [];
 
-  const apiDown = jobsResult.status === "rejected";
-  const apiError = apiDown
-    ? ((jobsResult as PromiseRejectedResult).reason as Error)?.message
-    : null;
-
-  // ── Computed metrics ──
-  const scheduled = jobs.filter((j) => j.status === "scheduled").length;
-  const inProgress = jobs.filter((j) => j.status === "in_progress").length;
-  const completed = jobs.filter((j) => j.status === "completed").length;
-  const activeJobs = inProgress + scheduled;
-  const revenue = jobs
-    .filter((j) => j.status === "completed")
-    .reduce((a, j) => a + j.total, 0);
-  const outstandingInvoices = invoices
-    .filter((i) => i.status === "sent" || i.status === "draft")
-    .reduce((a, i) => a + i.total, 0);
-
-  // Upcoming appointments (next 5, future only)
   const now = new Date();
-  const upcoming = appointments
-    .filter((a) => new Date(a.startsAt) > now)
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
-    .slice(0, 5);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
-  // Activity feed (last 10 items)
-  const feed = activities.slice(0, 10);
+  const todayAppointments = appointments
+    .filter((appointment) => {
+      const starts = new Date(appointment.startsAt);
+      return starts >= todayStart && starts < tomorrowStart;
+    })
+    .sort(
+      (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+    );
 
-  // Revenue trend (approximate: compare last 7 days)
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const recentRevenue = jobs
-    .filter((j) => j.status === "completed" && new Date(j.createdAt) > oneWeekAgo)
-    .reduce((a, j) => a + j.total, 0);
+  const activeDiagnostics = diagnosticSessions.filter((item) =>
+    ["workflow_ready", "testing", "blocked", "escalated"].includes(item.session.status),
+  );
+  const blockedDiagnostics = activeDiagnostics.filter(
+    (item) => item.session.status === "blocked" || item.session.status === "escalated",
+  );
+  const outstanding = invoices
+    .filter((invoice) => invoice.status === "draft" || invoice.status === "sent")
+    .reduce((sum, invoice) => sum + invoice.total, 0);
+  const completedRevenue = jobs
+    .filter((job) => job.status === "completed")
+    .reduce((sum, job) => sum + job.total, 0);
+  const apiDown = jobsResult.status === "rejected";
 
   return (
     <div>
-      {/* ── Header ── */}
       <PageHeader
-        title="Dashboard"
-        description={
-          apiDown
-            ? "API unreachable — data unavailable"
-            : `${jobs.length} jobs · ${formatMoney(revenue)} collected · ${customers.length} customers`
-        }
+        title="Today"
+        description="The next appointment, exact appliance, diagnostic state, and work required to close the job."
         actions={
           <div className="flex gap-2">
-            <Link href="/customers">
-              <Button variant="secondary" size="sm">
-                <span className="text-base mr-1">+</span> New Customer
-              </Button>
+            <Link href="/diagnostics/new">
+              <Button variant="secondary" size="sm">Start diagnostic</Button>
             </Link>
             <Link href="/schedule">
-              <Button variant="default" size="sm">
-                <span className="text-base mr-1">⊕</span> New Job
-              </Button>
+              <Button size="sm">Open dispatch</Button>
             </Link>
           </div>
         }
       />
 
-      {/* ── API error banner ── */}
-      {apiError && (
+      {apiDown && (
         <Card className="mb-6 border-red/30 bg-red/5">
-          <div className="flex items-center gap-3">
-            <span className="text-red font-bold">⚠</span>
-            <div>
-              <p className="text-sm text-red font-medium">API unreachable</p>
-              <p className="text-xs text-fg-muted mt-0.5">
-                {apiError}. Start it with{" "}
-                <code className="text-fg-dim">pnpm dev:api</code> and seed with{" "}
-                <code className="text-fg-dim">pnpm db:seed</code>
-              </p>
-            </div>
-          </div>
+          <CardContent className="pt-5">
+            <p className="text-sm font-semibold text-red">Operations API is unreachable</p>
+            <p className="mt-1 text-xs text-fg-muted">Start the API and apply the database schema before using the field workflow.</p>
+          </CardContent>
         </Card>
       )}
 
-      <SponsorSlot />
-
-      {/* ── Stat cards ── */}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 mb-8">
-        <StatCard
-          label="Active jobs"
-          value={String(activeJobs)}
-          icon="◈"
-          href="/schedule"
-          color={activeJobs > 0 ? "#7ab8ff" : undefined}
-        />
-        <StatCard
-          label="Completed"
-          value={String(completed)}
-          icon="✓"
-          color={completed > 0 ? "#86e29a" : undefined}
-        />
-        <StatCard
-          label="Revenue"
-          value={formatMoney(revenue)}
-          icon="⛁"
-          color="#86e29a"
-          trend={
-            recentRevenue > 0
-              ? {
-                  direction: "up" as const,
-                  label: `${formatMoney(recentRevenue)} this week`,
-                }
-              : undefined
-          }
-        />
-        <StatCard
-          label="Outstanding"
-          value={formatMoney(outstandingInvoices)}
-          icon="◎"
-          href="/invoices"
-          color={outstandingInvoices > 0 ? "#e0b34f" : undefined}
-        />
-        <StatCard
-          label="Customers"
-          value={String(customers.length)}
-          icon="⊕"
-          href="/customers"
-          color={customers.length > 0 ? "#7ab8ff" : undefined}
-        />
-        {summary && (
-          <StatCard
-            label="Realized margin"
-            value={formatMoney(summary.realizedMarginCents)}
-            icon="△"
-            color={
-              summary.realizedMarginCents < 0
-                ? "#ff8080"
-                : summary.realizedMarginCents > 0
-                  ? "#86e29a"
-                  : "#e6e9f0"
-            }
-          />
-        )}
-      </div>
-
-      {/* ── Two-column: Job status + Activity feed ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Job status breakdown */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-fg">Job status breakdown</h3>
-            <span className="text-xs text-fg-dim">{jobs.length} total</span>
-          </div>
-          {jobs.length === 0 ? (
-            <EmptyState
-              title="No jobs yet"
-              description="Create your first job to start tracking work"
-            />
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {(
-                ["lead", "scheduled", "in_progress", "completed", "canceled"] as const
-              ).map((status) => {
-                const count = jobs.filter((j) => j.status === status).length;
-                const pct = jobs.length > 0 ? (count / jobs.length) * 100 : 0;
-                return (
-                  <div key={status} className="flex items-center gap-3">
-                    <JobStatusBadge status={status} />
-                    <div className="flex-1 h-2 rounded-full bg-surface-400 overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${pct}%`,
-                          background:
-                            status === "completed"
-                              ? "linear-gradient(90deg, #86e29a, #4ade80)"
-                              : status === "in_progress"
-                                ? "linear-gradient(90deg, #e0b34f, #f59e0b)"
-                                : status === "canceled"
-                                  ? "linear-gradient(90deg, #ff8080, #ef4444)"
-                                  : status === "scheduled"
-                                    ? "linear-gradient(90deg, #7ab8ff, #3b82f6)"
-                                    : "linear-gradient(90deg, #8a97c2, #6b7280)",
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs text-fg-muted w-8 text-right tabular-nums">
-                      {count}
-                    </span>
-                    <span className="text-xs text-fg-dim w-10 text-right tabular-nums">
-                      {pct.toFixed(0)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Activity feed */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-fg">Recent activity</h3>
-            <span className="text-xs text-fg-dim">{activities.length} events</span>
-          </div>
-          {feed.length === 0 ? (
-            <EmptyState
-              title="No activity yet"
-              description="Activity will appear as you create jobs and interact with customers"
-            />
-          ) : (
-            <div className="relative pl-4 border-l-2 border-surface-400 space-y-3 max-h-[340px] overflow-y-auto">
-              {feed.map((a) => {
-                // Derive customer link: prefer direct customerId, fallback to job's customerId
-                const activityCustomerId =
-                  a.customerId ??
-                  (a.jobId ? jobs.find((j) => j.id === a.jobId)?.customerId : undefined);
-                const linkHref = activityCustomerId
-                  ? `/customers/${activityCustomerId}`
-                  : a.jobId
-                    ? `/jobs/${a.jobId}`
-                    : null;
-
-                const content = (
-                  <>
-                    <div className="absolute -left-[25px] top-1.5 w-3 h-3 rounded-full bg-surface-500 border-2 border-surface-300 group-hover:bg-accent transition-colors" />
-                    <p className="text-sm text-fg leading-snug">{a.summary}</p>
-                    <p className="text-xs text-fg-dim mt-1">
-                      {formatRelativeTime(a.createdAt)}
-                    </p>
-                  </>
-                );
-
-                return linkHref ? (
-                  <Link
-                    key={a.id}
-                    href={linkHref}
-                    className="relative group block hover:bg-surface-400/30 rounded-md -mx-1 px-1 py-1 transition-colors"
-                  >
-                    {content}
-                  </Link>
-                ) : (
-                  <div key={a.id} className="relative group">
-                    {content}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* ── Two-column: Upcoming appointments + Margins ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Upcoming appointments */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-fg">Upcoming appointments</h3>
-            <Link
-              href="/schedule"
-              className="text-xs text-fg-link hover:text-fg transition-colors"
-            >
-              View all →
-            </Link>
-          </div>
-          {upcoming.length === 0 ? (
-            <EmptyState
-              title="No upcoming appointments"
-              description="Schedule a job to see it here"
-            />
-          ) : (
-            <div className="flex flex-col gap-2">
-              {upcoming.map((a) => {
-                const job = jobs.find((j) => j.id === a.jobId);
-                const start = new Date(a.startsAt);
-                const day = start.toLocaleDateString(undefined, {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                });
-                const time = start.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-                const isToday =
-                  new Date().toDateString() === start.toDateString();
-
-                return (
-                  <Link
-                    key={a.id}
-                    href={`/jobs/${a.jobId}`}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-surface-200 hover:bg-surface-400 transition-colors"
-                  >
-                    <div
-                      className={`flex flex-col items-center min-w-14 px-2 py-1 rounded-md text-center ${
-                        isToday ? "bg-accent/20" : "bg-surface-400/50"
-                      }`}
-                    >
-                      <span
-                        className={`text-xs font-semibold ${
-                          isToday ? "text-blue" : "text-fg-muted"
-                        }`}
-                      >
-                        {day}
-                      </span>
-                      <span
-                        className={`text-sm font-bold ${
-                          isToday ? "text-blue" : "text-fg"
-                        }`}
-                      >
-                        {time}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-fg truncate">
-                        {job?.title ?? a.jobId.slice(0, 8)}
-                      </p>
-                      {isToday && (
-                        <p className="text-xs text-blue font-medium mt-0.5">Today</p>
-                      )}
-                    </div>
-                    <span className="text-fg-dim text-lg shrink-0">→</span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Margins card */}
-        {summary ? (
-          <Card>
-            <h3 className="text-sm font-semibold text-fg mb-4">Margins</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-fg-muted">Realized (completed)</span>
-                <span
-                  className="text-lg font-bold"
-                  style={{
-                    color:
-                      summary.realizedMarginCents < 0
-                        ? "#ff8080"
-                        : summary.realizedMarginCents > 0
-                          ? "#86e29a"
-                          : "#e6e9f0",
-                  }}
-                >
-                  {formatMoney(summary.realizedMarginCents)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-fg-muted">Pipeline (in-flight)</span>
-                <span
-                  className="text-lg font-bold"
-                  style={{
-                    color:
-                      summary.pipelineMarginCents < 0
-                        ? "#ff8080"
-                        : summary.pipelineMarginCents > 0
-                          ? "#86e29a"
-                          : "#e6e9f0",
-                  }}
-                >
-                  {formatMoney(summary.pipelineMarginCents)}
-                </span>
-              </div>
-              {summary.rating.count > 0 && (
-                <div className="flex justify-between items-center pt-4 border-t border-border">
-                  <span className="text-xs text-fg-muted">Average rating</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-yellow text-sm">
-                      {"★".repeat(Math.round(summary.rating.average))}
-                      {"☆".repeat(5 - Math.round(summary.rating.average))}
-                    </span>
-                    <span className="text-sm font-semibold text-fg">
-                      {summary.rating.average.toFixed(1)}
-                    </span>
-                    <span className="text-xs text-fg-dim">
-                      · {summary.rating.count} review{summary.rating.count !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {[
+          ["Today’s visits", todayAppointments.length, "text-blue"],
+          ["Active diagnostics", activeDiagnostics.length, "text-blue"],
+          ["Needs attention", blockedDiagnostics.length, blockedDiagnostics.length ? "text-red" : "text-green"],
+          ["Open jobs", jobs.filter((job) => !["completed", "canceled"].includes(job.status)).length, "text-yellow"],
+          ["Outstanding", formatMoney(outstanding), outstanding ? "text-yellow" : "text-green"],
+        ].map(([label, value, tone]) => (
+          <Card key={String(label)}>
+            <CardContent className="p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-dim">{label}</p>
+              <p className={`mt-1 text-2xl font-bold ${tone}`}>{value}</p>
+            </CardContent>
           </Card>
-        ) : (
-          <Card>
-            <EmptyState title="No report data" description="Reports will appear once jobs start completing" />
-          </Card>
-        )}
+        ))}
       </div>
 
-      {/* ── Recent jobs ── */}
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-fg">Recent jobs</h3>
-          <Link
-            href="/customers"
-            className="text-xs text-fg-link hover:text-fg transition-colors"
-          >
-            View all →
-          </Link>
-        </div>
-        {jobs.length === 0 ? (
-          <EmptyState
-            title="No jobs yet"
-            description="Create your first job from the Schedule page"
-          />
-        ) : (
-          <div className="flex flex-col gap-1">
-            {jobs.slice(0, 10).map((j) => {
-              const customer = customers.find((c) => c.id === j.customerId);
-              return (
-                <Link
-                  key={j.id}
-                  href={`/jobs/${j.id}`}
-                  className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-surface-400/50 transition-all duration-150 group"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <JobStatusBadge status={j.status} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-fg truncate group-hover:text-fg transition-colors">
-                        {j.title}
-                      </p>
-                      {customer && (
-                        <p className="text-xs text-fg-dim mt-0.5 truncate">
-                          {customer.name}
+      <div className="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <div>
+              <CardTitle>Today’s route</CardTitle>
+              <p className="mt-1 text-xs text-fg-muted">Open the work order, verify the appliance, and download the diagnostic package before arrival.</p>
+            </div>
+            <Link href="/schedule" className="text-xs text-fg-link">Full schedule →</Link>
+          </CardHeader>
+          <CardContent>
+            {todayAppointments.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-8 text-center">
+                <p className="font-semibold text-fg">No appointments today</p>
+                <p className="mt-1 text-sm text-fg-muted">Unscheduled and return-visit work remains available in the jobs pipeline.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {todayAppointments.map((appointment) => {
+                  const job = jobs.find((item) => item.id === appointment.jobId);
+                  const session = diagnosticSessions.find((item) => item.session.jobId === appointment.jobId);
+                  const starts = new Date(appointment.startsAt);
+                  const ends = new Date(appointment.endsAt);
+                  return (
+                    <div key={appointment.id} className="rounded-xl border border-border bg-surface-200 p-4">
+                      <div className="flex items-start gap-4">
+                        <div className="min-w-20 rounded-lg bg-surface-100 px-3 py-2 text-center">
+                          <p className="text-sm font-bold text-fg">
+                            {starts.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                          </p>
+                          <p className="text-[10px] text-fg-dim">
+                            to {ends.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                          </p>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <Link href={`/jobs/${appointment.jobId}`} className="font-semibold text-fg-link">
+                                {job?.title || "Service job"}
+                              </Link>
+                              {job && <div className="mt-1"><JobStatusBadge status={job.status} /></div>}
+                            </div>
+                            {session ? (
+                              <Link
+                                href={`/diagnostics/${session.session.id}`}
+                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize no-underline ${sessionTone(session.session.status)}`}
+                              >
+                                {session.session.status.replaceAll("_", " ")}
+                              </Link>
+                            ) : (
+                              <Link href="/diagnostics/new" className="rounded-full bg-surface-400 px-2.5 py-1 text-[10px] font-semibold text-fg-muted no-underline">
+                                diagnostic not started
+                              </Link>
+                            )}
+                          </div>
+                          {session && (
+                            <p className="mt-3 text-xs text-fg-muted">
+                              {[session.equipment.make, session.equipment.model, session.equipment.serialNumber]
+                                .filter(Boolean)
+                                .join(" · ") || session.equipment.type}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <div>
+              <CardTitle>Diagnostic attention</CardTitle>
+              <p className="mt-1 text-xs text-fg-muted">Sessions that are blocked, unresolved, or ready for the next field check.</p>
+            </div>
+            <Link href="/diagnostics" className="text-xs text-fg-link">Command center →</Link>
+          </CardHeader>
+          <CardContent>
+            {activeDiagnostics.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-fg-muted">
+                No active diagnostic sessions.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activeDiagnostics.slice(0, 7).map(({ session, equipment, workflow }) => (
+                  <Link
+                    key={session.id}
+                    href={`/diagnostics/${session.id}`}
+                    className="block rounded-xl border border-border bg-surface-200 p-4 no-underline hover:bg-surface-300"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-fg">
+                          {[equipment.make, equipment.model].filter(Boolean).join(" ") || equipment.type}
                         </p>
-                      )}
+                        <p className="mt-1 text-xs text-fg-muted">{session.customerComplaint || "Complaint not recorded"}</p>
+                        <p className="mt-2 text-[11px] text-fg-dim">{workflow?.name || "Coverage required"}</p>
+                      </div>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ${sessionTone(session.status)}`}>
+                        {session.status.replaceAll("_", " ")}
+                      </span>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4 shrink-0 ml-4">
-                    <span className="text-sm text-fg-muted tabular-nums">
-                      {formatMoney(j.total)}
-                    </span>
-                    <span className="text-fg-dim text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                      →
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+        <Card>
+          <CardHeader><CardTitle>Operations snapshot</CardTitle></CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between"><span className="text-fg-muted">Customers</span><span className="font-semibold text-fg">{customers.length}</span></div>
+            <div className="flex justify-between"><span className="text-fg-muted">Completed revenue</span><span className="font-semibold text-green">{formatMoney(completedRevenue)}</span></div>
+            <div className="flex justify-between"><span className="text-fg-muted">Outstanding invoices</span><span className="font-semibold text-yellow">{formatMoney(outstanding)}</span></div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Field rule</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-sm text-fg-muted">A job is the commercial container. The appliance and diagnostic session are the technical record. Keep both connected from intake through invoice.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Open-source operations</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-sm text-fg-muted">CRM, dispatch, estimates, invoices, payments, service plans, documents, and reporting remain part of the complete operations core.</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
