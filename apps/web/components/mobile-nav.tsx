@@ -4,51 +4,47 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_LINKS, decodeJwt } from "@/lib/nav";
+import { NAV_SECTIONS, decodeJwt } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
+
+function isActive(pathname: string, href: string) {
+  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function MobileNav() {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
-  const [user, setUser] = useState<{ name: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; role?: string } | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("ofp_token");
     if (token) {
       const payload = decodeJwt(token);
-      if (payload?.name) setUser({ name: payload.name });
+      if (payload?.name) setUser({ name: payload.name, role: payload.role });
     }
   }, []);
 
-  // Close drawer on route change
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  useEffect(() => setOpen(false), [pathname]);
 
-  // Escape key to close drawer
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Prevent body scroll when drawer is open
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
       document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
+    };
   }, [open]);
 
   return (
     <>
-      {/* ── Hamburger button ── */}
       <button
         onClick={() => setOpen(true)}
         className="md:hidden fixed top-0 left-0 z-30 h-12 w-12 flex items-center justify-center text-fg-muted hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-lg"
@@ -61,94 +57,86 @@ export function MobileNav() {
         </svg>
       </button>
 
-      {/* ── Backdrop ── */}
       {open && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity"
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         />
       )}
 
-      {/* ── Slide-over drawer ── */}
       <aside
         className={cn(
-          "md:hidden fixed left-0 top-0 bottom-0 w-64 z-50 flex flex-col bg-surface-50 border-r border-border shadow-2xl transition-transform duration-300 ease-out",
+          "md:hidden fixed left-0 top-0 bottom-0 w-72 z-50 flex flex-col bg-surface-50 border-r border-border shadow-2xl transition-transform duration-300 ease-out",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        {/* Brand header */}
         <div className="h-14 flex items-center justify-between px-5 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="text-lg">⊹</span>
-            <span className="font-semibold text-sm text-fg">OpenFieldPro</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-xs font-black text-white">OF</span>
+            <div>
+              <span className="block text-sm font-semibold text-fg">OpenFieldPro</span>
+              <span className="block text-[10px] text-fg-dim">Operations + diagnostics</span>
+            </div>
           </div>
-          <button
-            onClick={() => setOpen(false)}
-            className="text-fg-muted hover:text-fg transition-colors p-1"
-            aria-label="Close navigation menu"
-          >
+          <button onClick={() => setOpen(false)} className="p-1 text-fg-muted hover:text-fg" aria-label="Close navigation menu">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M3 3L13 13M13 3L3 13"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
+              <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </button>
         </div>
 
-        {/* Navigation links */}
-        <nav className="flex-1 flex flex-col gap-1 p-3 overflow-y-auto">
-          {NAV_LINKS.map(({ href, label, icon }) => {
-            const active = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-all duration-150 no-underline",
-                  active
-                    ? "bg-accent text-white font-medium"
-                    : "text-fg-muted hover:text-fg hover:bg-surface-300",
-                )}
-              >
-                <span className="text-base w-5 text-center">{icon}</span>
-                {label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto p-3">
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label} className="mb-5 last:mb-0">
+              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">{section.label}</p>
+              <div className="flex flex-col gap-1">
+                {section.links.map(({ href, label, icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-3 text-sm no-underline transition-all duration-150",
+                      isActive(pathname, href)
+                        ? "bg-accent text-white font-medium"
+                        : "text-fg-muted hover:text-fg hover:bg-surface-300",
+                    )}
+                  >
+                    <span className="w-5 text-center text-base">{icon}</span>
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        {/* Theme toggle */}
         <div className="p-3 border-t border-border shrink-0">
           <button
-            onClick={() => { toggle(); setOpen(false); }}
+            onClick={() => {
+              toggle();
+              setOpen(false);
+            }}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-surface-300 transition-all duration-150 cursor-pointer border-none bg-transparent"
           >
-            <span className="text-base w-5 text-center">
-              {theme === "dark" ? "☀" : "☾"}
-            </span>
+            <span className="text-base w-5 text-center">{theme === "dark" ? "☀" : "☾"}</span>
             {theme === "dark" ? "Light mode" : "Dark mode"}
           </button>
         </div>
 
-        {/* Bottom section */}
         <div className="p-3 border-t border-border shrink-0">
           {user ? (
             <div className="flex items-center gap-3 px-3 py-3">
-              <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-xs font-medium text-white shrink-0">
+              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-medium text-white shrink-0">
                 {user.name.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm text-fg-muted truncate">{user.name}</span>
+              <div className="min-w-0">
+                <span className="block truncate text-sm text-fg-muted">{user.name}</span>
+                <span className="block text-[10px] capitalize text-fg-dim">{user.role || "team member"}</span>
+              </div>
             </div>
           ) : (
-            <Link
-              href="/login"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-surface-300 transition-all duration-150 no-underline"
-            >
+            <Link href="/login" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-surface-300 no-underline">
               <span className="text-base w-5 text-center">↪</span>
               Sign in
             </Link>
