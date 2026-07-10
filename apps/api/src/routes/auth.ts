@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, orgs, users } from "@ofp/db";
 import { hashPassword, verifyPassword } from "../auth.js";
 
@@ -17,7 +17,6 @@ const loginBody = z.object({
 });
 
 export async function authRoutes(app: FastifyInstance) {
-  // Register creates a new org + its owner in one transaction-ish flow.
   app.post("/register", async (req, reply) => {
     const parsed = registerBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
@@ -35,8 +34,18 @@ export async function authRoutes(app: FastifyInstance) {
       })
       .returning();
 
-    const token = app.jwt.sign({ userId: user.id, orgId: org.id, role: user.role });
-    return reply.code(201).send({ token, user: { id: user.id, name, email, role: user.role }, orgId: org.id });
+    const token = app.jwt.sign({
+      userId: user.id,
+      orgId: org.id,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+    });
+    return reply.code(201).send({
+      token,
+      user: { id: user.id, name, email, role: user.role },
+      orgId: org.id,
+    });
   });
 
   app.post("/login", async (req, reply) => {
@@ -48,11 +57,20 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
       return reply.code(401).send({ error: "invalid credentials" });
     }
-    const token = app.jwt.sign({ userId: user.id, orgId: user.orgId, role: user.role });
-    return { token, user: { id: user.id, name: user.name, email, role: user.role }, orgId: user.orgId };
+    const token = app.jwt.sign({
+      userId: user.id,
+      orgId: user.orgId,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+    });
+    return {
+      token,
+      user: { id: user.id, name: user.name, email, role: user.role },
+      orgId: user.orgId,
+    };
   });
 
-  // Whoami — verifies the token and echoes the claims.
   app.get("/me", async (req, reply) => {
     try {
       await req.jwtVerify();
