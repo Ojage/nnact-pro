@@ -4,16 +4,17 @@ Open-source, self-hostable **field service management** for service businesses.
 
 OpenFieldPro is the open alternative to subscription-first platforms such as Housecall Pro: CRM, customers and properties, equipment history, scheduling and dispatch, work orders, estimates, invoicing, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows.
 
-Appliance-service organizations can also attach equipment-specific technical records to work orders, but those tools remain optional workflow depth—not the product definition.
+Appliance-service organizations can attach equipment-specific technical records to work orders, but those tools remain optional workflow depth—not the product definition.
 
-> **Status: product foundation.** The operations spine runs end-to-end across Postgres, Fastify, Next.js, and the Expo technician app. Core workflows are implemented at foundation level; dispatch, customer portal, technician completion, documents, accounting export, and release hardening are still being completed.
+> **Status: release-candidate hardening.** The lead-to-payment operations spine runs across Postgres, Fastify, Next.js, and the Expo technician app. Production release still requires every gate in `docs/release/RELEASE_CHECKLIST.md`, including device testing, backup/restore evidence, deployment-specific secrets, and human review of browser screenshots.
 
 ## Product architecture
 
 ### Operations core
 
 - Customers, properties, equipment, and service history
-- Scheduling, dispatch, jobs, and return visits
+- Job intake, scheduling, dispatch, work execution, and return visits
+- Closeout queues for start, completion, missing pricing, invoicing, and accounts receivable handoff
 - Price book, estimates, approvals, invoices, and payments
 - Photos, documents, organization branding, reviews, and service plans
 - Reporting, integrations, self-hosting, backup, and restore
@@ -53,10 +54,14 @@ pnpm dev
 # API: http://localhost:3001
 ```
 
-Run API tests:
+Run the primary validation gates:
 
 ```bash
+pnpm release:safety
 pnpm --filter @ofp/api test
+pnpm --filter @ofp/web test:unit
+pnpm --filter @ofp/web test:e2e
+pnpm --filter @ofp/mobile typecheck
 ```
 
 ## What works today
@@ -65,9 +70,12 @@ pnpm --filter @ofp/api test
 
 - Multi-tenant organizations, users, roles, customers, properties, equipment, and jobs
 - JWT authentication and organization-scoped APIs
+- New-customer and existing-customer job intake
 - Day, week, and month appointment scheduling
-- Dispatcher board with unassigned work, technician lanes, workload counts, search, date navigation, drag-and-drop, and accessible reassignment controls
+- Dispatcher board with unassigned work, technician lanes, workload counts, search, date navigation, drag-and-drop, accessible reassignment, and conflict prevention
+- Job closeout board for start, completion, missing pricing, invoice creation, and recent accounts-receivable handoff
 - Estimates, line items, invoices, offline payments, and optional Stripe checkout
+- Server-side rejection of zero-dollar and duplicate active invoices
 - Branded invoice and estimate previews/exports
 - Reviews, recurring work, service-plan foundation, reporting, notifications, and search
 - Technician mobile application foundation
@@ -79,13 +87,15 @@ pnpm --filter @ofp/api test
 - Equipment linked to customers and work orders
 - Technical sessions and measurement records
 - Coverage and correction foundations
-- Technician-facing diagnostic record surfaces
+- Technician-facing technical record surfaces
 
 ## Product surfaces
 
 - `/` — technician-first Today dashboard
+- `/jobs/new` — customer and work-order intake
 - `/dispatch` — dispatcher board with technician lanes and unassigned work
 - `/schedule` — day, week, and month calendar
+- `/closeout` — work start, completion, pricing, and invoice handoff
 - `/jobs` — work orders and status
 - `/customers` — CRM, properties, and equipment
 - `/estimates` — estimate workflow
@@ -103,12 +113,24 @@ The release gate is the complete lead-to-payment loop:
 2. Scheduling and dispatch
 3. Technician field execution
 4. Estimate approval
-5. Invoice and payment
+5. Closeout, invoice, and payment
 6. Customer communication and service history
 7. Reporting, integrations, offline resilience, and safe upgrades
 
-See `docs/release/final-product-roadmap.md` for the current operations-first roadmap.
+See `docs/release/final-product-roadmap.md` and `docs/release/RELEASE_CHECKLIST.md`.
+
+## Security
+
+Read `SECURITY.md` before deploying. Production startup rejects default/short JWT secrets and wildcard or missing production CORS configuration. Run `pnpm release:safety` before every release.
+
+Optional Ed25519 support-entitlement keys are documented in `docs/security/KEY_MANAGEMENT.md`. They are not required to run the AGPL core and do not narrow the rights in `LICENSE`.
+
+## Sponsorship
+
+The project sponsorship application, tier design, outreach copy, governance boundaries, and reporting plan are in `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
+
+After the GitHub Sponsors profile is approved, enable the repository Sponsor button. The repository funding configuration targets the `niko4244` GitHub Sponsors profile.
 
 ## Deploy
 
-Use the repository deployment and self-hosting scripts under `scripts/` together with the compose configuration. Production deployments should validate migrations, backups, restore procedures, secrets, storage, and outbound communication adapters before serving real customers.
+Use the repository deployment and self-hosting scripts under `scripts/` together with the compose configuration. Production deployments must validate migrations, backups, restore procedures, secrets, storage, TLS, CORS, payment webhooks, outbound communication adapters, and the complete release checklist before serving real customers.
