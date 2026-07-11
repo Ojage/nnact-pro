@@ -1,9 +1,4 @@
-import type { DispatchAppointment } from "@/lib/dispatch-api";
-
-export interface DispatchConflict {
-  appointmentId: string;
-  conflictingAppointmentIds: string[];
-}
+import type { DispatchAppointment } from "./dispatch-api";
 
 export function appointmentsOverlap(
   left: Pick<DispatchAppointment, "startsAt" | "endsAt">,
