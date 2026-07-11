@@ -87,7 +87,7 @@ services:
       context: ..
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?Set the public HTTPS API URL, including /api when applicable}
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?Set the public HTTPS origin; the client appends /api}
     depends_on:
       api:
         condition: service_healthy
