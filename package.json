@@ -2,7 +2,7 @@
   "name": "openfieldpro",
   "private": true,
   "version": "0.1.0",
-  "description": "OpenFieldPro — open-source field service operations with appliance diagnostic execution",
+  "description": "OpenFieldPro — open-source, self-hostable field service operations",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "pnpm --parallel --filter ./apps/* dev",
