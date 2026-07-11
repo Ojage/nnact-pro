@@ -84,12 +84,14 @@ export function technicianJobPatchAllowed(payload: Record<string, unknown>) {
   );
 }
 
+const CANONICAL_API_ONLY_SYNC_TABLES = new Set(["invoices", "payments", "estimates"]);
 const TECHNICIAN_SYNC_TABLES = new Set(["jobs", "line_items"]);
 
 export function roleCanSyncOperation(
   role: UserRole,
   operation: { table: string; type: string; payload: Record<string, unknown> },
 ) {
+  if (CANONICAL_API_ONLY_SYNC_TABLES.has(operation.table)) return false;
   if (role === "owner" || role === "dispatcher") return true;
   if (!TECHNICIAN_SYNC_TABLES.has(operation.table)) return false;
   if (operation.table === "jobs") {
