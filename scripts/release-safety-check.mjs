@@ -27,6 +27,8 @@ const requiredFiles = [
   "LICENSE",
   "SECURITY.md",
   ".github/FUNDING.yml",
+  "pnpm-lock.expected.sha256",
+  "scripts/verify-lockfile.mjs",
   "docs/funding/SPONSORSHIP_PLAYBOOK.md",
   "docs/security/KEY_MANAGEMENT.md",
   "docs/release/RELEASE_CHECKLIST.md",
@@ -54,6 +56,7 @@ const forbiddenTrackedNames = tracked.filter((file) => {
     file.startsWith(".secrets/") ||
     file.endsWith(".private.pem") ||
     file.endsWith(".ofp-license") ||
+    /(?:^|\/)license-signing-key\.pem$/i.test(file) ||
     /(?:^|\/)ofp-license-private\.pem$/i.test(file)
   );
 });
@@ -71,6 +74,7 @@ const secretPatterns = [
   ["Slack token", /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/],
 ];
 const secretFindings = [];
+const textFiles = [];
 for (const file of tracked) {
   if (file === "scripts/release-safety-check.mjs" || binaryExtensions.has(extname(file).toLowerCase())) continue;
   const absolute = resolve(root, file);
@@ -81,12 +85,20 @@ for (const file of tracked) {
   } catch {
     continue;
   }
+  textFiles.push({ file, content });
   for (const [label, pattern] of secretPatterns) {
     if (pattern.test(content)) secretFindings.push(`${label} in ${file}`);
   }
 }
 if (secretFindings.length) fail(`possible committed secrets: ${secretFindings.join("; ")}`);
 else pass("tracked-text secret pattern scan passed");
+
+const directCompetitorPattern = /housecall\s*pro/i;
+const competitorMentions = textFiles
+  .filter(({ content }) => directCompetitorPattern.test(content))
+  .map(({ file }) => file);
+if (competitorMentions.length) fail(`direct competitor naming remains in: ${competitorMentions.join(", ")}`);
+else pass("public repository copy remains vendor-neutral");
 
 const gitignore = existsSync(resolve(root, ".gitignore")) ? readFileSync(resolve(root, ".gitignore"), "utf8") : "";
 for (const entry of [".env", ".secrets/", "*.private.pem", "*.ofp-license"]) {
@@ -99,7 +111,14 @@ if (![".env", ".secrets/", "*.private.pem", "*.ofp-license"].some((entry) => !gi
 const envExample = existsSync(resolve(root, ".env.example"))
   ? readFileSync(resolve(root, ".env.example"), "utf8")
   : "";
-for (const required of ["NODE_ENV=development", "JWT_SECRET=change-me-in-production", "CORS_ORIGIN=http://localhost:3000"]) {
+for (const required of [
+  "NODE_ENV=development",
+  "JWT_SECRET=change-me-in-production",
+  "CORS_ORIGIN=http://localhost:3000",
+  "PUBLIC_WEB_URL=http://localhost:3000",
+  "JWT_EXPIRES_IN=12h",
+  "TRUST_PROXY=false",
+]) {
   if (!envExample.includes(required)) fail(`.env.example missing documented setting: ${required}`);
 }
 if (envExample.includes("STRIPE_SECRET_KEY=sk_live_")) fail(".env.example contains a live Stripe key");
@@ -107,8 +126,12 @@ else pass("environment template documents production security settings without l
 
 try {
   const rootPackage = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
-  if (!rootPackage.scripts?.["release:safety"]) fail("root package.json is missing release:safety");
-  else pass("root release:safety command is configured");
+  for (const script of ["release:safety", "lock:prepare", "install:verified"]) {
+    if (!rootPackage.scripts?.[script]) fail(`root package.json is missing ${script}`);
+  }
+  if (["release:safety", "lock:prepare", "install:verified"].every((script) => rootPackage.scripts?.[script])) {
+    pass("release safety and deterministic install commands are configured");
+  }
 
   const apiPackage = JSON.parse(readFileSync(resolve(root, "apps/api/package.json"), "utf8"));
   for (const script of ["license:keypair", "license:generate", "license:verify"]) {
