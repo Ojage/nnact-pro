@@ -32,7 +32,7 @@ export function Sidebar() {
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-xs font-black text-white">OF</span>
           <div>
             <span className="block text-sm font-semibold text-fg">OpenFieldPro</span>
-            <span className="block text-[10px] text-fg-dim">Operations + diagnostics</span>
+            <span className="block text-[10px] text-fg-dim">Open field-service operations</span>
           </div>
         </Link>
         <NotificationsPopover />
