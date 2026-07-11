@@ -213,6 +213,12 @@ export const appointments = pgTable(
   },
   (t) => ({
     orgStart: index("appointments_org_starts_idx").on(t.orgId, t.startsAt),
+    orgTechnicianWindow: index("appointments_org_technician_window_idx").on(
+      t.orgId,
+      t.technicianId,
+      t.startsAt,
+      t.endsAt,
+    ),
     job: index("appointments_job_idx").on(t.jobId),
   }),
 );
@@ -261,171 +267,170 @@ export const activities = pgTable(
   }),
 );
 
-export const photos = pgTable(
-  "photos",
-  {
-    id: uuid("id").primaryKey(),
-    orgId: orgId(),
-    jobId: uuid("job_id")
-      .notNull()
-      .references(() => jobs.id, { onDelete: "cascade" }),
-    objectKey: text("object_key").notNull(),
-    contentType: text("content_type").notNull(),
-    fileName: text("file_name"),
-    fileSize: integer("file_size"),
-    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
-    createdAt: ts(),
-  },
-  (t) => ({ job: index("photos_job_idx").on(t.orgId, t.jobId) }),
-);
+export const servicePlans = pgTable("service_plans", {
+  id: id(),
+  orgId: orgId(),
+  name: text("name").notNull(),
+  description: text("description"),
+  includedVisitsPerTerm: integer("included_visits_per_term").default(1).notNull(),
+  termMonths: integer("term_months").default(12).notNull(),
+  priceCents: integer("price_cents").default(0).notNull(),
+  priorityScheduling: boolean("priority_scheduling").default(false).notNull(),
+  benefits: jsonb("benefits").$type<string[]>().default([]).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: ts(),
+});
 
-export const equipment = pgTable(
-  "equipment",
+export const customerServicePlanStatus = pgEnum("customer_service_plan_status", [
+  "active",
+  "paused",
+  "canceled",
+  "expired",
+]);
+
+export const customerServicePlans = pgTable(
+  "customer_service_plans",
   {
     id: id(),
     orgId: orgId(),
     customerId: uuid("customer_id")
       .notNull()
       .references(() => customers.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    make: text("make"),
-    model: text("model"),
-    serialNumber: text("serial_number"),
-    installDate: timestamp("install_date", { withTimezone: true }),
-    warrantyExpiry: timestamp("warranty_expiry", { withTimezone: true }),
+    servicePlanId: uuid("service_plan_id")
+      .notNull()
+      .references(() => servicePlans.id, { onDelete: "restrict" }),
+    status: customerServicePlanStatus("status").default("active").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).defaultNow().notNull(),
+    renewsAt: timestamp("renews_at", { withTimezone: true }),
+    renewalReminderAt: timestamp("renewal_reminder_at", { withTimezone: true }),
+    visitsIncluded: integer("visits_included").default(0).notNull(),
+    visitsCompleted: integer("visits_completed").default(0).notNull(),
     notes: text("notes"),
     createdAt: ts(),
   },
-  (t) => ({ customer: index("equipment_customer_idx").on(t.orgId, t.customerId) }),
-);
-
-export const notifications = pgTable(
-  "notifications",
-  {
-    id: id(),
-    orgId: orgId(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    title: text("title").notNull(),
-    body: text("body"),
-    link: text("link"),
-    read: boolean("read").default(false).notNull(),
-    createdAt: ts(),
-  },
-  (t) => ({ userUnread: index("notifications_user_unread_idx").on(t.userId, t.read, t.createdAt) }),
-);
-
-export const catalogCategories = pgTable(
-  "catalog_categories",
-  {
-    id: id(),
-    orgId: orgId(),
-    name: text("name").notNull(),
-    description: text("description"),
-    createdAt: ts(),
-  },
-  (t) => ({ orgName: uniqueIndex("catalog_categories_org_name_idx").on(t.orgId, t.name) }),
-);
-
-export const catalogItems = pgTable(
-  "catalog_items",
-  {
-    id: id(),
-    orgId: orgId(),
-    categoryId: uuid("category_id")
-      .notNull()
-      .references(() => catalogCategories.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    description: text("description"),
-    priceCents: integer("price_cents").default(0).notNull(),
-    costCents: integer("cost_cents").default(0).notNull(),
-    taxable: boolean("taxable").default(true).notNull(),
-    active: boolean("active").default(true).notNull(),
-    createdAt: ts(),
-  },
   (t) => ({
-    orgActive: index("catalog_items_org_active_idx").on(t.orgId, t.active),
-    category: index("catalog_items_category_idx").on(t.categoryId),
+    customer: index("customer_service_plans_customer_idx").on(t.orgId, t.customerId),
+    renewal: index("customer_service_plans_renewal_idx").on(t.orgId, t.status, t.renewsAt),
   }),
 );
 
-export const plugins = pgTable(
-  "plugins",
+export const serviceVisitStatus = pgEnum("service_visit_status", [
+  "planned",
+  "scheduled",
+  "completed",
+  "skipped",
+]);
+
+export const servicePlanVisits = pgTable(
+  "service_plan_visits",
   {
     id: id(),
-    slug: text("slug").notNull(),
-    name: text("name").notNull(),
-    description: text("description"),
-    version: text("version").default("1.0.0").notNull(),
-    author: text("author"),
-    iconUrl: text("icon_url"),
-    webhookUrl: text("webhook_url"),
-    events: jsonb("events").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
-    scopes: jsonb("scopes").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
-    transform: text("transform").default("identity").notNull(),
-    firstParty: boolean("first_party").default(false).notNull(),
+    orgId: orgId(),
+    customerServicePlanId: uuid("customer_service_plan_id")
+      .notNull()
+      .references(() => customerServicePlans.id, { onDelete: "cascade" }),
+    jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    status: serviceVisitStatus("status").default("planned").notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    notes: text("notes"),
     createdAt: ts(),
   },
-  (t) => ({ slug: uniqueIndex("plugins_slug_idx").on(t.slug) }),
+  (t) => ({
+    enrollment: index("service_plan_visits_enrollment_idx").on(t.customerServicePlanId, t.status),
+    due: index("service_plan_visits_due_idx").on(t.orgId, t.status, t.dueAt),
+  }),
 );
+
+export const sponsorConfig = pgTable(
+  "sponsor_config",
+  {
+    id: id(),
+    orgId: orgId(),
+    key: text("key").notNull(),
+    value: jsonb("value").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true).defaultNow().notNull(),
+  },
+  (t) => ({ orgKey: uniqueIndex("sponsor_config_org_key_uidx").on(t.orgId, t.key) }),
+);
+
+export const pluginInstallStatus = pgEnum("plugin_install_status", ["enabled", "disabled", "error"]);
 
 export const pluginInstalls = pgTable(
   "plugin_installs",
   {
     id: id(),
     orgId: orgId(),
-    pluginId: uuid("plugin_id")
-      .notNull()
-      .references(() => plugins.id, { onDelete: "cascade" }),
-    enabled: boolean("enabled").default(true).notNull(),
-    config: jsonb("config").$type<Record<string, unknown>>().default(sql`'{}'::jsonb`).notNull(),
-    webhookUrl: text("webhook_url"),
-    webhookSecret: text("webhook_secret").notNull(),
+    pluginId: text("plugin_id").notNull(),
+    displayName: text("display_name").notNull(),
+    version: text("version").notNull(),
+    status: pluginInstallStatus("status").default("enabled").notNull(),
+    config: jsonb("config").$type<Record<string, unknown>>().default({}).notNull(),
+    lastError: text("last_error"),
     installedAt: timestamp("installed_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => ({ orgPlugin: uniqueIndex("plugin_installs_org_plugin_idx").on(t.orgId, t.pluginId) }),
+  (t) => ({ orgPlugin: uniqueIndex("plugin_installs_org_plugin_uidx").on(t.orgId, t.pluginId) }),
 );
 
-export const apiTokens = pgTable(
-  "api_tokens",
+export const pluginTokens = pgTable(
+  "plugin_tokens",
   {
     id: id(),
     orgId: orgId(),
-    installId: uuid("install_id").references(() => pluginInstalls.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
+    pluginInstallId: uuid("plugin_install_id")
+      .notNull()
+      .references(() => pluginInstalls.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull(),
-    prefix: text("prefix").notNull(),
-    scopes: jsonb("scopes").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
-    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    tokenPrefix: text("token_prefix").notNull(),
+    scopes: jsonb("scopes").$type<string[]>().default([]).notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: ts(),
   },
-  (t) => ({ tokenHash: uniqueIndex("api_tokens_hash_idx").on(t.tokenHash) }),
+  (t) => ({ tokenHash: uniqueIndex("plugin_tokens_hash_uidx").on(t.tokenHash) }),
 );
 
-export const pluginEvents = pgTable(
-  "plugin_events",
+export const outboundEvents = pgTable(
+  "outbound_events",
   {
     id: id(),
     orgId: orgId(),
-    installId: uuid("install_id")
-      .notNull()
-      .references(() => pluginInstalls.id, { onDelete: "cascade" }),
-    kind: text("kind").notNull(),
-    payload: jsonb("payload").$type<Record<string, unknown>>().default(sql`'{}'::jsonb`).notNull(),
+    eventType: text("event_type").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
     status: text("status").default("pending").notNull(),
-    attempts: integer("attempts").default(0).notNull(),
-    responseStatus: integer("response_status"),
-    error: text("error"),
-    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    attemptCount: integer("attempt_count").default(0).notNull(),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    lastError: text("last_error"),
     createdAt: ts(),
   },
   (t) => ({
-    install: index("plugin_events_install_idx").on(t.installId, t.createdAt),
-    retry: index("plugin_events_retry_idx").on(t.status, t.nextAttemptAt),
+    pending: index("outbound_events_pending_idx").on(t.orgId, t.status, t.nextAttemptAt),
+    entity: index("outbound_events_entity_idx").on(t.orgId, t.entityType, t.entityId),
+  }),
+);
+
+export const uploadPurpose = pgEnum("upload_purpose", ["job_photo", "customer_document", "org_logo"]);
+
+export const uploads = pgTable(
+  "uploads",
+  {
+    id: id(),
+    orgId: orgId(),
+    purpose: uploadPurpose("purpose").notNull(),
+    objectKey: text("object_key").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgPurpose: index("uploads_org_purpose_idx").on(t.orgId, t.purpose, t.createdAt),
+    objectKey: uniqueIndex("uploads_object_key_uidx").on(t.objectKey),
   }),
 );
