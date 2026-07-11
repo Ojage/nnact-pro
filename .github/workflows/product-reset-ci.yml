@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [ofp-monorepo]
   push:
-    branches: [product-reset-diagnostic-core]
+    branches: [ofp-monorepo]
 
 concurrency:
   group: product-reset-ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
