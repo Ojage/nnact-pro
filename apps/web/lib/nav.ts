@@ -17,6 +17,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Field",
     links: [
       { href: "/", label: "Today", icon: "◈" },
+      { href: "/jobs/new", label: "New Job", icon: "＋" },
       { href: "/jobs", label: "Jobs", icon: "⊞" },
       { href: "/diagnostics", label: "Diagnostics", icon: "⌁" },
     ],
