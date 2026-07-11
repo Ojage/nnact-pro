@@ -13,7 +13,9 @@
     "db:push": "pnpm --filter @ofp/db push",
     "db:seed": "pnpm --filter @ofp/db seed",
     "test": "pnpm -r test",
-    "release:safety": "node scripts/release-safety-check.mjs",
+    "lock:prepare": "pnpm install --lockfile-only --no-frozen-lockfile --reporter=silent && node scripts/verify-lockfile.mjs",
+    "install:verified": "pnpm lock:prepare && pnpm install --frozen-lockfile --reporter=silent",
+    "release:safety": "node scripts/release-safety-check.mjs && node scripts/verify-lockfile.mjs",
     "infra:up": "podman compose -f infra/compose.yml up -d",
     "infra:down": "podman compose -f infra/compose.yml down"
   },
