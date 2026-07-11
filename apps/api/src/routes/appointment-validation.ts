@@ -13,6 +13,14 @@ export type AppointmentWindowResult =
   | { ok: false; error: string };
 
 /**
+ * Uses half-open intervals: [start, end). Two visits that touch at the boundary
+ * are valid back-to-back appointments rather than a conflict.
+ */
+export function appointmentWindowsOverlap(left: AppointmentWindow, right: AppointmentWindow) {
+  return left.startsAt < right.endsAt && right.startsAt < left.endsAt;
+}
+
+/**
  * Resolves a partial appointment-time patch against the persisted window and
  * validates the resulting interval. The API must validate the final combined
  * state, not only a pair of values supplied in the same request.
