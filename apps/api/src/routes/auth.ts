@@ -5,6 +5,7 @@ import { db, orgs, users } from "@ofp/db";
 import { hashPassword, verifyPassword } from "../auth.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 import { publicRegistrationEnabled } from "../runtime-security.js";
+import { clearSessionCookie, setSessionCookie } from "../session-cookie.js";
 
 const registerBody = z.object({
   orgName: z.string().trim().min(1).max(200),
@@ -34,6 +35,22 @@ const loginRateLimit = createFixedWindowRateLimit({
     return `${requestIpKey(request)}:${email}`;
   },
 });
+
+function signUserToken(app: FastifyInstance, user: {
+  id: string;
+  orgId: string;
+  role: string;
+  name: string;
+  email: string;
+}) {
+  return app.jwt.sign({
+    userId: user.id,
+    orgId: user.orgId,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+  } as Parameters<typeof app.jwt.sign>[0]);
+}
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/register", { preHandler: registerRateLimit }, async (req, reply) => {
@@ -72,13 +89,8 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: "an account with this email already exists" });
     }
 
-    const token = app.jwt.sign({
-      userId: result.user.id,
-      orgId: result.org.id,
-      role: result.user.role,
-      name: result.user.name,
-      email: result.user.email,
-    } as Parameters<typeof app.jwt.sign>[0]);
+    const token = signUserToken(app, result.user);
+    setSessionCookie(reply, token);
     return reply.code(201).send({
       token,
       user: { id: result.user.id, name: result.user.name, email: result.user.email, role: result.user.role },
@@ -95,18 +107,18 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user || !user.active || !user.passwordHash || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
       return reply.code(401).send({ error: "invalid credentials" });
     }
-    const token = app.jwt.sign({
-      userId: user.id,
-      orgId: user.orgId,
-      role: user.role,
-      name: user.name,
-      email: user.email,
-    } as Parameters<typeof app.jwt.sign>[0]);
+    const token = signUserToken(app, user);
+    setSessionCookie(reply, token);
     return {
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
       orgId: user.orgId,
     };
+  });
+
+  app.post("/logout", async (_req, reply) => {
+    clearSessionCookie(reply);
+    return { ok: true };
   });
 
   app.get("/me", async (req, reply) => {
