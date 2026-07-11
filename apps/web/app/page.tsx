@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { api } from "@/lib/api";
-import { diagnosticsApi, type DiagnosticSessionListItem } from "@/lib/diagnostics-api";
+import { serverApi } from "@/lib/server-api";
+import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import { formatMoney } from "@ofp/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -18,11 +18,11 @@ function sessionTone(status: string) {
 export default async function TodayPage() {
   const [jobsResult, appointmentsResult, invoicesResult, customersResult, diagnosticsResult] =
     await Promise.allSettled([
-      api.jobs(),
-      api.appointments(),
-      api.invoices(),
-      api.customers(),
-      diagnosticsApi.sessions(),
+      serverApi.jobs(),
+      serverApi.appointments(),
+      serverApi.invoices(),
+      serverApi.customers(),
+      serverApi.diagnosticSessions(),
     ]);
 
   const jobs = jobsResult.status === "fulfilled" ? jobsResult.value : [];
@@ -88,8 +88,8 @@ export default async function TodayPage() {
       {apiDown && (
         <Card className="mb-6 border-red/30 bg-red/5">
           <CardContent className="pt-5">
-            <p className="text-sm font-semibold text-red">Operations API is unreachable</p>
-            <p className="mt-1 text-xs text-fg-muted">Start the API and apply the reviewed database schema before using the field workflow.</p>
+            <p className="text-sm font-semibold text-red">Operations API is unreachable or the session has expired</p>
+            <p className="mt-1 text-xs text-fg-muted">Sign in again or verify the API and reviewed database schema before using the field workflow.</p>
           </CardContent>
         </Card>
       )}
