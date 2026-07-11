@@ -41,9 +41,13 @@ export function buildServer() {
     trustProxy: process.env.TRUST_PROXY === "true",
   });
   app.register(cors, { origin: resolveCorsOrigin() });
-  app.register(jwt, { secret: resolveJwtSecret(), sign: { expiresIn: process.env.JWT_EXPIRES_IN ?? "12h" } });
-  app.addHook("onSend", async (_request, reply) => {
+  app.register(jwt, {
+    secret: resolveJwtSecret(),
+    sign: { expiresIn: process.env.JWT_EXPIRES_IN ?? "12h" },
+  });
+  app.addHook("onSend", async (_request, reply, payload) => {
     applyApiSecurityHeaders(reply);
+    return payload;
   });
   app.addHook("preHandler", diagnosticAuthoringGuard);
   app.register(healthRoutes);
