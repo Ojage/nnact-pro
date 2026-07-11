@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { diagnosticsApi, type DiagnosticSessionDetail } from "@/lib/diagnostics-api";
+import type { DiagnosticSessionDetail } from "@/lib/diagnostics-api";
+import { serverApi } from "@/lib/server-api";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { DiagnosticSessionClient } from "./session-client";
@@ -14,7 +15,7 @@ export default async function DiagnosticSessionPage({
   const { id } = await params;
   let detail: DiagnosticSessionDetail;
   try {
-    detail = await diagnosticsApi.session(id);
+    detail = await serverApi.diagnosticSession(id);
   } catch {
     notFound();
   }
