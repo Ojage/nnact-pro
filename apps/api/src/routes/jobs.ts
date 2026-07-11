@@ -34,18 +34,31 @@ function validTechnicianTransition(current: string, next: unknown) {
 }
 
 export async function jobRoutes(app: FastifyInstance) {
-  app.get("/", async (req) => {
+  app.get("/", async (req, reply) => {
     const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+
     const { skip, take } = req.query as { skip?: string; take?: string };
     const s = skip ? parseInt(skip, 10) : 0;
     const t = take ? parseInt(take, 10) : 50;
-    return db
-      .select()
-      .from(jobs)
-      .where(eq(jobs.orgId, orgId))
-      .orderBy(desc(jobs.createdAt))
-      .limit(t)
-      .offset(s);
+    const scope = claims.role === "technician"
+      ? and(eq(jobs.orgId, orgId), eq(jobs.assignedTo, claims.userId))
+      : eq(jobs.orgId, orgId);
+    return db.select().from(jobs).where(scope).orderBy(desc(jobs.createdAt)).limit(t).offset(s);
+  });
+
+  app.get("/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+    const { id } = req.params as { id: string };
+    const scope = claims.role === "technician"
+      ? and(eq(jobs.orgId, orgId), eq(jobs.id, id), eq(jobs.assignedTo, claims.userId))
+      : and(eq(jobs.orgId, orgId), eq(jobs.id, id));
+    const [row] = await db.select().from(jobs).where(scope).limit(1);
+    if (!row) return reply.code(404).send({ error: "not found" });
+    return row;
   });
 
   app.post("/", async (req, reply) => {
