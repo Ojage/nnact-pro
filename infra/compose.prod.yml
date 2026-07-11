@@ -62,6 +62,7 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:?Set the exact HTTPS web origin}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?Set the exact HTTPS web origin}
       TRUST_PROXY: "true"
+      OFP_ALLOW_PUBLIC_REGISTRATION: ${OFP_ALLOW_PUBLIC_REGISTRATION:-false}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       OFP_UPLOAD_DIR: /uploads
