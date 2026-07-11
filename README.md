@@ -45,7 +45,7 @@ Monorepo via pnpm workspaces: `apps/{api,web,mobile}`, `packages/{db,shared}`.
 
 ```bash
 cp .env.example .env
-pnpm install
+pnpm install:verified
 pnpm infra:up
 pnpm db:push
 pnpm db:seed
@@ -54,10 +54,13 @@ pnpm dev
 # API: http://localhost:3001
 ```
 
+`pnpm install:verified` regenerates the lockfile from committed manifests, verifies its pinned SHA-256, and then performs a frozen install. Dependency changes must update both the generated lockfile and `pnpm-lock.expected.sha256`.
+
 Run the primary validation gates:
 
 ```bash
 pnpm release:safety
+pnpm audit --prod --audit-level=high
 pnpm --filter @ofp/api test
 pnpm --filter @ofp/web test:unit
 pnpm --filter @ofp/web test:e2e
@@ -76,6 +79,7 @@ pnpm --filter @ofp/mobile typecheck
 - Job closeout board for start, completion, missing pricing, invoice creation, and recent accounts-receivable handoff
 - Estimates, line items, invoices, offline payments, and optional Stripe checkout
 - Server-side rejection of zero-dollar and duplicate active invoices
+- Concurrency-safe invoice numbering, manual payment application, and Stripe webhook processing
 - Branded invoice and estimate previews/exports
 - Reviews, recurring work, service-plan foundation, reporting, notifications, and search
 - Technician mobile application foundation
@@ -129,7 +133,7 @@ See `docs/release/final-product-roadmap.md` and `docs/release/RELEASE_CHECKLIST.
 
 ## Security
 
-Read `SECURITY.md` before deploying. Production startup rejects default/short JWT secrets and wildcard or missing production CORS configuration. Run `pnpm release:safety` before every release.
+Read `SECURITY.md` before deploying. Production startup rejects default/short JWT secrets and wildcard or missing production CORS configuration. Authentication, public booking, uploads, and checkout have bounded route-level rate limits. Run `pnpm release:safety` before every release.
 
 Optional Ed25519 support-entitlement keys are documented in `docs/security/KEY_MANAGEMENT.md`. They are not required to run the AGPL core and do not narrow the rights in `LICENSE`.
 
