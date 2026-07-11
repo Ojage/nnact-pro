@@ -31,11 +31,12 @@ import { diagnosticRoutes } from "./routes/diagnostics.js";
 import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
 import { diagnosticOutputRoutes } from "./routes/diagnostic-outputs.js";
 import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
+import { resolveCorsOrigin, resolveJwtSecret } from "./runtime-security.js";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
-  app.register(cors, { origin: true });
-  app.register(jwt, { secret: process.env.JWT_SECRET ?? "change-me-in-production" });
+  app.register(cors, { origin: resolveCorsOrigin() });
+  app.register(jwt, { secret: resolveJwtSecret() });
   app.addHook("preHandler", diagnosticAuthoringGuard);
   app.register(healthRoutes);
   app.register(authRoutes, { prefix: "/api/auth" });
@@ -44,7 +45,7 @@ export function buildServer() {
   app.register(appointmentRoutes, { prefix: "/api/appointments" });
   app.register(lineItemRoutes, { prefix: "/api" });
   app.register(invoiceRoutes, { prefix: "/api/invoices" });
-  app.register(stripeWebhookRoute, { prefix: "/api" }); // encapsulated raw-body parser
+  app.register(stripeWebhookRoute, { prefix: "/api" });
   app.register(estimateRoutes, { prefix: "/api/estimates" });
   app.register(reviewRoutes, { prefix: "/api/reviews" });
   app.register(reportRoutes, { prefix: "/api/reports" });
@@ -61,14 +62,13 @@ export function buildServer() {
   app.register(diagnosticOutputRoutes, { prefix: "/api/diagnostics" });
   app.register(notificationRoutes, { prefix: "/api/notifications" });
   app.register(searchRoutes, { prefix: "/api/search" });
-  app.register(pluginRoutes, { prefix: "/api/plugins" }); // owner-facing mgmt
-  app.register(pluginApiRoutes, { prefix: "/api/plugin" }); // scoped-token surface
+  app.register(pluginRoutes, { prefix: "/api/plugins" });
+  app.register(pluginApiRoutes, { prefix: "/api/plugin" });
   app.register(servicePlanRoutes, { prefix: "/api/service-plans" });
   app.register(orgSettingsRoutes, { prefix: "/api/org" });
   return app;
 }
 
-// Only listen when run directly (not when imported by tests).
 const isMain = import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const port = Number(process.env.API_PORT ?? 3001);
