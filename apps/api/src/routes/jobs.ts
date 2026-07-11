@@ -22,7 +22,7 @@ const patchBody = z.object({
   scheduledAt: z.string().datetime().nullable().optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   total: z.number().int().nonnegative().optional(),
-  laborCostCents: z.number().int().nonnegative().optional().default(0),
+  laborCostCents: z.number().int().nonnegative().optional(),
 });
 
 export async function jobRoutes(app: FastifyInstance) {
@@ -78,6 +78,20 @@ export async function jobRoutes(app: FastifyInstance) {
       .where(and(eq(jobs.orgId, orgId), eq(jobs.id, id)))
       .returning();
     if (!row) return reply.code(404).send({ error: "not found" });
+
+    if (parsed.data.status) {
+      const label = parsed.data.status.replaceAll("_", " ");
+      safeEmitActivity(orgId, "job.status_changed", `Job marked ${label}: ${row.title}`, {
+        customerId: row.customerId,
+        jobId: row.id,
+      });
+      void safeEmitEvent(orgId, "job.status_changed", {
+        id: row.id,
+        customerId: row.customerId,
+        status: row.status,
+      });
+    }
+
     return row;
   });
 }
