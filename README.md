@@ -2,7 +2,7 @@
 
 Open-source, self-hostable **field service management** for service businesses.
 
-OpenFieldPro is the open alternative to subscription-first platforms such as Housecall Pro: CRM, customers and properties, equipment history, scheduling and dispatch, work orders, estimates, invoicing, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows.
+OpenFieldPro provides CRM, customers and properties, equipment history, scheduling and dispatch, work orders, estimates, invoicing, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows without mandatory per-user subscriptions.
 
 Appliance-service organizations can attach equipment-specific technical records to work orders, but those tools remain optional workflow depth—not the product definition.
 
@@ -14,7 +14,7 @@ Appliance-service organizations can attach equipment-specific technical records 
 
 - Customers, properties, equipment, and service history
 - Job intake, scheduling, dispatch, work execution, and return visits
-- Closeout queues for start, completion, missing pricing, invoicing, and accounts receivable handoff
+- Closeout queues for start, completion, missing pricing, invoicing, and accounts-receivable handoff
 - Price book, estimates, approvals, invoices, and payments
 - Photos, documents, organization branding, reviews, and service plans
 - Reporting, integrations, self-hosting, backup, and restore
@@ -105,6 +105,14 @@ pnpm --filter @ofp/mobile typecheck
 - `/reports` — operational reporting
 - `/settings` — organization and branding settings
 
+## Open-source and sponsorship model
+
+The AGPL core is free to self-host and is never limited by users, technicians, customers, jobs, invoices, locations, or core operational features. Hosted modified versions must follow the obligations in `LICENSE`.
+
+Optional signed entitlements are verified locally without a license server, telemetry, or phone-home. They may represent sponsor recognition, bounded support benefits, or premium first-party plugins; they cannot disable or restrict the core.
+
+A free dashboard may show one clearly labeled, locally configured sponsor placement. OpenFieldPro does not use ad networks, tracking pixels, behavioral targeting, or sponsor access to operational data. See `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
+
 ## Product direction
 
 The release gate is the complete lead-to-payment loop:
@@ -127,7 +135,7 @@ Optional Ed25519 support-entitlement keys are documented in `docs/security/KEY_M
 
 ## Sponsorship
 
-The project sponsorship application, tier design, outreach copy, governance boundaries, and reporting plan are in `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
+The project sponsorship application, tier design, outreach copy, non-tracking sponsor policy, governance boundaries, and reporting plan are in `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
 
 After the GitHub Sponsors profile is approved, enable the repository Sponsor button. The repository funding configuration targets the `niko4244` GitHub Sponsors profile.
 
