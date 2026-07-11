@@ -6,6 +6,7 @@ import { JOB_STATUS } from "@ofp/shared";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";
+import { technicianJobPatchAllowed, verifiedClaims } from "../operational-authorization.js";
 
 const createBody = z.object({
   customerId: z.string().uuid(),
@@ -24,6 +25,13 @@ export const jobPatchBody = z.object({
   total: z.number().int().nonnegative().optional(),
   laborCostCents: z.number().int().nonnegative().optional(),
 });
+
+function validTechnicianTransition(current: string, next: unknown) {
+  return (
+    (current === "scheduled" && next === "in_progress") ||
+    (current === "in_progress" && next === "completed")
+  );
+}
 
 export async function jobRoutes(app: FastifyInstance) {
   app.get("/", async (req) => {
@@ -63,9 +71,37 @@ export async function jobRoutes(app: FastifyInstance) {
 
   app.patch("/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+
     const { id } = req.params as { id: string };
     const parsed = jobPatchBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    if (claims.role === "technician") {
+      if (!technicianJobPatchAllowed(parsed.data as Record<string, unknown>)) {
+        return reply.code(403).send({
+          error: "technicians may only start or complete their assigned jobs",
+        });
+      }
+      const [current] = await db
+        .select({ assignedTo: jobs.assignedTo, status: jobs.status })
+        .from(jobs)
+        .where(and(eq(jobs.orgId, orgId), eq(jobs.id, id)))
+        .limit(1);
+      if (!current) return reply.code(404).send({ error: "not found" });
+      if (current.assignedTo !== claims.userId) {
+        return reply.code(403).send({ error: "job is not assigned to this technician" });
+      }
+      if (!validTechnicianTransition(current.status, parsed.data.status)) {
+        return reply.code(409).send({
+          error: "invalid technician job transition",
+          currentStatus: current.status,
+          requestedStatus: parsed.data.status,
+        });
+      }
+    }
+
     const { scheduledAt, ...rest } = parsed.data;
     const [row] = await db
       .update(jobs)
