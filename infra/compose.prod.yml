@@ -87,11 +87,16 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?Set the public HTTPS origin; the client appends /api}
+    environment:
+      OFP_SPONSOR_ENABLED: ${OFP_SPONSOR_ENABLED:-false}
+      OFP_SPONSOR_NAME: ${OFP_SPONSOR_NAME:-}
+      OFP_SPONSOR_MESSAGE: ${OFP_SPONSOR_MESSAGE:-}
+      OFP_SPONSOR_URL: ${OFP_SPONSOR_URL:-}
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/" ]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/"]
       interval: 15s
       timeout: 5s
       start_period: 20s
