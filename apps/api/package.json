@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "node --import tsx --experimental-test-module-mocks --test test/*.test.ts",
+    "license:keypair": "tsx scripts/make-license-key.ts --generate-keypair",
     "license:generate": "tsx scripts/make-license-key.ts",
     "license:verify": "tsx scripts/verify-license-key.ts"
   },
