@@ -60,8 +60,9 @@ test("desktop diagnostic flow renders ordered route evidence and mode changes", 
   await heaterStep.click();
 
   await expect(page.getByRole("heading", { name: "Verify heater continuity" })).toBeVisible();
-  await expect(page.getByText("Power disconnected; verify zero volts before resistance testing")).toBeVisible();
-  await expect(page.getByText("Unit unplugged", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(/Power disconnected; verify zero volts before resistance testing · Unit unplugged/),
+  ).toBeVisible();
   await expect(page.getByText("Across-load continuity path").first()).toBeVisible();
 
   await page.getByRole("button", { name: "Report workflow issue" }).click();
