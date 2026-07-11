@@ -20,7 +20,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <>
       <Sidebar />
       <MobileNav />
-      <main className="ml-0 md:ml-64 min-h-screen p-4 pt-16 md:p-8">{children}</main>
+      <main className="ml-0 min-h-screen p-4 pt-16 md:ml-64 md:p-8">
+        <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+      </main>
       <CommandPalette />
     </>
   );
