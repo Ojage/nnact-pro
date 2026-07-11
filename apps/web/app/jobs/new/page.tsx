@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerDTO, JobDTO, UserDTO } from "@ofp/shared";
 import { api } from "@/lib/api";
@@ -20,8 +20,7 @@ async function createJob(body: {
   customerId: string;
   title: string;
   description?: string;
-  status: "lead" | "scheduled";
-  scheduledAt?: string;
+  status: "lead";
 }) {
   const token = localStorage.getItem("ofp_token");
   const response = await fetch(`${BASE}/api/jobs`, {
@@ -58,15 +57,16 @@ export default function NewJobPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [scheduleNow, setScheduleNow] = useState(true);
-  const defaultStart = useMemo(() => {
+  const [startsAt, setStartsAt] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("90");
+  const [technicianId, setTechnicianId] = useState("");
+
+  useEffect(() => {
     const date = new Date();
     date.setMinutes(0, 0, 0);
     date.setHours(date.getHours() + 1);
-    return localInputValue(date);
+    setStartsAt(localInputValue(date));
   }, []);
-  const [startsAt, setStartsAt] = useState(defaultStart);
-  const [durationMinutes, setDurationMinutes] = useState("90");
-  const [technicianId, setTechnicianId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -121,16 +121,18 @@ export default function NewJobPage() {
         resolvedCustomerId = customer.id;
       }
 
-      const scheduledAt = scheduleNow ? new Date(startsAt).toISOString() : undefined;
+      // Create the commercial work order as a lead first. The appointment API
+      // owns the transition to scheduled so a rejected conflict cannot leave a
+      // scheduled job without a calendar visit.
       const job = await createJob({
         customerId: resolvedCustomerId,
         title: title.trim(),
         description: description.trim() || undefined,
-        status: scheduleNow ? "scheduled" : "lead",
-        scheduledAt,
+        status: "lead",
       });
 
-      if (scheduleNow && scheduledAt) {
+      if (scheduleNow) {
+        const scheduledAt = new Date(startsAt).toISOString();
         const end = new Date(new Date(scheduledAt).getTime() + Number(durationMinutes) * 60_000);
         await api.createAppointment({
           jobId: job.id,
