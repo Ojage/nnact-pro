@@ -64,7 +64,7 @@ test("desktop diagnostic flow renders ordered route evidence and mode changes", 
   expect(runtimeErrors).toEqual([]);
 });
 
-test("mobile diagnostic flow avoids page overflow and preserves the audit evidence", async ({ page }) => {
+test("mobile diagnostic flow shows every ordered segment without page overflow", async ({ page }) => {
   const runtimeErrors = collectRuntimeErrors(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/visual-qa/diagnostics");
@@ -73,6 +73,10 @@ test("mobile diagnostic flow avoids page overflow and preserves the audit eviden
   await expect(page.getByRole("button", { name: "guided mode" })).toBeVisible();
   await expect(page.getByRole("button", { name: "field mode" })).toBeVisible();
   await expect(page.getByTestId("route-topology-audit")).toBeVisible();
+
+  for (const segmentId of ["SEG-L1-01", "SEG-L1-02", "SEG-L2-01", "SEG-L2-02", "SEG-CTL-01", "SEG-CTL-02", "SEG-HARNESS-07"]) {
+    await expect(page.getByText(segmentId, { exact: true })).toBeVisible();
+  }
 
   const bodyOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(bodyOverflow).toBeLessThanOrEqual(1);
