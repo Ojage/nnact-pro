@@ -7,7 +7,8 @@ if [ $# -ne 2 ] || [ "$2" != "--confirm-destroy-current-data" ]; then
 Usage: scripts/restore.sh backups/openfieldpro-YYYYMMDDTHHMMSSZ.tar.gz.age --confirm-destroy-current-data
 
 Restore stops application services, replaces the current database and upload directory, verifies the
-backup checksums, and then restarts the stack. Run it first in an isolated recovery environment.
+backup checksums, applies the reviewed current schema, and restarts the stack. Run it first in an
+isolated recovery environment.
 USAGE
   exit 2
 fi
@@ -70,8 +71,8 @@ export ALLOW_SCHEMA_PUSH=true
 "${COMPOSE[@]}" -f infra/compose.prod.yml config >/dev/null
 
 echo "Stopping services that can write application data..."
-"${COMPOSE[@]}" -f infra/compose.prod.yml stop caddy web api worker migrate >/dev/null 2>&1 || true
-"${COMPOSE[@]}" -f infra/compose.prod.yml up -d postgres >/dev/null
+"${COMPOSE[@]}" -f infra/compose.prod.yml stop caddy web api worker >/dev/null 2>&1 || true
+"${COMPOSE[@]}" -f infra/compose.prod.yml up -d postgres redis >/dev/null
 
 printf 'Replacing PostgreSQL database contents...\n'
 "${COMPOSE[@]}" -f infra/compose.prod.yml exec -T postgres \
@@ -90,8 +91,12 @@ if [ -f "$WORK_DIR/uploads.tar.gz" ]; then
   tar -xzf "$WORK_DIR/uploads.tar.gz" -C data
 fi
 
-printf 'Starting restored stack and applying the reviewed current schema...\n'
-"${COMPOSE[@]}" -f infra/compose.prod.yml up -d --build --remove-orphans
+printf 'Building application images and applying the reviewed current schema...\n'
+"${COMPOSE[@]}" -f infra/compose.prod.yml build api web worker
+"${COMPOSE[@]}" -f infra/compose.prod.yml --profile tools run --rm -e ALLOW_SCHEMA_PUSH=true migrate
+
+printf 'Starting restored application services...\n'
+"${COMPOSE[@]}" -f infra/compose.prod.yml up -d api web worker caddy --remove-orphans
 
 cat <<EOF
 Restore completed from:
