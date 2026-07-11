@@ -121,6 +121,8 @@ test("dispatcher creates and schedules a job for an existing customer", async ({
   await expect(page.getByRole("heading", { name: "New job" })).toBeVisible();
   await expect(page.getByText("Create the work order, customer record, and appointment in one intake flow.")).toBeVisible();
   await expect(page.getByLabel("Customer")).toHaveValue("customer-1");
+  await expect(page.getByRole("link", { name: "New Job" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Jobs", exact: true })).not.toHaveAttribute("aria-current", "page");
 
   await page.getByLabel("Job title").fill("Refrigerator not cooling");
   await page.getByLabel("Customer complaint and access notes").fill("Fresh-food section is warm. Call before arrival; dog will be secured.");
@@ -137,8 +139,9 @@ test("dispatcher creates and schedules a job for an existing customer", async ({
   expect(capture.job).toMatchObject({
     customerId: "customer-1",
     title: "Refrigerator not cooling",
-    status: "scheduled",
+    status: "lead",
   });
+  expect(capture.job).not.toHaveProperty("scheduledAt");
   expect(capture.appointment).toMatchObject({
     jobId: "job-created",
     technicianId: "tech-1",
@@ -157,6 +160,11 @@ test("mobile intake creates a new customer and clearly supports unscheduled lead
   await mockIntakeApi(page, capture);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/jobs/new");
+
+  await page.getByRole("button", { name: "Open navigation menu" }).click();
+  await expect(page.getByRole("link", { name: "New Job" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Jobs", exact: true })).not.toHaveAttribute("aria-current", "page");
+  await page.getByRole("button", { name: "Close navigation menu" }).click();
 
   await page.getByRole("button", { name: "new customer" }).click();
   await page.getByLabel("Customer name").fill("Casey Nguyen");
