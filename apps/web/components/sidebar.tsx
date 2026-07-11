@@ -4,16 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { NAV_SECTIONS, decodeJwt } from "@/lib/nav";
+import { NAV_SECTIONS, activeNavHref, decodeJwt } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
 
-function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
-}
-
 export function Sidebar() {
   const pathname = usePathname();
+  const currentNavHref = activeNavHref(pathname);
   const { theme, toggle } = useTheme();
   const [user, setUser] = useState<{ name: string; role?: string } | null>(null);
 
@@ -46,11 +43,12 @@ export function Sidebar() {
             </p>
             <div className="flex flex-col gap-1">
               {section.links.map(({ href, label, icon }) => {
-                const active = isActive(pathname, href);
+                const active = currentNavHref === href;
                 return (
                   <Link
                     key={href}
                     href={href}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-sm no-underline transition-all duration-150",
                       active
