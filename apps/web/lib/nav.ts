@@ -1,6 +1,5 @@
 // Shared navigation and auth helpers used by Sidebar, MobileNav, and CommandPalette.
-// OpenFieldPro keeps the complete field-service operations core while making
-// appliance diagnostic execution the primary field workflow.
+// OpenFieldPro is an open-source field-service operations platform with appliance-service workflows.
 
 export interface NavLink {
   href: string;
@@ -25,7 +24,8 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Operations",
     links: [
-      { href: "/schedule", label: "Schedule & Dispatch", icon: "◐" },
+      { href: "/dispatch", label: "Dispatch Board", icon: "⇄" },
+      { href: "/schedule", label: "Schedule", icon: "◐" },
       { href: "/pipeline", label: "Pipeline", icon: "⊟" },
       { href: "/customers", label: "Customers & Equipment", icon: "⊕" },
       { href: "/estimates", label: "Estimates", icon: "◷" },
