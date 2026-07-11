@@ -55,6 +55,8 @@ jobs:
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
       - name: Install workspace
         run: pnpm install --no-frozen-lockfile --reporter=silent
+      - name: Run dispatch unit tests
+        run: pnpm --filter @ofp/web test:unit
       - name: Build web application
         run: |
           set +e
