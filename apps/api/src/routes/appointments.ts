@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { eq, and, gte, lte, asc, lt, gt, ne } from "drizzle-orm";
+import { eq, and, gte, lte, asc, lt, gt, ne, inArray } from "drizzle-orm";
 import { db, appointments, jobs, users } from "@ofp/db";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
@@ -28,7 +28,7 @@ async function technicianIsAssignable(orgId: string, technicianId: string) {
       and(
         eq(users.orgId, orgId),
         eq(users.id, technicianId),
-        eq(users.role, "technician"),
+        inArray(users.role, ["technician", "owner"]),
         eq(users.active, true),
       ),
     );
@@ -122,7 +122,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
     if (rest.technicianId && !(await technicianIsAssignable(orgId, rest.technicianId))) {
       return reply
         .code(400)
-        .send({ error: "technician must be an active technician in this organization" });
+        .send({ error: "technician must be an active technician or owner in this organization" });
     }
 
     if (rest.technicianId) {
@@ -144,8 +144,17 @@ export async function appointmentRoutes(app: FastifyInstance) {
         endsAt: window.endsAt,
       })
       .returning();
-    // Moving a lead onto the calendar implies it's scheduled.
-    await db.update(jobs).set({ status: "scheduled" }).where(eq(jobs.id, rest.jobId));
+
+    // Keep the commercial work order aligned with the dispatch record.
+    await db
+      .update(jobs)
+      .set({
+        status: "scheduled",
+        scheduledAt: window.startsAt,
+        assignedTo: rest.technicianId ?? null,
+      })
+      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, rest.jobId)));
+
     safeEmitActivity(
       orgId,
       "appointment.scheduled",
@@ -171,7 +180,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
     if (technicianId && !(await technicianIsAssignable(orgId, technicianId))) {
       return reply
         .code(400)
-        .send({ error: "technician must be an active technician in this organization" });
+        .send({ error: "technician must be an active technician or owner in this organization" });
     }
 
     const window = resolveAppointmentWindow(current, { startsAt, endsAt });
@@ -199,6 +208,16 @@ export async function appointmentRoutes(app: FastifyInstance) {
       .where(and(eq(appointments.orgId, orgId), eq(appointments.id, id)))
       .returning();
     if (!row) return reply.code(404).send({ error: "not found" });
+
+    // Reassignment and rescheduling must update the work order used by jobs,
+    // reports, mobile sync, and customer-facing status views.
+    await db
+      .update(jobs)
+      .set({
+        scheduledAt: window.startsAt,
+        assignedTo: targetTechnicianId ?? null,
+      })
+      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, current.jobId)));
 
     const assignmentChanged = technicianId !== undefined && technicianId !== current.technicianId;
     const scheduleChanged =
