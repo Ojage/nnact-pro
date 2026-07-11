@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { DiagnosticSessionClient } from "./session-client";
 import { CompletionPanel } from "./completion-panel";
+import { RouteAuditPanel } from "./route-audit-panel";
 
 export default async function DiagnosticSessionPage({
   params,
@@ -47,6 +48,7 @@ export default async function DiagnosticSessionPage({
         }
       />
       <DiagnosticSessionClient initialDetail={detail} />
+      {detail.workflow && <RouteAuditPanel steps={detail.steps} />}
       <CompletionPanel
         sessionId={detail.session.id}
         initialStatus={detail.session.status}
