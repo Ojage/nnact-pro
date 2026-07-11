@@ -23,19 +23,18 @@ case "${1:-}" in
   *)
     cat >&2 <<'USAGE'
 Usage:
-  ./deploy.sh --apply-schema   Validate configuration, build, apply the reviewed schema, and start
+  ./deploy.sh --apply-schema   Validate, build, apply the reviewed schema, and start
   ./deploy.sh down             Stop the stack without deleting persistent data
 
-Production deployment is intentionally blocked without --apply-schema because schema push is a
-potentially destructive operation. Review the generated schema diff and complete the release
-checklist before continuing.
+Production deployment is intentionally blocked without --apply-schema. Review the generated schema
+diff and complete the release checklist before authorizing a production schema push.
 USAGE
     exit 2
     ;;
 esac
 
 if [ ! -f .env ]; then
-  echo "Missing .env. Copy .env.example, replace every production placeholder, and keep the file outside version control." >&2
+  echo "Missing .env. Copy .env.example, replace every production placeholder, and keep it outside version control." >&2
   exit 1
 fi
 
@@ -52,6 +51,10 @@ for name in "${required[@]}"; do
   fi
 done
 
+if [ "${POSTGRES_PASSWORD}" = "replace-with-a-unique-database-password" ] || [ "${#POSTGRES_PASSWORD}" -lt 16 ]; then
+  echo "POSTGRES_PASSWORD must be replaced with a unique value of at least 16 characters." >&2
+  exit 1
+fi
 if [ "${JWT_SECRET}" = "change-me-in-production" ] || [ "${#JWT_SECRET}" -lt 32 ]; then
   echo "JWT_SECRET must be unique and at least 32 characters." >&2
   exit 1
@@ -60,10 +63,14 @@ if [[ "${CORS_ORIGIN}" == *"*"* ]]; then
   echo "CORS_ORIGIN cannot contain a wildcard." >&2
   exit 1
 fi
-if [[ ! "${PUBLIC_WEB_URL}" =~ ^https:// ]] || [[ ! "${PUBLIC_API_URL}" =~ ^https:// ]]; then
-  echo "PUBLIC_WEB_URL and PUBLIC_API_URL must use HTTPS for production." >&2
-  exit 1
-fi
+
+node - "$PUBLIC_WEB_URL" "$PUBLIC_API_URL" <<'NODE'
+for (const [name, value] of [["PUBLIC_WEB_URL", process.argv[2]], ["PUBLIC_API_URL", process.argv[3]]]) {
+  const url = new URL(value);
+  if (url.protocol !== "https:") throw new Error(`${name} must use HTTPS`);
+  if (url.origin !== value.replace(/\/$/, "")) throw new Error(`${name} must be an origin without a path`);
+}
+NODE
 
 export ALLOW_SCHEMA_PUSH=true
 "${COMPOSE[@]}" -f infra/compose.prod.yml config >/dev/null
@@ -75,21 +82,38 @@ pnpm install:verified
 pnpm release:safety
 pnpm audit --prod --audit-level=high
 
-echo "Building and starting the production stack..."
-"${COMPOSE[@]}" -f infra/compose.prod.yml up -d --build --remove-orphans
+echo "Building production images..."
+"${COMPOSE[@]}" -f infra/compose.prod.yml build api web worker
+
+echo "Starting data services..."
+"${COMPOSE[@]}" -f infra/compose.prod.yml up -d postgres redis
+
+echo "Applying the reviewed schema once..."
+"${COMPOSE[@]}" -f infra/compose.prod.yml --profile tools run --rm -e ALLOW_SCHEMA_PUSH=true migrate
+
+echo "Starting application services..."
+"${COMPOSE[@]}" -f infra/compose.prod.yml up -d api web worker caddy --remove-orphans
 
 echo "Waiting for service health..."
-for attempt in $(seq 1 30); do
-  if "${COMPOSE[@]}" -f infra/compose.prod.yml ps --format json 2>/dev/null | grep -q '"Health":"unhealthy"'; then
+healthy=false
+for _attempt in $(seq 1 45); do
+  status="$(${COMPOSE[@]} -f infra/compose.prod.yml ps 2>/dev/null || true)"
+  if printf '%s\n' "$status" | grep -qi "unhealthy"; then
     echo "A service became unhealthy." >&2
-    "${COMPOSE[@]}" -f infra/compose.prod.yml ps >&2
+    printf '%s\n' "$status" >&2
     exit 1
   fi
-  if "${COMPOSE[@]}" -f infra/compose.prod.yml ps 2>/dev/null | grep -q "api"; then
+  if printf '%s\n' "$status" | grep -q "api" && printf '%s\n' "$status" | grep -q "web"; then
+    healthy=true
     break
   fi
   sleep 2
 done
+if [ "$healthy" != true ]; then
+  echo "Services did not reach the expected running state." >&2
+  "${COMPOSE[@]}" -f infra/compose.prod.yml ps >&2
+  exit 1
+fi
 
 cat <<EOF
 OpenFieldPro deployment started.
