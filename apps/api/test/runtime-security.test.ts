@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveCorsOrigin, resolveJwtSecret } from "../src/runtime-security.js";
+import { resolveCorsOrigin, resolveJwtSecret, resolvePublicWebUrl } from "../src/runtime-security.js";
 
 test("production rejects missing, default, and short JWT secrets", () => {
   for (const value of [undefined, "change-me-in-production", "too-short"]) {
@@ -36,5 +36,21 @@ test("production requires explicit HTTPS CORS origins", () => {
       CORS_ORIGIN: "https://app.openfieldpro.example,https://admin.openfieldpro.example",
     } as NodeJS.ProcessEnv),
     ["https://app.openfieldpro.example", "https://admin.openfieldpro.example"],
+  );
+});
+
+test("payment redirects require an exact HTTPS web origin in production", () => {
+  assert.throws(() => resolvePublicWebUrl({ NODE_ENV: "production" } as NodeJS.ProcessEnv), /PUBLIC_WEB_URL/);
+  assert.throws(
+    () => resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "http://openfieldpro.example" } as NodeJS.ProcessEnv),
+    /HTTPS/,
+  );
+  assert.throws(
+    () => resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "https://openfieldpro.example/path" } as NodeJS.ProcessEnv),
+    /without a path/,
+  );
+  assert.equal(
+    resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "https://openfieldpro.example/" } as NodeJS.ProcessEnv),
+    "https://openfieldpro.example",
   );
 });
