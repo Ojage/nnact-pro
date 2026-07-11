@@ -17,7 +17,7 @@ function routeIsValidated(route: TraceRoute) {
 
 function Endpoint({ label, value }: { label: string; value: string }) {
   return (
-    <div className="w-44 shrink-0 rounded-xl border border-blue/30 bg-blue/5 p-3">
+    <div className="w-full shrink-0 rounded-xl border border-blue/30 bg-blue/5 p-3 sm:w-44">
       <p className="text-[10px] font-bold uppercase tracking-wide text-blue">{label}</p>
       <p className="mt-1 break-words text-sm font-semibold text-fg">{value}</p>
     </div>
@@ -27,19 +27,22 @@ function Endpoint({ label, value }: { label: string; value: string }) {
 function SegmentChain({ route }: { route: TraceRoute }) {
   if (route.segmentIds.length === 0) {
     return (
-      <div className="min-w-48 flex-1 rounded-xl border border-dashed border-yellow/40 bg-yellow/5 p-4 text-center text-xs font-semibold text-yellow">
+      <div className="w-full flex-1 rounded-xl border border-dashed border-yellow/40 bg-yellow/5 p-4 text-center text-xs font-semibold text-yellow sm:min-w-48">
         No selectable segment chain attached
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-w-max flex-1 items-center gap-2 px-2" aria-label="Ordered selectable segment chain">
-      <div className="absolute left-3 right-3 top-1/2 h-px -translate-y-1/2 bg-border-light" />
+    <div
+      className="relative flex w-full flex-col items-stretch gap-2 px-2 sm:min-w-max sm:flex-1 sm:flex-row sm:items-center"
+      aria-label="Ordered selectable segment chain"
+    >
+      <div className="absolute bottom-3 left-1/2 top-3 w-px -translate-x-1/2 bg-border-light sm:bottom-auto sm:left-3 sm:right-3 sm:top-1/2 sm:h-px sm:w-auto sm:translate-x-0 sm:-translate-y-1/2" />
       {route.segmentIds.map((segmentId, index) => (
         <div
           key={`${route.id}-${segmentId}-${index}`}
-          className="relative z-10 min-w-28 rounded-lg border border-accent/35 bg-surface-100 px-3 py-2 text-center shadow-sm"
+          className="relative z-10 w-full rounded-lg border border-accent/35 bg-surface-100 px-3 py-2 text-center shadow-sm sm:w-auto sm:min-w-28"
         >
           <span className="mx-auto flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-black text-surface-100">
             {index + 1}
@@ -79,7 +82,7 @@ function RouteCard({ step, route }: { step: DiagnosticStep; route: TraceRoute })
       </div>
 
       <div className="mt-4 overflow-x-auto pb-2" data-testid="ordered-segment-chain">
-        <div className="flex min-w-[760px] items-stretch gap-3">
+        <div className="flex flex-col items-stretch gap-3 sm:min-w-[760px] sm:flex-row">
           <Endpoint label="Endpoint 1" value={point1} />
           <SegmentChain route={route} />
           <Endpoint label="Endpoint 2" value={point2} />
