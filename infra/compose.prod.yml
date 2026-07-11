@@ -27,6 +27,7 @@ services:
     restart: unless-stopped
 
   migrate:
+    profiles: ["tools"]
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -41,7 +42,7 @@ services:
       - -ec
       - |
         test "$${ALLOW_SCHEMA_PUSH}" = "true" || {
-          echo "Refusing production schema push. Review the generated schema change and set ALLOW_SCHEMA_PUSH=true for this deployment." >&2
+          echo "Refusing production schema push. Review the generated schema change and explicitly authorize it." >&2
           exit 1
         }
         pnpm --filter @ofp/db push
@@ -72,8 +73,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3001/health"]
       interval: 15s
@@ -92,7 +91,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/" ]
       interval: 15s
       timeout: 5s
       start_period: 20s
@@ -113,8 +112,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
     restart: unless-stopped
 
   caddy:
