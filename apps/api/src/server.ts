@@ -32,11 +32,19 @@ import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
 import { diagnosticOutputRoutes } from "./routes/diagnostic-outputs.js";
 import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
 import { resolveCorsOrigin, resolveJwtSecret } from "./runtime-security.js";
+import { applyApiSecurityHeaders } from "./security-headers.js";
 
 export function buildServer() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: true,
+    bodyLimit: 1_048_576,
+    trustProxy: process.env.TRUST_PROXY === "true",
+  });
   app.register(cors, { origin: resolveCorsOrigin() });
-  app.register(jwt, { secret: resolveJwtSecret() });
+  app.register(jwt, { secret: resolveJwtSecret(), sign: { expiresIn: process.env.JWT_EXPIRES_IN ?? "12h" } });
+  app.addHook("onSend", async (_request, reply) => {
+    applyApiSecurityHeaders(reply);
+  });
   app.addHook("preHandler", diagnosticAuthoringGuard);
   app.register(healthRoutes);
   app.register(authRoutes, { prefix: "/api/auth" });
