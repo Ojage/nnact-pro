@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { api } from "@/lib/api";
-import { diagnosticsApi, type DiagnosticSessionListItem } from "@/lib/diagnostics-api";
+import { serverApi } from "@/lib/server-api";
+import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import { formatMoney } from "@ofp/shared";
 import type { ActivityDTO, CustomerDTO, JobDTO } from "@ofp/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,19 +52,19 @@ export default async function JobDetailPage({
   let job: JobDTO | null = null;
   let jobLoadFailed = false;
   try {
-    job = await api.job(jobId);
+    job = await serverApi.job(jobId);
   } catch {
     jobLoadFailed = true;
   }
 
   const [activities, appointments, invoices, customers, lineItems, diagnosticRows] =
     await Promise.all([
-      api.activities({ jobId }).catch(() => [] as ActivityDTO[]),
-      api.appointments().catch(() => [] as Appointment[]),
-      api.invoices().catch(() => [] as Invoice[]),
-      api.customers().catch(() => [] as CustomerDTO[]),
-      api.lineItems(jobId).catch(() => [] as LineItem[]),
-      diagnosticsApi.sessions({ jobId }).catch(() => [] as DiagnosticSessionListItem[]),
+      serverApi.activities({ jobId }).catch(() => [] as ActivityDTO[]),
+      serverApi.appointments().catch(() => [] as Appointment[]),
+      serverApi.invoices().catch(() => [] as Invoice[]),
+      serverApi.customers().catch(() => [] as CustomerDTO[]),
+      serverApi.lineItems(jobId).catch(() => [] as LineItem[]),
+      serverApi.diagnosticSessions({ jobId }).catch(() => [] as DiagnosticSessionListItem[]),
     ]);
 
   const customer = job ? customers.find((item) => item.id === job.customerId) : null;
@@ -75,7 +75,7 @@ export default async function JobDetailPage({
   return (
     <div>
       {jobLoadFailed ? (
-        <PageHeader title="Couldn’t load job" description={`ID: ${jobId}`} />
+        <PageHeader title="Couldn’t load job" description="The work order is unavailable or this session is not authorized to view it." />
       ) : !job ? (
         <PageHeader title="Job not found" description={`No job with id ${jobId} in this organization.`} />
       ) : (
@@ -112,11 +112,11 @@ export default async function JobDetailPage({
             <div className="flex flex-wrap gap-2">
               {diagnostic ? (
                 <Link href={`/diagnostics/${diagnostic.session.id}`}>
-                  <Button size="sm">Continue diagnostic</Button>
+                  <Button size="sm">Continue equipment record</Button>
                 </Link>
               ) : (
                 <Link href="/diagnostics/new">
-                  <Button size="sm">Start diagnostic</Button>
+                  <Button size="sm">Add equipment record</Button>
                 </Link>
               )}
               {customer && (
@@ -124,8 +124,8 @@ export default async function JobDetailPage({
                   <Button variant="secondary" size="sm">Customer</Button>
                 </Link>
               )}
-              <Link href="/schedule">
-                <Button variant="secondary" size="sm">Schedule</Button>
+              <Link href="/closeout">
+                <Button variant="secondary" size="sm">Closeout</Button>
               </Link>
             </div>
           }
@@ -134,18 +134,44 @@ export default async function JobDetailPage({
 
       {!job ? (
         <Card>
-          <EmptyState title="No job data" description="Verify the job ID or check the API connection." />
+          <EmptyState title="No job data" description="Verify the work-order ID, authentication session, or API connection." />
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_.85fr]">
           <div className="space-y-6">
-            <Card className={diagnostic ? "border-accent/25" : "border-yellow/25"}>
+            <Card>
+              <CardHeader><CardTitle>Job details</CardTitle></CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-surface-200 p-4">
+                  <p className="text-xs text-fg-muted">Status</p>
+                  <div className="mt-2"><JobStatusBadge status={job.status} /></div>
+                </div>
+                <div className="rounded-xl bg-surface-200 p-4">
+                  <p className="text-xs text-fg-muted">Current total</p>
+                  <p className="mt-2 text-xl font-bold text-fg">{formatMoney(job.total)}</p>
+                </div>
+                <div className="rounded-xl bg-surface-200 p-4">
+                  <p className="text-xs text-fg-muted">Created</p>
+                  <p className="mt-2 text-sm text-fg">{new Date(job.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="rounded-xl bg-surface-200 p-4">
+                  <p className="text-xs text-fg-muted">Scheduled</p>
+                  <p className="mt-2 text-sm text-fg">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Not scheduled"}</p>
+                </div>
+                {job.description && (
+                  <div className="rounded-xl bg-surface-200 p-4 sm:col-span-2">
+                    <p className="text-xs text-fg-muted">Customer complaint and access notes</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-fg">{job.description}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className={diagnostic ? "border-accent/25" : "border-border"}>
               <CardHeader className="flex-row items-start justify-between">
                 <div>
-                  <CardTitle>Appliance & diagnostic</CardTitle>
-                  <CardDescription>
-                    The job is the commercial record. The appliance and diagnostic session are the technical record.
-                  </CardDescription>
+                  <CardTitle>Optional equipment record</CardTitle>
+                  <CardDescription>Technical evidence stays attached to this commercial work order without replacing status or billing.</CardDescription>
                 </div>
                 {diagnostic && (
                   <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold capitalize ${diagnosticTone(diagnostic.session.status)}`}>
@@ -172,48 +198,21 @@ export default async function JobDetailPage({
                       <div className="rounded-xl border border-border bg-surface-200 p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-dim">Applicable workflow</p>
                         <p className="mt-2 text-sm text-fg">{diagnostic.workflow?.name || "Coverage required"}</p>
-                        {diagnostic.workflow && (
-                          <p className="mt-1 text-xs text-fg-dim">{diagnostic.workflow.supportStatus} · v{diagnostic.session.workflowVersion ?? diagnostic.workflow.versionNumber}</p>
-                        )}
                       </div>
                     </div>
                     <Link href={`/diagnostics/${diagnostic.session.id}`}>
-                      <Button>{diagnostic.session.status === "completed" ? "Review diagnostic record" : "Open field workflow"}</Button>
+                      <Button>{diagnostic.session.status === "completed" ? "Review equipment record" : "Open equipment workflow"}</Button>
                     </Link>
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-border p-8 text-center">
-                    <p className="font-semibold text-fg">No appliance diagnostic session is attached</p>
-                    <p className="mt-1 text-sm text-fg-muted">
-                      Link the exact customer appliance, confirm model and serial, and select a validated workflow or explicit coverage-required state.
-                    </p>
+                    <p className="font-semibold text-fg">No equipment record is attached</p>
+                    <p className="mt-1 text-sm text-fg-muted">Add one only when model, serial, measurements, or technical evidence are useful for this work order.</p>
                     <Link href="/diagnostics/new" className="mt-4 inline-flex">
-                      <Button size="sm">Start diagnostic intake</Button>
+                      <Button size="sm">Add equipment record</Button>
                     </Link>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Job details</CardTitle></CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl bg-surface-200 p-4">
-                  <p className="text-xs text-fg-muted">Status</p>
-                  <div className="mt-2"><JobStatusBadge status={job.status} /></div>
-                </div>
-                <div className="rounded-xl bg-surface-200 p-4">
-                  <p className="text-xs text-fg-muted">Current total</p>
-                  <p className="mt-2 text-xl font-bold text-fg">{formatMoney(job.total)}</p>
-                </div>
-                <div className="rounded-xl bg-surface-200 p-4">
-                  <p className="text-xs text-fg-muted">Created</p>
-                  <p className="mt-2 text-sm text-fg">{new Date(job.createdAt).toLocaleDateString()}</p>
-                </div>
-                <div className="rounded-xl bg-surface-200 p-4">
-                  <p className="text-xs text-fg-muted">Scheduled</p>
-                  <p className="mt-2 text-sm text-fg">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Not scheduled"}</p>
-                </div>
               </CardContent>
             </Card>
 
@@ -281,7 +280,7 @@ export default async function JobDetailPage({
               </CardHeader>
               <CardContent>
                 {jobInvoices.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-fg-muted">Create the estimate and invoice after the repair decision is approved.</p>
+                  <p className="py-4 text-center text-sm text-fg-muted">Create the invoice from Job Closeout after pricing is complete.</p>
                 ) : (
                   <div className="space-y-2">
                     {jobInvoices.map((invoice) => (
