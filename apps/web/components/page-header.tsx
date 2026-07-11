@@ -13,12 +13,17 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-end justify-between mb-8", className)}>
-      <div>
-        <h1 className="text-2xl font-bold text-fg tracking-tight">{title}</h1>
-        {description && <p className="text-sm text-fg-muted mt-1">{description}</p>}
+    <div
+      className={cn(
+        "mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between",
+        className,
+      )}
+    >
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight text-fg">{title}</h1>
+        {description ? <p className="mt-1 max-w-3xl text-sm text-fg-muted">{description}</p> : null}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
