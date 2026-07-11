@@ -56,6 +56,13 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export const NAV_LINKS: NavLink[] = NAV_SECTIONS.flatMap((section) => section.links);
 
+export function activeNavHref(pathname: string): string | null {
+  const matches = NAV_LINKS.filter(({ href }) =>
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`),
+  );
+  return matches.sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null;
+}
+
 export function decodeJwt(token: string): { name?: string; email?: string; role?: string } | null {
   try {
     return JSON.parse(atob(token.split(".")[1]));
