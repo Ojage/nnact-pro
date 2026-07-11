@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq, and, desc, ne, sql } from "drizzle-orm";
 import { db, invoices, payments, jobs, lineItems } from "@ofp/db";
 import { applyPayment, invoiceNumber } from "../invoicing.js";
+import { validateInvoiceCreation } from "../invoice-creation.js";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";
@@ -50,12 +51,6 @@ export async function invoiceRoutes(app: FastifyInstance) {
       .from(jobs)
       .where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
     if (!job) return reply.code(404).send({ error: "job not found" });
-    if (job.total <= 0) {
-      return reply.code(400).send({
-        error: "job has no billable total",
-        hint: "Add at least one billable line item before creating an invoice.",
-      });
-    }
 
     const [existing] = await db
       .select({ id: invoices.id, number: invoices.number, status: invoices.status })
@@ -68,12 +63,9 @@ export async function invoiceRoutes(app: FastifyInstance) {
         ),
       )
       .limit(1);
-    if (existing) {
-      return reply.code(409).send({
-        error: "job already has an active invoice",
-        invoice: existing,
-      });
-    }
+
+    const blocked = validateInvoiceCreation(job.total, existing);
+    if (blocked) return reply.code(blocked.statusCode).send(blocked.body);
 
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -134,7 +126,6 @@ export async function invoiceRoutes(app: FastifyInstance) {
     void safeEmitEvent(orgId, "payment.received", {
       invoiceId: id, number: inv.number, amount: parsed.data.amount, method: parsed.data.method, status: result.status,
     });
-    // The whole invoice just cleared — a distinct event accounting/CRM plugins care about.
     if (result.status === "paid") {
       void safeEmitEvent(orgId, "invoice.paid", { invoiceId: id, number: inv.number, total: inv.total, jobId: inv.jobId });
     }
@@ -156,7 +147,6 @@ export async function invoiceRoutes(app: FastifyInstance) {
     const [inv] = await db.select().from(invoices).where(and(eq(invoices.orgId, orgId), eq(invoices.id, id)));
     if (!inv) return reply.code(404).send({ error: "not found" });
 
-    // Lazy import so the app runs without the stripe package installed.
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(key);
     const session = await stripe.checkout.sessions.create({
