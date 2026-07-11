@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveAppointmentWindow } from "../src/routes/appointment-validation.js";
+import {
+  appointmentWindowsOverlap,
+  resolveAppointmentWindow,
+} from "../src/routes/appointment-validation.js";
 
 const current = {
   startsAt: new Date("2026-07-11T14:00:00.000Z"),
@@ -44,4 +47,31 @@ test("accepts a complete reschedule with a valid final window", () => {
   if (!result.ok) return;
   assert.equal(result.startsAt.toISOString(), "2026-07-12T16:00:00.000Z");
   assert.equal(result.endsAt.toISOString(), "2026-07-12T17:45:00.000Z");
+});
+
+test("detects partial and contained overlaps", () => {
+  assert.equal(
+    appointmentWindowsOverlap(current, {
+      startsAt: new Date("2026-07-11T14:30:00.000Z"),
+      endsAt: new Date("2026-07-11T15:30:00.000Z"),
+    }),
+    true,
+  );
+  assert.equal(
+    appointmentWindowsOverlap(current, {
+      startsAt: new Date("2026-07-11T14:15:00.000Z"),
+      endsAt: new Date("2026-07-11T14:45:00.000Z"),
+    }),
+    true,
+  );
+});
+
+test("allows back-to-back appointment windows", () => {
+  assert.equal(
+    appointmentWindowsOverlap(current, {
+      startsAt: new Date("2026-07-11T15:00:00.000Z"),
+      endsAt: new Date("2026-07-11T16:00:00.000Z"),
+    }),
+    false,
+  );
 });
