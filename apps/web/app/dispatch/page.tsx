@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { dispatchApi, type DispatchAppointment } from "@/lib/dispatch-api";
+import {
+  buildConflictMap,
+  conflictsForAppointment,
+  countConflictPairs,
+} from "@/lib/dispatch-conflicts";
 
 interface DispatchColumn {
   id: string;
@@ -56,6 +61,7 @@ function DispatchCard({
   job,
   technicians,
   saving,
+  conflictTitles,
   onAssign,
   onDragStart,
 }: {
@@ -63,24 +69,29 @@ function DispatchCard({
   job?: JobDTO;
   technicians: UserDTO[];
   saving: boolean;
+  conflictTitles: string[];
   onAssign: (appointment: DispatchAppointment, technicianId: string | null) => void;
   onDragStart: (event: DragEvent<HTMLElement>, appointmentId: string) => void;
 }) {
   const title = job?.title ?? `Job ${appointment.jobId.slice(0, 8)}`;
   const status = job?.status ?? "scheduled";
+  const hasConflict = conflictTitles.length > 0;
 
   return (
     <article
       draggable={!saving}
       onDragStart={(event) => onDragStart(event, appointment.id)}
-      className={`rounded-xl border border-border bg-surface-200 p-3 shadow-sm transition-all ${
+      className={`rounded-xl border p-3 shadow-sm transition-all ${
+        hasConflict ? "border-red/50 bg-red/5" : "border-border bg-surface-200"
+      } ${
         saving ? "opacity-60" : "cursor-grab hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md active:cursor-grabbing"
       }`}
       data-testid={`dispatch-card-${appointment.id}`}
+      data-conflict={hasConflict ? "true" : "false"}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-bold text-accent">
+          <p className={`text-xs font-bold ${hasConflict ? "text-red" : "text-accent"}`}>
             {formatTime(appointment.startsAt)}–{formatTime(appointment.endsAt)}
           </p>
           <Link
@@ -94,6 +105,15 @@ function DispatchCard({
           {statusLabel(status)}
         </span>
       </div>
+
+      {hasConflict ? (
+        <div className="mt-3 rounded-lg border border-red/30 bg-red/10 px-2.5 py-2" role="alert">
+          <p className="text-[10px] font-black uppercase tracking-wide text-red">Time conflict</p>
+          <p className="mt-1 text-[11px] text-fg-muted">
+            Overlaps {conflictTitles.join(", ")}
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-3 border-t border-border pt-3">
         <label className="block text-[10px] font-bold uppercase tracking-wide text-fg-dim" htmlFor={`assign-${appointment.id}`}>
@@ -124,6 +144,7 @@ function DispatchLane({
   jobsById,
   technicians,
   savingIds,
+  conflictMap,
   dragOver,
   onAssign,
   onDragStart,
@@ -135,6 +156,7 @@ function DispatchLane({
   jobsById: Map<string, JobDTO>;
   technicians: UserDTO[];
   savingIds: Set<string>;
+  conflictMap: Map<string, Set<string>>;
   dragOver: boolean;
   onAssign: (appointment: DispatchAppointment, technicianId: string | null) => void;
   onDragStart: (event: DragEvent<HTMLElement>, appointmentId: string) => void;
@@ -142,10 +164,16 @@ function DispatchLane({
   onDragLeave: () => void;
   onDrop: (event: DragEvent<HTMLElement>) => void;
 }) {
+  const conflictCount = column.appointments.filter((appointment) => conflictMap.has(appointment.id)).length;
+
   return (
     <section
       className={`min-w-0 rounded-2xl border bg-surface-100 transition-colors ${
-        dragOver ? "border-accent bg-accent/5 ring-2 ring-accent/20" : "border-border"
+        dragOver
+          ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+          : conflictCount > 0
+            ? "border-red/35"
+            : "border-border"
       }`}
       onDragOver={(event) => event.preventDefault()}
       onDragEnter={onDragEnter}
@@ -157,6 +185,11 @@ function DispatchLane({
         <div>
           <h2 className="text-sm font-bold text-fg">{column.title}</h2>
           <p className="mt-0.5 text-[11px] text-fg-dim">{column.subtitle}</p>
+          {conflictCount > 0 ? (
+            <p className="mt-1 text-[11px] font-semibold text-red">
+              {conflictCount} conflicting {conflictCount === 1 ? "visit" : "visits"}
+            </p>
+          ) : null}
         </div>
         <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-surface-300 px-2 text-xs font-bold text-fg-muted">
           {column.appointments.length}
@@ -170,17 +203,27 @@ function DispatchLane({
             <p className="mt-1 text-[11px] text-fg-dim">Drop an appointment here</p>
           </div>
         ) : (
-          column.appointments.map((appointment) => (
-            <DispatchCard
-              key={appointment.id}
-              appointment={appointment}
-              job={jobsById.get(appointment.jobId)}
-              technicians={technicians}
-              saving={savingIds.has(appointment.id)}
-              onAssign={onAssign}
-              onDragStart={onDragStart}
-            />
-          ))
+          column.appointments.map((appointment) => {
+            const conflictingIds = [...(conflictMap.get(appointment.id) ?? [])];
+            const conflictTitles = conflictingIds.map((appointmentId) => {
+              const conflictingAppointment = column.appointments.find((item) => item.id === appointmentId);
+              if (!conflictingAppointment) return `another visit`;
+              return jobsById.get(conflictingAppointment.jobId)?.title ?? `job ${conflictingAppointment.jobId.slice(0, 8)}`;
+            });
+
+            return (
+              <DispatchCard
+                key={appointment.id}
+                appointment={appointment}
+                job={jobsById.get(appointment.jobId)}
+                technicians={technicians}
+                saving={savingIds.has(appointment.id)}
+                conflictTitles={conflictTitles}
+                onAssign={onAssign}
+                onDragStart={onDragStart}
+              />
+            );
+          })
         )}
       </div>
     </section>
@@ -229,22 +272,30 @@ export default function DispatchPage() {
   const jobsById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
   const selectedKey = dateKey(selectedDate);
 
+  const dayAppointments = useMemo(
+    () =>
+      appointments
+        .filter((appointment) => appointmentDateKey(appointment.startsAt) === selectedKey)
+        .toSorted((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+    [appointments, selectedKey],
+  );
+
   const visibleAppointments = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return appointments
-      .filter((appointment) => appointmentDateKey(appointment.startsAt) === selectedKey)
-      .filter((appointment) => {
-        if (!query) return true;
-        const job = jobsById.get(appointment.jobId);
-        const technician = technicians.find((item) => item.id === appointment.technicianId);
-        return (
-          job?.title.toLowerCase().includes(query) ||
-          job?.status.toLowerCase().includes(query) ||
-          technician?.name.toLowerCase().includes(query)
-        );
-      })
-      .toSorted((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  }, [appointments, jobsById, search, selectedKey, technicians]);
+    return dayAppointments.filter((appointment) => {
+      if (!query) return true;
+      const job = jobsById.get(appointment.jobId);
+      const technician = technicians.find((item) => item.id === appointment.technicianId);
+      return (
+        job?.title.toLowerCase().includes(query) ||
+        job?.status.toLowerCase().includes(query) ||
+        technician?.name.toLowerCase().includes(query)
+      );
+    });
+  }, [dayAppointments, jobsById, search, technicians]);
+
+  const conflictMap = useMemo(() => buildConflictMap(dayAppointments), [dayAppointments]);
+  const conflictPairCount = useMemo(() => countConflictPairs(conflictMap), [conflictMap]);
 
   const columns = useMemo<DispatchColumn[]>(() => {
     const unassigned = visibleAppointments.filter((appointment) => !appointment.technicianId);
@@ -276,6 +327,19 @@ export default function DispatchPage() {
   const assignAppointment = useCallback(async (appointment: DispatchAppointment, technicianId: string | null) => {
     if (appointment.technicianId === technicianId) return;
 
+    const technician = technicians.find((item) => item.id === technicianId);
+    const conflicts = conflictsForAppointment(appointment, technicianId, appointments);
+    if (conflicts.length > 0) {
+      const conflictLabels = conflicts.map((item) => {
+        const job = jobsById.get(item.jobId);
+        return `${job?.title ?? "another visit"} (${formatTime(item.startsAt)}–${formatTime(item.endsAt)})`;
+      });
+      setError(
+        `Cannot assign ${jobsById.get(appointment.jobId)?.title ?? "this visit"} to ${technician?.name ?? "that technician"} because it overlaps ${conflictLabels.join(", ")}.`,
+      );
+      return;
+    }
+
     const previous = appointment.technicianId;
     setError(null);
     setSavingIds((current) => new Set(current).add(appointment.id));
@@ -298,7 +362,7 @@ export default function DispatchPage() {
         return next;
       });
     }
-  }, []);
+  }, [appointments, jobsById, technicians]);
 
   const handleDragStart = useCallback((event: DragEvent<HTMLElement>, appointmentId: string) => {
     event.dataTransfer.effectAllowed = "move";
@@ -318,8 +382,8 @@ export default function DispatchPage() {
       <div>
         <Skeleton className="mb-2 h-8 w-48" />
         <Skeleton className="mb-8 h-4 w-72" />
-        <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-xl" />)}
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-xl" />)}
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-96 rounded-2xl" />)}
@@ -332,7 +396,7 @@ export default function DispatchPage() {
     <div>
       <PageHeader
         title="Dispatch board"
-        description="Assign today’s visits, balance technician workload, and surface unassigned work."
+        description="Assign today’s visits, balance technician workload, and prevent double-booking."
         actions={
           <div className="flex gap-2">
             <Link href="/schedule" className="no-underline">
@@ -344,16 +408,23 @@ export default function DispatchPage() {
       />
 
       {error ? (
-        <Card className="mb-5 border-red/30 bg-red/5">
-          <p className="text-sm font-semibold text-red">Dispatch update failed</p>
+        <Card className="mb-5 border-red/30 bg-red/5" role="alert">
+          <p className="text-sm font-semibold text-red">Dispatch attention required</p>
           <p className="mt-1 text-xs text-fg-muted">{error}</p>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="mt-3 text-xs font-semibold text-red underline underline-offset-2"
+          >
+            Dismiss
+          </button>
         </Card>
       ) : null}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card className="p-4">
           <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">Visits</p>
-          <p className="mt-2 text-2xl font-black text-fg">{visibleAppointments.length}</p>
+          <p className="mt-2 text-2xl font-black text-fg">{dayAppointments.length}</p>
           <p className="mt-1 text-xs text-fg-muted">On the selected day</p>
         </Card>
         <Card className="p-4">
@@ -362,6 +433,13 @@ export default function DispatchPage() {
             {columns[0]?.appointments.length ?? 0}
           </p>
           <p className="mt-1 text-xs text-fg-muted">Needs dispatcher action</p>
+        </Card>
+        <Card className={`p-4 ${conflictPairCount > 0 ? "border-red/35 bg-red/5" : ""}`}>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">Schedule conflicts</p>
+          <p className={`mt-2 text-2xl font-black ${conflictPairCount > 0 ? "text-red" : "text-green"}`}>
+            {conflictPairCount}
+          </p>
+          <p className="mt-1 text-xs text-fg-muted">Overlapping technician visits</p>
         </Card>
         <Card className="p-4">
           <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">Technicians</p>
@@ -385,7 +463,7 @@ export default function DispatchPage() {
               <p className="text-sm font-bold text-fg">
                 {selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
               </p>
-              <p className="text-[11px] text-fg-dim">Drag cards between lanes or use the assignment menu.</p>
+              <p className="text-[11px] text-fg-dim">Drag cards between lanes or use the assignment menu. Conflicting assignments are blocked.</p>
             </div>
           </div>
           <Input
@@ -415,6 +493,7 @@ export default function DispatchPage() {
               jobsById={jobsById}
               technicians={technicians}
               savingIds={savingIds}
+              conflictMap={conflictMap}
               dragOver={dragLaneId === column.id}
               onAssign={assignAppointment}
               onDragStart={handleDragStart}
