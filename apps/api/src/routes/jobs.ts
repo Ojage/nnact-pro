@@ -17,7 +17,7 @@ const createBody = z.object({
   laborCostCents: z.number().int().nonnegative().optional().default(0),
 });
 
-const patchBody = z.object({
+export const jobPatchBody = z.object({
   status: z.enum(JOB_STATUS).optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
   assignedTo: z.string().uuid().nullable().optional(),
@@ -64,7 +64,7 @@ export async function jobRoutes(app: FastifyInstance) {
   app.patch("/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const { id } = req.params as { id: string };
-    const parsed = patchBody.safeParse(req.body);
+    const parsed = jobPatchBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const { scheduledAt, ...rest } = parsed.data;
     const [row] = await db
