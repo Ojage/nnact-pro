@@ -1,350 +1,172 @@
-# OpenFieldPro Product Specification v2
+# OpenFieldPro v2 Product Specification
 
 ## Product definition
 
-OpenFieldPro is an open-source, self-hostable field service operations platform with appliance diagnostic execution built into the work-order lifecycle.
+OpenFieldPro is an open-source, self-hostable field service management platform. It is intended to cover the operational workflow businesses expect from products such as Housecall Pro while preserving data ownership, extensibility, and deployability.
 
-It combines:
+The universal product is the operations system:
 
-- CRM, customers, properties, equipment, scheduling, dispatch, jobs, estimates, invoices, payments, reviews, service plans, documents, reporting, integrations, and mobile workflows
-- model-specific diagnostic sessions with exact test points, operating conditions, measured values, wiring evidence, workflow validation, and correction governance
+- CRM and customer history
+- properties and equipment
+- scheduling and dispatch
+- work orders and technician execution
+- estimates and approvals
+- invoices, payments, and receipts
+- documents and photos
+- reviews and service plans
+- reporting and integrations
+- technician mobile workflows
+- customer-facing links and portal experiences
 
-The operations core is comparable in scope and workflow ambition to subscription-first field-service suites. The diagnostic core is the appliance-specific differentiator.
-
-## Product promise
-
-A service company should be able to run the business in OpenFieldPro, while a qualified appliance technician can move from assigned job to defensible diagnosis without manually reconstructing the procedure from disconnected documents.
-
-## Non-goals
-
-OpenFieldPro will not:
-
-- replace qualified technicians,
-- guarantee a diagnosis or repair outcome,
-- silently generate field instructions from unvalidated output,
-- claim universal appliance coverage,
-- make partner or sponsor incentives part of diagnostic logic,
-- sacrifice the complete operations workflow to become a standalone diagram viewer,
-- or hide unsupported, experimental, or suspended states.
+Appliance-specific technical records are an optional vertical module. They may enrich work orders and equipment history, but they do not redefine the product or replace commercial job state.
 
 ## Primary users
 
+### Owner / operator
+
+- Reviews today’s workload, revenue, receivables, and business health
+- Manages customers, jobs, price book, service plans, documents, and integrations
+- Configures users, branding, payments, notifications, and self-hosting operations
+
+### Dispatcher / office staff
+
+- Creates customers, properties, equipment, and work orders
+- Schedules visits and manages an unassigned queue
+- Balances technician workload and reassigns appointments
+- Tracks job status, return visits, estimates, approvals, invoices, and customer communication
+
 ### Technician
 
-Needs the next appointment, exact appliance, applicable workflow, current check, expected result, wiring path, and a fast way to record evidence.
-
-### Dispatcher or service manager
-
-Needs schedule, job state, diagnostic state, blocked sessions, escalations, return visits, and complete handoffs.
-
-### Owner
-
-Needs CRM, estimates, invoices, payments, margins, service plans, reviews, customer retention, and operational control.
-
-### Technical lead or content reviewer
-
-Needs workflow authoring, endpoint and route review, electrical review, visual audit, correction handling, versioning, and publication control.
+- Sees assigned visits and customer/equipment context
+- Starts and completes work orders
+- Records notes, photos, parts, signatures, estimates, and payments
+- Works through temporary connectivity loss with visible sync state
 
 ### Customer
 
-Needs appointment information, plain-language findings, an estimate, approval, payment, receipt, and warranty record—not internal diagnostic content.
+- Confirms or reschedules appointments
+- Approves or declines estimates
+- Pays invoices and views receipts
+- Accesses appropriate service history, documents, and service-plan status
 
-## Core object model
+## Core operational model
 
-### Job
+### Customer
 
-The commercial and scheduling container.
+A person, household, landlord, property manager, or commercial account.
+
+### Property
+
+The service location. A customer may own or manage multiple properties.
 
 ### Equipment
 
-The exact appliance installed at a property.
+An installed asset at a property. Equipment history persists across work orders.
 
-### Job-equipment link
+### Job
 
-Makes one appliance the primary technical subject of the job.
+The commercial work order. It owns status, assignment, line items, estimates, invoices, customer communication, and completion records.
 
-### Diagnostic workflow
+### Appointment
 
-A model-family, symptom, fault, component, or circuit-specific procedure.
+A scheduled visit for a job with start/end times and an optional technician assignment.
 
-### Workflow version
+### Estimate
 
-An immutable published evidence package with applicability, source revision, reviewers, limitations, and validation status.
+A customer-facing proposal built from line items. It can be approved, declined, revised, or converted into an invoice/work workflow.
 
-### Diagnostic step
+### Invoice and payment
 
-One field-executable check, decision, reference, or stop condition.
+The financial record for completed or billable work, including partial payment, balance due, receipts, voids, and reconciliation.
 
-### Trace route
+## Required product workflows
 
-The validated wiring-diagram path supporting a step.
+### Lead to scheduled job
 
-### Diagnostic session
+1. Capture customer and service request.
+2. Create or match property and equipment.
+3. Create the work order.
+4. Schedule an appointment.
+5. Assign or leave in the dispatcher’s unassigned queue.
+6. Confirm the visit with the customer.
 
-The technician’s actual execution record for one appliance and complaint.
+### Dispatch
 
-### Measurement
+1. View a selected day.
+2. See unassigned visits and technician lanes.
+3. Review workload counts and job states.
+4. Reassign by drag-and-drop or accessible assignment controls.
+5. Detect overlaps and route pressure.
+6. Preserve assignment and schedule audit history.
 
-A real field result attached to a session and step.
+### Technician execution
 
-### Correction report
+1. Open the assigned visit.
+2. Review customer, property, equipment, complaint, and prior history.
+3. Start the job.
+4. Record internal notes, customer-facing notes, photos, parts, and labor.
+5. Create or revise an estimate when required.
+6. Capture approval, signature, and payment.
+7. Complete, pause, cancel, or create a return visit.
 
-A field-reported defect or usability issue that can trigger triage, suspension, correction, and regression review.
+### Estimate to payment
 
-## Experience architecture
+1. Build estimate from price-book or custom line items.
+2. Send secure approval link.
+3. Capture approval/decline and audit metadata.
+4. Convert approved work into invoiceable line items.
+5. Send invoice and collect full or partial payment.
+6. Generate receipt and update receivables/reporting.
 
-### Technician navigation
+### Customer lifecycle
 
-- Today
-- Jobs
-- Diagnostics
-- Sync and Issues
+1. Send confirmations and reminders.
+2. Provide appointment, estimate, invoice, receipt, and service-plan access.
+3. Request and manage reviews after completion.
+4. Preserve service history across future visits.
 
-### Operations navigation
+## Operations-first release priorities
 
-- Schedule and Dispatch
-- Pipeline
-- Customers and Equipment
-- Estimates
-- Invoices and Payments
-- Service Plans
-- Documents
-- Price Book
+1. Dispatch and schedule conflict detection
+2. Technician completion workflow
+3. Customer portal and secure public links
+4. Estimate approval and payment lifecycle
+5. Reliable email/SMS delivery status
+6. Service-plan lifecycle
+7. Accounting export and adapters
+8. Permissions, audit log, release packaging, backup, and restore validation
 
-### Quality navigation
+## Optional appliance-service module
 
-- Coverage and Quality
-- Reviews
-- Reports
+The optional module may add:
 
-### System navigation
+- exact appliance model and serial
+- customer complaint and technician observation
+- technical readings, notes, photos, and disposition
+- equipment service history
+- return-visit continuity
+- technician and customer summaries
 
-- Integrations
-- Settings
+It must remain subordinate to the work order and must not introduce unrelated diagram-segment authoring concepts into the core field-service product.
 
-## Core field flow
+## Non-goals for the universal operations core
 
-1. Technician opens the assigned job.
-2. Technician confirms the exact appliance make, model, and serial.
-3. System shows validated, pilot, experimental, unsupported, or suspended applicability.
-4. Technician records the customer-reported complaint separately from observed behavior.
-5. Technician selects Guided Mode or Field Mode.
-6. System presents one exact check with safety state, power state, meter mode, points, operating condition, expected result, interpretation, and wiring evidence.
-7. Technician records the actual reading or an explicit inability to perform the check.
-8. Workflow advances only from stored evidence.
-9. Technician reaches diagnosed, inconclusive, unsafe, unsupported, escalated, or completed disposition.
-10. System generates technician, customer, estimate, and escalation outputs.
+- Requiring appliance-specific diagnostic workflows for ordinary job management
+- Treating wire diagrams or selectable route segments as a central product primitive
+- Blocking scheduling, invoicing, or payment on vertical-specific technical data
+- Making unsupported performance or diagnostic-accuracy claims
 
-## Field Mode
+## Release gate
 
-For direct access by technicians who already know the component or circuit.
+A release is operationally credible when a real service company can complete the full loop:
 
-Required capabilities:
-
-- search or browse component/circuit checks,
-- exact pin-to-pin tests,
-- source, control, load, feedback, and return paths,
-- expected values and test conditions,
-- related service tests, faults, service pointers, and parts context,
-- measured-value capture,
-- and synchronized wiring evidence.
-
-## Guided Mode
-
-For symptom- or fault-led diagnosis.
-
-Required capabilities:
-
-- user-observable symptom entry,
-- separate error-code entry,
-- ordered Power → Control → Load → Feedback logic where applicable,
-- pass/fail and range branching,
-- visible explanation for the next step,
-- no immediate part replacement recommendation,
-- and explicit stop/escalation states.
-
-## Diagnostic step contract
-
-Executable checks require:
-
-- public technician-facing label,
-- purpose,
-- step type,
-- safety state,
-- power state,
-- operating condition,
-- meter/tool mode,
-- Point 1 label and resolved endpoint,
-- Point 2 label and resolved endpoint,
-- connector, pin, and wire color where applicable,
-- expected result or range,
-- pass interpretation,
-- fail interpretation,
-- branch rules,
-- trace routes,
-- source references,
-- accessibility note,
-- and validation status.
-
-Internal group or segment IDs remain hidden from normal technician-facing UI.
-
-## Trace-route publication gate
-
-A route must:
-
-- start and end at the resolved meter endpoints,
-- use real selectable segment IDs,
-- form one expected continuous chain,
-- contain no disconnected islands,
-- contain no unintended branches,
-- preserve junction and crossing semantics,
-- enter the correct bus,
-- match source/return/reference semantics,
-- match the route template,
-- pass manual/gold comparison as audit evidence,
-- and pass visual trace audit.
-
-## Electrical sequencing
-
-For applicable loads, workflows should establish:
-
-1. source supply,
-2. reference or return supply,
-3. control input,
-4. controlled output,
-5. harness path,
-6. load terminal,
-7. opposite leg or neutral return,
-8. across-load voltage,
-9. de-energized resistance or continuity where appropriate.
-
-Circuit-specific deviations are allowed only when the technical evidence supports them.
-
-## Trust and safety
-
-- Qualified-technician use is explicit.
-- Live and de-energized checks are visually distinct.
-- Safety and stop conditions are contextual.
-- Unsupported is a first-class state.
-- Workflow source and revision remain visible.
-- Published versions are immutable.
-- Safety-critical corrections suspend the workflow.
-- Diagnostic recommendations remain independent from sponsors, vendors, and parts economics.
-- Customer-facing documents exclude protected technical content.
-- Quantitative claims require field evidence.
-
-## Offline requirements
-
-Before a visit, cache:
-
-- job,
-- customer and property,
-- equipment,
-- current workflow version,
-- diagnostic steps,
-- diagrams and route assets,
-- source metadata,
-- prior session notes,
-- and repair history.
-
-Offline, allow:
-
-- session start and continuation,
-- diagram use,
-- measurements,
-- notes,
-- photos,
-- disposition,
-- and local summary generation.
-
-On reconnect:
-
-- show pending work,
-- upload safely,
-- never overwrite measurements silently,
-- detect version conflicts,
-- and warn if the workflow was suspended while offline.
-
-## Operations integration
-
-Diagnosis must flow into the existing operations system:
-
-- linked appliance and diagnostic state on job,
-- repair recommendation to estimate handoff,
-- parts and labor line items,
-- return-visit state,
-- invoice and payment,
-- customer-facing summary,
-- equipment service history,
-- review follow-up,
-- and warranty record.
-
-## MVP acceptance criteria
-
-1. A job can be linked to an exact appliance.
-2. A technician can start a diagnostic session.
-3. Complaint and observation are distinct.
-4. Support status is explicit.
-5. At least one model family has Field Mode.
-6. At least one model family has Guided Mode.
-7. Every published check contains exact points, condition, and expected result.
-8. Measurements are stored.
-9. Branching uses recorded evidence.
-10. Wiring evidence remains synchronized to the active check.
-11. Unsupported cases stop cleanly.
-12. Workflow and source revision remain attached to the session.
-13. The field flow works offline.
-14. The system produces a diagnostic summary.
-15. The finding can create an estimate handoff.
-16. A field correction can be reported.
-17. A safety-critical correction can suspend a workflow.
-18. Internal IDs never leak into technician UI.
-19. Managers can see coverage demand and defects.
-20. Diagnostic decisions remain free from sponsor influence.
-
-## Success metrics
-
-### Field activation
-
-- supported jobs with a diagnostic session,
-- time from opening job to first useful step,
-- workflow package download success.
-
-### Execution
-
-- session completion,
-- measurement-entry rate,
-- step abandonment,
-- blocked and escalation rates,
-- offline completion.
-
-### Trust and quality
-
-- correction reports,
-- safety-critical defects,
-- suspended workflows,
-- route-validation failures,
-- repeated use by technicians.
-
-### Coverage
-
-- supported and unsupported jobs,
-- requested model families,
-- requested symptoms and faults,
-- workflow utilization.
-
-### Operations
-
-- booking and estimate conversion,
-- first-visit and return-visit performance,
-- revenue and margin,
-- outstanding invoices,
-- customer retention and reviews.
-
-## Decision gates
-
-- Do not broaden model coverage before initial workflows survive field use.
-- Do not publish generated workflows without endpoint, route, electrical, and visual review.
-- Do not commit to low-price SaaS assumptions before measuring workflow-production and support cost.
-- Do not prioritize peripheral integrations ahead of field adoption blockers.
-- Do not publish accuracy, time, callback, or revenue claims without evidence.
+1. customer intake
+2. property/equipment record
+3. work order
+4. schedule and dispatch
+5. technician execution
+6. estimate approval
+7. invoice and payment
+8. customer communication and service history
+9. reporting and export
+10. backup, restore, and safe upgrade
