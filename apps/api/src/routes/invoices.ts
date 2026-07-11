@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, ne, sql } from "drizzle-orm";
 import { db, invoices, payments, jobs, lineItems } from "@ofp/db";
 import { applyPayment, invoiceNumber } from "../invoicing.js";
 import { resolveOrgId } from "./org.js";
@@ -50,6 +50,30 @@ export async function invoiceRoutes(app: FastifyInstance) {
       .from(jobs)
       .where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
     if (!job) return reply.code(404).send({ error: "job not found" });
+    if (job.total <= 0) {
+      return reply.code(400).send({
+        error: "job has no billable total",
+        hint: "Add at least one billable line item before creating an invoice.",
+      });
+    }
+
+    const [existing] = await db
+      .select({ id: invoices.id, number: invoices.number, status: invoices.status })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.orgId, orgId),
+          eq(invoices.jobId, job.id),
+          ne(invoices.status, "void"),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      return reply.code(409).send({
+        error: "job already has an active invoice",
+        invoice: existing,
+      });
+    }
 
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
