@@ -1,0 +1,131 @@
+#!/usr/bin/env node
+
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { extname, resolve } from "node:path";
+
+const root = resolve(import.meta.dirname, "..");
+const failures = [];
+const passes = [];
+
+function pass(message) {
+  passes.push(message);
+}
+
+function fail(message) {
+  failures.push(message);
+}
+
+function requireFile(path) {
+  const absolute = resolve(root, path);
+  if (!existsSync(absolute) || !statSync(absolute).isFile()) fail(`required file missing: ${path}`);
+  else pass(`required file present: ${path}`);
+}
+
+const requiredFiles = [
+  "LICENSE",
+  "SECURITY.md",
+  ".github/FUNDING.yml",
+  "docs/funding/SPONSORSHIP_PLAYBOOK.md",
+  "docs/security/KEY_MANAGEMENT.md",
+  "docs/release/RELEASE_CHECKLIST.md",
+  "apps/api/src/license-keys.ts",
+  "apps/api/scripts/make-license-key.ts",
+  "apps/api/scripts/verify-license-key.ts",
+];
+requiredFiles.forEach(requireFile);
+
+let tracked = [];
+try {
+  tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" })
+    .split("\0")
+    .filter(Boolean);
+  pass(`inspected ${tracked.length} tracked files`);
+} catch (error) {
+  fail(`unable to list tracked files: ${error instanceof Error ? error.message : String(error)}`);
+}
+
+const forbiddenTrackedNames = tracked.filter((file) => {
+  if (file === ".env.example") return false;
+  return (
+    file === ".env" ||
+    file.startsWith(".env.") ||
+    file.startsWith(".secrets/") ||
+    file.endsWith(".private.pem") ||
+    file.endsWith(".ofp-license") ||
+    /(?:^|\/)ofp-license-private\.pem$/i.test(file)
+  );
+});
+if (forbiddenTrackedNames.length) fail(`sensitive files are tracked: ${forbiddenTrackedNames.join(", ")}`);
+else pass("no tracked environment, private-key, or entitlement files");
+
+const binaryExtensions = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf", ".mp4",
+]);
+const secretPatterns = [
+  ["private key material", /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
+  ["Stripe live secret", /\bsk_live_[A-Za-z0-9]{16,}\b/],
+  ["GitHub access token", /\bgh[pousr]_[A-Za-z0-9]{20,}\b/],
+  ["AWS access key", /\bAKIA[0-9A-Z]{16}\b/],
+  ["Slack token", /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/],
+];
+const secretFindings = [];
+for (const file of tracked) {
+  if (file === "scripts/release-safety-check.mjs" || binaryExtensions.has(extname(file).toLowerCase())) continue;
+  const absolute = resolve(root, file);
+  if (!existsSync(absolute) || statSync(absolute).size > 1_000_000) continue;
+  let content;
+  try {
+    content = readFileSync(absolute, "utf8");
+  } catch {
+    continue;
+  }
+  for (const [label, pattern] of secretPatterns) {
+    if (pattern.test(content)) secretFindings.push(`${label} in ${file}`);
+  }
+}
+if (secretFindings.length) fail(`possible committed secrets: ${secretFindings.join("; ")}`);
+else pass("tracked-text secret pattern scan passed");
+
+const gitignore = existsSync(resolve(root, ".gitignore")) ? readFileSync(resolve(root, ".gitignore"), "utf8") : "";
+for (const entry of [".env", ".secrets/", "*.private.pem", "*.ofp-license"]) {
+  if (!gitignore.split(/\r?\n/).includes(entry)) fail(`.gitignore missing ${entry}`);
+}
+if (![".env", ".secrets/", "*.private.pem", "*.ofp-license"].some((entry) => !gitignore.includes(entry))) {
+  pass("local secret and key outputs are ignored");
+}
+
+const envExample = existsSync(resolve(root, ".env.example"))
+  ? readFileSync(resolve(root, ".env.example"), "utf8")
+  : "";
+for (const required of ["NODE_ENV=development", "JWT_SECRET=change-me-in-production", "CORS_ORIGIN=http://localhost:3000"]) {
+  if (!envExample.includes(required)) fail(`.env.example missing documented setting: ${required}`);
+}
+if (envExample.includes("STRIPE_SECRET_KEY=sk_live_")) fail(".env.example contains a live Stripe key");
+else pass("environment template documents production security settings without live payment secrets");
+
+try {
+  const rootPackage = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+  if (!rootPackage.scripts?.["release:safety"]) fail("root package.json is missing release:safety");
+  else pass("root release:safety command is configured");
+
+  const apiPackage = JSON.parse(readFileSync(resolve(root, "apps/api/package.json"), "utf8"));
+  for (const script of ["license:keypair", "license:generate", "license:verify"]) {
+    if (!apiPackage.scripts?.[script]) fail(`API package is missing ${script}`);
+  }
+  if (["license:keypair", "license:generate", "license:verify"].every((script) => apiPackage.scripts?.[script])) {
+    pass("license keypair, generation, and verification commands are configured");
+  }
+} catch (error) {
+  fail(`unable to validate package scripts: ${error instanceof Error ? error.message : String(error)}`);
+}
+
+console.log("OpenFieldPro release safety checks");
+for (const message of passes) console.log(`PASS  ${message}`);
+for (const message of failures) console.error(`FAIL  ${message}`);
+
+if (failures.length) {
+  console.error(`\nRelease safety failed with ${failures.length} finding(s).`);
+  process.exit(1);
+}
+console.log(`\nRelease safety passed (${passes.length} checks).`);
