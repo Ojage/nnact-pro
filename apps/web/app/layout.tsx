@@ -4,9 +4,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata = {
-  title: "OpenFieldPro — Field service operations and appliance diagnostics",
+  title: "OpenFieldPro — Open-source field service management",
   description:
-    "Open-source field service operations with CRM, dispatch, estimates, invoices, payments, mobile workflows, and validated appliance diagnostic execution.",
+    "Open-source field service management with CRM, scheduling, dispatch, estimates, invoices, payments, service plans, reporting, and technician mobile workflows.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
