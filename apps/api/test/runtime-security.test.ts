@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveCorsOrigin, resolveJwtSecret, resolvePublicWebUrl } from "../src/runtime-security.js";
+import {
+  publicRegistrationEnabled,
+  resolveCorsOrigin,
+  resolveJwtSecret,
+  resolvePublicWebUrl,
+} from "../src/runtime-security.js";
 
 test("production rejects missing, default, and short JWT secrets", () => {
   for (const value of [undefined, "change-me-in-production", "too-short"]) {
@@ -52,5 +57,18 @@ test("payment redirects require an exact HTTPS web origin in production", () => 
   assert.equal(
     resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "https://openfieldpro.example/" } as NodeJS.ProcessEnv),
     "https://openfieldpro.example",
+  );
+});
+
+test("public organization registration is disabled by default in production", () => {
+  assert.equal(publicRegistrationEnabled({ NODE_ENV: "production" } as NodeJS.ProcessEnv), false);
+  assert.equal(
+    publicRegistrationEnabled({ NODE_ENV: "production", OFP_ALLOW_PUBLIC_REGISTRATION: "true" } as NodeJS.ProcessEnv),
+    true,
+  );
+  assert.equal(publicRegistrationEnabled({ NODE_ENV: "development" } as NodeJS.ProcessEnv), true);
+  assert.equal(
+    publicRegistrationEnabled({ NODE_ENV: "development", OFP_ALLOW_PUBLIC_REGISTRATION: "false" } as NodeJS.ProcessEnv),
+    false,
   );
 });
