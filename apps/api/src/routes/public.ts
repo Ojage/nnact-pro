@@ -1,17 +1,24 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, orgs, customers, jobs } from "@ofp/db";
+import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 
-// Public, UNAUTHENTICATED online-booking endpoint. A prospect submits a request
-// and it lands as a `lead` job + customer for the org. No auth by design; the
-// orgId is the public booking handle. Rate-limiting belongs in front (Caddy).
 const bookBody = z.object({
-  name: z.string().min(1),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  title: z.string().min(1),
-  description: z.string().optional(),
+  name: z.string().trim().min(1).max(200),
+  email: z.string().trim().email().max(320).optional(),
+  phone: z.string().trim().max(50).optional(),
+  title: z.string().trim().min(1).max(250),
+  description: z.string().trim().max(5_000).optional(),
+});
+
+const bookingRateLimit = createFixedWindowRateLimit({
+  max: 10,
+  windowMs: 60 * 60 * 1000,
+  key: (request: FastifyRequest) => {
+    const orgId = (request.params as { orgId?: string } | undefined)?.orgId ?? "unknown";
+    return `${requestIpKey(request)}:${orgId}`;
+  },
 });
 
 export async function publicRoutes(app: FastifyInstance) {
@@ -22,7 +29,7 @@ export async function publicRoutes(app: FastifyInstance) {
     return { org };
   });
 
-  app.post("/:orgId/book", async (req, reply) => {
+  app.post("/:orgId/book", { preHandler: bookingRateLimit }, async (req, reply) => {
     const { orgId } = req.params as { orgId: string };
     const parsed = bookBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
@@ -30,12 +37,17 @@ export async function publicRoutes(app: FastifyInstance) {
     const [org] = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId));
     if (!org) return reply.code(404).send({ error: "business not found" });
 
-    const { name, email, phone, title, description } = parsed.data;
-    const [customer] = await db.insert(customers).values({ orgId, name, email, phone }).returning();
-    const [job] = await db
-      .insert(jobs)
-      .values({ orgId, customerId: customer.id, title, description, status: "lead" })
-      .returning();
+    const { name, phone, title, description } = parsed.data;
+    const email = parsed.data.email?.toLowerCase();
+    const job = await db.transaction(async (tx) => {
+      const [customer] = await tx.insert(customers).values({ orgId, name, email, phone }).returning();
+      const [createdJob] = await tx
+        .insert(jobs)
+        .values({ orgId, customerId: customer.id, title, description, status: "lead" })
+        .returning();
+      return createdJob;
+    });
+
     return reply.code(201).send({ ok: true, requestId: job.id });
   });
 }
