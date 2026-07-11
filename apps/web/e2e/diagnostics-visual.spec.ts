@@ -13,8 +13,25 @@ function collectRuntimeErrors(page: Page) {
   return errors;
 }
 
+async function mockShellApi(page: Page) {
+  await page.route("http://127.0.0.1:3001/**", async (route) => {
+    const url = route.request().url();
+    const body = url.includes("unread")
+      ? JSON.stringify({ count: 0 })
+      : url.includes("notifications")
+        ? JSON.stringify([])
+        : JSON.stringify({});
+
+    await route.fulfill({ status: 200, contentType: "application/json", body });
+  });
+}
+
 test.beforeAll(async () => {
   await mkdir(artifactDir, { recursive: true });
+});
+
+test.beforeEach(async ({ page }) => {
+  await mockShellApi(page);
 });
 
 test("desktop diagnostic flow renders ordered route evidence and mode changes", async ({ page }) => {
