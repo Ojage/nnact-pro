@@ -21,7 +21,7 @@ interface ApiErrorBody {
   };
 }
 
-function formatApiError(status: number, statusText: string, body: string) {
+export function formatDispatchApiError(status: number, statusText: string, body: string) {
   if (!body) return `${status}: ${statusText}`;
 
   try {
@@ -61,7 +61,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(formatApiError(response.status, response.statusText, body));
+    throw new Error(formatDispatchApiError(response.status, response.statusText, body));
   }
 
   const text = await response.text();
