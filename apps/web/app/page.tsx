@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { JobStatusBadge } from "@/components/status-badge";
+import { SponsorSlot } from "@/components/sponsor-slot";
 
 function sessionTone(status: string) {
   if (status === "blocked") return "bg-yellow/10 text-yellow";
@@ -41,35 +42,43 @@ export default async function TodayPage() {
       const starts = new Date(appointment.startsAt);
       return starts >= todayStart && starts < tomorrowStart;
     })
-    .sort(
-      (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
-    );
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 
-  const activeDiagnostics = diagnosticSessions.filter((item) =>
-    ["workflow_ready", "testing", "blocked", "escalated"].includes(item.session.status),
+  const activeInvoiceJobIds = new Set(
+    invoices.filter((invoice) => invoice.status !== "void").map((invoice) => invoice.jobId),
   );
-  const blockedDiagnostics = activeDiagnostics.filter(
-    (item) => item.session.status === "blocked" || item.session.status === "escalated",
+  const unscheduledLeads = jobs.filter((job) => job.status === "lead");
+  const inProgress = jobs.filter((job) => job.status === "in_progress");
+  const readyToInvoice = jobs.filter(
+    (job) => job.status === "completed" && job.total > 0 && !activeInvoiceJobIds.has(job.id),
   );
+  const needsPricing = jobs.filter(
+    (job) => job.status === "completed" && job.total === 0 && !activeInvoiceJobIds.has(job.id),
+  );
+  const closeoutAttention = [...inProgress, ...needsPricing, ...readyToInvoice];
   const outstanding = invoices
     .filter((invoice) => invoice.status === "draft" || invoice.status === "sent")
     .reduce((sum, invoice) => sum + invoice.total, 0);
   const completedRevenue = jobs
     .filter((job) => job.status === "completed")
     .reduce((sum, job) => sum + job.total, 0);
+  const activeDiagnostics = diagnosticSessions.filter((item) =>
+    ["workflow_ready", "testing", "blocked", "escalated"].includes(item.session.status),
+  );
+  const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const apiDown = jobsResult.status === "rejected";
 
   return (
     <div>
       <PageHeader
         title="Today"
-        description="The next appointment, exact appliance, diagnostic state, and work required to close the job."
+        description="Run today’s visits, dispatch open work, close completed jobs, and move approved work into payment."
         actions={
           <div className="flex gap-2">
-            <Link href="/diagnostics/new">
-              <Button variant="secondary" size="sm">Start diagnostic</Button>
+            <Link href="/jobs/new">
+              <Button variant="secondary" size="sm">New job</Button>
             </Link>
-            <Link href="/schedule">
+            <Link href="/dispatch">
               <Button size="sm">Open dispatch</Button>
             </Link>
           </div>
@@ -80,17 +89,19 @@ export default async function TodayPage() {
         <Card className="mb-6 border-red/30 bg-red/5">
           <CardContent className="pt-5">
             <p className="text-sm font-semibold text-red">Operations API is unreachable</p>
-            <p className="mt-1 text-xs text-fg-muted">Start the API and apply the database schema before using the field workflow.</p>
+            <p className="mt-1 text-xs text-fg-muted">Start the API and apply the reviewed database schema before using the field workflow.</p>
           </CardContent>
         </Card>
       )}
 
+      <SponsorSlot />
+
       <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
         {[
           ["Today’s visits", todayAppointments.length, "text-blue"],
-          ["Active diagnostics", activeDiagnostics.length, "text-blue"],
-          ["Needs attention", blockedDiagnostics.length, blockedDiagnostics.length ? "text-red" : "text-green"],
-          ["Open jobs", jobs.filter((job) => !["completed", "canceled"].includes(job.status)).length, "text-yellow"],
+          ["Unscheduled leads", unscheduledLeads.length, unscheduledLeads.length ? "text-yellow" : "text-green"],
+          ["In progress", inProgress.length, inProgress.length ? "text-yellow" : "text-green"],
+          ["Ready to invoice", readyToInvoice.length, readyToInvoice.length ? "text-green" : "text-fg"],
           ["Outstanding", formatMoney(outstanding), outstanding ? "text-yellow" : "text-green"],
         ].map(([label, value, tone]) => (
           <Card key={String(label)}>
@@ -107,7 +118,7 @@ export default async function TodayPage() {
           <CardHeader className="flex-row items-center justify-between">
             <div>
               <CardTitle>Today’s route</CardTitle>
-              <p className="mt-1 text-xs text-fg-muted">Open the work order, verify the appliance, and download the diagnostic package before arrival.</p>
+              <p className="mt-1 text-xs text-fg-muted">Open the work order, review arrival notes, and continue any optional equipment record.</p>
             </div>
             <Link href="/schedule" className="text-xs text-fg-link">Full schedule →</Link>
           </CardHeader>
@@ -143,26 +154,18 @@ export default async function TodayPage() {
                               </Link>
                               {job && <div className="mt-1"><JobStatusBadge status={job.status} /></div>}
                             </div>
-                            {session ? (
+                            {session && (
                               <Link
                                 href={`/diagnostics/${session.session.id}`}
                                 className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize no-underline ${sessionTone(session.session.status)}`}
                               >
-                                {session.session.status.replaceAll("_", " ")}
-                              </Link>
-                            ) : (
-                              <Link href="/diagnostics/new" className="rounded-full bg-surface-400 px-2.5 py-1 text-[10px] font-semibold text-fg-muted no-underline">
-                                diagnostic not started
+                                optional record · {session.session.status.replaceAll("_", " ")}
                               </Link>
                             )}
                           </div>
-                          {session && (
-                            <p className="mt-3 text-xs text-fg-muted">
-                              {[session.equipment.make, session.equipment.model, session.equipment.serialNumber]
-                                .filter(Boolean)
-                                .join(" · ") || session.equipment.type}
-                            </p>
-                          )}
+                          <p className="mt-3 text-xs text-fg-muted">
+                            {job ? customerMap.get(job.customerId) || "Customer unavailable" : "Work-order details unavailable"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -176,38 +179,46 @@ export default async function TodayPage() {
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <div>
-              <CardTitle>Diagnostic attention</CardTitle>
-              <p className="mt-1 text-xs text-fg-muted">Sessions that are blocked, unresolved, or ready for the next field check.</p>
+              <CardTitle>Closeout attention</CardTitle>
+              <p className="mt-1 text-xs text-fg-muted">Active work and completed visits that still need pricing or an invoice.</p>
             </div>
-            <Link href="/diagnostics" className="text-xs text-fg-link">Command center →</Link>
+            <Link href="/closeout" className="text-xs text-fg-link">Closeout board →</Link>
           </CardHeader>
           <CardContent>
-            {activeDiagnostics.length === 0 ? (
+            {closeoutAttention.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-fg-muted">
-                No active diagnostic sessions.
+                No jobs require closeout action.
               </div>
             ) : (
               <div className="space-y-3">
-                {activeDiagnostics.slice(0, 7).map(({ session, equipment, workflow }) => (
-                  <Link
-                    key={session.id}
-                    href={`/diagnostics/${session.id}`}
-                    className="block rounded-xl border border-border bg-surface-200 p-4 no-underline hover:bg-surface-300"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-fg">
-                          {[equipment.make, equipment.model].filter(Boolean).join(" ") || equipment.type}
-                        </p>
-                        <p className="mt-1 text-xs text-fg-muted">{session.customerComplaint || "Complaint not recorded"}</p>
-                        <p className="mt-2 text-[11px] text-fg-dim">{workflow?.name || "Coverage required"}</p>
+                {closeoutAttention.slice(0, 7).map((job) => {
+                  const label = job.status === "in_progress"
+                    ? "In progress"
+                    : job.total === 0
+                      ? "Needs pricing"
+                      : "Ready to invoice";
+                  const tone = job.total === 0 && job.status === "completed"
+                    ? "border-red/25 bg-red/5 text-red"
+                    : "border-border bg-surface-200 text-fg";
+                  return (
+                    <Link
+                      key={job.id}
+                      href="/closeout"
+                      className={`block rounded-xl border p-4 no-underline hover:bg-surface-300 ${tone}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold">{job.title}</p>
+                          <p className="mt-1 text-xs text-fg-muted">{customerMap.get(job.customerId) || "Customer unavailable"}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-[10px] font-bold uppercase tracking-wide">{label}</p>
+                          <p className="mt-1 text-sm font-bold">{formatMoney(job.total)}</p>
+                        </div>
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ${sessionTone(session.status)}`}>
-                        {session.status.replaceAll("_", " ")}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -224,15 +235,25 @@ export default async function TodayPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Field rule</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Next office action</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-sm text-fg-muted">A job is the commercial container. The appliance and diagnostic session are the technical record. Keep both connected from intake through invoice.</p>
+            <p className="text-sm text-fg-muted">
+              {needsPricing.length
+                ? `${needsPricing.length} completed job${needsPricing.length === 1 ? "" : "s"} need pricing before invoicing.`
+                : readyToInvoice.length
+                  ? `${readyToInvoice.length} completed job${readyToInvoice.length === 1 ? " is" : "s are"} ready to invoice.`
+                  : unscheduledLeads.length
+                    ? `${unscheduledLeads.length} lead${unscheduledLeads.length === 1 ? " needs" : "s need"} scheduling.`
+                    : "No urgent office handoff is waiting."}
+            </p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Open-source operations</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Optional technical records</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-sm text-fg-muted">CRM, dispatch, estimates, invoices, payments, service plans, documents, and reporting remain part of the complete operations core.</p>
+            <p className="text-sm text-fg-muted">
+              {activeDiagnostics.length} active equipment record{activeDiagnostics.length === 1 ? "" : "s"}. Technical evidence stays attached to the commercial work order without replacing job status, billing, or customer history.
+            </p>
           </CardContent>
         </Card>
       </div>
