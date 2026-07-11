@@ -1,0 +1,28 @@
+name: Refresh pnpm lockfile
+
+on:
+  pull_request:
+    branches: [ofp-monorepo]
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Refresh lockfile only
+        run: pnpm install --lockfile-only --no-frozen-lockfile --reporter=silent
+      - name: Upload refreshed lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: refreshed-pnpm-lock
+          path: pnpm-lock.yaml
+          retention-days: 1
