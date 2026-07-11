@@ -57,3 +57,8 @@ export function resolvePublicWebUrl(env: NodeJS.ProcessEnv = process.env) {
   if (!configured) throw new Error("PUBLIC_WEB_URL is required in production when creating payment checkout sessions");
   return validateOrigin(configured, "PUBLIC_WEB_URL", production);
 }
+
+export function publicRegistrationEnabled(env: NodeJS.ProcessEnv = process.env) {
+  if (env.NODE_ENV !== "production") return env.OFP_ALLOW_PUBLIC_REGISTRATION !== "false";
+  return env.OFP_ALLOW_PUBLIC_REGISTRATION === "true";
+}
