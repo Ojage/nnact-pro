@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
@@ -7,6 +8,9 @@ import {
   publicKeyFingerprint,
   signSupportEntitlement,
 } from "../src/license-keys.js";
+
+const DEFAULT_KEY_DIR = resolve(homedir(), ".ofp");
+const DEFAULT_PRIVATE_KEY = resolve(DEFAULT_KEY_DIR, "license-signing-key.pem");
 
 const { values } = parseArgs({
   options: {
@@ -38,9 +42,9 @@ function ensurePrivatePermissions(path: string) {
 }
 
 if (values["generate-keypair"]) {
-  const outputDir = resolve(values["output-dir"] ?? ".secrets/license");
-  const privatePath = resolve(outputDir, "ofp-license-private.pem");
-  const publicPath = resolve(outputDir, "ofp-license-public.pem");
+  const outputDir = resolve(values["output-dir"] ?? DEFAULT_KEY_DIR);
+  const privatePath = resolve(outputDir, "license-signing-key.pem");
+  const publicPath = resolve(outputDir, "license-signing-public.pem");
   if (existsSync(privatePath) || existsSync(publicPath)) {
     fail(`refusing to overwrite an existing keypair in ${outputDir}`);
   }
@@ -52,22 +56,23 @@ if (values["generate-keypair"]) {
   console.error(`Private key written to ${privatePath}`);
   console.error(`Public key written to ${publicPath}`);
   console.error(`Public key fingerprint: ${publicKeyFingerprint(pair.publicKey)}`);
-  console.error("Back up the private key offline. Never commit or paste it into CI logs.");
+  console.error("Back up the private key offline. Never commit it, upload it, or provide it to an OpenFieldPro runtime.");
   process.exit(0);
 }
 
-const privateKeyPath = values["private-key"] ?? process.env.OFP_LICENSE_PRIVATE_KEY_PATH;
-if (!privateKeyPath) fail("provide --private-key or OFP_LICENSE_PRIVATE_KEY_PATH");
+const privateKeyPath = values["private-key"] ?? process.env.OFP_LICENSE_PRIVATE_KEY_PATH ?? DEFAULT_PRIVATE_KEY;
 if (!values.organization) fail("provide --organization");
 
 const resolvedPrivateKeyPath = resolve(privateKeyPath);
-if (!existsSync(resolvedPrivateKeyPath)) fail(`private key not found: ${resolvedPrivateKeyPath}`);
+if (!existsSync(resolvedPrivateKeyPath)) {
+  fail(`private key not found: ${resolvedPrivateKeyPath}; generate it with license:keypair`);
+}
 ensurePrivatePermissions(resolvedPrivateKeyPath);
 
 const seats = values.seats ? Number(values.seats) : 1;
 if (!Number.isInteger(seats) || seats <= 0) fail("--seats must be a positive integer");
 const tier = values.tier ?? "supporter";
-if (!(["supporter", "business", "partner"] as const).includes(tier as "supporter" | "business" | "partner")) {
+if (!( ["supporter", "business", "partner"] as const).includes(tier as "supporter" | "business" | "partner")) {
   fail("--tier must be supporter, business, or partner");
 }
 
