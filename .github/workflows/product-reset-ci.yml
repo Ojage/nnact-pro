@@ -14,6 +14,39 @@ permissions:
   contents: read
 
 jobs:
+  release-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Verify frozen workspace install
+        run: pnpm install --frozen-lockfile --reporter=silent
+      - name: Run repository safety checks
+        run: pnpm release:safety
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
+      - name: Verify keypair generation and signed entitlement CLI
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/ofp-license-smoke
+          pnpm --filter @ofp/api license:keypair -- --output-dir /tmp/ofp-license-smoke
+          pnpm --filter @ofp/api license:generate -- \
+            --private-key /tmp/ofp-license-smoke/ofp-license-private.pem \
+            --organization "OpenFieldPro CI" \
+            --tier supporter \
+            --seats 1 \
+            --expires-at "2030-01-01T00:00:00.000Z" \
+            --output /tmp/ofp-license-smoke/ci.ofp-license
+          pnpm --filter @ofp/api license:verify -- \
+            --public-key /tmp/ofp-license-smoke/ofp-license-public.pem \
+            --license-file /tmp/ofp-license-smoke/ci.ofp-license
+          test "$(stat -c '%a' /tmp/ofp-license-smoke/ofp-license-private.pem)" = "600"
+
   api:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -25,7 +58,7 @@ jobs:
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
       - name: Install workspace
-        run: pnpm install --no-frozen-lockfile --reporter=silent
+        run: pnpm install --frozen-lockfile --reporter=silent
       - name: Generate database schema
         run: pnpm --filter @ofp/db generate
         env:
@@ -58,8 +91,8 @@ jobs:
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
       - name: Install workspace
-        run: pnpm install --no-frozen-lockfile --reporter=silent
-      - name: Run dispatch unit tests
+        run: pnpm install --frozen-lockfile --reporter=silent
+      - name: Run operations unit tests
         run: pnpm --filter @ofp/web test:unit
       - name: Build web application
         run: |
@@ -89,14 +122,14 @@ jobs:
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
       - name: Install workspace
-        run: pnpm install --no-frozen-lockfile --reporter=silent
+        run: pnpm install --frozen-lockfile --reporter=silent
       - name: Install Chromium
         run: pnpm --filter @ofp/web exec playwright install --with-deps chromium
       - name: Build operations web application
         run: pnpm --filter @ofp/web build
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
-      - name: Run dispatch browser and visual tests
+      - name: Run operations browser and visual tests
         run: pnpm --filter @ofp/web test:e2e
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
@@ -123,7 +156,7 @@ jobs:
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
       - name: Install workspace
-        run: pnpm install --no-frozen-lockfile --reporter=silent
+        run: pnpm install --frozen-lockfile --reporter=silent
       - name: Type-check technician app
         run: |
           set +e
