@@ -1,4 +1,4 @@
-name: Product reset CI
+name: OpenFieldPro release CI
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
     branches: [ofp-monorepo]
 
 concurrency:
-  group: product-reset-ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: openfieldpro-release-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -16,7 +16,7 @@ permissions:
 jobs:
   release-safety:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,32 +24,34 @@ jobs:
           node-version: 22
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
-      - name: Verify frozen workspace install
-        run: pnpm install --frozen-lockfile --reporter=silent
+      - name: Generate and verify deterministic lockfile, then install
+        run: pnpm install:verified
       - name: Run repository safety checks
         run: pnpm release:safety
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level=high
-      - name: Verify keypair generation and signed entitlement CLI
+      - name: Verify offline keypair generation and signed entitlement CLI
         run: |
           set -euo pipefail
           rm -rf /tmp/ofp-license-smoke
           pnpm --filter @ofp/api license:keypair -- --output-dir /tmp/ofp-license-smoke
           pnpm --filter @ofp/api license:generate -- \
-            --private-key /tmp/ofp-license-smoke/ofp-license-private.pem \
+            --private-key /tmp/ofp-license-smoke/license-signing-key.pem \
             --organization "OpenFieldPro CI" \
             --tier supporter \
             --seats 1 \
             --expires-at "2030-01-01T00:00:00.000Z" \
             --output /tmp/ofp-license-smoke/ci.ofp-license
           pnpm --filter @ofp/api license:verify -- \
-            --public-key /tmp/ofp-license-smoke/ofp-license-public.pem \
+            --public-key /tmp/ofp-license-smoke/license-signing-public.pem \
             --license-file /tmp/ofp-license-smoke/ci.ofp-license
-          test "$(stat -c '%a' /tmp/ofp-license-smoke/ofp-license-private.pem)" = "600"
+          test "$(stat -c '%a' /tmp/ofp-license-smoke/license-signing-key.pem)" = "600"
+          test "$(stat -c '%a' /tmp/ofp-license-smoke/ci.ofp-license)" = "600"
+          rm -rf /tmp/ofp-license-smoke
 
   api:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,8 +59,8 @@ jobs:
           node-version: 22
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
-      - name: Install workspace
-        run: pnpm install --frozen-lockfile --reporter=silent
+      - name: Install verified workspace
+        run: pnpm install:verified
       - name: Generate database schema
         run: pnpm --filter @ofp/db generate
         env:
@@ -68,7 +70,7 @@ jobs:
           set +e
           pnpm --filter @ofp/api build > /tmp/openfieldpro-api-build.log 2>&1
           code=$?
-          tail -n 120 /tmp/openfieldpro-api-build.log
+          tail -n 160 /tmp/openfieldpro-api-build.log
           exit $code
       - name: Run API tests
         run: pnpm --filter @ofp/api test
@@ -82,7 +84,7 @@ jobs:
 
   web:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -90,8 +92,8 @@ jobs:
           node-version: 22
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
-      - name: Install workspace
-        run: pnpm install --frozen-lockfile --reporter=silent
+      - name: Install verified workspace
+        run: pnpm install:verified
       - name: Run operations unit tests
         run: pnpm --filter @ofp/web test:unit
       - name: Build web application
@@ -99,7 +101,7 @@ jobs:
           set +e
           pnpm --filter @ofp/web build > /tmp/openfieldpro-web-build.log 2>&1
           code=$?
-          tail -n 140 /tmp/openfieldpro-web-build.log
+          tail -n 180 /tmp/openfieldpro-web-build.log
           exit $code
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001
@@ -113,7 +115,7 @@ jobs:
 
   operations-visual-qa:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -121,8 +123,8 @@ jobs:
           node-version: 22
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
-      - name: Install workspace
-        run: pnpm install --frozen-lockfile --reporter=silent
+      - name: Install verified workspace
+        run: pnpm install:verified
       - name: Install Chromium
         run: pnpm --filter @ofp/web exec playwright install --with-deps chromium
       - name: Build operations web application
@@ -147,7 +149,7 @@ jobs:
 
   mobile:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -155,14 +157,14 @@ jobs:
           node-version: 22
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@9.0.0 --activate
-      - name: Install workspace
-        run: pnpm install --frozen-lockfile --reporter=silent
+      - name: Install verified workspace
+        run: pnpm install:verified
       - name: Type-check technician app
         run: |
           set +e
           pnpm --filter @ofp/mobile typecheck > /tmp/openfieldpro-mobile-typecheck.log 2>&1
           code=$?
-          tail -n 120 /tmp/openfieldpro-mobile-typecheck.log
+          tail -n 160 /tmp/openfieldpro-mobile-typecheck.log
           exit $code
       - name: Upload mobile compiler log
         if: always()
