@@ -72,6 +72,42 @@ jobs:
           path: /tmp/openfieldpro-web-build.log
           if-no-files-found: ignore
 
+  visual-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Install workspace
+        run: pnpm install --no-frozen-lockfile --reporter=silent
+      - name: Install Chromium
+        run: pnpm --filter @ofp/web exec playwright install --with-deps chromium
+      - name: Build visual QA surface
+        run: pnpm --filter @ofp/web build
+        env:
+          OFP_VISUAL_QA: "1"
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      - name: Run diagnostic browser and visual tests
+        run: pnpm --filter @ofp/web test:e2e
+        env:
+          OFP_VISUAL_QA: "1"
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      - name: Upload diagnostic visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-visual-evidence
+          path: |
+            apps/web/artifacts/*.png
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: warn
+          retention-days: 14
+
   mobile:
     runs-on: ubuntu-latest
     timeout-minutes: 20
