@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { eq, and, gte, lte, asc } from "drizzle-orm";
+import { eq, and, gte, lte, asc, lt, gt, ne } from "drizzle-orm";
 import { db, appointments, jobs, users } from "@ofp/db";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
@@ -33,6 +33,57 @@ async function technicianIsAssignable(orgId: string, technicianId: string) {
       ),
     );
   return Boolean(technician);
+}
+
+async function findTechnicianConflict({
+  orgId,
+  technicianId,
+  startsAt,
+  endsAt,
+  excludeAppointmentId,
+}: {
+  orgId: string;
+  technicianId: string;
+  startsAt: Date;
+  endsAt: Date;
+  excludeAppointmentId?: string;
+}) {
+  const overlap = and(
+    eq(appointments.orgId, orgId),
+    eq(appointments.technicianId, technicianId),
+    lt(appointments.startsAt, endsAt),
+    gt(appointments.endsAt, startsAt),
+  );
+
+  const [conflict] = await db
+    .select({
+      id: appointments.id,
+      jobId: appointments.jobId,
+      startsAt: appointments.startsAt,
+      endsAt: appointments.endsAt,
+    })
+    .from(appointments)
+    .where(excludeAppointmentId ? and(overlap, ne(appointments.id, excludeAppointmentId)) : overlap)
+    .limit(1);
+
+  return conflict;
+}
+
+function conflictResponse(conflict: {
+  id: string;
+  jobId: string;
+  startsAt: Date;
+  endsAt: Date;
+}) {
+  return {
+    error: "technician has an overlapping appointment",
+    conflict: {
+      appointmentId: conflict.id,
+      jobId: conflict.jobId,
+      startsAt: conflict.startsAt.toISOString(),
+      endsAt: conflict.endsAt.toISOString(),
+    },
+  };
 }
 
 export async function appointmentRoutes(app: FastifyInstance) {
@@ -72,6 +123,16 @@ export async function appointmentRoutes(app: FastifyInstance) {
       return reply
         .code(400)
         .send({ error: "technician must be an active technician in this organization" });
+    }
+
+    if (rest.technicianId) {
+      const conflict = await findTechnicianConflict({
+        orgId,
+        technicianId: rest.technicianId,
+        startsAt: window.startsAt,
+        endsAt: window.endsAt,
+      });
+      if (conflict) return reply.code(409).send(conflictResponse(conflict));
     }
 
     const [row] = await db
@@ -115,6 +176,18 @@ export async function appointmentRoutes(app: FastifyInstance) {
 
     const window = resolveAppointmentWindow(current, { startsAt, endsAt });
     if (!window.ok) return reply.code(400).send({ error: window.error });
+
+    const targetTechnicianId = technicianId !== undefined ? technicianId : current.technicianId;
+    if (targetTechnicianId) {
+      const conflict = await findTechnicianConflict({
+        orgId,
+        technicianId: targetTechnicianId,
+        startsAt: window.startsAt,
+        endsAt: window.endsAt,
+        excludeAppointmentId: id,
+      });
+      if (conflict) return reply.code(409).send(conflictResponse(conflict));
+    }
 
     const [row] = await db
       .update(appointments)
