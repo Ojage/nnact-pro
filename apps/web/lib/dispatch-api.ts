@@ -10,6 +10,43 @@ export interface DispatchAppointment {
   endsAt: string;
 }
 
+interface ApiErrorBody {
+  error?: string;
+  message?: string;
+  conflict?: {
+    appointmentId?: string;
+    jobId?: string;
+    startsAt?: string;
+    endsAt?: string;
+  };
+}
+
+function formatApiError(status: number, statusText: string, body: string) {
+  if (!body) return `${status}: ${statusText}`;
+
+  try {
+    const parsed = JSON.parse(body) as ApiErrorBody;
+    const message = parsed.error || parsed.message;
+    if (!message) return `${status}: ${body}`;
+
+    if (status === 409 && parsed.conflict?.startsAt && parsed.conflict?.endsAt) {
+      const start = new Date(parsed.conflict.startsAt).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      const end = new Date(parsed.conflict.endsAt).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      return `${message} (${start}–${end})`;
+    }
+
+    return message;
+  } catch {
+    return `${status}: ${body}`;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     "content-type": "application/json",
@@ -24,7 +61,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body || response.statusText}`);
+    throw new Error(formatApiError(response.status, response.statusText, body));
   }
 
   const text = await response.text();
