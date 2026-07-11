@@ -1,13 +1,12 @@
 # OpenFieldPro
 
-Open-source, self-hostable **field service operations with appliance diagnostic execution**.
+Open-source, self-hostable **field service management** for service businesses.
 
-OpenFieldPro keeps the complete operations workflow service businesses expect—CRM, scheduling and dispatch, work orders, estimates, invoicing, payments, reminders, reviews, reporting, service plans, documents, and mobile technician workflows—then adds an appliance-specific diagnostic layer that connects the exact equipment record, complaint, meter points, measured results, and validated wiring evidence.
+OpenFieldPro is the open alternative to subscription-first platforms such as Housecall Pro: CRM, customers and properties, equipment history, scheduling and dispatch, work orders, estimates, invoicing, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows.
 
-> **Status: product foundation with diagnostic-core implementation in progress.**
-> The full-stack operations spine runs end-to-end. The diagnostic domain, API,
-> technician command center, workflow intake, measurement capture, coverage dashboard,
-> publication gates, and field correction loop are now part of the product direction.
+Appliance-service organizations can also attach equipment-specific technical records to work orders, but those tools remain optional workflow depth—not the product definition.
+
+> **Status: product foundation.** The operations spine runs end-to-end across Postgres, Fastify, Next.js, and the Expo technician app. Core workflows are implemented at foundation level; dispatch, customer portal, technician completion, documents, accounting export, and release hardening are still being completed.
 
 ## Product architecture
 
@@ -18,22 +17,14 @@ OpenFieldPro keeps the complete operations workflow service businesses expect—
 - Price book, estimates, approvals, invoices, and payments
 - Photos, documents, organization branding, reviews, and service plans
 - Reporting, integrations, self-hosting, backup, and restore
+- Technician mobile workflows with offline foundations
 
-### Diagnostic core
+### Optional vertical workflows
 
-- Job-to-appliance binding
-- Explicit validated, pilot, experimental, unsupported, suspended, and retired states
-- Diagnostic sessions separate from commercial job status
-- Field Mode for direct component and circuit checks
-- Guided Mode for symptom- and error-code-led diagnosis
-- Exact meter points, operating conditions, expected readings, and interpretations
-- Actual measurement capture before branching
-- Validated trace routes with continuity, island, branch, and visual-audit gates
-- Diagnostic completion, inconclusive, unsupported, and escalation dispositions
-- Field correction reports, including safety-critical workflow suspension
-- Coverage and quality reporting
-
-OpenFieldPro does not claim to replace a qualified technician. It makes diagnostic reasoning visible, executable, recordable, and auditable inside the work-order lifecycle.
+- Equipment-linked technical notes and evidence
+- Appliance model and serial records
+- Complaint, observation, measurements, and completion summaries
+- Return-visit continuity without replacing commercial job status
 
 ## Stack
 
@@ -62,7 +53,7 @@ pnpm dev
 # API: http://localhost:3001
 ```
 
-Run the API unit tests:
+Run API tests:
 
 ```bash
 pnpm --filter @ofp/api test
@@ -73,8 +64,9 @@ pnpm --filter @ofp/api test
 ### Operations
 
 - Multi-tenant organizations, users, roles, customers, properties, equipment, and jobs
-- JWT authentication and org-scoped APIs
-- Appointment scheduling and reassignment
+- JWT authentication and organization-scoped APIs
+- Day, week, and month appointment scheduling
+- Dispatcher board with unassigned work, technician lanes, workload counts, search, date navigation, drag-and-drop, and accessible reassignment controls
 - Estimates, line items, invoices, offline payments, and optional Stripe checkout
 - Branded invoice and estimate previews/exports
 - Reviews, recurring work, service-plan foundation, reporting, notifications, and search
@@ -82,92 +74,41 @@ pnpm --filter @ofp/api test
 - Plugin registry, scoped API tokens, outbound events, and integration surface
 - Self-hosting install, update, backup, and restore helpers
 
-### Diagnostic foundation
+### Optional appliance-service records
 
-- Diagnostic workflow, step, trace-route, session, measurement, and correction schemas
-- Job-to-equipment link model
-- Diagnostic API for workflow authoring, publishing, sessions, measurements, coverage, and corrections
-- Publication guard requiring field-ready labels and validated checks
-- Automatic suspension of workflows receiving safety-critical correction reports
-- Web diagnostic command center
-- Diagnostic session intake that requires an exact job and appliance
-- Explicit coverage-required fallback when no workflow applies
-- Field/Guided execution surface with actual measurement capture
-- Wiring-evidence panel showing route endpoints and validation status
-- Coverage and quality dashboard
-- Technician-first Today dashboard
-- Technician mobile home centered on next appointment and diagnostic attention
-
-## Diagnostic trust model
-
-A workflow cannot be published merely because content exists. Executable checks must include:
-
-1. Technician-facing label
-2. Meter or tool mode
-3. Exact Point 1 and Point 2
-4. Operating condition
-5. Expected result
-6. Validated step status
-7. At least one attached trace route
-8. Route continuity
-9. No disconnected islands
-10. No unintended branches
-11. Passed visual trace audit
-
-Unsupported or unresolved equipment remains explicitly unsupported. OpenFieldPro must not invent a field path from unreviewed output.
+- Equipment linked to customers and work orders
+- Technical sessions and measurement records
+- Coverage and correction foundations
+- Technician-facing diagnostic record surfaces
 
 ## Product surfaces
 
-- `/` — technician-first Today dashboard with operations snapshot
-- `/diagnostics` — active diagnostic command center
-- `/diagnostics/new` — job, appliance, complaint, and workflow intake
-- `/diagnostics/:id` — Field/Guided execution and measurement capture
-- `/coverage` — workflow coverage, demand, and quality state
-- Existing operations pages remain available for schedule, pipeline, customers, estimates, invoices, documents, service plans, price book, reviews, reporting, integrations, and settings.
+- `/` — technician-first Today dashboard
+- `/dispatch` — dispatcher board with technician lanes and unassigned work
+- `/schedule` — day, week, and month calendar
+- `/jobs` — work orders and status
+- `/customers` — CRM, properties, and equipment
+- `/estimates` — estimate workflow
+- `/invoices` — invoices and payments
+- `/service-plans` — recurring service-plan foundation
+- `/documents` — branded operational documents
+- `/reports` — operational reporting
+- `/settings` — organization and branding settings
 
-## Database setup
+## Product direction
 
-Drizzle includes:
+The release gate is the complete lead-to-payment loop:
 
-```text
-packages/db/src/schema.ts
-packages/db/src/service-plans.ts
-packages/db/src/diagnostics.ts
-```
+1. Customer and property intake
+2. Scheduling and dispatch
+3. Technician field execution
+4. Estimate approval
+5. Invoice and payment
+6. Customer communication and service history
+7. Reporting, integrations, offline resilience, and safe upgrades
 
-Apply the schema after pulling diagnostic-core changes:
+See `docs/release/final-product-roadmap.md` for the current operations-first roadmap.
 
-```bash
-pnpm db:push
-```
+## Deploy
 
-## Deployment
-
-```bash
-./deploy.sh           # Linux/macOS
-.\deploy.ps1          # Windows
-```
-
-Operator helpers:
-
-```bash
-scripts/install.sh
-scripts/update.sh
-scripts/backup.sh
-scripts/restore.sh backups/YYYYMMDD-HHMMSS
-```
-
-For a public host, configure the production Caddyfile and real values for `JWT_SECRET`, `POSTGRES_PASSWORD`, storage, and payment credentials.
-
-## Product roadmap
-
-The roadmap deliberately advances two connected tracks:
-
-1. **Operations parity:** complete the customer portal, technician job completion, dispatch polish, communication, accounting export, and release packaging.
-2. **Diagnostic differentiation:** deliver real diagram rendering, offline workflow packages, authoring and review tools, workflow version immutability, escalation packets, and validated model-family pilots.
-
-See `docs/release/final-product-roadmap.md` and `docs/product/openfieldpro-v2-spec.md`.
-
-## License
-
-See [LICENSE]. Self-host according to the repository license terms.
+Use the repository deployment and self-hosting scripts under `scripts/` together with the compose configuration. Production deployments should validate migrations, backups, restore procedures, secrets, storage, and outbound communication adapters before serving real customers.
