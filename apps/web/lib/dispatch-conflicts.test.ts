@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DispatchAppointment } from "@/lib/dispatch-api";
+import type { DispatchAppointment } from "./dispatch-api";
 import {
   appointmentsOverlap,
   buildConflictMap,
   conflictsForAppointment,
   countConflictPairs,
-} from "@/lib/dispatch-conflicts";
+} from "./dispatch-conflicts";
 
 function appointment(
   id: string,
@@ -49,8 +49,8 @@ test("conflict map reports both appointments but counts one unique pair", () => 
 
   const map = buildConflictMap([first, second, third]);
 
-  assert.deepEqual([...map.get("a") ?? []], ["b"]);
-  assert.deepEqual([...map.get("b") ?? []], ["a"]);
+  assert.deepEqual([...(map.get("a") ?? [])], ["b"]);
+  assert.deepEqual([...(map.get("b") ?? [])], ["a"]);
   assert.equal(map.has("c"), false);
   assert.equal(countConflictPairs(map), 1);
 });
