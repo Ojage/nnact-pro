@@ -7,7 +7,7 @@ on:
     branches: [product-reset-diagnostic-core]
 
 concurrency:
-  group: product-reset-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: product-reset-ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
