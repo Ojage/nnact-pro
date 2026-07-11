@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { db, orgs, users } from "@ofp/db";
 import { hashPassword, verifyPassword } from "../auth.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
+import { publicRegistrationEnabled } from "../runtime-security.js";
 
 const registerBody = z.object({
   orgName: z.string().trim().min(1).max(200),
@@ -36,6 +37,13 @@ const loginRateLimit = createFixedWindowRateLimit({
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/register", { preHandler: registerRateLimit }, async (req, reply) => {
+    if (!publicRegistrationEnabled()) {
+      return reply.code(403).send({
+        error: "public registration is disabled",
+        hint: "An owner can temporarily enable OFP_ALLOW_PUBLIC_REGISTRATION during controlled onboarding.",
+      });
+    }
+
     const parsed = registerBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const { orgName, name, password } = parsed.data;
