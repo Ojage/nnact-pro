@@ -4,15 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_SECTIONS, decodeJwt } from "@/lib/nav";
+import { NAV_SECTIONS, activeNavHref, decodeJwt } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
-
-function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
-}
 
 export function MobileNav() {
   const pathname = usePathname();
+  const currentNavHref = activeNavHref(pathname);
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<{ name: string; role?: string } | null>(null);
@@ -75,7 +72,7 @@ export function MobileNav() {
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-xs font-black text-white">OF</span>
             <div>
               <span className="block text-sm font-semibold text-fg">OpenFieldPro</span>
-              <span className="block text-[10px] text-fg-dim">Operations + diagnostics</span>
+              <span className="block text-[10px] text-fg-dim">Open field-service operations</span>
             </div>
           </div>
           <button onClick={() => setOpen(false)} className="p-1 text-fg-muted hover:text-fg" aria-label="Close navigation menu">
@@ -90,22 +87,26 @@ export function MobileNav() {
             <div key={section.label} className="mb-5 last:mb-0">
               <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">{section.label}</p>
               <div className="flex flex-col gap-1">
-                {section.links.map(({ href, label, icon }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-3 text-sm no-underline transition-all duration-150",
-                      isActive(pathname, href)
-                        ? "bg-accent text-white font-medium"
-                        : "text-fg-muted hover:text-fg hover:bg-surface-300",
-                    )}
-                  >
-                    <span className="w-5 text-center text-base">{icon}</span>
-                    {label}
-                  </Link>
-                ))}
+                {section.links.map(({ href, label, icon }) => {
+                  const active = currentNavHref === href;
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-3 text-sm no-underline transition-all duration-150",
+                        active
+                          ? "bg-accent text-white font-medium"
+                          : "text-fg-muted hover:text-fg hover:bg-surface-300",
+                      )}
+                    >
+                      <span className="w-5 text-center text-base">{icon}</span>
+                      {label}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           ))}
