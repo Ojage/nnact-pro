@@ -1,26 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_SECTIONS, activeNavHref, decodeJwt } from "@/lib/nav";
+import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
+import { useSessionUser } from "@/lib/use-session-user";
 
 export function MobileNav() {
   const pathname = usePathname();
   const currentNavHref = activeNavHref(pathname);
   const { theme, toggle } = useTheme();
+  const { user, loading, signingOut, signOut } = useSessionUser();
   const [open, setOpen] = useState(false);
-  const [user, setUser] = useState<{ name: string; role?: string } | null>(null);
-
-  useEffect(() => {
-    const token = localStorage.getItem("ofp_token");
-    if (token) {
-      const payload = decodeJwt(token);
-      if (payload?.name) setUser({ name: payload.name, role: payload.role });
-    }
-  }, []);
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -44,7 +37,7 @@ export function MobileNav() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden fixed top-0 left-0 z-30 h-12 w-12 flex items-center justify-center text-fg-muted hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-lg"
+        className="fixed left-0 top-0 z-30 flex h-12 w-12 items-center justify-center rounded-lg text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 md:hidden"
         aria-label="Open navigation menu"
       >
         <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
@@ -56,18 +49,19 @@ export function MobileNav() {
 
       {open && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
           onClick={() => setOpen(false)}
         />
       )}
 
       <aside
         className={cn(
-          "md:hidden fixed left-0 top-0 bottom-0 w-72 z-50 flex flex-col bg-surface-50 border-r border-border shadow-2xl transition-transform duration-300 ease-out",
+          "fixed bottom-0 left-0 top-0 z-50 flex w-72 flex-col border-r border-border bg-surface-50 shadow-2xl transition-transform duration-300 ease-out md:hidden",
           open ? "translate-x-0" : "-translate-x-full",
         )}
+        aria-hidden={!open}
       >
-        <div className="h-14 flex items-center justify-between px-5 border-b border-border shrink-0">
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-xs font-black text-white">OF</span>
             <div>
@@ -98,8 +92,8 @@ export function MobileNav() {
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-3 text-sm no-underline transition-all duration-150",
                         active
-                          ? "bg-accent text-white font-medium"
-                          : "text-fg-muted hover:text-fg hover:bg-surface-300",
+                          ? "bg-accent font-medium text-white"
+                          : "text-fg-muted hover:bg-surface-300 hover:text-fg",
                       )}
                     >
                       <span className="w-5 text-center text-base">{icon}</span>
@@ -112,33 +106,46 @@ export function MobileNav() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-border shrink-0">
+        <div className="shrink-0 border-t border-border p-3">
           <button
             onClick={() => {
               toggle();
               setOpen(false);
             }}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-surface-300 transition-all duration-150 cursor-pointer border-none bg-transparent"
+            className="flex w-full cursor-pointer items-center gap-3 rounded-lg border-none bg-transparent px-3 py-3 text-sm text-fg-muted transition-all duration-150 hover:bg-surface-300 hover:text-fg"
           >
-            <span className="text-base w-5 text-center">{theme === "dark" ? "☀" : "☾"}</span>
+            <span className="w-5 text-center text-base">{theme === "dark" ? "☀" : "☾"}</span>
             {theme === "dark" ? "Light mode" : "Dark mode"}
           </button>
         </div>
 
-        <div className="p-3 border-t border-border shrink-0">
-          {user ? (
-            <div className="flex items-center gap-3 px-3 py-3">
-              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-medium text-white shrink-0">
-                {user.name.charAt(0).toUpperCase()}
+        <div className="shrink-0 border-t border-border p-3">
+          {loading ? (
+            <div className="px-3 py-3 text-xs text-fg-dim">Loading session…</div>
+          ) : user ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 px-3 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-medium text-white">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-fg-muted">{user.name}</span>
+                  <span className="block text-[10px] capitalize text-fg-dim">{user.role || "team member"}</span>
+                </div>
               </div>
-              <div className="min-w-0">
-                <span className="block truncate text-sm text-fg-muted">{user.name}</span>
-                <span className="block text-[10px] capitalize text-fg-dim">{user.role || "team member"}</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                disabled={signingOut}
+                className="flex w-full items-center gap-3 rounded-lg border-none bg-transparent px-3 py-3 text-sm text-fg-muted transition-colors hover:bg-surface-300 hover:text-fg disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className="w-5 text-center">↪</span>
+                {signingOut ? "Signing out…" : "Sign out"}
+              </button>
             </div>
           ) : (
-            <Link href="/login" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-surface-300 no-underline">
-              <span className="text-base w-5 text-center">↪</span>
+            <Link href="/login" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm text-fg-muted no-underline hover:bg-surface-300 hover:text-fg">
+              <span className="w-5 text-center text-base">↪</span>
               Sign in
             </Link>
           )}
