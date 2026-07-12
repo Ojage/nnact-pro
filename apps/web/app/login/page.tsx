@@ -9,61 +9,73 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("owner@demo.test");
-  const [password, setPassword] = useState(
-    typeof window !== "undefined" ? "" : "",
-  );
-  const [msg, setMsg] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
+    setSubmitting(true);
     try {
-      const { token } = await login(email, password);
-      localStorage.setItem("ofp_token", token);
-      router.push("/");
+      await login(email, password);
+      router.replace("/");
+      router.refresh();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="flex min-h-screen items-center justify-center bg-surface-100 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-sm font-black text-white">
+            OF
+          </div>
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>Access your OpenFieldPro account</CardDescription>
+          <CardDescription>Access your OpenFieldPro workspace.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs text-fg-muted mb-1.5">Email</label>
+              <label htmlFor="login-email" className="mb-1.5 block text-xs text-fg-muted">Email</label>
               <Input
+                id="login-email"
                 type="email"
+                autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email"
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                required
               />
             </div>
             <div>
-              <label className="block text-xs text-fg-muted mb-1.5">Password</label>
+              <label htmlFor="login-password" className="mb-1.5 block text-xs text-fg-muted">Password</label>
               <Input
+                id="login-password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="password"
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password"
+                required
               />
             </div>
-            <Button type="submit" className="w-full">
-              Sign in
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Signing in…" : "Sign in"}
             </Button>
-            {msg && <p className="text-sm text-center text-green">{msg}</p>}
-            {error && <p className="text-sm text-center text-red">{error}</p>}
+            {error && (
+              <p role="alert" className="rounded-lg border border-red/25 bg-red/5 px-3 py-2 text-sm text-red">
+                Sign-in failed. Verify your email and password, then try again.
+              </p>
+            )}
           </form>
-          <p className="text-xs text-fg-muted mt-4 text-center">
-            New shop? Register via <code>POST /api/auth/register</code>
+          <p className="mt-4 text-center text-xs leading-5 text-fg-muted">
+            New organization registration is controlled by the deployment owner and is disabled by default in production.
           </p>
         </CardContent>
       </Card>

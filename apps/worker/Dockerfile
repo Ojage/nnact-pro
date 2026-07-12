@@ -1,13 +1,16 @@
-# OpenFieldPro background worker (recurring jobs + reminders).
-FROM node:22-alpine AS base
-RUN corepack enable
+FROM node:22-alpine
+
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 WORKDIR /app
 
-COPY pnpm-workspace.yaml package.json ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml pnpm-lock.expected.sha256 ./
+COPY scripts/verify-lockfile.mjs ./scripts/verify-lockfile.mjs
+COPY apps ./apps
 COPY packages ./packages
-COPY apps/worker ./apps/worker
-COPY apps/api/src/recurrence.ts ./apps/api/src/recurrence.ts
-RUN pnpm install --filter @ofp/worker... --frozen-lockfile=false
+
+RUN pnpm install:verified
 
 ENV NODE_ENV=production
-CMD ["pnpm", "--filter", "@ofp/worker", "exec", "tsx", "src/index.ts"]
+USER node
+
+CMD ["node", "--experimental-strip-types", "apps/worker/src/index.ts"]

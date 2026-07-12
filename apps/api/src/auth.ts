@@ -28,6 +28,8 @@ export interface JwtClaims {
   userId: string;
   orgId: string;
   role: string;
+  name?: string;
+  email?: string;
 }
 
 // Type the JWT payload/user across the app so req.user is JwtClaims, not `any`.

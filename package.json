@@ -2,7 +2,7 @@
   "name": "openfieldpro",
   "private": true,
   "version": "0.1.0",
-  "description": "OpenFieldPro — open-source, self-hostable field service management for service businesses",
+  "description": "OpenFieldPro — open-source, self-hostable field service operations",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "pnpm --parallel --filter ./apps/* dev",
@@ -13,8 +13,20 @@
     "db:push": "pnpm --filter @ofp/db push",
     "db:seed": "pnpm --filter @ofp/db seed",
     "test": "pnpm -r test",
+    "lock:prepare": "pnpm install --lockfile-only --no-frozen-lockfile --reporter=silent && node scripts/verify-lockfile.mjs",
+    "install:verified": "pnpm lock:prepare && pnpm install --frozen-lockfile --reporter=silent",
+    "release:safety": "node scripts/release-safety-check.mjs && node scripts/verify-lockfile.mjs",
     "infra:up": "podman compose -f infra/compose.yml up -d",
     "infra:down": "podman compose -f infra/compose.yml down"
   },
-  "engines": { "node": ">=20" }
+  "pnpm": {
+    "overrides": {
+      "fast-jwt": "6.2.4",
+      "postcss": "8.5.17",
+      "tar": "7.5.19",
+      "@xmldom/xmldom": "0.8.13",
+      "uuid": "11.1.1"
+    }
+  },
+  "engines": { "node": ">=22" }
 }

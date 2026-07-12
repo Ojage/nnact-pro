@@ -1,25 +1,42 @@
 # OpenFieldPro
 
 Open-source, self-hostable **field service management** for service businesses.
-CRM, scheduling/dispatch, work orders, estimates, invoicing, payments, reminders,
-reviews, reporting, service plans, and mobile technician workflows for home-service businesses
-(HVAC, plumbing, electrical, cleaning, appliance repair, and adjacent trades).
 
-> **Status: Product foundation.** The full-stack spine is in place and runs end-to-end
-> (Postgres → Drizzle → Fastify API → Next web, plus an Expo technician app and the infra
-> compose). The branded landing page, service-plan foundation, sponsor-config foundation,
-> organization branding settings, branded document renderer, and self-hosting operator scripts are now part of the repo.
+OpenFieldPro provides CRM, customers and properties, equipment history, scheduling and dispatch, work orders, estimates, invoicing, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows without mandatory per-user subscriptions.
+
+Appliance-service organizations can attach equipment-specific technical records to work orders, but those tools remain optional workflow depth—not the product definition.
+
+> **Status: release-candidate hardening.** The lead-to-payment operations spine runs across Postgres, Fastify, Next.js, and the Expo technician app. Production release still requires every gate in `docs/release/RELEASE_CHECKLIST.md`, including device testing, backup/restore evidence, deployment-specific secrets, and human review of browser screenshots.
+
+## Product architecture
+
+### Operations core
+
+- Customers, properties, equipment, and service history
+- Job intake, scheduling, dispatch, work execution, and return visits
+- Closeout queues for start, completion, missing pricing, invoicing, and accounts-receivable handoff
+- Price book, estimates, approvals, invoices, and payments
+- Photos, documents, organization branding, reviews, and service plans
+- Reporting, integrations, self-hosting, backup, and restore
+- Technician mobile workflows with offline foundations
+
+### Optional vertical workflows
+
+- Equipment-linked technical notes and evidence
+- Appliance model and serial records
+- Complaint, observation, measurements, and completion summaries
+- Return-visit continuity without replacing commercial job status
 
 ## Stack
 
-| Layer | Tech |
+| Layer | Technology |
 |---|---|
 | Backend | Fastify 5 + TypeScript + Drizzle ORM + Zod |
 | Frontend | Next.js 15 (App Router, RSC) |
 | Mobile | React Native (Expo) |
 | Database | PostgreSQL 16 + PostGIS |
-| Queue | Redis + BullMQ *(wired in Phase 2 for reminders)* |
-| Storage | MinIO (S3-compatible) |
+| Queue | Redis + BullMQ |
+| Storage | MinIO / S3-compatible storage |
 | Infra | Podman/Docker Compose + Caddy |
 
 Monorepo via pnpm workspaces: `apps/{api,web,mobile}`, `packages/{db,shared}`.
@@ -28,100 +45,104 @@ Monorepo via pnpm workspaces: `apps/{api,web,mobile}`, `packages/{db,shared}`.
 
 ```bash
 cp .env.example .env
-pnpm install
-pnpm infra:up        # postgres + redis + minio + caddy (podman or docker)
-pnpm db:push         # create tables from the Drizzle schema
-pnpm db:seed         # demo org + customers + a job + invoice
-pnpm dev             # api on :3001, web on :3000
-# open http://localhost:3000  (or http://localhost:8080 via Caddy)
+pnpm install:verified
+pnpm infra:up
+pnpm db:push
+pnpm db:seed
+pnpm dev
+# Web: http://localhost:3000
+# API: http://localhost:3001
 ```
 
-Run the unit check (no database needed):
+`pnpm install:verified` regenerates the lockfile from committed manifests, verifies its pinned SHA-256, and then performs a frozen install. Dependency changes must update both the generated lockfile and `pnpm-lock.expected.sha256`.
+
+Run the primary validation gates:
 
 ```bash
+pnpm release:safety
+pnpm audit --prod --audit-level=high
 pnpm --filter @ofp/api test
+pnpm --filter @ofp/web test:unit
+pnpm --filter @ofp/web test:e2e
+pnpm --filter @ofp/mobile typecheck
 ```
 
 ## What works today
 
-- **Multi-tenant schema** for core field-service concepts: orgs, users/technicians,
-  customers, properties, jobs (work orders), line items, estimates, invoices, payments,
-  appointments, service plans, plan enrollments, and plan visits. Money is integer cents throughout.
-- **Auth**: `POST /api/auth/register` (creates org + owner), `POST /api/auth/login`,
-  `GET /api/auth/me`. JWT via `@fastify/jwt`; passwords hashed with stdlib scrypt + constant-time
-  verify. Org is resolved from the verified token (header/first-org fallback in dev only).
-  Demo login: `owner@demo.test` / `demo12345` after seeding.
-- **Scheduling/dispatch**: `GET/POST /api/appointments` (with `?from&to` range),
-  `PATCH /api/appointments/:id` (reschedule/reassign — the backend for calendar drag-drop).
-  Booking a job auto-moves it to `scheduled`.
-- **Invoicing + payments**: line items (`/api/jobs/:id/line-items`) recompute the job
-  total; `POST /api/invoices` generates a numbered invoice from a job; `POST /api/invoices/:id/pay`
-  records offline payments (cash/check/card) and flips status to `paid` when covered (partials and
-  overpayment handled). Online card via `POST /api/invoices/:id/checkout` (Stripe-optional, returns
-  501 with guidance when unconfigured) + a **signature-verified** `/api/stripe/webhook`. Web invoices view.
-- **Documents**: shared branded HTML renderer, `/documents` hub, invoice/estimate previews, organization branding, and direct HTML export routes for print/save-as-PDF workflows.
-- **Organization branding**: `/settings` includes company name, brand color, logo URL, public contact details, document footer, and attribution removal settings.
-- **Service plans**: schema, API routes, shared DTOs, navigation, and a starter web page at `/service-plans`.
-- **API**: `customers` + `jobs` CRUD, `GET /api/health`. Zod-validated, org-scoped.
-- **Web**: dashboard, customers table, schedule view, sign-in form, branded landing page, documents, settings, and service plans.
-- **Mobile**: technician job list (Expo).
-- **Plugins/integrations**: plugin registry, installs, scoped API tokens, outbound event journal, and plugin API surface.
-- **Sponsor config**: local static sponsor configuration example with no tracking/ad-network dependency.
-- **Self-hosting**: install, update, backup, and restore helper scripts under `scripts/`.
-- **Tests**: money math (3/3) + password hashing (4/4), both runnable with zero install via
-  `node --experimental-strip-types --test`.
+### Operations
 
-## Roadmap to full field-service suite parity
+- Multi-tenant organizations, users, roles, customers, properties, equipment, and jobs
+- JWT authentication and organization-scoped APIs
+- New-customer and existing-customer job intake
+- Day, week, and month appointment scheduling
+- Dispatcher board with unassigned work, technician lanes, workload counts, search, date navigation, drag-and-drop, accessible reassignment, and conflict prevention
+- Job closeout board for start, completion, missing pricing, invoice creation, and recent accounts-receivable handoff
+- Estimates, line items, invoices, offline payments, and optional Stripe checkout
+- Server-side rejection of zero-dollar and duplicate active invoices
+- Concurrency-safe invoice numbering, manual payment application, and Stripe webhook processing
+- Branded invoice and estimate previews/exports
+- Reviews, recurring work, service-plan foundation, reporting, notifications, and search
+- Technician mobile application foundation
+- Plugin registry, scoped API tokens, outbound events, and integration surface
+- Self-hosting install, update, backup, and restore helpers
 
-Each row is one vertical slice on the existing spine (schema → API route → web page).
+### Optional appliance-service records
 
-| Phase | Module | Notes |
-|---|---|---|
-| 1 ✅ | Customers, Jobs, Dashboard | done — the reference slice |
-| 2 ✅ | Auth & orgs (JWT) | done — scrypt + `@fastify/jwt`; token-scoped tenancy |
-| 2 ✅ | Scheduling / dispatch | done — appointments API + schedule view; drag-assign UI is the next polish on the existing PATCH |
-| 2 ✅ | Estimates → accept → convert to job | done — create from job, accept advances job to scheduled |
-| 3 ✅ | Invoicing + line-item editor | done — line items recompute job totals; invoice generated from job; PDF/email is the next polish |
-| 3 ✅ | Online payments | done — offline `/pay` (cash/check/card) + Stripe-optional `/checkout` + signature-verified webhook |
-| 3 ✅ | Reminders & notifications | done — `@ofp/worker` sends appointment reminders via pluggable `notify` (ntfy/console; SMS/email plug in) |
-| 4 ✅ | Online booking page | done — public `POST /api/public/:orgId/book` → `lead` job (no auth) |
-| 4 ✅ | Recurring jobs, reviews, reporting | done — recurring templates materialized by the worker; reviews API; `/api/reports/summary` |
-| 5 ◐ | Documents + branding | branded HTML preview/export and org branding done — server-side PDF and email delivery remain |
-| 5 ◐ | Service plans | foundation done — customer profile integration, renewal worker, and customer portal view remain |
-| 5 ◐ | Sponsor slot | config foundation done — dashboard/mobile components and Pro removal toggle remain |
-| 5 ◐ | Self-hosting polish | scripts added — permissions, platform testing, and release packaging remain |
+- Equipment linked to customers and work orders
+- Technical sessions and measurement records
+- Coverage and correction foundations
+- Technician-facing technical record surfaces
 
-See `docs/release/final-product-roadmap.md` for the full final-product checklist.
+## Product surfaces
+
+- `/` — technician-first Today dashboard
+- `/jobs/new` — customer and work-order intake
+- `/dispatch` — dispatcher board with technician lanes and unassigned work
+- `/schedule` — day, week, and month calendar
+- `/closeout` — work start, completion, pricing, and invoice handoff
+- `/jobs` — work orders and status
+- `/customers` — CRM, properties, and equipment
+- `/estimates` — estimate workflow
+- `/invoices` — invoices and payments
+- `/service-plans` — recurring service-plan foundation
+- `/documents` — branded operational documents
+- `/reports` — operational reporting
+- `/settings` — organization and branding settings
+
+## Open-source and sponsorship model
+
+The AGPL core is free to self-host and is never limited by users, technicians, customers, jobs, invoices, locations, or core operational features. Hosted modified versions must follow the obligations in `LICENSE`.
+
+Optional signed entitlements are verified locally without a license server, telemetry, or phone-home. They may represent sponsor recognition, bounded support benefits, or premium first-party plugins; they cannot disable or restrict the core.
+
+A free dashboard may show one clearly labeled, locally configured sponsor placement. OpenFieldPro does not use ad networks, tracking pixels, behavioral targeting, or sponsor access to operational data. See `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
+
+## Product direction
+
+The release gate is the complete lead-to-payment loop:
+
+1. Customer and property intake
+2. Scheduling and dispatch
+3. Technician field execution
+4. Estimate approval
+5. Closeout, invoice, and payment
+6. Customer communication and service history
+7. Reporting, integrations, offline resilience, and safe upgrades
+
+See `docs/release/final-product-roadmap.md` and `docs/release/RELEASE_CHECKLIST.md`.
+
+## Security
+
+Read `SECURITY.md` before deploying. Production startup rejects default/short JWT secrets and wildcard or missing production CORS configuration. Authentication, public booking, uploads, and checkout have bounded route-level rate limits. Run `pnpm release:safety` before every release.
+
+Optional Ed25519 support-entitlement keys are documented in `docs/security/KEY_MANAGEMENT.md`. They are not required to run the AGPL core and do not narrow the rights in `LICENSE`.
+
+## Sponsorship
+
+The project sponsorship application, tier design, outreach copy, non-tracking sponsor policy, governance boundaries, and reporting plan are in `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
+
+After the GitHub Sponsors profile is approved, enable the repository Sponsor button. The repository funding configuration targets the `niko4244` GitHub Sponsors profile.
 
 ## Deploy
 
-One command builds the images, runs migrations + seed, and brings the whole stack up behind
-Caddy on `:8080` (works with podman or docker compose):
-
-```bash
-./deploy.sh           # Linux/macOS
-.\deploy.ps1          # Windows
-```
-
-Operator scripts:
-
-```bash
-scripts/install.sh
-scripts/update.sh
-scripts/backup.sh
-scripts/restore.sh backups/YYYYMMDD-HHMMSS
-```
-
-Then:
-
-- **App** → http://localhost:8080  ·  **Landing** → http://localhost:8080/welcome
-- **API** → http://localhost:8080/api/health  ·  **Login** → `owner@demo.test` / `demo12345`
-
-For a public host, point the `:8080` block in `infra/Caddyfile.prod` at your domain (Caddy
-auto-provisions HTTPS) and set real secrets in `.env` (`JWT_SECRET`, `POSTGRES_PASSWORD`,
-and `STRIPE_*` if you want online card payments). Services: `api`, `web`, `worker`, `postgres`,
-`redis`, `minio`, `caddy` (see `infra/compose.prod.yml`).
-
-## License
-
-See [LICENSE]. Self-host freely.
+Use the repository deployment and self-hosting scripts under `scripts/` together with the compose configuration. Production deployments must validate migrations, backups, restore procedures, secrets, storage, TLS, CORS, payment webhooks, outbound communication adapters, and the complete release checklist before serving real customers.

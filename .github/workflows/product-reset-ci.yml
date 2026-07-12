@@ -1,0 +1,175 @@
+name: OpenFieldPro release CI
+
+on:
+  pull_request:
+    branches: [ofp-monorepo]
+  push:
+    branches: [ofp-monorepo]
+
+concurrency:
+  group: openfieldpro-release-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Generate and verify deterministic lockfile, then install
+        run: pnpm install:verified
+      - name: Run repository safety checks
+        run: pnpm release:safety
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
+      - name: Verify offline keypair generation and signed entitlement CLI
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/ofp-license-smoke
+          pnpm --filter @ofp/api license:keypair -- --output-dir /tmp/ofp-license-smoke
+          pnpm --filter @ofp/api license:generate -- \
+            --private-key /tmp/ofp-license-smoke/license-signing-key.pem \
+            --organization "OpenFieldPro CI" \
+            --tier supporter \
+            --seats 1 \
+            --expires-at "2030-01-01T00:00:00.000Z" \
+            --output /tmp/ofp-license-smoke/ci.ofp-license
+          pnpm --filter @ofp/api license:verify -- \
+            --public-key /tmp/ofp-license-smoke/license-signing-public.pem \
+            --license-file /tmp/ofp-license-smoke/ci.ofp-license
+          test "$(stat -c '%a' /tmp/ofp-license-smoke/license-signing-key.pem)" = "600"
+          test "$(stat -c '%a' /tmp/ofp-license-smoke/ci.ofp-license)" = "600"
+          rm -rf /tmp/ofp-license-smoke
+
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Install verified workspace
+        run: pnpm install:verified
+      - name: Generate database schema
+        run: pnpm --filter @ofp/db generate
+        env:
+          DATABASE_URL: postgres://ofp:ofp@localhost:5432/ofp
+      - name: Build API
+        run: |
+          set +e
+          pnpm --filter @ofp/api build > /tmp/openfieldpro-api-build.log 2>&1
+          code=$?
+          tail -n 160 /tmp/openfieldpro-api-build.log
+          exit $code
+      - name: Run API tests
+        run: pnpm --filter @ofp/api test
+      - name: Upload API compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-compiler-log
+          path: /tmp/openfieldpro-api-build.log
+          if-no-files-found: ignore
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Install verified workspace
+        run: pnpm install:verified
+      - name: Run operations unit tests
+        run: pnpm --filter @ofp/web test:unit
+      - name: Build web application
+        run: |
+          set +e
+          pnpm --filter @ofp/web build > /tmp/openfieldpro-web-build.log 2>&1
+          code=$?
+          tail -n 180 /tmp/openfieldpro-web-build.log
+          exit $code
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+      - name: Upload web compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-compiler-log
+          path: /tmp/openfieldpro-web-build.log
+          if-no-files-found: ignore
+
+  operations-visual-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Install verified workspace
+        run: pnpm install:verified
+      - name: Install Chromium
+        run: pnpm --filter @ofp/web exec playwright install --with-deps chromium
+      - name: Build operations web application
+        run: pnpm --filter @ofp/web build
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      - name: Run operations browser and visual tests
+        run: pnpm --filter @ofp/web test:e2e
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      - name: Upload operations visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operations-visual-evidence
+          path: |
+            apps/web/artifacts/*.png
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.0.0 --activate
+      - name: Install verified workspace
+        run: pnpm install:verified
+      - name: Type-check technician app
+        run: |
+          set +e
+          pnpm --filter @ofp/mobile typecheck > /tmp/openfieldpro-mobile-typecheck.log 2>&1
+          code=$?
+          tail -n 160 /tmp/openfieldpro-mobile-typecheck.log
+          exit $code
+      - name: Upload mobile compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-typecheck-log
+          path: /tmp/openfieldpro-mobile-typecheck.log
+          if-no-files-found: ignore

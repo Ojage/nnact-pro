@@ -27,11 +27,33 @@ import { pluginRoutes } from "./routes/plugins.js";
 import { pluginApiRoutes } from "./routes/plugin-api.js";
 import { servicePlanRoutes } from "./routes/service-plans.js";
 import { orgSettingsRoutes } from "./routes/org-settings.js";
+import { diagnosticRoutes } from "./routes/diagnostics.js";
+import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
+import { diagnosticOutputRoutes } from "./routes/diagnostic-outputs.js";
+import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
+import { operationalAuthorizationGuard } from "./operational-authorization.js";
+import { resolveCorsOrigin, resolveJwtSecret } from "./runtime-security.js";
+import { applyApiSecurityHeaders } from "./security-headers.js";
+import { sessionCookieAuthenticationHook } from "./session-cookie.js";
 
 export function buildServer() {
-  const app = Fastify({ logger: true });
-  app.register(cors, { origin: true });
-  app.register(jwt, { secret: process.env.JWT_SECRET ?? "change-me-in-production" });
+  const app = Fastify({
+    logger: true,
+    bodyLimit: 1_048_576,
+    trustProxy: process.env.TRUST_PROXY === "true",
+  });
+  app.register(cors, { origin: resolveCorsOrigin(), credentials: true });
+  app.register(jwt, {
+    secret: resolveJwtSecret(),
+    sign: { expiresIn: process.env.JWT_EXPIRES_IN ?? "12h" },
+  });
+  app.addHook("onRequest", sessionCookieAuthenticationHook);
+  app.addHook("onSend", async (_request, reply, payload) => {
+    applyApiSecurityHeaders(reply);
+    return payload;
+  });
+  app.addHook("preHandler", operationalAuthorizationGuard);
+  app.addHook("preHandler", diagnosticAuthoringGuard);
   app.register(healthRoutes);
   app.register(authRoutes, { prefix: "/api/auth" });
   app.register(customerRoutes, { prefix: "/api/customers" });
@@ -39,7 +61,7 @@ export function buildServer() {
   app.register(appointmentRoutes, { prefix: "/api/appointments" });
   app.register(lineItemRoutes, { prefix: "/api" });
   app.register(invoiceRoutes, { prefix: "/api/invoices" });
-  app.register(stripeWebhookRoute, { prefix: "/api" }); // encapsulated raw-body parser
+  app.register(stripeWebhookRoute, { prefix: "/api" });
   app.register(estimateRoutes, { prefix: "/api/estimates" });
   app.register(reviewRoutes, { prefix: "/api/reviews" });
   app.register(reportRoutes, { prefix: "/api/reports" });
@@ -51,16 +73,18 @@ export function buildServer() {
   app.register(syncRoutes);
   app.register(userRoutes, { prefix: "/api/users" });
   app.register(equipmentRoutes, { prefix: "/api/equipment" });
+  app.register(diagnosticRoutes, { prefix: "/api/diagnostics" });
+  app.register(diagnosticOfflineRoutes, { prefix: "/api/diagnostics" });
+  app.register(diagnosticOutputRoutes, { prefix: "/api/diagnostics" });
   app.register(notificationRoutes, { prefix: "/api/notifications" });
   app.register(searchRoutes, { prefix: "/api/search" });
-  app.register(pluginRoutes, { prefix: "/api/plugins" }); // owner-facing mgmt
-  app.register(pluginApiRoutes, { prefix: "/api/plugin" }); // scoped-token surface
+  app.register(pluginRoutes, { prefix: "/api/plugins" });
+  app.register(pluginApiRoutes, { prefix: "/api/plugin" });
   app.register(servicePlanRoutes, { prefix: "/api/service-plans" });
   app.register(orgSettingsRoutes, { prefix: "/api/org" });
   return app;
 }
 
-// Only listen when run directly (not when imported by tests).
 const isMain = import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const port = Number(process.env.API_PORT ?? 3001);

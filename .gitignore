@@ -5,7 +5,15 @@ dist/
 *.tsbuildinfo
 .env
 .env.local
+.env.*.local
+.secrets/
+*.private.pem
+*.ofp-license
 drizzle/meta/_journal.json.bak
 .DS_Store
+backups/
 data/minio/
 data/pg/
+data/redis/
+data/uploads/
+.ofp-uploads/

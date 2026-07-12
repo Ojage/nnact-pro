@@ -1,22 +1,21 @@
-// OpenFieldPro technician app — dashboard with stat cards, appointments, and job cards.
-// Run: pnpm --filter @ofp/mobile dev  (requires Expo Go or a simulator).
-import { useEffect, useState, useMemo, useRef } from "react";
+// OpenFieldPro technician app — next-action field dashboard with a durable
+// diagnostic-package fallback for low-signal service locations.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
-  ScrollView,
-  ActivityIndicator,
 } from "react-native";
 import type { JobDTO } from "@ofp/shared";
-import { formatMoney } from "@ofp/shared";
-import { StatCard } from "./components/StatCard";
-import { JobCard } from "./components/JobCard";
-import { AppointmentCard } from "./components/AppointmentCard";
-import { SyncService } from "./src/sync";
+import { SyncService, type FieldPackage } from "./src/sync";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
+const AUTH_TOKEN = process.env.EXPO_PUBLIC_AUTH_TOKEN ?? "";
+const ORG_ID = process.env.EXPO_PUBLIC_ORG_ID ?? "";
 
 interface Appointment {
   id: string;
@@ -26,111 +25,198 @@ interface Appointment {
   endsAt: string;
 }
 
-interface Invoice {
-  id: string;
-  jobId: string;
-  number: string;
-  status: "draft" | "sent" | "paid" | "void";
-  total: number;
+interface DiagnosticListItem {
+  session: {
+    id: string;
+    jobId: string;
+    status: string;
+    customerComplaint?: string | null;
+    updatedAt: string;
+  };
+  equipment: {
+    id: string;
+    type: string;
+    make?: string | null;
+    model?: string | null;
+    serialNumber?: string | null;
+  };
+  workflow: {
+    id: string;
+    name: string;
+    supportStatus: string;
+  } | null;
+}
+
+async function fetchJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${API}${path}`, {
+    headers: {
+      ...(AUTH_TOKEN ? { authorization: `Bearer ${AUTH_TOKEN}` } : {}),
+      ...(ORG_ID ? { "x-org-id": ORG_ID } : {}),
+    },
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.json() as Promise<T>;
+}
+
+function humanize(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function statusColor(status: string) {
+  if (["blocked", "escalated", "suspended"].includes(status)) return "#ff8080";
+  if (["diagnosed", "completed"].includes(status)) return "#86e29a";
+  if (["testing", "workflow_ready"].includes(status)) return "#7ab8ff";
+  return "#e0b34f";
+}
+
+function packageToDiagnostic(fieldPackage: FieldPackage): DiagnosticListItem | null {
+  if (!fieldPackage.session || !fieldPackage.equipment) return null;
+  return {
+    session: fieldPackage.session as unknown as DiagnosticListItem["session"],
+    equipment: fieldPackage.equipment as unknown as DiagnosticListItem["equipment"],
+    workflow: fieldPackage.workflow
+      ? (fieldPackage.workflow as unknown as DiagnosticListItem["workflow"])
+      : null,
+  };
+}
+
+function packageToAppointment(fieldPackage: FieldPackage): Appointment | null {
+  const job = fieldPackage.job as Partial<JobDTO> & { scheduledAt?: string | null };
+  if (!job.id || !job.scheduledAt) return null;
+  const start = new Date(job.scheduledAt);
+  if (Number.isNaN(start.getTime())) return null;
+  return {
+    id: `cached-${job.id}`,
+    jobId: job.id,
+    technicianId: null,
+    startsAt: start.toISOString(),
+    endsAt: new Date(start.getTime() + 90 * 60 * 1000).toISOString(),
+  };
 }
 
 export default function App() {
   const [jobs, setJobs] = useState<JobDTO[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [queuedWrites, setQueuedWrites] = useState(0);
   const syncRef = useRef<SyncService | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [jr, ar, ir] = await Promise.all([
-          fetch(`${API}/api/jobs`).then((r) => r.json()).catch(() => []),
-          fetch(`${API}/api/appointments`).then((r) => r.json()).catch(() => []),
-          fetch(`${API}/api/invoices`).then((r) => r.json()).catch(() => []),
-        ]);
-        if (!cancelled) {
-          setJobs(jr);
-          setAppointments(ar);
-          setInvoices(ir);
-        }
-      } catch (e) {
-        if (!cancelled) setErr(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
+  const loadCached = useCallback(async (): Promise<boolean> => {
+    const packages = await syncRef.current?.listCachedPackages();
+    if (!packages?.length) return false;
 
-    // Init sync service and pull on mount + every 30s
-    const token = process.env.EXPO_PUBLIC_AUTH_TOKEN ?? "";
-    const orgId = process.env.EXPO_PUBLIC_ORG_ID ?? "";
-    syncRef.current = new SyncService({ apiUrl: API, orgId, token });
-
-    const doSync = () => {
-      syncRef.current
-        ?.pull()
-        .then((_res) => {
-          setLastSync(new Date().toLocaleTimeString());
-          // ponytail: results are logged but not applied to local mirror yet
-          // Ceiling: when we add a real SQLite mirror, pipe res.results here
-          // Upgrade: connect Mirror to expo-sqlite and upsert each result row
-        })
-        .catch((e) => setErr(String(e)));
-    };
-
-    doSync();
-    const interval = setInterval(doSync, 30_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    setJobs(packages.map((item) => item.job as unknown as JobDTO));
+    setAppointments(
+      packages.flatMap((item) => {
+        const appointment = packageToAppointment(item);
+        return appointment ? [appointment] : [];
+      }),
+    );
+    setDiagnostics(
+      packages.flatMap((item) => {
+        const diagnostic = packageToDiagnostic(item);
+        return diagnostic ? [diagnostic] : [];
+      }),
+    );
+    setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
+    setOffline(true);
+    return true;
   }, []);
 
-  // ── Computed metrics ──
-  const stats = useMemo(() => {
-    const active =
-      jobs.filter((j) => j.status === "scheduled" || j.status === "in_progress")
-        .length;
-    const completed = jobs.filter((j) => j.status === "completed").length;
-    const revenue = jobs
-      .filter((j) => j.status === "completed")
-      .reduce((a, j) => a + j.total, 0);
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      const [jobRows, appointmentRows, diagnosticRows] = await Promise.all([
+        fetchJson<JobDTO[]>("/api/jobs"),
+        fetchJson<Appointment[]>("/api/appointments"),
+        fetchJson<DiagnosticListItem[]>("/api/diagnostics/sessions").catch(() => []),
+      ]);
+      setJobs(jobRows);
+      setAppointments(appointmentRows);
+      setDiagnostics(diagnosticRows);
+      setOffline(false);
+      setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
+    } catch (caught) {
+      const restored = await loadCached();
+      setError(
+        restored
+          ? "Offline mode — showing downloaded field packages. New readings remain queued until synchronization succeeds."
+          : caught instanceof Error
+            ? caught.message
+            : String(caught),
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [loadCached]);
 
-    const now = new Date();
-    const todayAppts = appointments.filter(
-      (a) => new Date(a.startsAt).toDateString() === now.toDateString(),
-    ).length;
+  useEffect(() => {
+    const service = new SyncService({ apiUrl: API, orgId: ORG_ID, token: AUTH_TOKEN });
+    syncRef.current = service;
+    void load();
 
-    const outstanding = invoices
-      .filter((i) => i.status === "sent" || i.status === "draft")
-      .reduce((a, i) => a + i.total, 0);
+    const synchronize = async () => {
+      try {
+        const result = await service.pull();
+        setLastSync(new Date().toLocaleTimeString());
+        setQueuedWrites(Math.max(0, result.queuedBeforeFlush - result.flushed));
+        await load();
+      } catch {
+        await loadCached();
+      }
+    };
 
-    return { active, completed, revenue, todayAppts, outstanding };
-  }, [jobs, appointments, invoices]);
+    void synchronize();
+    const interval = setInterval(() => void synchronize(), 30_000);
+    return () => clearInterval(interval);
+  }, [load, loadCached]);
 
-  // ── Upcoming appointments (future, next 7 days) ──
-  const upcoming = useMemo(() => {
-    const now = new Date();
-    return appointments
-      .filter((a) => new Date(a.startsAt) > now)
-      .sort(
-        (a, b) =>
-          new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
-      )
-      .slice(0, 8);
-  }, [appointments]);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
-  // ── Loading state ──
+  const todayAppointments = useMemo(
+    () =>
+      appointments
+        .filter((appointment) => {
+          const starts = new Date(appointment.startsAt);
+          return starts >= todayStart && starts < tomorrowStart;
+        })
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+    [appointments, todayStart.getTime(), tomorrowStart.getTime()],
+  );
+
+  const activeDiagnostics = useMemo(
+    () =>
+      diagnostics.filter((item) =>
+        ["identification_required", "workflow_ready", "testing", "blocked", "escalated"].includes(
+          item.session.status,
+        ),
+      ),
+    [diagnostics],
+  );
+
+  const nextAppointment = todayAppointments.find(
+    (appointment) => new Date(appointment.endsAt) > now,
+  );
+  const nextJob = nextAppointment ? jobs.find((job) => job.id === nextAppointment.jobId) : null;
+  const nextDiagnostic = nextAppointment
+    ? diagnostics.find((item) => item.session.jobId === nextAppointment.jobId)
+    : null;
+
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b56b0" />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
+          <ActivityIndicator size="large" color="#22c55e" />
+          <Text style={styles.loadingText}>Loading today’s field work…</Text>
         </View>
         <StatusBar style="light" />
       </View>
@@ -143,225 +229,226 @@ export default function App() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void load();
+            }}
+            tintColor="#22c55e"
+          />
+        }
       >
-        {/* ── Header ── */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Dashboard</Text>
+          <View style={styles.headerStatusRow}>
+            <Text style={styles.eyebrow}>OPENFIELDPRO FIELD</Text>
+            <Text style={[styles.connectivity, { color: offline ? "#e0b34f" : "#86e29a" }]}>
+              {offline ? "OFFLINE" : "ONLINE"}
+            </Text>
+          </View>
+          <Text style={styles.headerTitle}>Today</Text>
           <Text style={styles.headerSub}>
-            {jobs.length} jobs · {stats.active} active
-            {lastSync && ` · synced ${lastSync}`}
+            {todayAppointments.length} visit{todayAppointments.length === 1 ? "" : "s"} · {activeDiagnostics.length} active diagnostic{activeDiagnostics.length === 1 ? "" : "s"}
+            {queuedWrites ? ` · ${queuedWrites} queued` : ""}
+            {lastSync ? ` · synced ${lastSync}` : ""}
           </Text>
         </View>
 
-        {/* ── Error banner ── */}
-        {err && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorIcon}>⚠</Text>
-            <View style={styles.errorTextBlock}>
-              <Text style={styles.errorTitle}>Couldn't load data</Text>
-              <Text style={styles.errorMsg}>{err}</Text>
-            </View>
+        {error && (
+          <View style={[styles.errorBanner, offline && styles.offlineBanner]}>
+            <Text style={[styles.errorTitle, offline && styles.offlineTitle]}>
+              {offline ? "Working from downloaded field packages" : "Field data needs attention"}
+            </Text>
+            <Text style={styles.errorMessage}>{error}</Text>
           </View>
         )}
 
-        {/* ── Stat cards (horizontal scroll) ── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.statRow}
-          contentContainerStyle={styles.statRowContent}
-        >
-          <StatCard
-            label="Active"
-            value={String(stats.active)}
-            color={stats.active > 0 ? "#7ab8ff" : undefined}
-          />
-          <StatCard
-            label="Completed"
-            value={String(stats.completed)}
-            color={stats.completed > 0 ? "#86e29a" : undefined}
-          />
-          <StatCard label="Revenue" value={formatMoney(stats.revenue)} color="#86e29a" />
-          <StatCard
-            label="Today"
-            value={String(stats.todayAppts)}
-            color={stats.todayAppts > 0 ? "#e0b34f" : undefined}
-          />
-          <StatCard
-            label="Outstanding"
-            value={formatMoney(stats.outstanding)}
-            color={stats.outstanding > 0 ? "#e0b34f" : undefined}
-          />
-        </ScrollView>
-
-        {/* ── Upcoming appointments ── */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-            <Text style={styles.sectionCount}>{upcoming.length}</Text>
-          </View>
-          {upcoming.length === 0 ? (
-            <View style={styles.emptyBlock}>
-              <Text style={styles.emptyTitle}>No upcoming appointments</Text>
-              <Text style={styles.emptySub}>
-                Scheduled jobs will appear here
-              </Text>
+          <Text style={styles.sectionTitle}>Next action</Text>
+          {nextAppointment ? (
+            <View style={styles.primaryCard}>
+              <View style={styles.rowBetween}>
+                <View style={styles.timeBlock}>
+                  <Text style={styles.timeText}>
+                    {new Date(nextAppointment.startsAt).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                  <Text style={styles.timeLabel}>arrival</Text>
+                </View>
+                <View style={styles.flexOne}>
+                  <Text style={styles.cardTitle}>{nextJob?.title ?? "Assigned service job"}</Text>
+                  <Text style={styles.cardMeta}>
+                    {nextJob?.status ? humanize(nextJob.status) : "scheduled"}
+                  </Text>
+                </View>
+              </View>
+
+              {nextDiagnostic ? (
+                <View style={styles.appliancePanel}>
+                  <View style={styles.rowBetween}>
+                    <View style={styles.flexOne}>
+                      <Text style={styles.applianceTitle}>
+                        {[nextDiagnostic.equipment.make, nextDiagnostic.equipment.model]
+                          .filter(Boolean)
+                          .join(" ") || nextDiagnostic.equipment.type}
+                      </Text>
+                      <Text style={styles.cardMeta}>
+                        {nextDiagnostic.workflow?.name ?? "Coverage required"}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusPill,
+                        { borderColor: statusColor(nextDiagnostic.session.status) },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: statusColor(nextDiagnostic.session.status) },
+                        ]}
+                      >
+                        {humanize(nextDiagnostic.session.status)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.complaintText}>
+                    {nextDiagnostic.session.customerComplaint || "Customer complaint not recorded"}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.warningPanel}>
+                  <Text style={styles.warningTitle}>Diagnostic not started</Text>
+                  <Text style={styles.cardMeta}>
+                    Confirm the exact model and serial, then select the applicable validated workflow.
+                  </Text>
+                </View>
+              )}
             </View>
           ) : (
-            upcoming.map((a) => {
-              const job = jobs.find((j) => j.id === a.jobId);
-              return <AppointmentCard key={a.id} appt={a} job={job} />;
-            })
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No remaining appointments today</Text>
+              <Text style={styles.emptyText}>
+                Check Jobs for unscheduled work, parts returns, and incomplete diagnostic sessions.
+              </Text>
+            </View>
           )}
         </View>
 
-        {/* ── All jobs ── */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>All Jobs</Text>
-            <Text style={styles.sectionCount}>{jobs.length}</Text>
+          <View style={styles.rowBetween}>
+            <Text style={styles.sectionTitle}>Diagnostic attention</Text>
+            <Text style={styles.sectionCount}>{activeDiagnostics.length}</Text>
           </View>
-          {jobs.length === 0 ? (
-            <View style={styles.emptyBlock}>
-              <Text style={styles.emptyTitle}>No jobs yet</Text>
-              <Text style={styles.emptySub}>
-                Jobs will appear here once created
+          {activeDiagnostics.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No active diagnostic sessions</Text>
+              <Text style={styles.emptyText}>
+                New sessions appear after the work order is linked to the exact appliance.
               </Text>
             </View>
           ) : (
-            jobs.map((job) => <JobCard key={job.id} job={job} />)
+            activeDiagnostics.slice(0, 8).map((item) => (
+              <View key={item.session.id} style={styles.listCard}>
+                <View style={styles.rowBetween}>
+                  <View style={styles.flexOne}>
+                    <Text style={styles.listTitle}>
+                      {[item.equipment.make, item.equipment.model].filter(Boolean).join(" ") ||
+                        item.equipment.type}
+                    </Text>
+                    <Text style={styles.cardMeta}>
+                      {item.workflow?.name ?? "Unsupported / unresolved"}
+                    </Text>
+                  </View>
+                  <Text style={[styles.smallStatus, { color: statusColor(item.session.status) }]}>
+                    {humanize(item.session.status)}
+                  </Text>
+                </View>
+                <Text style={styles.complaintText} numberOfLines={2}>
+                  {item.session.customerComplaint || "Complaint not recorded"}
+                </Text>
+              </View>
+            ))
           )}
         </View>
 
-        {/* Bottom spacer */}
-        <View style={{ height: 40 }} />
+        <View style={styles.section}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.sectionTitle}>Today’s route</Text>
+            <Text style={styles.sectionCount}>{todayAppointments.length}</Text>
+          </View>
+          {todayAppointments.map((appointment) => {
+            const job = jobs.find((item) => item.id === appointment.jobId);
+            const session = diagnostics.find((item) => item.session.jobId === appointment.jobId);
+            return (
+              <View key={appointment.id} style={styles.routeCard}>
+                <Text style={styles.routeTime}>
+                  {new Date(appointment.startsAt).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </Text>
+                <View style={styles.flexOne}>
+                  <Text style={styles.listTitle}>{job?.title ?? "Service job"}</Text>
+                  <Text style={styles.cardMeta}>
+                    {session ? humanize(session.session.status) : "diagnostic not started"}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+        <View style={{ height: 48 }} />
       </ScrollView>
-
       <StatusBar style="light" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0b1020",
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-
-  // ── Loading ──
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  loadingText: {
-    color: "#8a97c2",
-    fontSize: 14,
-  },
-
-  // ── Header ──
-  header: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  headerTitle: {
-    color: "#e6e9f0",
-    fontSize: 28,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-  },
-  headerSub: {
-    color: "#8a97c2",
-    fontSize: 13,
-    marginTop: 4,
-  },
-
-  // ── Error ──
-  errorBanner: {
-    backgroundColor: "rgba(255,128,128,0.08)",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,128,128,0.2)",
-    marginHorizontal: 20,
-    marginBottom: 16,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  errorIcon: {
-    fontSize: 16,
-    color: "#ff8080",
-    marginTop: 1,
-  },
-  errorTextBlock: {
-    flex: 1,
-  },
-  errorTitle: {
-    color: "#ff8080",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  errorMsg: {
-    color: "#8a97c2",
-    fontSize: 11,
-    marginTop: 2,
-  },
-
-  // ── Stat cards ──
-  statRow: {
-    marginBottom: 24,
-  },
-  statRowContent: {
-    paddingLeft: 20,
-    paddingRight: 10,
-  },
-
-  // ── Sections ──
-  section: {
-    marginBottom: 24,
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    color: "#e6e9f0",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  sectionCount: {
-    color: "#6b7aa8",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  // ── Empty ──
-  emptyBlock: {
-    backgroundColor: "#141b33",
-    borderRadius: 12,
-    paddingVertical: 40,
-    alignItems: "center",
-  },
-  emptyTitle: {
-    color: "#8a97c2",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  emptySub: {
-    color: "#6b7aa8",
-    fontSize: 12,
-    marginTop: 4,
-  },
+  container: { flex: 1, backgroundColor: "#0b1020" },
+  scroll: { flex: 1 },
+  scrollContent: { paddingTop: 58, paddingBottom: 24 },
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: { color: "#8a97c2", fontSize: 14 },
+  header: { paddingHorizontal: 20, marginBottom: 22 },
+  headerStatusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  eyebrow: { color: "#22c55e", fontSize: 10, fontWeight: "800", letterSpacing: 2 },
+  connectivity: { fontSize: 9, fontWeight: "900", letterSpacing: 1.4 },
+  headerTitle: { color: "#e6e9f0", fontSize: 32, fontWeight: "800", letterSpacing: -0.8, marginTop: 4 },
+  headerSub: { color: "#8a97c2", fontSize: 12, marginTop: 5 },
+  errorBanner: { marginHorizontal: 20, marginBottom: 18, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,128,128,.28)", backgroundColor: "rgba(255,128,128,.08)", padding: 14 },
+  offlineBanner: { borderColor: "rgba(224,179,79,.28)", backgroundColor: "rgba(224,179,79,.08)" },
+  errorTitle: { color: "#ff8080", fontSize: 13, fontWeight: "700" },
+  offlineTitle: { color: "#e0b34f" },
+  errorMessage: { color: "#8a97c2", fontSize: 11, marginTop: 4 },
+  section: { paddingHorizontal: 20, marginBottom: 24 },
+  sectionTitle: { color: "#e6e9f0", fontSize: 16, fontWeight: "700", marginBottom: 11 },
+  sectionCount: { color: "#6b7aa8", fontSize: 12, fontWeight: "700", marginBottom: 11 },
+  primaryCard: { borderRadius: 18, borderWidth: 1, borderColor: "rgba(34,197,94,.35)", backgroundColor: "#141b33", padding: 16 },
+  rowBetween: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  flexOne: { flex: 1, minWidth: 0 },
+  timeBlock: { width: 72, borderRadius: 12, backgroundColor: "#0f1630", paddingVertical: 9, alignItems: "center" },
+  timeText: { color: "#e6e9f0", fontSize: 16, fontWeight: "800" },
+  timeLabel: { color: "#6b7aa8", fontSize: 9, marginTop: 2, textTransform: "uppercase" },
+  cardTitle: { color: "#e6e9f0", fontSize: 17, fontWeight: "700" },
+  cardMeta: { color: "#8a97c2", fontSize: 11, marginTop: 3 },
+  appliancePanel: { marginTop: 14, borderRadius: 13, backgroundColor: "#0f1630", padding: 13 },
+  applianceTitle: { color: "#e6e9f0", fontSize: 14, fontWeight: "700" },
+  statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  statusText: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
+  complaintText: { color: "#aab4d0", fontSize: 12, lineHeight: 17, marginTop: 10 },
+  warningPanel: { marginTop: 14, borderRadius: 13, backgroundColor: "rgba(224,179,79,.08)", padding: 13 },
+  warningTitle: { color: "#e0b34f", fontSize: 13, fontWeight: "700" },
+  emptyCard: { borderRadius: 14, backgroundColor: "#141b33", paddingVertical: 28, paddingHorizontal: 18, alignItems: "center" },
+  emptyTitle: { color: "#8a97c2", fontSize: 14, fontWeight: "700", textAlign: "center" },
+  emptyText: { color: "#6b7aa8", fontSize: 11, lineHeight: 16, marginTop: 5, textAlign: "center" },
+  listCard: { borderRadius: 14, backgroundColor: "#141b33", borderWidth: 1, borderColor: "#1d2440", padding: 14, marginBottom: 9 },
+  listTitle: { color: "#e6e9f0", fontSize: 13, fontWeight: "700" },
+  smallStatus: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
+  routeCard: { flexDirection: "row", alignItems: "center", gap: 13, borderRadius: 13, backgroundColor: "#141b33", padding: 13, marginBottom: 8 },
+  routeTime: { width: 70, color: "#7ab8ff", fontSize: 13, fontWeight: "800" },
 });

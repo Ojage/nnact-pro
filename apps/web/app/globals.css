@@ -97,4 +97,15 @@
       linear-gradient(90deg, rgba(126, 231, 242, 0.07) 1px, transparent 1px);
     background-size: 36px 36px;
   }
+
+  [data-testid="dispatch-board"] {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  }
+
+  [data-testid^="dispatch-card-"] a {
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+    line-height: 1.35;
+  }
 }

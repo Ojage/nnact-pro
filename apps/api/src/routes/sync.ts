@@ -1,13 +1,14 @@
-// Phase 5a PR 1 — sync route.
-// JWT-gated POST /api/sync, accepts SyncRequestDTO, returns SyncResponseDTO.
-// Delegates all per-op logic to ../sync/executor.ts (pure dispatcher).
-
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { db } from "@ofp/db";
 import { resolveOrgId } from "./org.js";
 import { applyOps } from "../sync/executor.js";
+import {
+  roleCanSyncOperation,
+  verifiedClaims,
+  type UserRole,
+} from "../operational-authorization.js";
 
 const REQUEST_Z = z.object({
   ops: z
@@ -29,20 +30,17 @@ const REQUEST_Z = z.object({
           baseVersion: z.number().int().positive().optional(),
           payload: z.record(z.string(), z.unknown()),
         })
-        .passthrough(),
+        .strict(),
     )
-    // ponytail: 500-op ceiling keeps a batch under ~1MB JSON and one TCP
-    // round-trip for typical mobile flushes. Ceiling: real drop is at
-    // ~1000 ops; raise to 1000 if mobile dashboards need larger batches.
     .min(1)
     .max(500),
 });
 
 export async function syncRoutes(app: FastifyInstance) {
   app.post("/api/sync", async (req, reply) => {
-    // resolveOrgId() calls req.jwtVerify() internally — same pattern as
-    // existing routes/jobs.ts and routes/org.ts. No separate onRequest hook.
     const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
 
     const parsed = REQUEST_Z.safeParse(req.body);
     if (!parsed.success) {
@@ -52,7 +50,19 @@ export async function syncRoutes(app: FastifyInstance) {
       });
     }
 
-    const results = await applyOps(db, orgId, parsed.data.ops);
+    const role = claims.role as UserRole;
+    const denied = parsed.data.ops.filter((operation) => !roleCanSyncOperation(role, operation));
+    if (denied.length) {
+      return reply.code(403).send({
+        error: "one or more offline operations are not permitted for this role",
+        denied: denied.map(({ opId, table, type }) => ({ opId, table, type })),
+      });
+    }
+
+    const results = await applyOps(db, orgId, parsed.data.ops, {
+      role,
+      userId: claims.userId,
+    });
     return { results };
   });
 }
