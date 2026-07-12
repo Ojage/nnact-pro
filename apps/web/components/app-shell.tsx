@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/command-palette";
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isPublicSurface =
+    pathname === "/login" ||
     pathname === "/welcome" ||
     pathname.startsWith("/welcome/") ||
     pathname === "/portal" ||
