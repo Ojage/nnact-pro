@@ -2,29 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { NAV_SECTIONS, activeNavHref, decodeJwt } from "@/lib/nav";
+import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
+import { useSessionUser } from "@/lib/use-session-user";
 
 export function Sidebar() {
   const pathname = usePathname();
   const currentNavHref = activeNavHref(pathname);
   const { theme, toggle } = useTheme();
-  const [user, setUser] = useState<{ name: string; role?: string } | null>(null);
-
-  useEffect(() => {
-    const token = localStorage.getItem("ofp_token");
-    if (token) {
-      const payload = decodeJwt(token);
-      if (payload?.name) setUser({ name: payload.name, role: payload.role });
-    }
-  }, []);
+  const { user, loading, signingOut, signOut } = useSessionUser();
 
   return (
-    <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 flex-col bg-surface-50 border-r border-border z-40">
-      <div className="h-14 flex items-center justify-between px-5 border-b border-border shrink-0">
+    <aside className="fixed bottom-0 left-0 top-0 z-40 hidden w-64 flex-col border-r border-border bg-surface-50 md:flex">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
         <Link href="/" className="flex items-center gap-2.5 no-underline">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-xs font-black text-white">OF</span>
           <div>
@@ -52,8 +44,8 @@ export function Sidebar() {
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-sm no-underline transition-all duration-150",
                       active
-                        ? "bg-accent text-white font-medium"
-                        : "text-fg-muted hover:text-fg hover:bg-surface-300",
+                        ? "bg-accent font-medium text-white"
+                        : "text-fg-muted hover:bg-surface-300 hover:text-fg",
                     )}
                   >
                     <span className="w-5 text-center text-base">{icon}</span>
@@ -66,34 +58,47 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="p-3 border-t border-border shrink-0">
+      <div className="shrink-0 border-t border-border p-3">
         <button
           onClick={toggle}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-surface-300 transition-all duration-150 cursor-pointer border-none bg-transparent"
+          className="flex w-full cursor-pointer items-center gap-3 rounded-lg border-none bg-transparent px-3 py-2 text-sm text-fg-muted transition-all duration-150 hover:bg-surface-300 hover:text-fg"
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
-          <span className="text-base w-5 text-center">{theme === "dark" ? "☀" : "☾"}</span>
+          <span className="w-5 text-center text-base">{theme === "dark" ? "☀" : "☾"}</span>
           {theme === "dark" ? "Light mode" : "Dark mode"}
         </button>
       </div>
 
-      <div className="p-3 border-t border-border shrink-0">
-        {user ? (
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-medium text-white shrink-0">
-              {user.name.charAt(0).toUpperCase()}
+      <div className="shrink-0 border-t border-border p-3">
+        {loading ? (
+          <div className="px-3 py-2 text-xs text-fg-dim">Loading session…</div>
+        ) : user ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-medium text-white">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-fg-muted">{user.name}</span>
+                <span className="block text-[10px] capitalize text-fg-dim">{user.role || "team member"}</span>
+              </div>
             </div>
-            <div className="min-w-0">
-              <span className="block truncate text-sm text-fg-muted">{user.name}</span>
-              <span className="block text-[10px] capitalize text-fg-dim">{user.role || "team member"}</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              disabled={signingOut}
+              className="flex w-full items-center gap-3 rounded-lg border-none bg-transparent px-3 py-2 text-sm text-fg-muted transition-colors hover:bg-surface-300 hover:text-fg disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="w-5 text-center">↪</span>
+              {signingOut ? "Signing out…" : "Sign out"}
+            </button>
           </div>
         ) : (
           <Link
             href="/login"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-surface-300 transition-all duration-150 no-underline"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg-muted no-underline transition-all duration-150 hover:bg-surface-300 hover:text-fg"
           >
-            <span className="text-base w-5 text-center">↪</span>
+            <span className="w-5 text-center text-base">↪</span>
             Sign in
           </Link>
         )}
