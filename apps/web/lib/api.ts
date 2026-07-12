@@ -14,18 +14,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string>),
   };
-  // ponytail: reads token from localStorage on the client; RSCs don't have
-  // access to it, so they run unauthenticated against the demo seed.
-  // Ceiling: multi-org with real auth per user. Upgrade: switch to
-  // httpOnly cookie set by the login endpoint, or pass the token via a
-  // server-side session cookie.
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("ofp_token");
-    if (token) headers["authorization"] = `Bearer ${token}`;
-  }
 
   const res = await fetch(`${BASE}${path}`, {
     ...init,
+    credentials: init?.credentials ?? "include",
     headers: { "content-type": "application/json", ...headers },
   });
   if (!res.ok) {
@@ -46,6 +38,14 @@ export async function login(email: string, password: string): Promise<LoginResul
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+}
+
+export async function currentUser(): Promise<LoginResult["user"]> {
+  return request("/api/auth/me");
+}
+
+export async function logout(): Promise<void> {
+  await request("/api/auth/logout", { method: "POST" });
 }
 
 type JobDTO = import("@ofp/shared").JobDTO;
@@ -305,10 +305,9 @@ export const api = {
   uploadJobPhoto: async (jobId: string, file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    const token = typeof window !== "undefined" ? localStorage.getItem("ofp_token") : null;
     const res = await fetch(`${BASE}/api/photos/upload/${jobId}`, {
       method: "POST",
-      headers: { ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      credentials: "include",
       body: fd,
     });
     if (!res.ok) {
