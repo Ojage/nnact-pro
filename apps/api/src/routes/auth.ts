@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db, orgs, users } from "@ofp/db";
-import { hashPassword, verifyPassword } from "../auth.js";
+import { hashPassword, verifyPassword, type JwtClaims } from "../auth.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 import { publicRegistrationEnabled } from "../runtime-security.js";
 import { clearSessionCookie, setSessionCookie } from "../session-cookie.js";
@@ -52,8 +52,13 @@ function signUserToken(app: FastifyInstance, user: {
   } as Parameters<typeof app.jwt.sign>[0]);
 }
 
+function publicUser(user: { id: string; name: string; email: string; role: string }) {
+  return { id: user.id, name: user.name, email: user.email, role: user.role };
+}
+
 export async function authRoutes(app: FastifyInstance) {
   app.post("/register", { preHandler: registerRateLimit }, async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
     if (!publicRegistrationEnabled()) {
       return reply.code(403).send({
         error: "public registration is disabled",
@@ -93,12 +98,13 @@ export async function authRoutes(app: FastifyInstance) {
     setSessionCookie(reply, token);
     return reply.code(201).send({
       token,
-      user: { id: result.user.id, name: result.user.name, email: result.user.email, role: result.user.role },
+      user: publicUser(result.user),
       orgId: result.org.id,
     });
   });
 
   app.post("/login", { preHandler: loginRateLimit }, async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
     const parsed = loginBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const email = parsed.data.email.toLowerCase();
@@ -111,20 +117,28 @@ export async function authRoutes(app: FastifyInstance) {
     setSessionCookie(reply, token);
     return {
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: publicUser(user),
       orgId: user.orgId,
     };
   });
 
   app.post("/logout", async (_req, reply) => {
+    reply.header("Cache-Control", "no-store");
     clearSessionCookie(reply);
     return { ok: true };
   });
 
   app.get("/me", async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
     try {
       await req.jwtVerify();
-      return req.user;
+      const claims = req.user as JwtClaims;
+      return publicUser({
+        id: claims.userId,
+        name: claims.name ?? "Team member",
+        email: claims.email ?? "",
+        role: claims.role,
+      });
     } catch {
       return reply.code(401).send({ error: "unauthorized" });
     }
