@@ -58,6 +58,7 @@ export const orgs = pgTable("orgs", {
   publicPhone: text("public_phone"),
   publicAddress: text("public_address"),
   removeOpenFieldProAttribution: boolean("remove_openfieldpro_attribution").default(false).notNull(),
+  businessSettings: jsonb("business_settings").$type<Record<string, unknown>>().default(sql`'{}'::jsonb`).notNull(),
   updatedAt: updatedAt(),
   createdAt: ts(),
 });
@@ -156,8 +157,12 @@ export const estimates = pgTable("estimates", {
   jobId: uuid("job_id")
     .notNull()
     .references(() => jobs.id, { onDelete: "cascade" }),
+  number: text("number").notNull().default("EST-1000"),
   total: integer("total").default(0).notNull(),
   accepted: boolean("accepted").default(false).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  acceptedByName: text("accepted_by_name"),
   version: version(),
   updatedAt: updatedAt(),
   createdAt: ts(),

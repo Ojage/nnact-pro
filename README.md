@@ -111,11 +111,15 @@ pnpm --filter @ofp/mobile typecheck
 
 ## Open-source and sponsorship model
 
+The business model and public voice are governed by `docs/product/BUSINESS_PLAN_AND_VOICE.md`: practical, field-ready, self-hostable, no telemetry, no phone-home licensing, and no artificial limits on the core workflow.
+
 The AGPL core is free to self-host and is never limited by users, technicians, customers, jobs, invoices, locations, or core operational features. Hosted modified versions must follow the obligations in `LICENSE`.
 
 Optional signed entitlements are verified locally without a license server, telemetry, or phone-home. They may represent sponsor recognition, bounded support benefits, or premium first-party plugins; they cannot disable or restrict the core.
 
 A free dashboard may show one clearly labeled, locally configured sponsor placement. OpenFieldPro does not use ad networks, tracking pixels, behavioral targeting, or sponsor access to operational data. See `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
+
+Official sponsorship campaigns, release scheduling, and token inventories are maintained in a separate private operations repository. Only approved public sponsor copy and immutable source identifiers enter official builds; the boundary is documented in `docs/operations/OFFICIAL_DISTRIBUTION_BOUNDARY.md`.
 
 ## Product direction
 

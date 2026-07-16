@@ -4,6 +4,7 @@ import { formatMoney } from "@ofp/shared";
 import { Card } from "@/components/ui/card";
 import { JobStatusBadge } from "@/components/status-badge";
 import { SponsorSlot } from "@/components/sponsor-slot";
+import { EstimateApprovalForm } from "./estimate-approval-form";
 
 export default async function CustomerPortalPage({
   params,
@@ -11,15 +12,36 @@ export default async function CustomerPortalPage({
   params: Promise<{ customerId: string }>;
 }) {
   const { customerId } = await params;
-  const [customer, jobs, invoices] = await Promise.all([
+  const [customer, jobs, invoices, estimates, org] = await Promise.all([
     api.customer(customerId).catch(() => null),
     api.jobs().catch(() => []),
     api.invoices().catch(() => []),
+    api.estimates().catch(() => []),
+    api.org().catch(() => null),
   ]);
 
+  const portalSettings = org?.businessSettings.portal;
+  if (!customer || !org || portalSettings?.enabled === false) {
+    return (
+      <main className="min-h-screen bg-surface-100 px-4 py-16 text-fg">
+        <Card className="mx-auto max-w-xl text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">OpenFieldPro Portal</p>
+          <h1 className="mt-3 text-3xl font-black tracking-tight">This portal link is unavailable</h1>
+          <p className="mt-3 text-sm text-fg-muted">
+            Ask the service company for a new secure portal link. No customer or billing information has been displayed.
+          </p>
+        </Card>
+      </main>
+    );
+  }
   const customerJobs = jobs.filter((job) => job.customerId === customerId);
   const customerJobIds = new Set(customerJobs.map((job) => job.id));
   const customerInvoices = invoices.filter((invoice) => customerJobIds.has(invoice.jobId));
+  const customerEstimates = estimates.filter((estimate) => customerJobIds.has(estimate.jobId));
+  const pendingEstimates = customerEstimates.filter((estimate) => {
+    const active = !estimate.expiresAt || new Date(estimate.expiresAt).getTime() >= Date.now();
+    return !estimate.accepted && active;
+  });
   const openInvoices = customerInvoices.filter((invoice) => invoice.status === "sent" || invoice.status === "draft");
   const paidInvoices = customerInvoices.filter((invoice) => invoice.status === "paid");
 
@@ -42,11 +64,11 @@ export default async function CustomerPortalPage({
             {customer?.name ?? "Customer portal"}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-            This portal surface is ready for estimate approvals, invoice payments, appointment visibility, service-plan status, receipts, and review requests.
+            Review service history, invoices, and estimates shared by your service company.
           </p>
         </div>
 
-        <SponsorSlot surface="customer_portal" sponsorName="Metro Supply Co." message="Local sponsor placement can appear for free-tier portals and be removed by Pro branding." />
+        {portalSettings?.showSponsorSlot ? <SponsorSlot /> : null}
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <Card>
@@ -65,30 +87,32 @@ export default async function CustomerPortalPage({
           </Card>
           <Card>
             <p className="text-xs uppercase tracking-wide text-fg-dim">Service history</p>
-            <p className="mt-2 text-3xl font-black text-fg">{customerJobs.length}</p>
-            <p className="mt-1 text-sm text-fg-muted">jobs connected to this customer</p>
+            <p className="mt-2 text-3xl font-black text-fg">{portalSettings?.allowServiceHistory === false ? "—" : customerJobs.length}</p>
+            <p className="mt-1 text-sm text-fg-muted">{portalSettings?.allowServiceHistory === false ? "hidden by company settings" : "jobs connected to this customer"}</p>
           </Card>
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <h2 className="mb-4 text-base font-semibold text-fg">Recent service</h2>
-            {customerJobs.length === 0 ? (
-              <p className="py-8 text-center text-sm text-fg-muted">No service history available yet.</p>
-            ) : (
-              <div className="grid gap-2">
-                {customerJobs.slice(0, 6).map((job) => (
-                  <div key={job.id} className="flex items-center justify-between rounded-lg bg-surface-200 p-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-fg">{job.title}</p>
-                      <p className="text-xs text-fg-muted">{new Date(job.createdAt).toLocaleDateString()}</p>
+          {portalSettings?.allowServiceHistory === false ? null : (
+            <Card>
+              <h2 className="mb-4 text-base font-semibold text-fg">Recent service</h2>
+              {customerJobs.length === 0 ? (
+                <p className="py-8 text-center text-sm text-fg-muted">No service history available yet.</p>
+              ) : (
+                <div className="grid gap-2">
+                  {customerJobs.slice(0, 6).map((job) => (
+                    <div key={job.id} className="flex items-center justify-between rounded-lg bg-surface-200 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-fg">{job.title}</p>
+                        <p className="text-xs text-fg-muted">{new Date(job.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <JobStatusBadge status={job.status} />
                     </div>
-                    <JobStatusBadge status={job.status} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
 
           <Card>
             <h2 className="mb-4 text-base font-semibold text-fg">Invoices</h2>
@@ -110,15 +134,33 @@ export default async function CustomerPortalPage({
           </Card>
         </div>
 
-        <Card className="mt-6 border-accent/30 bg-accent/5">
-          <h2 className="text-base font-semibold text-fg">Next portal integrations</h2>
-          <div className="mt-3 grid gap-2 text-sm text-fg-muted md:grid-cols-2">
-            <p>✓ Estimate approval surface</p>
-            <p>✓ Invoice payment link surface</p>
-            <p>✓ Service-plan status card</p>
-            <p>✓ Review request flow</p>
-          </div>
-        </Card>
+        {portalSettings?.allowEstimateApproval ? (
+          <Card className="mt-6">
+            <h2 className="mb-4 text-base font-semibold text-fg">Estimates awaiting approval</h2>
+            {pendingEstimates.length === 0 ? (
+              <p className="py-8 text-center text-sm text-fg-muted">No estimates are waiting for approval.</p>
+            ) : (
+              <div className="grid gap-3">
+                {pendingEstimates.map((estimate) => {
+                  const job = customerJobs.find((row) => row.id === estimate.jobId);
+                  return (
+                    <div key={estimate.id} className="grid gap-3 rounded-lg bg-surface-200 p-4 md:grid-cols-[1fr_auto] md:items-center">
+                      <div>
+                        <p className="text-sm font-semibold text-fg">Estimate {estimate.number}</p>
+                        <p className="text-xs text-fg-muted">{job?.title ?? "Service work"} · {formatMoney(estimate.total)}</p>
+                        {estimate.expiresAt ? (
+                          <p className="mt-1 text-xs text-fg-dim">Expires {new Date(estimate.expiresAt).toLocaleDateString()}</p>
+                        ) : null}
+                      </div>
+                      <EstimateApprovalForm estimateId={estimate.id} customerName={customer?.name ?? undefined} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        ) : null}
+
       </div>
     </main>
   );

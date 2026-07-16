@@ -33,6 +33,24 @@ export interface LoginResult {
   user: { id: string; name: string; email: string; role: string };
 }
 
+export function parseSessionUser(value: unknown): LoginResult["user"] {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("id" in value) ||
+    !("name" in value) ||
+    !("email" in value) ||
+    !("role" in value) ||
+    typeof value.id !== "string" ||
+    typeof value.name !== "string" ||
+    typeof value.email !== "string" ||
+    typeof value.role !== "string"
+  ) {
+    throw new Error("Invalid session response");
+  }
+  return value as LoginResult["user"];
+}
+
 export async function login(email: string, password: string): Promise<LoginResult> {
   return request("/api/auth/login", {
     method: "POST",
@@ -41,7 +59,7 @@ export async function login(email: string, password: string): Promise<LoginResul
 }
 
 export async function currentUser(): Promise<LoginResult["user"]> {
-  return request("/api/auth/me");
+  return parseSessionUser(await request<unknown>("/api/auth/me"));
 }
 
 export async function logout(): Promise<void> {
@@ -54,6 +72,7 @@ type ActivityDTO = import("@ofp/shared").ActivityDTO;
 type ReportSummaryDTO = import("@ofp/shared").ReportSummaryDTO;
 type UserDTO = import("@ofp/shared").UserDTO;
 type RecurringJobDTO = import("@ofp/shared").RecurringJobDTO;
+export type BusinessSettingsDTO = import("@ofp/shared").BusinessSettings;
 
 export interface OrgSettingsDTO {
   id: string;
@@ -66,6 +85,7 @@ export interface OrgSettingsDTO {
   publicPhone?: string | null;
   publicAddress?: string | null;
   removeOpenFieldProAttribution: boolean;
+  businessSettings: BusinessSettingsDTO;
   updatedAt?: string;
   createdAt?: string;
 }
@@ -105,8 +125,12 @@ interface Estimate {
   id: string;
   orgId: string;
   jobId: string;
+  number: string;
   total: number;
   accepted: boolean;
+  expiresAt?: string | null;
+  acceptedAt?: string | null;
+  acceptedByName?: string | null;
   createdAt: string;
 }
 
@@ -249,7 +273,7 @@ export const api = {
 
   // ── Organization settings ──
   org: () => request<OrgSettingsDTO>("/api/org/me"),
-  patchOrg: (body: Partial<Pick<OrgSettingsDTO, "name" | "timezone" | "logoUrl" | "brandColor" | "documentFooter" | "publicEmail" | "publicPhone" | "publicAddress" | "removeOpenFieldProAttribution">>) =>
+  patchOrg: (body: Partial<Pick<OrgSettingsDTO, "name" | "timezone" | "logoUrl" | "brandColor" | "documentFooter" | "publicEmail" | "publicPhone" | "publicAddress" | "removeOpenFieldProAttribution" | "businessSettings">>) =>
     request<OrgSettingsDTO>("/api/org/me", { method: "PATCH", body: JSON.stringify(body) }),
 
   jobs: () => request<JobDTO[]>("/api/jobs"),
@@ -296,6 +320,11 @@ export const api = {
   estimate: (id: string) => request<EstimateDetail>(`/api/estimates/${id}`),
   createEstimate: (body: { jobId: string }) =>
     request<Estimate>("/api/estimates", { method: "POST", body: JSON.stringify(body) }),
+  acceptEstimate: (id: string, body?: { customerName?: string }) =>
+    request<Estimate & { jobStatus: string }>(`/api/estimates/${id}/accept`, {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
 
   reviews: () => request<ReviewList>("/api/reviews"),
   patchReview: (id: string, body: { reply?: string }) =>

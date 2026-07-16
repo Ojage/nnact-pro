@@ -10,13 +10,14 @@ A release is ready only when every required gate below is complete and evidence 
 - [ ] Deferred defects have owners and documented impact.
 - [ ] No feature is described as complete when its production dependency is still mocked or optional.
 - [ ] Public copy remains vendor-neutral and makes no unsupported adoption or savings claim.
+- [ ] The product parity gap audit in `docs/release/PRODUCT_PARITY_GAP_AUDIT.md` is resolved or explicitly accepted as a no-go blocker.
 
 ## 2. Source and dependency integrity
 
 ```bash
 pnpm install:verified
 pnpm release:safety
-pnpm audit --prod --audit-level=high
+pnpm audit:dependencies
 ```
 
 - [ ] `pnpm lock:prepare` regenerates the lockfile from committed manifests and matches `pnpm-lock.expected.sha256`.
@@ -30,7 +31,9 @@ pnpm audit --prod --audit-level=high
 ## 3. Automated validation
 
 ```bash
-pnpm --filter @ofp/db generate
+pnpm db:check
+ALLOW_SCHEMA_PUSH=true pnpm db:migrate
+pnpm db:parity
 pnpm --filter @ofp/api build
 pnpm --filter @ofp/api test
 pnpm --filter @ofp/web test:unit
@@ -39,7 +42,8 @@ pnpm --filter @ofp/web test:e2e
 pnpm --filter @ofp/mobile typecheck
 ```
 
-- [ ] Database schema generation passes.
+- [ ] Committed migrations apply to an empty PostgreSQL database without interactive prompts.
+- [ ] Database table, column, and type parity matches the application schema.
 - [ ] API compiles and all tests pass.
 - [ ] Web unit tests pass.
 - [ ] Next.js production build passes.
@@ -53,6 +57,7 @@ pnpm --filter @ofp/mobile typecheck
 
 Test with a clean organization and realistic non-production data:
 
+- [ ] Configure company profile, business hours, service area, invoice defaults, estimate defaults, payment options, tax/discount settings, messages, numbering, and portal settings.
 - [ ] Create a new customer during job intake.
 - [ ] Create a job for an existing customer.
 - [ ] Create both scheduled and unscheduled work.
@@ -64,12 +69,13 @@ Test with a clean organization and realistic non-production data:
 - [ ] Confirm a zero-dollar job cannot be invoiced.
 - [ ] Confirm concurrent requests cannot create duplicate active invoices or duplicate invoice numbers.
 - [ ] Create an invoice from the closeout queue.
-- [ ] Send or mark the invoice according to the configured workflow.
+- [ ] Send or mark the invoice according to the configured invoice settings.
 - [ ] Record a partial payment.
 - [ ] Confirm checkout charges only the remaining balance.
 - [ ] Record the final payment and confirm paid status.
 - [ ] Confirm duplicate webhook delivery is idempotent.
 - [ ] Verify activity history, reporting, search, and mobile sync reflect the same state.
+- [ ] Verify customer-facing invoice and estimate previews obey the configured visibility, terms, message, numbering, payment, tax, and branding settings.
 
 ## 5. Authentication and authorization
 
@@ -178,6 +184,8 @@ See `docs/security/KEY_MANAGEMENT.md`.
 
 ## 13. Sponsorship and public claims
 
+- [ ] Product parity gaps are not being hidden by sponsor/revenue language.
+- [ ] Sponsor outreach is paused if `docs/release/PRODUCT_PARITY_GAP_AUDIT.md` still marks the product as release-blocked.
 - [ ] Sponsor profile statements are factual.
 - [ ] Adoption metrics are measured or explicitly labeled estimates.
 - [ ] Sponsorship benefits do not sell merge approval, undisclosed control, customer data, or security access.

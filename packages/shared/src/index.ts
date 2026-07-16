@@ -1,5 +1,6 @@
 export * from "./sponsors.js";
 export * from "./documents.js";
+export * from "./business-settings.js";
 
 // Shared domain enums + DTO types used by api, web, and mobile.
 
@@ -40,6 +41,7 @@ export interface JobDTO {
   id: string;
   customerId: string;
   title: string;
+  description?: string | null;
   status: JobStatus;
   scheduledAt?: string | null;
   assignedTo?: string | null;

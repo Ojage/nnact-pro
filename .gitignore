@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .next/
+apps/web/artifacts/
+apps/web/playwright-report/
+apps/web/test-results/
 .expo/
 *.tsbuildinfo
 .env
@@ -9,6 +12,8 @@ dist/
 .secrets/
 *.private.pem
 *.ofp-license
+.env.official
+official-release-manifest.json
 drizzle/meta/_journal.json.bak
 .DS_Store
 backups/
