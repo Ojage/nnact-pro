@@ -10,15 +10,38 @@ class ApiError extends Error {
   }
 }
 
+export interface DownloadedDocument {
+  blob: Blob;
+  filename: string;
+}
+
+/** Fetches a PDF as a blob and keeps the server-provided download filename. */
+async function downloadDocument(path: string): Promise<DownloadedDocument> {
+  const res = await fetch(`${BASE}${path}`, { credentials: "include" });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ApiError(res.status, body);
+  }
+  const disposition = res.headers.get("content-disposition") ?? "";
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  return { blob: await res.blob(), filename: match?.[1] ?? "document.pdf" };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string>),
   };
 
+  if (
+    init?.body
+    && !(typeof FormData !== "undefined" && init.body instanceof FormData)
+  ) {
+    headers["content-type"] = "application/json";
+  }
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     credentials: init?.credentials ?? "include",
-    headers: { "content-type": "application/json", ...headers },
+    headers,
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -121,7 +144,26 @@ interface Invoice {
   createdAt?: string;
 }
 
-interface Estimate {
+export interface EstimateOptionLineItem {
+  id: string;
+  optionId: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  unitCost: number;
+  createdAt: string;
+}
+
+export interface EstimateOption {
+  id: string;
+  estimateId: string;
+  label: string;
+  position: number;
+  total: number;
+  lineItems: EstimateOptionLineItem[];
+}
+
+export interface Estimate {
   id: string;
   orgId: string;
   jobId: string;
@@ -131,6 +173,12 @@ interface Estimate {
   expiresAt?: string | null;
   acceptedAt?: string | null;
   acceptedByName?: string | null;
+  status: "draft" | "sent" | "approved" | "declined" | "expired";
+  selectedOptionId?: string | null;
+  signatureName?: string | null;
+  sentAt?: string | null;
+  declinedAt?: string | null;
+  copiedToJobAt?: string | null;
   createdAt: string;
 }
 
@@ -146,6 +194,14 @@ interface LineItem {
 
 interface EstimateDetail extends Estimate {
   lineItems: LineItem[];
+  options: EstimateOption[];
+  deposit?: {
+    requiredCents: number;
+    collectedCents: number;
+    remainingCents: number;
+    collected: boolean;
+    invoice: { id: string; number: string; status: string } | null;
+  };
 }
 
 interface Review {
@@ -185,8 +241,19 @@ interface Payment {
   paidAt: string;
 }
 
-interface InvoiceDetail extends Invoice {
-  lineItems: LineItem[];
+export interface InvoiceLineItem {
+  id: string;
+  invoiceId: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  unitCost: number;
+  position: number;
+  createdAt: string;
+}
+
+export interface InvoiceDetail extends Invoice {
+  lineItems: InvoiceLineItem[];
   payments: Payment[];
 }
 
@@ -263,6 +330,86 @@ interface PluginEvent {
   createdAt: string;
 }
 
+export type PortalLinkScope = import("@ofp/shared").PortalLinkScope;
+
+export interface PortalLinkDTO {
+  id: string;
+  customerId: string;
+  tokenPrefix: string;
+  scopes: PortalLinkScope[];
+  expiresAt: string | null;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+  sentCount: number;
+  lastSentAt: string | null;
+  createdAt: string;
+}
+
+export interface MessageLogDTO {
+  id: string;
+  kind: "invoice" | "estimate";
+  documentId: string;
+  customerId: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  status: "pending" | "sent" | "failed";
+  attempts: number;
+  messageId: string | null;
+  error: string | null;
+  sentAt: string | null;
+  lastAttemptAt: string | null;
+  createdAt: string;
+}
+
+export interface EmailPreviewDTO {
+  to: string;
+  recipientName: string;
+  subject: string;
+  body: string;
+}
+
+export interface EmailAttachmentInfo {
+  filename: string;
+  sizeBytes: number;
+}
+
+export interface PortalSessionDTO {
+  org: {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+    publicEmail?: string | null;
+    publicPhone?: string | null;
+    publicAddress?: string | null;
+    sponsorEnabled?: boolean;
+  };
+  customer: { name: string; email?: string | null; phone?: string | null };
+  views: PortalLinkScope[];
+  balance: {
+    invoices: Array<{ id: string; number: string; total: number; paid: number; remaining: number; dueAt: string | null }>;
+    totalRemaining: number;
+    paymentInstructions: string;
+  };
+  checkout: { available: boolean; totalRemaining: number };
+  receipts: Array<{
+    id: string;
+    number: string;
+    total: number;
+    paidAt: string | null;
+    payments: Array<{ amount: number; method: string; paidAt: string }>;
+  }>;
+  servicePlans: Array<{
+    id: string;
+    planName: string;
+    status: string;
+    visitsIncluded: number;
+    visitsCompleted: number;
+    renewsAt: string | null;
+    nextVisit: { title: string; dueAt: string | null; status: string } | null;
+  }>;
+}
+
 export const api = {
   health: () => request<{ ok: boolean }>("/api/health"),
 
@@ -275,6 +422,12 @@ export const api = {
   org: () => request<OrgSettingsDTO>("/api/org/me"),
   patchOrg: (body: Partial<Pick<OrgSettingsDTO, "name" | "timezone" | "logoUrl" | "brandColor" | "documentFooter" | "publicEmail" | "publicPhone" | "publicAddress" | "removeOpenFieldProAttribution" | "businessSettings">>) =>
     request<OrgSettingsDTO>("/api/org/me", { method: "PATCH", body: JSON.stringify(body) }),
+  uploadOrgLogo: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<OrgSettingsDTO>("/api/org/logo", { method: "POST", body });
+  },
+  deleteOrgLogo: () => request<OrgSettingsDTO>("/api/org/logo", { method: "DELETE" }),
 
   jobs: () => request<JobDTO[]>("/api/jobs"),
   job: (id: string) => request<JobDTO>(`/api/jobs/${id}`),
@@ -309,17 +462,64 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
+  addInvoiceLine: (id: string, body: { description: string; quantity: number; unitPrice: number; unitCost?: number }) =>
+    request<{ lineItem: InvoiceLineItem; total: number }>(`/api/invoices/${id}/lines`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateInvoiceLine: (id: string, lineId: string, body: Partial<{ description: string; quantity: number; unitPrice: number; unitCost: number }>) =>
+    request<{ lineItem: InvoiceLineItem; total: number }>(`/api/invoices/${id}/lines/${lineId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteInvoiceLine: (id: string, lineId: string) =>
+    request<{ ok: boolean; total: number }>(`/api/invoices/${id}/lines/${lineId}`, { method: "DELETE" }),
   recordPayment: (id: string, body: { amount: number; method?: string }) =>
     request<{ status: string; remaining: number; overpaid: number }>(`/api/invoices/${id}/pay`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  // ── Email send workflow ──
+  invoiceEmailPreview: (id: string) => request<EmailPreviewDTO>(`/api/invoices/${id}/email-preview`),
+  invoiceSendEmail: (id: string) =>
+    request<{ log: MessageLogDTO; draft: EmailPreviewDTO; attachment: EmailAttachmentInfo }>(`/api/invoices/${id}/email`, { method: "POST" }),
+  estimateEmailPreview: (id: string) => request<EmailPreviewDTO>(`/api/estimates/${id}/email-preview`),
+  estimateSendEmail: (id: string) =>
+    request<{ log: MessageLogDTO; draft: EmailPreviewDTO; attachment: EmailAttachmentInfo }>(`/api/estimates/${id}/email`, { method: "POST" }),
+
+  // ── Durable documents (PDF) ──
+  invoicePdf: (id: string) => downloadDocument(`/api/invoices/${id}/document`),
+  estimatePdf: (id: string) => downloadDocument(`/api/estimates/${id}/document`),
+  messageLogs: (query: { kind?: "invoice" | "estimate"; documentId?: string }) => {
+    const params = new URLSearchParams();
+    if (query.kind) params.set("kind", query.kind);
+    if (query.documentId) params.set("documentId", query.documentId);
+    const qs = params.toString();
+    return request<MessageLogDTO[]>(`/api/messages${qs ? `?${qs}` : ""}`);
+  },
+  retryMessage: (id: string) =>
+    request<MessageLogDTO>(`/api/messages/${id}/retry`, { method: "POST" }),
+
   reports: () => request<ReportSummaryDTO>("/api/reports/summary"),
 
   estimates: () => request<Estimate[]>("/api/estimates"),
   estimate: (id: string) => request<EstimateDetail>(`/api/estimates/${id}`),
   createEstimate: (body: { jobId: string }) =>
-    request<Estimate>("/api/estimates", { method: "POST", body: JSON.stringify(body) }),
+    request<EstimateDetail>("/api/estimates", { method: "POST", body: JSON.stringify(body) }),
+  renameEstimateOption: (estimateId: string, optionId: string, label: string) =>
+    request<EstimateOption>(`/api/estimates/${estimateId}/options/${optionId}`, { method: "PATCH", body: JSON.stringify({ label }) }),
+  addEstimateOptionLine: (estimateId: string, optionId: string, body: { description: string; quantity: number; unitPrice: number; unitCost?: number }) =>
+    request<{ lineItem: EstimateOptionLineItem; total: number }>(`/api/estimates/${estimateId}/options/${optionId}/lines`, { method: "POST", body: JSON.stringify(body) }),
+  patchEstimateOptionLine: (estimateId: string, optionId: string, lineId: string, body: Partial<{ description: string; quantity: number; unitPrice: number; unitCost: number }>) =>
+    request<{ lineItem: EstimateOptionLineItem; total: number }>(`/api/estimates/${estimateId}/options/${optionId}/lines/${lineId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteEstimateOptionLine: (estimateId: string, optionId: string, lineId: string) =>
+    request<{ ok: boolean; total: number }>(`/api/estimates/${estimateId}/options/${optionId}/lines/${lineId}`, { method: "DELETE" }),
+  markEstimateSent: (id: string) => request<Estimate>(`/api/estimates/${id}/send`, { method: "POST" }),
+  approveEstimateOption: (id: string, body: { optionId: string; signatureName?: string }) =>
+    request<Estimate>(`/api/estimates/${id}/approve`, { method: "POST", body: JSON.stringify(body) }),
+  declineEstimate: (id: string) => request<Estimate>(`/api/estimates/${id}/decline`, { method: "POST" }),
+  copyApprovedEstimateToJob: (id: string) => request<{ ok: boolean; total: number; alreadyCopied: boolean }>(`/api/estimates/${id}/copy-approved-to-job`, { method: "POST" }),
   acceptEstimate: (id: string, body?: { customerName?: string }) =>
     request<Estimate & { jobStatus: string }>(`/api/estimates/${id}/accept`, {
       method: "POST",
@@ -351,7 +551,8 @@ export const api = {
   users: () => request<UserDTO[]>("/api/users"),
   recurring: () => request<RecurringJobDTO[]>("/api/recurring"),
 
-  patchUser: (id: string, body: { role?: string }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  me: () => request<{ id: string; name: string; email: string; role: string }>("/api/auth/me"),
+  patchUser: (id: string, body: { role?: string; active?: boolean }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteUser: (id: string) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
 
   notifications: () => request<NotificationDTO[]>("/api/notifications"),
@@ -409,4 +610,24 @@ export const api = {
     request<CatalogItemDTO>(`/api/catalog/items/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteCatalogItem: (id: string) =>
     request<void>(`/api/catalog/items/${id}`, { method: "DELETE" }),
+
+  // ── Customer portal links (owner management) ──
+  portalLinks: (customerId: string) => request<PortalLinkDTO[]>(`/api/portal/links?customerId=${customerId}`),
+  createPortalLink: (body: { customerId: string; scopes: PortalLinkScope[]; expiresInDays?: number | null }) =>
+    request<{ link: PortalLinkDTO; token: string; ttlDays: number }>("/api/portal/links", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  revokePortalLink: (id: string) =>
+    request<{ ok: boolean }>(`/api/portal/links/${id}/revoke`, { method: "POST" }),
+  sendPortalLink: (id: string) =>
+    request<{ ok: boolean; to: string; messageId: string; sentAt: string }>(`/api/portal/links/${id}/send`, { method: "POST" }),
+
+  // ── Customer portal (anonymous, bearer token in path) ──
+  portalSession: (token: string) => request<PortalSessionDTO>(`/api/portal/${token}`),
+  portalCheckout: (token: string, invoiceId: string) =>
+    request<{ url: string }>(`/api/portal/${token}/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ invoiceId }),
+    }),
 };

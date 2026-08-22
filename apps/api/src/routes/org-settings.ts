@@ -1,9 +1,16 @@
 import type { FastifyInstance } from "fastify";
+import multipart from "@fastify/multipart";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, orgs } from "@ofp/db";
-import { DEFAULT_BUSINESS_SETTINGS, mergeBusinessSettings } from "@ofp/shared";
+import {
+  DEFAULT_BUSINESS_SETTINGS,
+  mergeBusinessSettings,
+  validateMessageTemplate,
+  type MessageTemplateKind,
+} from "@ofp/shared";
 import { resolveOrgId } from "./org.js";
+import { deleteOrgLogo, saveOrgLogo } from "../uploads.js";
 
 const time = z.string().regex(/^\d{2}:\d{2}$/);
 const documentFormat = z.enum(["email", "envelope"]);
@@ -84,7 +91,33 @@ export const businessSettingsSchema = z.object({
     estimateEmailSubject: z.string().trim().min(1).max(160),
     estimateEmailBody: z.string().trim().min(1).max(2000),
     reviewRequestBody: z.string().trim().min(1).max(1000),
-  }).default(DEFAULT_BUSINESS_SETTINGS.messages),
+    portalLinkSubject: z.string().trim().min(1).max(160),
+    portalLinkBody: z.string().trim().min(1).max(2000),
+  })
+    .default(DEFAULT_BUSINESS_SETTINGS.messages)
+    .superRefine((messages, ctx) => {
+      // Templates may only reference variables defined for their kind — a
+      // typo like {{costumerName}} is a hard save error, not a silent empty.
+      const fields: Array<[keyof typeof messages, MessageTemplateKind]> = [
+        ["invoiceEmailSubject", "invoice"],
+        ["invoiceEmailBody", "invoice"],
+        ["estimateEmailSubject", "estimate"],
+        ["estimateEmailBody", "estimate"],
+        ["portalLinkSubject", "portal_link"],
+        ["portalLinkBody", "portal_link"],
+        ["reviewRequestBody", "review_request"],
+      ];
+      for (const [field, kind] of fields) {
+        const validation = validateMessageTemplate(messages[field], kind);
+        if (validation.unknown.length > 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [field],
+            message: `unknown variable(s): ${validation.unknown.join(", ")}`,
+          });
+        }
+      }
+    }),
   numbering: z.object({
     invoicePrefix: z.string().trim().min(1).max(12).regex(/^[A-Za-z0-9-]+$/),
     invoiceNextNumber: z.number().int().min(1).max(999_999_999),
@@ -114,6 +147,8 @@ const patchBody = z.object({
 });
 
 export async function orgSettingsRoutes(app: FastifyInstance) {
+  await app.register(multipart, { limits: { files: 1, fileSize: 2 * 1024 * 1024, fields: 0 } });
+
   app.get("/me", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const [row] = await db.select().from(orgs).where(eq(orgs.id, orgId));
@@ -135,6 +170,37 @@ export async function orgSettingsRoutes(app: FastifyInstance) {
       })
       .where(eq(orgs.id, orgId))
       .returning();
+    if (!row) return reply.code(404).send({ error: "organization not found" });
+    return { ...row, businessSettings: mergeBusinessSettings(row.businessSettings) };
+  });
+
+  app.post("/logo", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    try {
+      const file = await req.file();
+      if (!file) return reply.code(400).send({ error: "no logo uploaded" });
+      await saveOrgLogo(orgId, { stream: file.file, filenameHint: file.filename ?? null });
+      const publicApiOrigin = (process.env.PUBLIC_API_URL ?? `${req.protocol}://${req.hostname}`).replace(/\/$/, "");
+      const logoUrl = `${publicApiOrigin}/api/public/${orgId}/logo?v=${Date.now()}`;
+      const [row] = await db.update(orgs).set({ logoUrl, updatedAt: new Date() }).where(eq(orgs.id, orgId)).returning();
+      if (!row) {
+        await deleteOrgLogo(orgId);
+        return reply.code(404).send({ error: "organization not found" });
+      }
+      return reply.code(201).send({ ...row, businessSettings: mergeBusinessSettings(row.businessSettings) });
+    } catch (error) {
+      const uploadError = error as { statusCode?: number; code?: string; message?: string } | null;
+      if (uploadError?.statusCode) return reply.code(uploadError.statusCode).send({ error: uploadError.message ?? "logo upload failed" });
+      if (uploadError?.code?.includes("TOO_LARGE")) return reply.code(413).send({ error: "logo exceeds the 2 MB size limit" });
+      req.log.error({ err: error }, "organization logo upload failed");
+      return reply.code(500).send({ error: "internal error" });
+    }
+  });
+
+  app.delete("/logo", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    await deleteOrgLogo(orgId);
+    const [row] = await db.update(orgs).set({ logoUrl: null, updatedAt: new Date() }).where(eq(orgs.id, orgId)).returning();
     if (!row) return reply.code(404).send({ error: "organization not found" });
     return { ...row, businessSettings: mergeBusinessSettings(row.businessSettings) };
   });

@@ -21,7 +21,16 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
+
+// drizzle 0.45 does not ship a bytea column type; define one mapping Buffer.
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+  toDriver: (value: Buffer) => value,
+  fromDriver: (value: Buffer) => value,
+});
+import type { PortalLinkScope } from "@ofp/shared";
 
 export const jobStatus = pgEnum("job_status", [
   "lead",
@@ -35,6 +44,13 @@ export const invoiceStatus = pgEnum("invoice_status", [
   "sent",
   "paid",
   "void",
+]);
+export const estimateStatus = pgEnum("estimate_status", [
+  "draft",
+  "sent",
+  "approved",
+  "declined",
+  "expired",
 ]);
 export const userRole = pgEnum("user_role", ["owner", "dispatcher", "technician"]);
 
@@ -163,10 +179,56 @@ export const estimates = pgTable("estimates", {
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   acceptedByName: text("accepted_by_name"),
+  status: estimateStatus("status").default("draft").notNull(),
+  selectedOptionId: uuid("selected_option_id"),
+  signatureName: text("signature_name"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  declinedAt: timestamp("declined_at", { withTimezone: true }),
+  copiedToJobAt: timestamp("copied_to_job_at", { withTimezone: true }),
+  depositCents: integer("deposit_cents").default(0).notNull(),
+  depositInvoiceId: uuid("deposit_invoice_id").references(() => invoices.id, { onDelete: "set null" }),
   version: version(),
   updatedAt: updatedAt(),
   createdAt: ts(),
 });
+
+export const estimateOptions = pgTable(
+  "estimate_options",
+  {
+    id: id(),
+    orgId: orgId(),
+    estimateId: uuid("estimate_id")
+      .notNull()
+      .references(() => estimates.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    position: integer("position").default(0).notNull(),
+    total: integer("total").default(0).notNull(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    estimatePosition: uniqueIndex("estimate_options_position_idx").on(t.estimateId, t.position),
+    orgEstimate: index("estimate_options_org_estimate_idx").on(t.orgId, t.estimateId),
+  }),
+);
+
+export const estimateOptionLineItems = pgTable(
+  "estimate_option_line_items",
+  {
+    id: id(),
+    orgId: orgId(),
+    optionId: uuid("option_id")
+      .notNull()
+      .references(() => estimateOptions.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    quantity: integer("quantity").default(1).notNull(),
+    unitPrice: integer("unit_price").default(0).notNull(),
+    unitCost: integer("unit_cost").default(0).notNull(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({ orgOption: index("estimate_option_lines_org_option_idx").on(t.orgId, t.optionId) }),
+);
 
 export const invoices = pgTable(
   "invoices",
@@ -185,6 +247,25 @@ export const invoices = pgTable(
     createdAt: ts(),
   },
   (t) => ({ orgStatus: index("invoices_org_status_idx").on(t.orgId, t.status) }),
+);
+
+export const invoiceLineItems = pgTable(
+  "invoice_line_items",
+  {
+    id: id(),
+    orgId: orgId(),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    quantity: integer("quantity").default(1).notNull(),
+    unitPrice: integer("unit_price").default(0).notNull(),
+    unitCost: integer("unit_cost").default(0).notNull(),
+    position: integer("position").default(0).notNull(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({ orgInvoice: index("invoice_line_items_org_invoice_idx").on(t.orgId, t.invoiceId) }),
 );
 
 export const payments = pgTable("payments", {
@@ -432,5 +513,81 @@ export const pluginEvents = pgTable(
   (t) => ({
     install: index("plugin_events_install_idx").on(t.installId, t.createdAt),
     retry: index("plugin_events_retry_idx").on(t.status, t.nextAttemptAt),
+  }),
+);
+
+export const portalLinks = pgTable(
+  "portal_links",
+  {
+    id: id(),
+    orgId: orgId(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    tokenPrefix: text("token_prefix").notNull(),
+    tokenCipher: text("token_cipher"),
+    scopes: jsonb("scopes").$type<PortalLinkScope[]>().default(sql`'[]'::jsonb`).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    sentCount: integer("sent_count").default(0).notNull(),
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+    createdAt: ts(),
+  },
+  (t) => ({
+    tokenHash: uniqueIndex("portal_links_hash_idx").on(t.tokenHash),
+    orgCustomer: index("portal_links_org_customer_idx").on(t.orgId, t.customerId),
+  }),
+);
+
+export const messageLogs = pgTable(
+  "message_logs",
+  {
+    id: id(),
+    orgId: orgId(),
+    kind: text("kind").notNull(),
+    documentId: uuid("document_id").notNull(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    recipient: text("recipient").notNull(),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    status: text("status").default("pending").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    messageId: text("message_id"),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    version: version(),
+    updatedAt: updatedAt(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgDocument: index("message_logs_org_document_idx").on(t.orgId, t.kind, t.documentId),
+  }),
+);
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: id(),
+    orgId: orgId(),
+    kind: text("kind").notNull(),
+    documentId: uuid("document_id").notNull(),
+    filename: text("filename").notNull(),
+    mime: text("mime").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: text("sha256").notNull(),
+    // Generated server-side and immutable once stored, so the bytea lives in
+    // the database and is covered by database backups.
+    data: bytea("data").notNull(),
+    version: version(),
+    updatedAt: updatedAt(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgDocument: uniqueIndex("documents_org_kind_document_idx").on(t.orgId, t.kind, t.documentId),
   }),
 );
