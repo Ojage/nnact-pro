@@ -5,6 +5,8 @@ export interface NavLink {
   href: string;
   label: string;
   icon: string;
+  /** [data-tour] id for the guided-walkthrough engine (see shared walkthroughs). */
+  tour?: string;
 }
 
 export interface NavSection {
@@ -17,21 +19,21 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Field",
     links: [
       { href: "/", label: "Today", icon: "◈" },
-      { href: "/jobs/new", label: "New Job", icon: "＋" },
-      { href: "/jobs", label: "Jobs", icon: "⊞" },
+      { href: "/jobs/new", label: "New Job", icon: "＋", tour: "jobs-add" },
+      { href: "/jobs", label: "Jobs", icon: "⊞", tour: "nav-jobs" },
       { href: "/diagnostics", label: "Diagnostics", icon: "⌁" },
     ],
   },
   {
     label: "Operations",
     links: [
-      { href: "/dispatch", label: "Dispatch Board", icon: "⇄" },
+      { href: "/dispatch", label: "Dispatch Board", icon: "⇄", tour: "nav-dispatch" },
       { href: "/schedule", label: "Schedule", icon: "◐" },
       { href: "/closeout", label: "Job Closeout", icon: "✓" },
       { href: "/pipeline", label: "Pipeline", icon: "⊟" },
-      { href: "/customers", label: "Customers & Equipment", icon: "⊕" },
+      { href: "/customers", label: "Customers & Equipment", icon: "⊕", tour: "nav-customers" },
       { href: "/estimates", label: "Estimates", icon: "◷" },
-      { href: "/invoices", label: "Invoices & Payments", icon: "◎" },
+      { href: "/invoices", label: "Invoices & Payments", icon: "◎", tour: "nav-invoices" },
       { href: "/service-plans", label: "Service Plans", icon: "◌" },
       { href: "/documents", label: "Documents", icon: "▤" },
       { href: "/price-book", label: "Price Book", icon: "⊡" },
@@ -40,7 +42,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Quality",
     links: [
-      { href: "/repair-brain", label: "Repair Brain", icon: "◉" },
+      { href: "/repair-brain", label: "Repair Brain", icon: "◉", tour: "nav-repair-brain" },
       { href: "/diagnostic-library", label: "Diagnostic Library", icon: "⌘" },
       { href: "/coverage", label: "Coverage & Quality", icon: "◇" },
       { href: "/reviews", label: "Reviews", icon: "★" },
@@ -58,7 +60,8 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export const NAV_LINKS: NavLink[] = NAV_SECTIONS.flatMap((section) => section.links);
 
-export function activeNavHref(pathname: string): string | null {
+export function activeNavHref(pathname: string | null | undefined): string | null {
+  if (!pathname) return null;
   const matches = NAV_LINKS.filter(({ href }) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`),
   );

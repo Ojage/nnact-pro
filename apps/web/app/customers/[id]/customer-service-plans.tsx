@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
 import { formatMoney, type CustomerServicePlanDTO, type ServicePlanDTO, type ServicePlanVisitDTO } from "@nnact/shared";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -150,17 +151,15 @@ export function CustomerServicePlans({ customerId }: { customerId: string }) {
             )}
 
             <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-300 p-4 sm:flex-row sm:items-center">
-              <select
+              <FormSelect
                 value={selectedPlanId}
-                onChange={(event) => setSelectedPlanId(event.target.value)}
-                className="h-10 flex-1 rounded-lg border border-border bg-surface-200 px-3 text-sm text-fg"
-              >
-                {plans.length === 0 ? (
-                  <option value="">Create a plan first</option>
-                ) : (
-                  plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)
-                )}
-              </select>
+                onChange={setSelectedPlanId}
+                className="flex-1"
+                allowEmpty={plans.length === 0}
+                placeholder="Create a plan first"
+                emptyLabel="Create a plan first"
+                options={plans.map((plan) => ({ value: plan.id, label: plan.name }))}
+              />
               <Button size="sm" disabled={!selectedPlanId || enrolling} onClick={enroll}>
                 {enrolling ? "Enrolling..." : "Enroll customer"}
               </Button>

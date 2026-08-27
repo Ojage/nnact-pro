@@ -4,7 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { diagnosticsApi, type DiagnosticOutput } from "@/lib/diagnostics-api";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
+import { ADVANCE_TAG } from "@nnact/shared";
 
 export function CompletionPanel({
   sessionId,
@@ -41,6 +45,7 @@ export function CompletionPanel({
       });
       setOutput(generated);
       setMessage("Diagnostic disposition saved and the technician/customer handoff was generated.");
+      emitWalkthroughDone(ADVANCE_TAG.diagnosisRecorded);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -63,7 +68,7 @@ export function CompletionPanel({
   }
 
   return (
-    <Card className="mt-6 border-accent/25">
+    <Card className="mt-6 border-accent/25" data-tour="diag-outcome">
       <CardHeader>
         <CardTitle>Complete the diagnostic handoff</CardTitle>
         <p className="mt-1 text-sm text-fg-muted">
@@ -73,19 +78,19 @@ export function CompletionPanel({
       <CardContent>
         <form onSubmit={complete} className="grid gap-5 xl:grid-cols-[.75fr_1.25fr]">
           <div className="space-y-4">
-            <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Disposition state</span>
-              <select
+            <div>
+              <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Disposition state</Label>
+              <FormSelect
                 value={status}
-                onChange={(event) => setStatus(event.target.value as typeof status)}
-                className="w-full rounded-lg border border-border bg-surface-200 px-3 py-2.5 text-sm text-fg"
-              >
-                <option value="diagnosed">Diagnosed</option>
-                <option value="inconclusive">Inconclusive</option>
-                <option value="escalated">Escalated</option>
-                <option value="completed">Completed</option>
-              </select>
-            </label>
+                onChange={(value) => setStatus(value as typeof status)}
+                options={[
+                  { value: "diagnosed", label: "Diagnosed" },
+                  { value: "inconclusive", label: "Inconclusive" },
+                  { value: "escalated", label: "Escalated" },
+                  { value: "completed", label: "Completed" },
+                ]}
+              />
+            </div>
 
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Repair or escalation recommendation</span>

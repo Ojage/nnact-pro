@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
 import { useSessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
+import { requestLearn } from "@/lib/walkthroughs/events";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -29,12 +31,13 @@ export function Sidebar() {
               {section.label}
             </p>
             <div className="flex flex-col gap-1">
-              {section.links.map(({ href, label, icon }) => {
+              {section.links.map(({ href, label, icon, tour }) => {
                 const active = currentNavHref === href;
                 return (
                   <Link
                     key={href}
                     href={href}
+                    data-tour={tour}
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-sm no-underline transition-all duration-150",
@@ -54,14 +57,29 @@ export function Sidebar() {
       </nav>
 
       <div className="shrink-0 border-t border-border p-3">
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={requestLearn}
+          className="h-auto w-full justify-start gap-3 px-3 py-2 text-sm text-fg-muted hover:text-fg"
+          aria-label="Open the Learn NNACT walkthrough catalog"
+        >
+          <span aria-hidden="true" className="w-5 text-center text-base">🎓</span>
+          Learn NNACT
+        </Button>
+      </div>
+
+      <div className="shrink-0 border-t border-border p-3">
+        <Button
+          type="button"
+          variant="ghost"
           onClick={toggle}
-          className="flex w-full cursor-pointer items-center gap-3 rounded-lg border-none bg-transparent px-3 py-2 text-sm text-fg-muted transition-all duration-150 hover:bg-surface-300 hover:text-fg"
+          className="h-auto w-full justify-start gap-3 px-3 py-2 text-sm text-fg-muted hover:text-fg"
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
           <span className="w-5 text-center text-base">{theme === "dark" ? "☀" : "☾"}</span>
           {theme === "dark" ? "Light mode" : "Dark mode"}
-        </button>
+        </Button>
       </div>
 
       <div className="shrink-0 border-t border-border p-3">
@@ -78,15 +96,16 @@ export function Sidebar() {
                 <span className="block text-[10px] capitalize text-fg-dim">{user.role || "team member"}</span>
               </div>
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => void signOut()}
               disabled={signingOut}
-              className="flex w-full items-center gap-3 rounded-lg border-none bg-transparent px-3 py-2 text-sm text-fg-muted transition-colors hover:bg-surface-300 hover:text-fg disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-auto w-full justify-start gap-3 px-3 py-2 text-sm text-fg-muted hover:text-fg"
             >
               <span className="w-5 text-center">↪</span>
               {signingOut ? "Signing out…" : "Sign out"}
-            </button>
+            </Button>
           </div>
         ) : (
           <Link

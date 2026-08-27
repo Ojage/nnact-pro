@@ -10,7 +10,8 @@
     "schema:parity": "tsx src/check-schema-parity.ts",
     "migrate": "tsx src/migrate.ts",
     "push": "drizzle-kit push",
-    "seed": "tsx src/seed.ts"
+    "seed": "tsx src/seed.ts",
+    "seed:nnact": "tsx src/seed-nnact.ts"
   },
   "dependencies": {
     "@nnact/shared": "workspace:*",

@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { JobStatusBadge, InvoiceStatusBadge } from "@/components/status-badge";
+import { ADVANCE_TAG } from "@nnact/shared";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 
 interface InvoiceRow {
   id: string;
@@ -88,6 +90,8 @@ export default function CloseoutPage() {
     setBusy({ jobId: job.id, action: status === "in_progress" ? "start" : "complete" });
     try {
       const updated = await api.patchJob(job.id, { status });
+      if (status === "in_progress") emitWalkthroughDone(ADVANCE_TAG.visitStarted);
+      if (status === "completed") emitWalkthroughDone(ADVANCE_TAG.visitCompleted);
       setJobs((rows) => rows.map((row) => (row.id === job.id ? updated : row)));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));

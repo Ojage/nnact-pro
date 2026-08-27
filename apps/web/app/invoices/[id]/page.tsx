@@ -11,9 +11,13 @@ import { PageHeader } from "@/components/page-header";
 import { InvoiceStatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageSendDialog } from "@/components/message-send-dialog";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
+import { ADVANCE_TAG } from "@nnact/shared";
 
 interface Payment {
   id: string;
@@ -165,6 +169,7 @@ export default function InvoiceDetailPage() {
       const result = await api.updateInvoiceStatus(invoice.id, status);
       setInvoice((prev) => prev ? { ...prev, status: result.status as InvoiceDetail["status"] } : prev);
       setConfirmAction(null);
+      if (status === "sent") emitWalkthroughDone(ADVANCE_TAG.invoiceSent);
     } catch (e) {
       setActionError(String(e));
     } finally {
@@ -184,6 +189,7 @@ export default function InvoiceDetailPage() {
       const refreshed = await api.invoice(invoiceId);
       setInvoice(refreshed);
       setConfirmAction(null);
+      emitWalkthroughDone(ADVANCE_TAG.paymentRecorded);
     } catch (e) {
       setActionError(String(e));
     } finally {
@@ -219,6 +225,7 @@ export default function InvoiceDetailPage() {
       setInvoice(refreshed);
       setShowPayment(false);
       setPayAmount("");
+      emitWalkthroughDone(ADVANCE_TAG.paymentRecorded);
     } catch (e) {
       setPayError(String(e));
     } finally {
@@ -376,13 +383,16 @@ export default function InvoiceDetailPage() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-fg">Record Payment</h3>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-fg-muted hover:text-fg"
                     onClick={() => setShowPayment(false)}
-                    className="text-fg-muted hover:text-fg transition-colors cursor-pointer bg-transparent border-none text-lg leading-none"
+                    aria-label="Close payment dialog"
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
 
                 {payError && (
@@ -416,20 +426,15 @@ export default function InvoiceDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-fg-muted mb-1.5">
-                      Method
-                    </label>
-                    <select
+                    <Label className="mb-1.5 block text-xs font-semibold text-fg-muted">Method</Label>
+                    <FormSelect
                       value={payMethod}
-                      onChange={(e) => setPayMethod(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-                    >
-                      {acceptedPaymentMethods.map((method) => (
-                        <option key={method.value} value={method.value}>
-                          {method.label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setPayMethod}
+                      options={acceptedPaymentMethods.map((method) => ({
+                        value: method.value,
+                        label: method.label,
+                      }))}
+                    />
                   </div>
                 </div>
 
@@ -464,13 +469,16 @@ export default function InvoiceDetailPage() {
                   <h3 className="text-base font-semibold text-fg">
                     {lineModal.mode === "edit" ? "Edit line item" : "Add line item"}
                   </h3>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-fg-muted hover:text-fg"
                     onClick={() => setLineModal(null)}
-                    className="text-fg-muted hover:text-fg transition-colors cursor-pointer bg-transparent border-none text-lg leading-none"
+                    aria-label="Close line item dialog"
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
 
                 {lineError && (
@@ -587,7 +595,7 @@ export default function InvoiceDetailPage() {
                 </Button>
               )}
               {invoice.status === "draft" && (
-                <Button size="sm" onClick={() => setConfirmAction("sent")}>
+                <Button size="sm" onClick={() => setConfirmAction("sent")} data-tour="invoices-send">
                   Mark as Sent
                 </Button>
               )}
@@ -602,7 +610,7 @@ export default function InvoiceDetailPage() {
                 </Button>
               )}
               {(invoice.status === "draft" || invoice.status === "sent" || (invoice.status === "paid" && remaining > 0)) && (
-                <Button size="sm" variant="secondary" onClick={openPayment}>
+                <Button size="sm" variant="secondary" onClick={openPayment} data-tour="invoices-pay">
                   Record Payment
                 </Button>
               )}
@@ -630,12 +638,16 @@ export default function InvoiceDetailPage() {
             <Card className="mb-4 border-red/30 bg-red/5">
               <div className="flex items-center justify-between p-3">
                 <p className="text-red text-sm">{actionError}</p>
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-fg-muted hover:text-fg"
                   onClick={() => setActionError(null)}
-                  className="text-fg-muted hover:text-fg cursor-pointer bg-transparent border-none"
+                  aria-label="Dismiss error"
                 >
                   ✕
-                </button>
+                </Button>
               </div>
             </Card>
           )}

@@ -5,6 +5,9 @@ import { diagnosticsApi, type DiagnosticStep, type DiagnosticWorkflow } from "@/
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 
 interface WorkflowBundle {
@@ -292,11 +295,12 @@ export default function DiagnosticLibraryPage() {
                 <p className="text-sm text-fg-muted">No workflows yet.</p>
               ) : (
                 workflows.map((workflow) => (
-                  <button
+                  <Button
                     key={workflow.id}
                     type="button"
+                    variant={selectedId === workflow.id ? "default" : "secondary"}
+                    className="h-auto w-full justify-start rounded-xl p-3 text-left"
                     onClick={() => void selectWorkflow(workflow.id)}
-                    className={`w-full rounded-xl border p-3 text-left ${selectedId === workflow.id ? "border-accent bg-accent/10" : "border-border bg-surface-200 hover:bg-surface-300"}`}
                   >
                     <p className="text-sm font-semibold text-fg">{workflow.name}</p>
                     <p className="mt-1 text-[11px] text-fg-dim">{[workflow.make, workflow.modelFamily].filter(Boolean).join(" · ") || workflow.productType}</p>
@@ -304,7 +308,7 @@ export default function DiagnosticLibraryPage() {
                       <span className={`rounded-full px-2 py-1 text-[9px] font-semibold capitalize ${statusTone(workflow.supportStatus)}`}>{workflow.supportStatus}</span>
                       <span className={`rounded-full px-2 py-1 text-[9px] font-semibold capitalize ${statusTone(workflow.lifecycleStatus)}`}>{workflow.lifecycleStatus.replaceAll("_", " ")}</span>
                     </div>
-                  </button>
+                  </Button>
                 ))
               )}
             </CardContent>
@@ -377,8 +381,25 @@ export default function DiagnosticLibraryPage() {
                 <form onSubmit={addStep} className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   <Input value={stepForm.stepKey} onChange={(event) => setStepForm({ ...stepForm, stepKey: event.target.value })} placeholder="Stable step key" required />
                   <Input value={stepForm.publicLabel} onChange={(event) => setStepForm({ ...stepForm, publicLabel: event.target.value })} placeholder="Technician-facing label" required />
-                  <select value={stepForm.mode} onChange={(event) => setStepForm({ ...stepForm, mode: event.target.value as typeof stepForm.mode })} className="rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg"><option value="both">Field + Guided</option><option value="field">Field</option><option value="guided">Guided</option></select>
-                  <select value={stepForm.stepType} onChange={(event) => setStepForm({ ...stepForm, stepType: event.target.value as typeof stepForm.stepType })} className="rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg"><option value="check">Check</option><option value="decision">Decision</option><option value="reference">Reference</option><option value="stop">Stop</option></select>
+                  <FormSelect
+                    value={stepForm.mode}
+                    onChange={(mode) => setStepForm({ ...stepForm, mode: mode as typeof stepForm.mode })}
+                    options={[
+                      { value: "both", label: "Field + Guided" },
+                      { value: "field", label: "Field" },
+                      { value: "guided", label: "Guided" },
+                    ]}
+                  />
+                  <FormSelect
+                    value={stepForm.stepType}
+                    onChange={(stepType) => setStepForm({ ...stepForm, stepType: stepType as typeof stepForm.stepType })}
+                    options={[
+                      { value: "check", label: "Check" },
+                      { value: "decision", label: "Decision" },
+                      { value: "reference", label: "Reference" },
+                      { value: "stop", label: "Stop" },
+                    ]}
+                  />
                   <Input value={stepForm.purpose} onChange={(event) => setStepForm({ ...stepForm, purpose: event.target.value })} placeholder="Purpose" />
                   <Input value={stepForm.safetyState} onChange={(event) => setStepForm({ ...stepForm, safetyState: event.target.value })} placeholder="Safety state" />
                   <Input value={stepForm.powerState} onChange={(event) => setStepForm({ ...stepForm, powerState: event.target.value })} placeholder="Power state" />
@@ -398,7 +419,14 @@ export default function DiagnosticLibraryPage() {
                   <Input value={stepForm.accessibilityNote} onChange={(event) => setStepForm({ ...stepForm, accessibilityNote: event.target.value })} placeholder="Accessibility note" />
                   <Input value={stepForm.sourceDocument} onChange={(event) => setStepForm({ ...stepForm, sourceDocument: event.target.value })} placeholder="Source document" />
                   <Input value={stepForm.sourcePage} onChange={(event) => setStepForm({ ...stepForm, sourcePage: event.target.value })} placeholder="Source page" />
-                  <select value={stepForm.validationStatus} onChange={(event) => setStepForm({ ...stepForm, validationStatus: event.target.value })} className="rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg"><option value="unreviewed">Unreviewed</option><option value="validated">Validated</option></select>
+                  <FormSelect
+                    value={stepForm.validationStatus}
+                    onChange={(validationStatus) => setStepForm({ ...stepForm, validationStatus })}
+                    options={[
+                      { value: "unreviewed", label: "Unreviewed" },
+                      { value: "validated", label: "Validated" },
+                    ]}
+                  />
                   <Button type="submit" disabled={saving}>Add step</Button>
                 </form>
               </CardContent>
@@ -416,8 +444,22 @@ export default function DiagnosticLibraryPage() {
                     <Input value={routeForm.segmentIds} onChange={(event) => setRouteForm({ ...routeForm, segmentIds: event.target.value })} placeholder="Actual segment IDs, comma separated" />
                     <Input value={routeForm.disconnectedIslands} onChange={(event) => setRouteForm({ ...routeForm, disconnectedIslands: event.target.value })} placeholder="Disconnected islands" />
                     <Input value={routeForm.unintendedBranches} onChange={(event) => setRouteForm({ ...routeForm, unintendedBranches: event.target.value })} placeholder="Unintended branches" />
-                    <select value={routeForm.visualAuditStatus} onChange={(event) => setRouteForm({ ...routeForm, visualAuditStatus: event.target.value })} className="rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg"><option value="pending">Visual audit pending</option><option value="passed">Visual audit passed</option><option value="failed">Visual audit failed</option></select>
-                    <label className="flex items-center gap-2 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg"><input type="checkbox" checked={routeForm.continuityValid} onChange={(event) => setRouteForm({ ...routeForm, continuityValid: event.target.checked })} /> Continuity validated</label>
+                    <FormSelect
+                      value={routeForm.visualAuditStatus}
+                      onChange={(visualAuditStatus) => setRouteForm({ ...routeForm, visualAuditStatus })}
+                      options={[
+                        { value: "pending", label: "Visual audit pending" },
+                        { value: "passed", label: "Visual audit passed" },
+                        { value: "failed", label: "Visual audit failed" },
+                      ]}
+                    />
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg">
+                      <Switch
+                        checked={routeForm.continuityValid}
+                        onCheckedChange={(continuityValid) => setRouteForm({ ...routeForm, continuityValid })}
+                      />
+                      <Label className="font-normal">Continuity validated</Label>
+                    </div>
                     <Input value={routeForm.validationNotes} onChange={(event) => setRouteForm({ ...routeForm, validationNotes: event.target.value })} placeholder="Validation notes" />
                     <Button type="submit" disabled={saving}>Attach route evidence</Button>
                   </form>

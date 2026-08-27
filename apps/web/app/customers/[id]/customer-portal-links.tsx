@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { api, type PortalLinkDTO, type PortalLinkScope } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const SCOPE_LABELS: Record<PortalLinkScope, string> = {
@@ -235,14 +237,14 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
             ) : null}
           </fieldset>
 
-          <label className="mt-4 block text-sm text-fg">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-fg-dim">Expiration</span>
-            <select value={ttl} onChange={(event) => setTtl(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-surface-300 px-3 text-sm text-fg">
-              {TTL_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
+          <div className="mt-4">
+            <Label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-fg-dim">Expiration</Label>
+            <FormSelect
+              value={ttl}
+              onChange={setTtl}
+              options={TTL_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+            />
+          </div>
 
           {newToken ? (
             <div className="mt-4 rounded-xl border border-green/40 bg-green/10 p-4">

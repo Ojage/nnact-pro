@@ -13,6 +13,10 @@ import {
 } from "@/lib/repair-brain-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 
 const STEPS = [
@@ -159,12 +163,6 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
     setSearchResults(results);
   }
 
-  function toggleSymptom(label: string) {
-    setSelectedSymptoms((prev) =>
-      prev.includes(label) ? prev.filter((s) => s !== label) : [...prev, label],
-    );
-  }
-
   async function addCustomSymptom() {
     if (!customSymptom.trim()) return;
     try {
@@ -249,14 +247,6 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
     }
   }
 
-  function togglePart(part: { partName: string; oemPartNumber?: string }) {
-    setSelectedParts((prev) => {
-      const exists = prev.find((p) => p.partName === part.partName);
-      if (exists) return prev.filter((p) => p.partName !== part.partName);
-      return [...prev, { ...part, quantity: 1 }];
-    });
-  }
-
   async function recordOutcome(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedEquipmentId) return;
@@ -328,20 +318,23 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
             </Link>
           )}
         </div>
-        <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+        <ToggleGroup
+          type="single"
+          value={String(activeStep)}
+          onValueChange={(value) => value && setActiveStep(Number(value))}
+          className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none"
+          aria-label="Workflow steps"
+        >
           {STEPS.map((label, i) => (
-            <button
+            <ToggleGroupItem
               key={label}
-              type="button"
-              onClick={() => setActiveStep(i)}
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                activeStep === i ? "bg-green text-white" : "bg-surface-300 text-fg-muted"
-              }`}
+              value={String(i)}
+              className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium data-[state=on]:bg-green data-[state=on]:text-white"
             >
               {i + 1}. {label}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </CardHeader>
 
       <CardContent className="space-y-4 pb-6">
@@ -373,19 +366,17 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
               </div>
             ) : (
               <>
-                <select
-                  className="w-full rounded-lg border border-border bg-surface-200 px-3 py-2.5 text-sm"
+                <FormSelect
                   value={selectedEquipmentId}
-                  onChange={(e) => setSelectedEquipmentId(e.target.value)}
-                >
-                  <option value="">Select customer equipment…</option>
-                  {customerEquipment.map((eq) => (
-                    <option key={String(eq.id)} value={String(eq.id)}>
-                      {[eq.make, eq.model, eq.type].filter(Boolean).join(" ")}
-                      {eq.serialNumber ? ` (${eq.serialNumber})` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedEquipmentId}
+                  allowEmpty
+                  placeholder="Select customer equipment…"
+                  emptyLabel="Select customer equipment…"
+                  options={customerEquipment.map((eq) => ({
+                    value: String(eq.id),
+                    label: `${[eq.make, eq.model, eq.type].filter(Boolean).join(" ")}${eq.serialNumber ? ` (${eq.serialNumber})` : ""}`,
+                  }))}
+                />
                 <Button size="sm" className="w-full" disabled={busy || !selectedEquipmentId} onClick={linkEquipment}>
                   Link equipment to job
                 </Button>
@@ -428,16 +419,17 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
               <p className="text-xs font-medium text-fg-muted mb-2">Known faults ({ctx?.knownFaults.length ?? 0})</p>
               <div className="space-y-2">
                 {(ctx?.knownFaults ?? []).slice(0, 5).map((f) => (
-                  <button
+                  <Button
                     key={f.id}
                     type="button"
+                    variant="secondary"
+                    className="h-auto w-full justify-start rounded-lg p-2.5 text-left text-sm"
                     onClick={() => { setSelectedFaultId(f.id); setActiveStep(2); }}
-                    className="w-full text-left rounded-lg border border-border p-2.5 text-sm hover:bg-surface-300"
                   >
                     <span className="font-medium">{f.title}</span>
                     {f.faultCode && <span className="text-fg-muted ml-2">({f.faultCode})</span>}
                     <span className="block text-[10px] text-fg-dim capitalize mt-0.5">{f.confidenceStatus.replaceAll("_", " ")}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -470,22 +462,23 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
 
             <div>
               <p className="text-xs text-fg-muted mb-2">Symptoms (tap to select)</p>
-              <div className="flex flex-wrap gap-1.5">
+              <ToggleGroup
+                type="multiple"
+                value={selectedSymptoms}
+                onValueChange={setSelectedSymptoms}
+                className="flex flex-wrap gap-1.5"
+                aria-label="Symptoms"
+              >
                 {(ctx?.availableSymptoms ?? []).slice(0, 12).map((s) => (
-                  <button
+                  <ToggleGroupItem
                     key={s.id}
-                    type="button"
-                    onClick={() => toggleSymptom(s.label)}
-                    className={`rounded-full px-2.5 py-1 text-[11px] border ${
-                      selectedSymptoms.includes(s.label)
-                        ? "border-green bg-green/10 text-green"
-                        : "border-border text-fg-muted"
-                    }`}
+                    value={s.label}
+                    className="rounded-full px-2.5 py-1 text-[11px] data-[state=on]:border-green data-[state=on]:bg-green/10 data-[state=on]:text-green"
                   >
                     {s.label}
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
               <div className="flex gap-2 mt-2">
                 <Input
                   placeholder="Add symptom…"
@@ -503,17 +496,16 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
               <div>
                 <p className="text-xs text-fg-muted mb-2">Suggested faults (symptom match)</p>
                 {suggestedFaults.map((f) => (
-                  <button
+                  <Button
                     key={f.faultId}
                     type="button"
+                    variant={selectedFaultId === f.faultId ? "default" : "secondary"}
+                    className="mb-2 h-auto w-full justify-start rounded-lg p-2.5 text-left text-sm"
                     onClick={() => setSelectedFaultId(f.faultId)}
-                    className={`w-full text-left rounded-lg border p-2.5 mb-2 text-sm ${
-                      selectedFaultId === f.faultId ? "border-green bg-green/5" : "border-border"
-                    }`}
                   >
                     <span className="font-medium">{f.title}</span>
                     <span className="text-fg-dim text-xs ml-2">score {f.score}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -581,45 +573,62 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
 
             <div>
               <p className="text-xs text-fg-muted mb-2">Parts used</p>
-              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+              <ToggleGroup
+                type="multiple"
+                value={selectedParts.map((p) => p.partName)}
+                onValueChange={(values) => {
+                  setSelectedParts((prev) =>
+                    values.map((partName) => {
+                      const existing = prev.find((p) => p.partName === partName);
+                      if (existing) return existing;
+                      const option = partOptions.find((p) => p.partName === partName);
+                      return option
+                        ? { partName: option.partName, oemPartNumber: option.oemPartNumber, quantity: 1 }
+                        : { partName, quantity: 1 };
+                    }),
+                  );
+                }}
+                className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto"
+                aria-label="Parts used"
+              >
                 {partOptions.map((p) => (
-                  <button
+                  <ToggleGroupItem
                     key={`${p.source}-${p.id}`}
-                    type="button"
-                    onClick={() => togglePart(p)}
-                    className={`rounded-full px-2.5 py-1 text-[11px] border ${
-                      selectedParts.some((s) => s.partName === p.partName)
-                        ? "border-green bg-green/10 text-green"
-                        : "border-border text-fg-muted"
-                    }`}
+                    value={p.partName}
+                    className="rounded-full px-2.5 py-1 text-[11px] data-[state=on]:border-green data-[state=on]:bg-green/10 data-[state=on]:text-green"
                   >
                     {p.partName}
                     {p.oemPartNumber ? ` (${p.oemPartNumber})` : ""}
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
             </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={isFailedAttempt} onChange={(e) => setIsFailedAttempt(e.target.checked)} />
-              This was an unsuccessful attempt (still valuable knowledge)
-            </label>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="failed-attempt"
+                checked={isFailedAttempt}
+                onCheckedChange={setIsFailedAttempt}
+              />
+              <Label htmlFor="failed-attempt" className="text-sm font-normal">
+                This was an unsuccessful attempt (still valuable knowledge)
+              </Label>
+            </div>
           </section>
         )}
 
         {/* Step 5: Outcome */}
         {activeStep === 5 && (
-          <section className="space-y-3">
+          <section className="space-y-3" data-tour="job-detail-outcome">
             <h3 className="text-sm font-semibold text-fg">Repair outcome</h3>
-            <select
-              className="w-full rounded-lg border border-border bg-surface-200 px-3 py-2.5 text-sm"
+            <FormSelect
               value={outcome}
-              onChange={(e) => setOutcome(e.target.value as Outcome)}
-            >
-              {OUTCOMES.map((o) => (
-                <option key={o} value={o}>{o.replaceAll("_", " ")}</option>
-              ))}
-            </select>
+              onChange={(value) => setOutcome(value as Outcome)}
+              options={OUTCOMES.map((o) => ({
+                value: o,
+                label: o.replaceAll("_", " "),
+              }))}
+            />
             <Input placeholder="Conclusion" value={conclusion} onChange={(e) => setConclusion(e.target.value)} className="text-sm" />
 
             {(ctx?.repairOutcomes ?? []).length > 0 && (

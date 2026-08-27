@@ -54,7 +54,9 @@ export function EditCustomerDialog({ customer }: { customer: CustomerDTO }) {
                 <h2 className="text-lg font-bold text-fg">Edit customer</h2>
                 <p className="mt-1 text-sm text-fg-muted">Update the contact record used by jobs, documents, and follow-up.</p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="text-fg-muted hover:text-fg">✕</button>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-fg-muted hover:text-fg" onClick={() => setOpen(false)} aria-label="Close customer editor">
+                ✕
+              </Button>
             </div>
             <form onSubmit={save} className="mt-5 space-y-4">
               <label className="block">

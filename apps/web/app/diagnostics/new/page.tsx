@@ -8,6 +8,8 @@ import { diagnosticsApi, type DiagnosticWorkflow } from "@/lib/diagnostics-api";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
 type Jobs = Awaited<ReturnType<typeof api.jobs>>;
@@ -108,66 +110,67 @@ export default function NewDiagnosticPage() {
               <p className="text-sm text-fg-muted">Loading jobs, appliances, and workflows…</p>
             ) : (
               <>
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Assigned job</span>
-                  <select
+                <div>
+                  <Label htmlFor="diagnostic-job" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Assigned job</Label>
+                  <FormSelect
+                    id="diagnostic-job"
                     value={jobId}
-                    onChange={(event) => {
-                      setJobId(event.target.value);
+                    onChange={(value) => {
+                      setJobId(value);
                       setEquipmentId("");
                     }}
-                    className="w-full rounded-lg border border-border bg-surface-200 px-3 py-2.5 text-sm text-fg"
-                    required
-                  >
-                    <option value="">Select a job</option>
-                    {jobs
+                    allowEmpty
+                    placeholder="Select a job"
+                    emptyLabel="Select a job"
+                    options={jobs
                       .filter((job) => !["completed", "canceled"].includes(job.status))
-                      .map((job) => (
-                        <option key={job.id} value={job.id}>{job.title} · {job.status.replaceAll("_", " ")}</option>
-                      ))}
-                  </select>
-                </label>
+                      .map((job) => ({
+                        value: job.id,
+                        label: `${job.title} · ${job.status.replaceAll("_", " ")}`,
+                      }))}
+                  />
+                </div>
 
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Exact appliance</span>
-                  <select
+                <div>
+                  <Label htmlFor="diagnostic-equipment" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Exact appliance</Label>
+                  <FormSelect
+                    id="diagnostic-equipment"
                     value={equipmentId}
-                    onChange={(event) => setEquipmentId(event.target.value)}
-                    className="w-full rounded-lg border border-border bg-surface-200 px-3 py-2.5 text-sm text-fg"
-                    required
+                    onChange={setEquipmentId}
+                    allowEmpty
+                    placeholder="Select model and serial"
+                    emptyLabel="Select model and serial"
                     disabled={!jobId}
-                  >
-                    <option value="">Select model and serial</option>
-                    {eligibleEquipment.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {[item.make, item.model, item.serialNumber && `S/N ${item.serialNumber}`]
+                    options={eligibleEquipment.map((item) => ({
+                      value: item.id,
+                      label:
+                        [item.make, item.model, item.serialNumber && `S/N ${item.serialNumber}`]
                           .filter(Boolean)
-                          .join(" · ") || item.type}
-                      </option>
-                    ))}
-                  </select>
+                          .join(" · ") || item.type,
+                    }))}
+                  />
                   {jobId && eligibleEquipment.length === 0 && (
                     <span className="mt-2 block text-xs text-yellow">
                       No appliance record is attached to this customer. Add equipment from the customer profile first.
                     </span>
                   )}
-                </label>
+                </div>
 
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Validated workflow</span>
-                  <select
+                <div>
+                  <Label htmlFor="diagnostic-workflow" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Validated workflow</Label>
+                  <FormSelect
+                    id="diagnostic-workflow"
                     value={workflowId}
-                    onChange={(event) => setWorkflowId(event.target.value)}
-                    className="w-full rounded-lg border border-border bg-surface-200 px-3 py-2.5 text-sm text-fg"
-                  >
-                    <option value="">No matching workflow — mark identification/coverage required</option>
-                    {workflows.map((workflow) => (
-                      <option key={workflow.id} value={workflow.id}>
-                        {workflow.name} · {workflow.supportStatus} · v{workflow.versionNumber}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    onChange={setWorkflowId}
+                    allowEmpty
+                    placeholder="No matching workflow — mark identification/coverage required"
+                    emptyLabel="No matching workflow — mark identification/coverage required"
+                    options={workflows.map((workflow) => ({
+                      value: workflow.id,
+                      label: `${workflow.name} · ${workflow.supportStatus} · v${workflow.versionNumber}`,
+                    }))}
+                  />
+                </div>
 
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-fg-muted">Customer-reported complaint</span>

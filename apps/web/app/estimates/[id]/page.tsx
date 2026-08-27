@@ -8,9 +8,13 @@ import { api, type BusinessSettingsDTO, type EstimateOption } from "@/lib/api";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageSendDialog } from "@/components/message-send-dialog";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
+import { ADVANCE_TAG } from "@nnact/shared";
 
 type EstimateDetail = Awaited<ReturnType<typeof api.estimate>>;
 
@@ -99,7 +103,9 @@ export default function EstimateDetailPage() {
           <Link href={`/estimates/${id}/preview`}><Button size="sm" variant="secondary">Preview</Button></Link>
           <Button size="sm" variant="secondary" disabled={downloadingPdf} onClick={() => void downloadPdf()}>{downloadingPdf ? "Preparing…" : "Download PDF"}</Button>
           <Button size="sm" variant="secondary" onClick={() => setEmailOpen(true)}>Email estimate</Button>
-          {estimate.status === "draft" ? <Button size="sm" disabled={busy} onClick={() => refreshAfter(() => api.markEstimateSent(id))}>Mark sent</Button> : null}
+          {estimate.status === "draft" ? <Button size="sm" variant="secondary" disabled={busy} data-tour="estimates-send" onClick={() => {
+            void refreshAfter(() => api.markEstimateSent(id)).then(() => emitWalkthroughDone(ADVANCE_TAG.estimateSent));
+          }}>Mark sent</Button> : null}
           {estimate.status === "approved" ? <Button size="sm" disabled={busy || Boolean(estimate.copiedToJobAt)} onClick={() => refreshAfter(() => api.copyApprovedEstimateToJob(id))}>{estimate.copiedToJobAt ? "Copied to job" : "Copy approved work to job"}</Button> : null}
         </div>}
       />
@@ -125,10 +131,20 @@ export default function EstimateDetailPage() {
       ) : null}
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3" role="tablist" aria-label="Estimate options">
         {estimate.options.map((option) => (
-          <button key={option.id} role="tab" aria-selected={active?.id === option.id} onClick={() => setActiveId(option.id)} className={`rounded-xl border p-4 text-left ${active?.id === option.id ? "border-accent bg-accent/10" : "border-border bg-surface-100"}`}>
+          <Button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={active?.id === option.id}
+            variant="ghost"
+            onClick={() => setActiveId(option.id)}
+            className={`h-auto rounded-xl border p-4 text-left ${
+              active?.id === option.id ? "border-accent bg-accent/10 hover:bg-accent/10" : "border-border bg-surface-100"
+            }`}
+          >
             <span className="block text-sm font-semibold text-fg">{option.label}</span>
             <span className="mt-1 block text-lg font-black text-fg">{formatMoney(option.total)}</span>
-          </button>
+          </Button>
         ))}
       </div>
       {active ? <OptionEditor estimateId={id} option={active} editable={editable} busy={busy} onChange={refreshAfter} discounts={discounts} discountsEnabled={discountsEnabled} /> : <Card><p className="py-10 text-center text-sm text-fg-muted">This estimate has no options.</p></Card>}
@@ -189,21 +205,20 @@ function OptionEditor({ estimateId, option, editable, busy, onChange, discounts,
     {(pricing || (editable && discountsEnabled && discounts.length > 0)) && (
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {editable && discountsEnabled && discounts.length > 0 ? (
-          <label className="grid gap-1.5 text-sm text-fg-muted">
-            Discount
-            <select
+          <div className="grid gap-1.5">
+            <Label className="text-sm text-fg-muted">Discount</Label>
+            <FormSelect
               value={pricing?.discountId ?? ""}
-              onChange={(event) => onChange(() => api.setEstimateOptionDiscount(estimateId, option.id, event.target.value || null))}
-              className="h-10 rounded-lg border border-border bg-surface-200 px-3 text-sm text-fg"
-            >
-              <option value="">No discount</option>
-              {discounts.map((discount) => (
-                <option key={discount.id} value={discount.id}>
-                  {discount.name} · {discount.type === "fixed" ? formatMoney(discount.value) : `${discount.value / 100}%`}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={(value) => onChange(() => api.setEstimateOptionDiscount(estimateId, option.id, value || null))}
+              allowEmpty
+              placeholder="No discount"
+              emptyLabel="No discount"
+              options={discounts.map((discount) => ({
+                value: discount.id,
+                label: `${discount.name} · ${discount.type === "fixed" ? formatMoney(discount.value) : `${discount.value / 100}%`}`,
+              }))}
+            />
+          </div>
         ) : null}
         {pricing ? (
           <div className="space-y-1 rounded-lg bg-surface-200 p-3 text-xs text-fg-muted sm:col-start-2">

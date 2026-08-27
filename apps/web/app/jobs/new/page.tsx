@@ -8,6 +8,12 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FormSelect } from "@/components/ui/form-select";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Label } from "@/components/ui/label";
+import { ADVANCE_TAG } from "@nnact/shared";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -130,6 +136,7 @@ export default function NewJobPage() {
         description: description.trim() || undefined,
         status: "lead",
       });
+      emitWalkthroughDone(ADVANCE_TAG.jobCreated);
 
       if (scheduleNow) {
         const scheduledAt = new Date(startsAt).toISOString();
@@ -162,7 +169,7 @@ export default function NewJobPage() {
         </div>
       )}
 
-      <form onSubmit={submit} className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
+      <form onSubmit={submit} className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]" data-tour="job-form">
         <div className="space-y-5">
           <Card>
             <CardHeader>
@@ -170,36 +177,39 @@ export default function NewJobPage() {
               <p className="text-xs text-fg-muted">Attach this job to an existing customer or create the customer during intake.</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 rounded-xl bg-surface-100 p-1">
+              <ToggleGroup
+                type="single"
+                value={customerMode}
+                onValueChange={(value) => value && setCustomerMode(value as "existing" | "new")}
+                className="grid w-full grid-cols-2 gap-2 rounded-xl bg-surface-100 p-1"
+              >
                 {(["existing", "new"] as const).map((mode) => (
-                  <button
+                  <ToggleGroupItem
                     key={mode}
-                    type="button"
-                    onClick={() => setCustomerMode(mode)}
-                    className={`rounded-lg px-3 py-2 text-sm font-semibold capitalize ${
-                      customerMode === mode ? "bg-accent text-white" : "text-fg-muted hover:text-fg"
-                    }`}
+                    value={mode}
+                    className="h-auto rounded-lg px-3 py-2 text-sm font-semibold capitalize data-[state=on]:bg-accent data-[state=on]:text-white"
                   >
                     {mode} customer
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
 
               {customerMode === "existing" ? (
                 <div>
-                  <label htmlFor="customer" className="mb-1.5 block text-xs font-semibold text-fg-muted">Customer</label>
-                  <select
+                  <Label htmlFor="customer" className="mb-1.5 block text-xs font-semibold text-fg-muted">Customer</Label>
+                  <FormSelect
                     id="customer"
                     value={customerId}
-                    onChange={(event) => setCustomerId(event.target.value)}
+                    onChange={setCustomerId}
                     disabled={loading}
-                    className="h-11 w-full rounded-lg border border-border bg-surface-200 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                  >
-                    <option value="">{loading ? "Loading customers…" : "Select a customer"}</option>
-                    {customers.map((customer) => (
-                      <option key={customer.id} value={customer.id}>{customer.name}</option>
-                    ))}
-                  </select>
+                    allowEmpty
+                    placeholder={loading ? "Loading customers…" : "Select a customer"}
+                    emptyLabel={loading ? "Loading customers…" : "Select a customer"}
+                    options={customers.map((customer) => ({
+                      value: customer.id,
+                      label: customer.name,
+                    }))}
+                  />
                   {!loading && customers.length === 0 && (
                     <p className="mt-2 text-xs text-yellow">No customers exist yet. Choose “New customer” to create one.</p>
                   )}
@@ -231,7 +241,7 @@ export default function NewJobPage() {
             <CardContent className="space-y-4">
               <div>
                 <label htmlFor="job-title" className="mb-1.5 block text-xs font-semibold text-fg-muted">Job title</label>
-                <Input id="job-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Washer leaking during drain" />
+                <Input id="job-title" data-tour="job-form-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Washer leaking during drain" />
               </div>
               <div>
                 <label htmlFor="job-description" className="mb-1.5 block text-xs font-semibold text-fg-muted">Customer complaint and access notes</label>
@@ -256,16 +266,12 @@ export default function NewJobPage() {
                   <CardTitle>Schedule and dispatch</CardTitle>
                   <p className="mt-1 text-xs text-fg-muted">Leave scheduling off to create an unscheduled lead.</p>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={scheduleNow}
+                <Switch
+                  id="schedule-now"
+                  checked={scheduleNow}
+                  onCheckedChange={setScheduleNow}
                   aria-label="Schedule this job"
-                  onClick={() => setScheduleNow((value) => !value)}
-                  className={`relative h-7 w-12 rounded-full transition-colors ${scheduleNow ? "bg-accent" : "bg-surface-400"}`}
-                >
-                  <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform ${scheduleNow ? "translate-x-6" : "translate-x-1"}`} />
-                </button>
+                />
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -277,23 +283,34 @@ export default function NewJobPage() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                     <div>
-                      <label htmlFor="duration" className="mb-1.5 block text-xs font-semibold text-fg-muted">Visit length</label>
-                      <select id="duration" value={durationMinutes} onChange={(event) => setDurationMinutes(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-surface-200 px-3 text-sm text-fg">
-                        <option value="30">30 minutes</option>
-                        <option value="60">1 hour</option>
-                        <option value="90">1.5 hours</option>
-                        <option value="120">2 hours</option>
-                        <option value="180">3 hours</option>
-                      </select>
+                      <Label htmlFor="duration" className="mb-1.5 block text-xs font-semibold text-fg-muted">Visit length</Label>
+                      <FormSelect
+                        id="duration"
+                        value={durationMinutes}
+                        onChange={setDurationMinutes}
+                        options={[
+                          { value: "30", label: "30 minutes" },
+                          { value: "60", label: "1 hour" },
+                          { value: "90", label: "1.5 hours" },
+                          { value: "120", label: "2 hours" },
+                          { value: "180", label: "3 hours" },
+                        ]}
+                      />
                     </div>
                     <div>
-                      <label htmlFor="technician" className="mb-1.5 block text-xs font-semibold text-fg-muted">Technician</label>
-                      <select id="technician" value={technicianId} onChange={(event) => setTechnicianId(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-surface-200 px-3 text-sm text-fg">
-                        <option value="">Unassigned</option>
-                        {technicians.map((technician) => (
-                          <option key={technician.id} value={technician.id}>{technician.name}</option>
-                        ))}
-                      </select>
+                      <Label htmlFor="technician" className="mb-1.5 block text-xs font-semibold text-fg-muted">Technician</Label>
+                      <FormSelect
+                        id="technician"
+                        value={technicianId}
+                        onChange={setTechnicianId}
+                        allowEmpty
+                        placeholder="Unassigned"
+                        emptyLabel="Unassigned"
+                        options={technicians.map((technician) => ({
+                          value: technician.id,
+                          label: technician.name,
+                        }))}
+                      />
                     </div>
                   </div>
                 </>
@@ -311,7 +328,7 @@ export default function NewJobPage() {
               <p className="text-xs leading-5 text-fg-muted">
                 NNACT Pro creates the customer when needed, creates the work order, adds the appointment when scheduled, and opens the job detail for estimates, notes, photos, invoices, and payment.
               </p>
-              <Button type="submit" className="w-full" disabled={saving || loading}>
+              <Button type="submit" className="w-full" data-tour="job-form-submit" disabled={saving || loading}>
                 {saving ? "Creating job…" : scheduleNow ? "Create and schedule job" : "Create unscheduled job"}
               </Button>
               <Button type="button" variant="secondary" className="w-full" onClick={() => router.back()} disabled={saving}>

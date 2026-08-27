@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { JobStatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination } from "@/components/pagination";
 
@@ -199,7 +200,7 @@ export default function JobsPage() {
             : undefined
         }
         actions={
-          <Link href="/schedule">
+          <Link href="/schedule" data-tour="jobs-add">
             <Button variant="default" size="sm">
               <span className="text-base mr-1">⊕</span> New Job
             </Button>
@@ -224,17 +225,12 @@ export default function JobsPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-md"
           />
-          <select
+          <FormSelect
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="h-10 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setStatusFilter(value as StatusFilter)}
+            options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+            className="sm:w-48"
+          />
         </div>
       )}
 
@@ -249,7 +245,7 @@ export default function JobsPage() {
       ) : (
         <>
           {/* ═══ Desktop table ═══ */}
-          <Card className="p-0 overflow-hidden hidden md:block">
+          <Card className="p-0 overflow-hidden hidden md:block" data-tour="jobs-list">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -292,12 +288,15 @@ export default function JobsPage() {
                       <p className="text-sm text-fg-muted">
                         No jobs match your filters
                       </p>
-                      <button
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="mt-1 h-auto p-0 text-xs"
                         onClick={() => { setSearch(""); setStatusFilter("all"); }}
-                        className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
                       >
                         Clear search
-                      </button>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -318,6 +317,7 @@ export default function JobsPage() {
                       <TableCell className="text-right">
                         <Link
                           href={`/jobs/${j.id}`}
+                          data-tour="jobs-link"
                           className="text-xs text-fg-link hover:text-fg transition-colors"
                         >
                           View →
@@ -331,18 +331,22 @@ export default function JobsPage() {
           </Card>
 
           {/* ═══ Mobile cards ═══ */}
-          <div className="md:hidden flex flex-col gap-3">
+<div className="md:hidden flex flex-col gap-3" data-tour="jobs-list">
             {noResults ? (
               <Card>
                 <div className="text-center py-10">
                   <p className="text-sm text-fg-muted">
                     No jobs match your filters
                   </p>
-                  <button                      onClick={() => { setSearch(""); setStatusFilter("all"); }}
-                    className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="mt-1 h-auto p-0 text-xs"
+                    onClick={() => { setSearch(""); setStatusFilter("all"); }}
                   >
                     Clear search
-                  </button>
+                  </Button>
                 </div>
               </Card>
             ) : (
@@ -352,6 +356,7 @@ export default function JobsPage() {
                   <Link
                     key={j.id}
                     href={`/jobs/${j.id}`}
+                    data-tour="jobs-link"
                     className="block no-underline hover:no-underline"
                   >
                     <Card className="p-4 hover:bg-surface-400 transition-colors cursor-pointer">

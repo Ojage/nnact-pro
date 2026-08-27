@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { diagnosticsApi, type DiagnosticSessionDetail, type DiagnosticStep } from "@/lib/diagnostics-api";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
@@ -27,12 +29,13 @@ function StepButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={onClick}
-      className={`w-full rounded-xl border p-3 text-left transition-colors ${
+      className={`h-auto w-full justify-start rounded-xl border p-3 text-left ${
         active
-          ? "border-accent bg-accent/10"
+          ? "border-accent bg-accent/10 hover:bg-accent/10"
           : completed
             ? "border-green/30 bg-green/5 hover:bg-green/10"
             : "border-border bg-surface-200 hover:bg-surface-300"
@@ -53,7 +56,7 @@ function StepButton({
           </p>
         </div>
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -183,24 +186,28 @@ export function DiagnosticSessionClient({ initialDetail }: { initialDetail: Diag
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-200 p-3">
-        <div className="flex gap-1 rounded-lg bg-surface-100 p-1">
+        <ToggleGroup
+          type="single"
+          value={mode}
+          onValueChange={(value) => {
+            if (!value) return;
+            const next = value as "guided" | "field";
+            setMode(next);
+            const first = detail.steps.find((step) => step.mode === "both" || step.mode === next);
+            if (first) setActiveStepId(first.id);
+          }}
+          className="gap-1 rounded-lg bg-surface-100 p-1"
+        >
           {(["guided", "field"] as const).map((item) => (
-            <button
+            <ToggleGroupItem
               key={item}
-              type="button"
-              onClick={() => {
-                setMode(item);
-                const first = detail.steps.find((step) => step.mode === "both" || step.mode === item);
-                if (first) setActiveStepId(first.id);
-              }}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize ${
-                mode === item ? "bg-accent text-white" : "text-fg-muted hover:text-fg"
-              }`}
+              value={item}
+              className="rounded-md px-3 py-1.5 text-xs capitalize data-[state=on]:bg-accent data-[state=on]:text-white"
             >
               {item} mode
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="sm" onClick={() => setCorrectionOpen((open) => !open)}>
             Report workflow issue
@@ -220,29 +227,29 @@ export function DiagnosticSessionClient({ initialDetail }: { initialDetail: Diag
           <CardHeader><CardTitle>Report a workflow defect</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={reportCorrection} className="grid gap-3 md:grid-cols-[.7fr_.7fr_1.6fr_auto]">
-              <select
+              <FormSelect
                 value={correctionCategory}
-                onChange={(event) => setCorrectionCategory(event.target.value)}
-                className="rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg"
-              >
-                <option value="endpoint_resolution">Endpoint resolution</option>
-                <option value="trace_route">Trace route</option>
-                <option value="expected_reading">Expected reading</option>
-                <option value="operating_condition">Operating condition</option>
-                <option value="branch_logic">Branch logic</option>
-                <option value="field_usability">Field usability</option>
-                <option value="part_recommendation">Part recommendation</option>
-              </select>
-              <select
+                onChange={setCorrectionCategory}
+                options={[
+                  { value: "endpoint_resolution", label: "Endpoint resolution" },
+                  { value: "trace_route", label: "Trace route" },
+                  { value: "expected_reading", label: "Expected reading" },
+                  { value: "operating_condition", label: "Operating condition" },
+                  { value: "branch_logic", label: "Branch logic" },
+                  { value: "field_usability", label: "Field usability" },
+                  { value: "part_recommendation", label: "Part recommendation" },
+                ]}
+              />
+              <FormSelect
                 value={correctionSeverity}
-                onChange={(event) => setCorrectionSeverity(event.target.value as typeof correctionSeverity)}
-                className="rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="safety_critical">Safety critical</option>
-              </select>
+                onChange={(value) => setCorrectionSeverity(value as typeof correctionSeverity)}
+                options={[
+                  { value: "low", label: "Low" },
+                  { value: "medium", label: "Medium" },
+                  { value: "high", label: "High" },
+                  { value: "safety_critical", label: "Safety critical" },
+                ]}
+              />
               <Input
                 value={correctionDescription}
                 onChange={(event) => setCorrectionDescription(event.target.value)}
@@ -320,7 +327,7 @@ export function DiagnosticSessionClient({ initialDetail }: { initialDetail: Diag
                   ))}
                 </div>
 
-                <form onSubmit={recordMeasurement} className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+                <form onSubmit={recordMeasurement} className="rounded-xl border border-accent/30 bg-accent/5 p-4" data-tour="diag-run">
                   <p className="font-semibold text-fg">Record actual result</p>
                   <p className="mt-1 text-xs text-fg-muted">The workflow does not branch until a real field result is stored.</p>
                   <div className="mt-4 grid gap-3 md:grid-cols-[1fr_.8fr_1.3fr_auto]">
@@ -329,18 +336,18 @@ export function DiagnosticSessionClient({ initialDetail }: { initialDetail: Diag
                       onChange={(event) => setValueText(event.target.value)}
                       placeholder={activeStep.expectedText ? `Expected: ${activeStep.expectedText}` : "Measured value"}
                     />
-                    <select
+                    <FormSelect
                       value={result}
-                      onChange={(event) => setResult(event.target.value as typeof result)}
-                      className="rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg"
-                    >
-                      <option value="pass">Pass</option>
-                      <option value="fail">Fail</option>
-                      <option value="within_range">Within range</option>
-                      <option value="out_of_range">Out of range</option>
-                      <option value="unable">Unable to access</option>
-                      <option value="not_reproduced">Condition not reproduced</option>
-                    </select>
+                      onChange={(value) => setResult(value as typeof result)}
+                      options={[
+                        { value: "pass", label: "Pass" },
+                        { value: "fail", label: "Fail" },
+                        { value: "within_range", label: "Within range" },
+                        { value: "out_of_range", label: "Out of range" },
+                        { value: "unable", label: "Unable to access" },
+                        { value: "not_reproduced", label: "Condition not reproduced" },
+                      ]}
+                    />
                     <Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Field note or access limitation" />
                     <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Record"}</Button>
                   </div>

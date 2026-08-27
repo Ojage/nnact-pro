@@ -17,6 +17,7 @@
     "db:migrate": "pnpm --filter @nnact/db migrate",
     "db:push": "pnpm --filter @nnact/db push",
     "db:seed": "pnpm --filter @nnact/db seed",
+    "seed:nnact": "pnpm --filter @nnact/db seed:nnact",
     "test": "pnpm -r test",
     "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "test:release": "node --test scripts/*.test.mjs",

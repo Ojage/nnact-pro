@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 
 export interface DocumentPreviewVariant {
@@ -69,19 +72,35 @@ export function DocumentPreviewWorkbench({
             <p className="mt-1 text-xs text-fg-muted">Changes appear here before they are saved or sent.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-lg border border-border bg-surface-200 p-1" aria-label="Preview viewport">
-              <button type="button" aria-pressed={viewport === "page"} onClick={() => setViewport("page")} className={`min-h-8 rounded-md px-2.5 text-xs font-semibold ${viewport === "page" ? "bg-surface-50 text-fg shadow-sm" : "text-fg-muted"}`}>Page</button>
-              <button type="button" aria-pressed={viewport === "phone"} onClick={() => setViewport("phone")} className={`min-h-8 rounded-md px-2.5 text-xs font-semibold ${viewport === "phone" ? "bg-surface-50 text-fg shadow-sm" : "text-fg-muted"}`}>Phone</button>
-            </div>
+            <ToggleGroup
+              type="single"
+              value={viewport}
+              onValueChange={(value) => value && setViewport(value as "page" | "phone")}
+              className="rounded-lg border border-border bg-surface-200 p-1"
+              aria-label="Preview viewport"
+            >
+              <ToggleGroupItem value="page" className="min-h-8 rounded-md px-2.5 text-xs font-semibold data-[state=on]:bg-surface-50 data-[state=on]:text-fg data-[state=on]:shadow-sm">
+                Page
+              </ToggleGroupItem>
+              <ToggleGroupItem value="phone" className="min-h-8 rounded-md px-2.5 text-xs font-semibold data-[state=on]:bg-surface-50 data-[state=on]:text-fg data-[state=on]:shadow-sm">
+                Phone
+              </ToggleGroupItem>
+            </ToggleGroup>
             {viewport === "page" ? (
-              <label className="flex items-center gap-2 text-xs text-fg-muted">
+              <Label className="flex items-center gap-2 text-xs font-normal text-fg-muted">
                 Zoom
-                <select aria-label="Preview zoom" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} className="h-9 rounded-lg border border-border bg-surface-50 px-2 text-xs text-fg">
-                  <option value={50}>50%</option>
-                  <option value={75}>75%</option>
-                  <option value={100}>100%</option>
-                </select>
-              </label>
+                <FormSelect
+                  value={String(zoom)}
+                  onChange={(value) => setZoom(Number(value))}
+                  size="sm"
+                  className="w-20"
+                  options={[
+                    { value: "50", label: "50%" },
+                    { value: "75", label: "75%" },
+                    { value: "100", label: "100%" },
+                  ]}
+                />
+              </Label>
             ) : null}
             {!compact ? (
               <>
@@ -93,19 +112,45 @@ export function DocumentPreviewWorkbench({
         </div>
 
         {documents.length > 1 ? (
-          <div role="tablist" aria-label="Document type" className="mt-4 flex flex-wrap gap-2">
+          <ToggleGroup
+            type="single"
+            value={documentId}
+            onValueChange={(value) => value && setDocumentId(value)}
+            className="mt-4 flex flex-wrap gap-2"
+            aria-label="Document type"
+          >
             {documents.map((document) => (
-              <button key={document.id} type="button" role="tab" aria-selected={activeDocument?.id === document.id} onClick={() => setDocumentId(document.id)} className={`min-h-9 rounded-lg border px-3 text-xs font-semibold ${activeDocument?.id === document.id ? "border-accent bg-accent text-surface-50" : "border-border bg-surface-100 text-fg-muted hover:text-fg"}`}>{document.label}</button>
+              <ToggleGroupItem
+                key={document.id}
+                value={document.id}
+                className="min-h-9 rounded-lg border px-3 text-xs font-semibold data-[state=on]:border-accent data-[state=on]:bg-accent data-[state=on]:text-surface-50"
+              >
+                {document.label}
+              </ToggleGroupItem>
             ))}
-          </div>
+          </ToggleGroup>
         ) : null}
 
         {activeDocument?.variants?.length ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Estimate option preview">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium text-fg-muted">Selected option</span>
-            {activeDocument.variants.map((variant) => (
-              <button key={variant.id} type="button" role="radio" aria-checked={(activeVariant?.id ?? activeDocument.variants?.[0]?.id) === variant.id} onClick={() => setVariantId(variant.id)} className={`min-h-8 rounded-md border px-2.5 text-xs font-semibold ${(activeVariant?.id ?? activeDocument.variants?.[0]?.id) === variant.id ? "border-accent bg-accent-muted text-accent" : "border-border bg-surface-100 text-fg-muted"}`}>{variant.label}</button>
-            ))}
+            <ToggleGroup
+              type="single"
+              value={activeVariant?.id ?? activeDocument.variants?.[0]?.id ?? ""}
+              onValueChange={(value) => value && setVariantId(value)}
+              className="flex flex-wrap gap-2"
+              aria-label="Estimate option preview"
+            >
+              {activeDocument.variants.map((variant) => (
+                <ToggleGroupItem
+                  key={variant.id}
+                  value={variant.id}
+                  className="min-h-8 rounded-md border px-2.5 text-xs font-semibold data-[state=on]:border-accent data-[state=on]:bg-accent-muted data-[state=on]:text-accent"
+                >
+                  {variant.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
         ) : null}
       </div>

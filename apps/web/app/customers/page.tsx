@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/pagination";
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import type { ActivityDTO, CustomerDTO } from "@nnact/shared";
+import { ADVANCE_TAG } from "@nnact/shared";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 
 type SortField = "name" | "createdAt" | "lastActivity";
 type SortDir = "asc" | "desc";
@@ -141,6 +143,7 @@ export default function CustomersPage() {
         phone: createPhone.trim() || undefined,
         notes: createNotes.trim() || undefined,
       });
+      emitWalkthroughDone(ADVANCE_TAG.customerCreated);
       setCustomers((prev) => [created, ...prev]);
       setShowCreate(false);
       setCreateName("");
@@ -220,7 +223,7 @@ export default function CustomersPage() {
             : undefined
         }
         actions={
-          <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Button size="sm" data-tour="customers-add" onClick={() => setShowCreate(true)}>
             + New Customer
           </Button>
         }
@@ -278,7 +281,7 @@ export default function CustomersPage() {
             description="Add your first customer to get started"
           />
           <div className="flex justify-center pb-6">
-            <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Button size="sm" data-tour="customers-add" onClick={() => setShowCreate(true)}>
               + New Customer
             </Button>
           </div>
@@ -286,7 +289,7 @@ export default function CustomersPage() {
       ) : (
         <>
           {/* ═══ Desktop table ═══ */}
-          <Card className="p-0 overflow-hidden hidden md:block">
+          <Card className="p-0 overflow-hidden hidden md:block" data-tour="customers-list">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -305,12 +308,15 @@ export default function CustomersPage() {
                       <p className="text-sm text-fg-muted">
                         No customers match &ldquo;{search}&rdquo;
                       </p>
-                      <button
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="mt-1 h-auto p-0 text-xs"
                         onClick={() => setSearch("")}
-                        className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
                       >
                         Clear search
-                      </button>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -347,6 +353,7 @@ export default function CustomersPage() {
                         <TableCell className="text-right">
                           <Link
                             href={`/customers/${c.id}`}
+                            data-tour="customers-link"
                             className="text-xs text-fg-link hover:text-fg transition-colors"
                           >
                             View →
@@ -361,19 +368,22 @@ export default function CustomersPage() {
           </Card>
 
           {/* ═══ Mobile cards ═══ */}
-          <div className="md:hidden flex flex-col gap-3">
+<div className="md:hidden flex flex-col gap-3" data-tour="customers-list">
             {noResults ? (
               <Card>
                 <div className="text-center py-10">
                   <p className="text-sm text-fg-muted">
                     No customers match &ldquo;{search}&rdquo;
                   </p>
-                  <button
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="mt-1 h-auto p-0 text-xs"
                     onClick={() => setSearch("")}
-                    className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
                   >
                     Clear search
-                  </button>
+                  </Button>
                 </div>
               </Card>
             ) : (
@@ -383,6 +393,7 @@ export default function CustomersPage() {
                   <Link
                     key={c.id}
                     href={`/customers/${c.id}`}
+                    data-tour="customers-link"
                     className="block no-underline hover:no-underline"
                   >
                     <Card className="p-4 hover:bg-surface-400 transition-colors cursor-pointer">
@@ -427,6 +438,7 @@ export default function CustomersPage() {
       {/* ── Create customer dialog ── */}
       <Dialog
         open={showCreate}
+        data-tour="customer-create-dialog"
         onOpenChange={(open) => {
           if (!open) {
             setCreateName("");
@@ -452,6 +464,7 @@ export default function CustomersPage() {
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-fg-muted">Name *</label>
               <input
+                data-tour="customer-create-name"
                 className="h-10 px-3 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
@@ -496,7 +509,7 @@ export default function CustomersPage() {
               <Button type="button" variant="ghost" size="sm" disabled={creating} onClick={() => setShowCreate(false)}>
                 Cancel
               </Button>
-              <Button type="submit" size="sm" disabled={!createName.trim() || creating}>
+              <Button type="submit" size="sm" data-tour="customer-create-submit" disabled={!createName.trim() || creating}>
                 {creating ? "Creating..." : "Create"}
               </Button>
             </DialogFooter>

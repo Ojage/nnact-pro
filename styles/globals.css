@@ -3,7 +3,7 @@
 :root {
   --font-size: 16px;
 
-  /* ── Banking Design System: Light ── */
+  /* ── tech Design System: Light ── */
   --background: #f8fafc;
   --foreground: #1e293b;
   --card: #ffffff;
@@ -43,7 +43,7 @@
   --chart-4: #f59e0b;
   --chart-5: #dc2626;
   
-  /* ── Banking Design System Tokens: Light ── */
+  /* ── tech Design System Tokens: Light ── */
   --color-canvas-default: #ffffff;
   --color-canvas-subtle: #f8fafc;
   --color-fg-default: #1e293b;
@@ -69,7 +69,7 @@
 }
 
 .dark {
-  /* ── Banking Design System: Dark ── */
+  /* ── tech Design System: Dark ── */
   --background: #0f172a;
   --foreground: #e2e8f0;
   --card: #1e293b;
@@ -106,7 +106,7 @@
   --chart-4: #fbbf24;
   --chart-5: #f87171;
   
-  /* ── Banking Design System Tokens: Dark ── */
+  /* ── tech Design System Tokens: Dark ── */
   --color-canvas-default: #0f172a;
   --color-canvas-subtle: #1e293b;
   --color-fg-default: #e2e8f0;

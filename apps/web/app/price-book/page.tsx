@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
 import { EmptyState } from "@/components/empty-state";
 import { formatMoney } from "@nnact/shared";
 
@@ -153,18 +154,15 @@ export default function PriceBookPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-xs flex-1"
         />
-        <select
+        <FormSelect
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="h-10 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-        >
-          <option value="all">All categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+          onChange={setCategoryFilter}
+          options={[
+            { value: "all", label: "All categories" },
+            ...CATEGORIES.map((c) => ({ value: c, label: c })),
+          ]}
+          className="sm:w-48"
+        />
       </div>
 
       {/* Add/Edit form */}
@@ -196,17 +194,11 @@ export default function PriceBookPage() {
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
-              <select
+              <FormSelect
                 value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                className="h-10 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+                onChange={(category) => setForm((f) => ({ ...f, category }))}
+                options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              />
             </div>
             <div className="flex gap-2">
               <Button onClick={handleSave} disabled={!form.name.trim() || !form.price}>
@@ -238,12 +230,15 @@ export default function PriceBookPage() {
         <Card>
           <div className="text-center py-10">
             <p className="text-sm text-fg-muted">No services match your filters</p>
-            <button
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="mt-1 h-auto p-0 text-xs"
               onClick={() => { setSearch(""); setCategoryFilter("all"); }}
-              className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
             >
               Clear filters
-            </button>
+            </Button>
           </div>
         </Card>
       ) : (
@@ -267,18 +262,24 @@ export default function PriceBookPage() {
                     {s.category}
                   </span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto px-2 py-1 text-xs"
                       onClick={() => openEdit(s)}
-                      className="text-xs px-2 py-1 rounded bg-surface-300 text-fg-muted hover:text-fg hover:bg-surface-400 transition-colors cursor-pointer border-none"
                     >
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      className="h-auto px-2 py-1 text-xs"
                       onClick={() => handleDelete(s.id)}
-                      className="text-xs px-2 py-1 rounded bg-surface-300 text-red hover:bg-red/10 transition-colors cursor-pointer border-none"
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </CardContent>

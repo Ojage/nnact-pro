@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
 
 const COLUMNS = [
   { status: "lead", label: "Lead", color: "border-t-purple" },
@@ -103,9 +104,7 @@ export default function PipelinePage() {
         description={`${jobs.length} job${jobs.length !== 1 ? "s" : ""} across 5 stages`}
         actions={
           <Link href="/schedule">
-            <button className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-accent text-white hover:bg-accent/90 transition-colors cursor-pointer border-none">
-              ⊕ New Job
-            </button>
+            <Button size="sm" className="text-xs">⊕ New Job</Button>
           </Link>
         }
       />

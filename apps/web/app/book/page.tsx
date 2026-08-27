@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 
 interface BookingForm {
@@ -64,7 +66,7 @@ export default function BookPage() {
               Thanks, {form.name}! We&apos;ll review your request and reach out to confirm your
               appointment for <strong>{form.service}</strong>.
             </p>
-            <button
+            <Button
               onClick={() => {
                 setSubmitted(false);
                 setForm({
@@ -78,10 +80,9 @@ export default function BookPage() {
                   address: "",
                 });
               }}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent/90 transition-colors cursor-pointer border-none"
             >
               Book Another Service
-            </button>
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -109,9 +110,9 @@ export default function BookPage() {
               {/* Contact info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                  <Label htmlFor="book-name" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                     Full Name *
-                  </label>
+                  </Label>
                   <Input
                     required
                     placeholder="John Smith"
@@ -120,9 +121,9 @@ export default function BookPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                  <Label htmlFor="book-email" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                     Email *
-                  </label>
+                  </Label>
                   <Input
                     required
                     type="email"
@@ -135,9 +136,9 @@ export default function BookPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                  <Label htmlFor="book-phone" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                     Phone *
-                  </label>
+                  </Label>
                   <Input
                     required
                     type="tel"
@@ -147,29 +148,23 @@ export default function BookPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                  <Label htmlFor="book-service" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                     Service *
-                  </label>
-                  <select
-                    required
+                  </Label>
+                  <FormSelect
+                    id="book-service"
                     value={form.service}
-                    onChange={(e) => update("service", e.target.value)}
-                    className="h-10 w-full rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-                  >
-                    {SERVICES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(service) => update("service", service)}
+                    options={SERVICES.map((s) => ({ value: s, label: s }))}
+                  />
                 </div>
               </div>
 
               {/* Address */}
               <div>
-                <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                <Label htmlFor="book-address" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                   Service Address *
-                </label>
+                </Label>
                 <Input
                   required
                   placeholder="123 Main St, City, State"
@@ -181,9 +176,9 @@ export default function BookPage() {
               {/* Preferred date/time */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                  <Label htmlFor="book-date" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                     Preferred Date
-                  </label>
+                  </Label>
                   <Input
                     type="date"
                     min={today}
@@ -192,27 +187,30 @@ export default function BookPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                  <Label htmlFor="book-time" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                     Preferred Time
-                  </label>
-                  <select
+                  </Label>
+                  <FormSelect
+                    id="book-time"
                     value={form.preferredTime}
-                    onChange={(e) => update("preferredTime", e.target.value)}
-                    className="h-10 w-full rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-                  >
-                    <option value="">No preference</option>
-                    <option value="morning">Morning (8am–12pm)</option>
-                    <option value="afternoon">Afternoon (12pm–4pm)</option>
-                    <option value="evening">Evening (4pm–7pm)</option>
-                  </select>
+                    onChange={(preferredTime) => update("preferredTime", preferredTime)}
+                    allowEmpty
+                    placeholder="No preference"
+                    emptyLabel="No preference"
+                    options={[
+                      { value: "morning", label: "Morning (8am–12pm)" },
+                      { value: "afternoon", label: "Afternoon (12pm–4pm)" },
+                      { value: "evening", label: "Evening (4pm–7pm)" },
+                    ]}
+                  />
                 </div>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                <Label htmlFor="book-notes" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                   Notes (optional)
-                </label>
+                </Label>
                 <textarea
                   placeholder="Describe your issue or any special requests..."
                   value={form.notes}

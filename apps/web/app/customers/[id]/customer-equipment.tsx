@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
+import { ADVANCE_TAG } from "@nnact/shared";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 
 interface EquipmentDTO {
   id: string; orgId: string; customerId: string; type: string;
@@ -12,6 +14,8 @@ interface EquipmentDTO {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface EquipmentForm {
@@ -82,6 +86,7 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
         warrantyExpiry: form.warrantyExpiry || undefined,
         notes: form.notes || undefined,
       });
+      emitWalkthroughDone(ADVANCE_TAG.equipmentCreated);
       setAddOpen(false);
       setForm(initForm);
       await load();
@@ -103,9 +108,10 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle>Equipment</CardTitle>
-        <Button size="sm" onClick={() => setAddOpen(true)}>Add Equipment</Button>
+        <Button size="sm" data-tour="equipment-add" onClick={() => setAddOpen(true)}>Add Equipment</Button>
       </CardHeader>
       <CardContent>
+        <div data-tour="equipment-section">
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -151,50 +157,40 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
                 </div>
                 {deleting === e.id ? (
                   <div className="flex gap-1 shrink-0">
-                    <button
-                      onClick={() => handleDelete(e.id)}
-                      className="text-xs text-red hover:text-red/80 transition-colors cursor-pointer bg-transparent border-none"
-                    >
-                      Confirm
-                    </button>
-                    <button
-                      onClick={() => setDeleting(null)}
-                      className="text-xs text-fg-muted hover:text-fg transition-colors cursor-pointer bg-transparent border-none"
-                    >
-                      Cancel
-                    </button>
+                    <Button type="button" size="sm" variant="danger" className="h-auto px-0 text-xs" onClick={() => handleDelete(e.id)}>Confirm</Button>
+                    <Button type="button" size="sm" variant="ghost" className="h-auto px-0 text-xs" onClick={() => setDeleting(null)}>Cancel</Button>
                   </div>
                 ) : (
-                  <button
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-auto shrink-0 px-0 text-xs text-fg-muted hover:text-destructive"
                     onClick={() => setDeleting(e.id)}
-                    className="text-xs text-fg-muted hover:text-red transition-colors cursor-pointer bg-transparent border-none shrink-0"
                   >
                     Delete
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
           </div>
         )}
+        </div>
       </CardContent>
 
       {/* Add Equipment Dialog */}
       {addOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { if (!submitting) { setAddOpen(false); setForm(initForm); } }}>
-          <div className="bg-surface-200 rounded-xl border border-border w-full max-w-lg mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+          <div data-tour="equipment-form" className="bg-surface-200 rounded-xl border border-border w-full max-w-lg mx-4 p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-fg mb-4">Add Equipment</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-fg-muted mb-1.5">Type *</label>
-                <select
+                <Label className="mb-1.5 block text-xs font-semibold text-fg-muted">Type *</Label>
+                <FormSelect
                   value={form.type}
-                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                  className="h-10 w-full rounded-lg border border-border bg-surface-300 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                >
-                  {EQUIPMENT_TYPES.map((t) => (
-                    <option key={t} value={t}>{TYPE_LABELS[t] ?? t}</option>
-                  ))}
-                </select>
+                  onChange={(value) => setForm((f) => ({ ...f, type: value }))}
+                  options={EQUIPMENT_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] ?? t }))}
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -233,7 +229,7 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
               {error && <p className="text-xs text-red">{error}</p>}
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="ghost" onClick={() => { setAddOpen(false); setForm(initForm); }} disabled={submitting}>Cancel</Button>
-                <Button onClick={handleAdd} disabled={submitting}>
+                <Button onClick={handleAdd} data-tour="equipment-form" disabled={submitting}>
                   {submitting ? "Saving..." : "Save"}
                 </Button>
               </div>

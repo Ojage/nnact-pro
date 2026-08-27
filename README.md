@@ -108,7 +108,8 @@ EXPO_PUBLIC_API_URL=http://localhost:3003 pnpm --filter @nnact/mobile dev
 ```bash
 pnpm infra:up    # Postgres (5433), Redis (6379), MinIO (9100/9101), Caddy (8080)
 pnpm db:push     # sync Drizzle schema to the local database
-pnpm db:seed     # demo org, users, customers, and work orders
+pnpm db:seed     # plugin manifests + NNACT development demo (idempotent)
+pnpm seed:nnact  # NNACT demo only (safe to re-run anytime)
 pnpm infra:down  # stop only the containers; keep it, else restart with infra:up
 ```
 

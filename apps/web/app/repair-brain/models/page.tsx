@@ -35,7 +35,7 @@ export default function EquipmentModelsListPage() {
 
       {loading && <p className="text-fg-muted">Loading models…</p>}
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3" data-tour="rb-models">
         {models.map((m) => (
           <Link key={m.id} href={`/repair-brain/models/${m.id}`}>
             <Card className="hover:bg-surface-300 transition-colors h-full">

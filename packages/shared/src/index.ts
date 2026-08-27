@@ -8,6 +8,7 @@ export * from "./operations.js";
 export * from "./message-templates.js";
 export * from "./currency.js";
 export * from "./repair-brain.js";
+export * from "./walkthroughs.js";
 
 // Shared domain enums + DTO types used by api, web, and mobile.
 

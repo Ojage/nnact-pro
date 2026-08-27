@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { repairBrainApi, type ModelProfile } from "@/lib/repair-brain-api";
 
 type Tab =
@@ -85,21 +86,23 @@ export default function EquipmentModelProfilePage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-1 border-b border-border pb-2">
+      <ToggleGroup
+        type="single"
+        value={tab}
+        onValueChange={(value) => value && setTab(value as Tab)}
+        className="mb-4 flex flex-wrap gap-1 border-b border-border pb-2"
+      >
         {tabs.map((t) => (
-          <button
+          <ToggleGroupItem
             key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`rounded-md px-3 py-1.5 text-sm ${
-              tab === t.key ? "bg-green/10 text-green font-medium" : "text-fg-muted hover:bg-surface-300"
-            }`}
+            value={t.key}
+            className="rounded-md px-3 py-1.5 text-sm data-[state=on]:bg-green/10 data-[state=on]:text-green data-[state=on]:font-medium"
           >
             {t.label}
             {t.count !== undefined ? ` (${t.count})` : ""}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
 
       {tab === "overview" && (
         <div className="grid gap-4 md:grid-cols-2">

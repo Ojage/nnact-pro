@@ -1,6 +1,6 @@
 "use client";
 
-import type React from "react";
+import * as React from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type BusinessSettingsDTO, type OrgSettingsDTO } from "@/lib/api";
@@ -14,6 +14,8 @@ import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FormSelect, type FormSelectOption } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 type Tab = "company" | "hours" | "areas" | "invoice" | "estimate" | "payments" | "taxes" | "messages" | "numbering" | "portal" | "currency" | "team";
@@ -80,17 +82,18 @@ export default function SettingsPage() {
                   {group.tabs.map((id) => {
                     const item = TABS.find((candidate) => candidate.id === id)!;
                     return (
-                      <button
+                      <Button
                         key={id}
                         type="button"
+                        variant={tab === id ? "default" : "ghost"}
                         aria-current={tab === id ? "page" : undefined}
                         onClick={() => selectTab(id)}
-                        className={`min-h-10 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-                          tab === id ? "bg-accent text-surface-100" : "text-fg-muted hover:bg-surface-300 hover:text-fg"
+                        className={`h-auto min-h-10 w-full justify-start rounded-lg px-3 py-2 text-left text-sm font-medium ${
+                          tab === id ? "bg-accent text-surface-100 hover:bg-accent/90" : "text-fg-muted hover:text-fg"
                         }`}
                       >
                         {item.label}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -450,14 +453,16 @@ function ServiceAreasSection({ settings, updateSettings }: SettingsProps) {
           {settings.serviceAreas.map((area) => (
             <li key={area} className="flex items-center gap-2 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg">
               <span className="break-words">{area}</span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-fg-dim hover:text-destructive"
                 aria-label={`Remove ${area}`}
-                className="rounded text-fg-dim hover:text-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                 onClick={() => updateSettings({ ...settings, serviceAreas: settings.serviceAreas.filter((item) => item !== area) })}
               >
                 ×
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -914,35 +919,38 @@ function TeamTab() {
                   </TableCell>
                   <TableCell className="text-fg-muted">{u.email}</TableCell>
                   <TableCell>
-                    <select
+                    <FormSelect
                       value={u.role}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      onChange={(value) => handleRoleChange(u.id, value)}
                       disabled={savingId === u.id || Boolean(roleReason)}
-                      title={roleReason}
-                      aria-label={`Role for ${u.name}`}
-                      className="h-8 rounded-md border border-border bg-surface-300 px-2 text-xs text-fg disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="dispatcher">Dispatcher</option>
-                      <option value="technician">Technician</option>
-                    </select>
+                      size="sm"
+                      triggerClassName="h-8 text-xs"
+                      options={[
+                        { value: "owner", label: "Owner" },
+                        { value: "dispatcher", label: "Dispatcher" },
+                        { value: "technician", label: "Technician" },
+                      ]}
+                    />
                     {roleReason ? <p className="mt-1 max-w-56 text-xs text-fg-dim">{roleReason}</p> : null}
                   </TableCell>
                   <TableCell>
                     {confirmDelete === u.id ? (
                       <div className="flex gap-2">
-                        <button onClick={() => handleDelete(u.id)} className="border-none bg-transparent text-xs text-red">Confirm</button>
-                        <button onClick={() => setConfirmDelete(null)} className="border-none bg-transparent text-xs text-fg-muted">Cancel</button>
+                        <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(u.id)}>Confirm</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmDelete(null)}>Cancel</Button>
                       </div>
                     ) : (
-                      <button
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-fg-muted hover:text-destructive"
                         onClick={() => setConfirmDelete(u.id)}
                         disabled={Boolean(deleteReason)}
                         title={deleteReason}
-                        className="border-none bg-transparent text-xs text-fg-muted hover:text-red disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Delete
-                      </button>
+                      </Button>
                     )}
                   </TableCell>
                 </TableRow>
@@ -1113,14 +1121,51 @@ function TextArea({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
-function SelectField({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode }) {
+function optionsFromChildren(children: React.ReactNode): FormSelectOption[] {
+  return React.Children.toArray(children).flatMap((child) => {
+    if (!React.isValidElement<{ value?: string; children?: React.ReactNode; disabled?: boolean }>(child)) {
+      return [];
+    }
+    if (child.type !== "option") return [];
+    return [{
+      value: String(child.props.value ?? ""),
+      label: child.props.children ?? child.props.value ?? "",
+      disabled: child.props.disabled,
+    }];
+  });
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  children,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children?: React.ReactNode;
+  options?: FormSelectOption[];
+}) {
+  const id = React.useId();
+  const resolved = options ?? optionsFromChildren(children);
+  const allowEmpty = resolved.some((option) => option.value === "");
+
   return (
-    <label className="grid gap-1.5 text-sm text-fg-muted">
-      {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-lg border border-border bg-surface-200 px-3 text-sm text-fg">
-        {children}
-      </select>
-    </label>
+    <div className="grid gap-1.5 text-sm text-fg-muted">
+      <Label htmlFor={id}>{label}</Label>
+      <FormSelect
+        id={id}
+        value={value}
+        onChange={onChange}
+        options={resolved.filter((option) => option.value !== "")}
+        allowEmpty={allowEmpty}
+        emptyLabel={
+          resolved.find((option) => option.value === "")?.label?.toString() ?? undefined
+        }
+      />
+    </div>
   );
 }
 

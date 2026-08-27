@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { EmptyState } from "@/components/empty-state";
 
 interface Review {
@@ -181,24 +183,19 @@ export default function ReviewsPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="max-w-sm flex-1"
               />
-              <div className="flex rounded-lg border border-border overflow-hidden w-fit">
-                <button
-                  onClick={() => handleSort("date")}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border-none ${
-                    sort === "date" ? "bg-accent text-white" : "bg-surface-300 text-fg-muted hover:text-fg"
-                  }`}
-                >
+              <ToggleGroup
+                type="single"
+                value={sort}
+                onValueChange={(value) => value && handleSort(value as "date" | "rating")}
+                className="w-fit overflow-hidden rounded-lg border border-border bg-surface-300"
+              >
+                <ToggleGroupItem value="date" className="rounded-none px-3 py-1.5 text-xs data-[state=on]:bg-accent data-[state=on]:text-white">
                   Date {sort === "date" ? (dir === "asc" ? "↑" : "↓") : ""}
-                </button>
-                <button
-                  onClick={() => handleSort("rating")}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border-none ${
-                    sort === "rating" ? "bg-accent text-white" : "bg-surface-300 text-fg-muted hover:text-fg"
-                  }`}
-                >
+                </ToggleGroupItem>
+                <ToggleGroupItem value="rating" className="rounded-none px-3 py-1.5 text-xs data-[state=on]:bg-accent data-[state=on]:text-white">
                   Rating {sort === "rating" ? (dir === "asc" ? "↑" : "↓") : ""}
-                </button>
-              </div>
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
           </div>
 
@@ -207,12 +204,15 @@ export default function ReviewsPage() {
             <Card>
               <div className="text-center py-10">
                 <p className="text-sm text-fg-muted">No reviews match your search</p>
-                <button
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="mt-1 h-auto p-0 text-xs"
                   onClick={() => setSearch("")}
-                  className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
                 >
                   Clear search
-                </button>
+                </Button>
               </div>
             </Card>
           ) : (

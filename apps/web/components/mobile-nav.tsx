@@ -8,6 +8,7 @@ import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
 import { useSessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
+import { Button } from "@/components/ui/button";
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -36,9 +37,12 @@ export function MobileNav() {
 
   return (
     <>
-      <button
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
         onClick={() => setOpen(true)}
-        className="fixed left-0 top-0 z-30 flex h-12 w-12 items-center justify-center rounded-lg text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 md:hidden"
+        className="fixed left-0 top-0 z-30 h-12 w-12 rounded-lg text-fg-muted hover:text-fg md:hidden"
         aria-label="Open navigation menu"
       >
         <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
@@ -46,7 +50,7 @@ export function MobileNav() {
           <rect y="7" width="20" height="2" rx="1" fill="currentColor" />
           <rect y="14" width="20" height="2" rx="1" fill="currentColor" />
         </svg>
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -64,11 +68,18 @@ export function MobileNav() {
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
           <BrandMark size="md" showSubtitle={false} />
-          <button onClick={() => setOpen(false)} className="p-1 text-fg-muted hover:text-fg" aria-label="Close navigation menu">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setOpen(false)}
+            className="h-8 w-8 text-fg-muted hover:text-fg"
+            aria-label="Close navigation menu"
+          >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
@@ -76,12 +87,13 @@ export function MobileNav() {
             <div key={section.label} className="mb-5 last:mb-0">
               <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">{section.label}</p>
               <div className="flex flex-col gap-1">
-                {section.links.map(({ href, label, icon }) => {
+                {section.links.map(({ href, label, icon, tour }) => {
                   const active = currentNavHref === href;
                   return (
                     <Link
                       key={href}
                       href={href}
+                      data-tour={tour}
                       onClick={() => setOpen(false)}
                       aria-current={active ? "page" : undefined}
                       className={cn(
@@ -102,16 +114,18 @@ export function MobileNav() {
         </nav>
 
         <div className="shrink-0 border-t border-border p-3">
-          <button
+          <Button
+            type="button"
+            variant="ghost"
             onClick={() => {
               toggle();
               setOpen(false);
             }}
-            className="flex w-full cursor-pointer items-center gap-3 rounded-lg border-none bg-transparent px-3 py-3 text-sm text-fg-muted transition-all duration-150 hover:bg-surface-300 hover:text-fg"
+            className="h-auto w-full justify-start gap-3 px-3 py-3 text-sm text-fg-muted hover:text-fg"
           >
             <span className="w-5 text-center text-base">{theme === "dark" ? "☀" : "☾"}</span>
             {theme === "dark" ? "Light mode" : "Dark mode"}
-          </button>
+          </Button>
         </div>
 
         <div className="shrink-0 border-t border-border p-3">
@@ -128,15 +142,16 @@ export function MobileNav() {
                   <span className="block text-[10px] capitalize text-fg-dim">{user.role || "team member"}</span>
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => void signOut()}
                 disabled={signingOut}
-                className="flex w-full items-center gap-3 rounded-lg border-none bg-transparent px-3 py-3 text-sm text-fg-muted transition-colors hover:bg-surface-300 hover:text-fg disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-auto w-full justify-start gap-3 px-3 py-3 text-sm text-fg-muted hover:text-fg"
               >
                 <span className="w-5 text-center">↪</span>
                 {signingOut ? "Signing out…" : "Sign out"}
-              </button>
+              </Button>
             </div>
           ) : (
             <Link href="/login" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm text-fg-muted no-underline hover:bg-surface-300 hover:text-fg">

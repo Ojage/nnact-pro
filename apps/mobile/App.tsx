@@ -55,13 +55,18 @@ interface DiagnosticListItem {
   } | null;
 }
 
-async function fetchJson<T>(session: StoredStaffSession, path: string): Promise<T> {
+async function fetchJson<T>(
+  session: StoredStaffSession,
+  path: string,
+  onSession?: (next: StoredStaffSession) => void,
+): Promise<T> {
   try {
     return await staffFetch<T>(session, path);
   } catch (error) {
     if (error instanceof Error && error.message === "session_expired") {
       const refreshed = await staffRefresh(session.refreshToken);
       await saveStaffSession(refreshed);
+      onSession?.(refreshed);
       return staffFetch<T>(refreshed, path);
     }
     throw error;
@@ -152,9 +157,9 @@ function FieldDashboard({
     try {
       setError(null);
       const [jobRows, appointmentRows, diagnosticRows] = await Promise.all([
-        fetchJson<JobDTO[]>(session, "/api/jobs"),
-        fetchJson<Appointment[]>(session, "/api/appointments"),
-        fetchJson<DiagnosticListItem[]>(session, "/api/diagnostics/sessions").catch(() => []),
+        fetchJson<JobDTO[]>(session, "/api/jobs", onSession),
+        fetchJson<Appointment[]>(session, "/api/appointments", onSession),
+        fetchJson<DiagnosticListItem[]>(session, "/api/diagnostics/sessions", onSession).catch(() => []),
       ]);
       setJobs(jobRows);
       setAppointments(appointmentRows);
@@ -174,10 +179,10 @@ function FieldDashboard({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [loadCached]);
+  }, [loadCached, onSession, session]);
 
   useEffect(() => {
-    const service = new SyncService({ apiUrl: API, orgId: ORG_ID, token: AUTH_TOKEN });
+    const service = new SyncService({ apiUrl: API, orgId: session.orgId, token: session.accessToken });
     syncRef.current = service;
     void load();
 
@@ -195,7 +200,7 @@ function FieldDashboard({
     void synchronize();
     const interval = setInterval(() => void synchronize(), 30_000);
     return () => clearInterval(interval);
-  }, [load, loadCached]);
+  }, [load, loadCached, session.accessToken, session.orgId]);
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -262,14 +267,19 @@ function FieldDashboard({
       >
         <View style={styles.header}>
           <View style={styles.headerStatusRow}>
-            <Text style={styles.eyebrow}>NNAC FIELD</Text>
-            <Text style={[styles.connectivity, { color: offline ? colors.warning : colors.success }]}>
-              {offline ? "OFFLINE" : "ONLINE"}
-            </Text>
+            <Text style={styles.eyebrow}>NNACT FIELD</Text>
+            <View style={styles.headerActions}>
+              <Text style={[styles.connectivity, { color: offline ? colors.warning : colors.success }]}>
+                {offline ? "OFFLINE" : "ONLINE"}
+              </Text>
+              <TouchableOpacity onPress={onSignOut}>
+                <Text style={styles.signOut}>Sign out</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <Text style={styles.headerTitle}>Today</Text>
           <Text style={styles.headerSub}>
-            {todayAppointments.length} visit{todayAppointments.length === 1 ? "" : "s"} · {activeDiagnostics.length} active diagnostic{activeDiagnostics.length === 1 ? "" : "s"}
+            {session.user.name} · {todayAppointments.length} visit{todayAppointments.length === 1 ? "" : "s"} · {activeDiagnostics.length} active diagnostic{activeDiagnostics.length === 1 ? "" : "s"}
             {queuedWrites ? ` · ${queuedWrites} queued` : ""}
             {lastSync ? ` · synced ${lastSync}` : ""}
           </Text>
@@ -428,6 +438,59 @@ function FieldDashboard({
   );
 }
 
+export default function App() {
+  const { colors, scheme } = useTheme();
+  const [session, setSession] = useState<StoredStaffSession | null>(null);
+  const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    void loadStaffSession().then((stored) => {
+      setSession(stored);
+      setBooting(false);
+    });
+  }, []);
+
+  async function handleSignOut(current: StoredStaffSession) {
+    await staffLogout(current.refreshToken);
+    await clearStaffSession();
+    setSession(null);
+  }
+
+  if (booting) {
+    return (
+      <>
+        <AuthBootScreen colors={colors} />
+        <StatusBar style={scheme === "light" ? "dark" : "light"} />
+      </>
+    );
+  }
+
+  if (!session) {
+    return (
+      <>
+        <LoginScreen
+          colors={colors}
+          onSignedIn={async (next) => {
+            await saveStaffSession(next);
+            setSession(next);
+          }}
+        />
+        <StatusBar style={scheme === "light" ? "dark" : "light"} />
+      </>
+    );
+  }
+
+  return (
+    <FieldDashboard
+      session={session}
+      onSession={(next) => {
+        void saveStaffSession(next).then(() => setSession(next));
+      }}
+      onSignOut={() => void handleSignOut(session)}
+    />
+  );
+}
+
 const createStyles = (colors: Palette) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -437,6 +500,8 @@ const createStyles = (colors: Palette) =>
   loadingText: { color: colors.mutedForeground, fontSize: 14, fontFamily: fonts.regular },
   header: { paddingHorizontal: 20, marginBottom: 22 },
   headerStatusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 12 },
+  signOut: { color: colors.mutedForeground, fontSize: 11, fontFamily: fonts.bold },
   eyebrow: { color: colors.primary, fontSize: 10, fontFamily: fonts.extraBold, letterSpacing: 2 },
   connectivity: { fontSize: 9, fontFamily: fonts.black, letterSpacing: 1.4 },
   headerTitle: { color: colors.foreground, fontSize: 32, fontFamily: fonts.extraBold, letterSpacing: -0.8, marginTop: 4 },

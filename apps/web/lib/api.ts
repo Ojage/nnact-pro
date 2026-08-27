@@ -53,7 +53,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export interface LoginResult {
   token: string;
-  user: { id: string; name: string; email: string; role: string };
+  user: { id: string; name: string; email: string; role: string; orgId: string };
 }
 
 export function parseSessionUser(value: unknown): LoginResult["user"] {
@@ -71,7 +71,14 @@ export function parseSessionUser(value: unknown): LoginResult["user"] {
   ) {
     throw new Error("Invalid session response");
   }
-  return value as LoginResult["user"];
+  const user = value as Record<string, unknown>;
+  return {
+    id: user.id as string,
+    name: user.name as string,
+    email: user.email as string,
+    role: user.role as string,
+    orgId: typeof user.orgId === "string" ? (user.orgId as string) : "",
+  };
 }
 
 export async function login(email: string, password: string): Promise<LoginResult> {
@@ -574,9 +581,18 @@ export const api = {
   users: () => request<UserDTO[]>("/api/users"),
   recurring: () => request<RecurringJobDTO[]>("/api/recurring"),
 
-  me: () => request<{ id: string; name: string; email: string; role: string }>("/api/auth/me"),
+  me: () => request<{ id: string; name: string; email: string; role: string; orgId: string }>("/api/auth/me"),
   patchUser: (id: string, body: { role?: string; active?: boolean }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteUser: (id: string) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
+
+  // ── Guided-walkthrough progress (server-authoritative) ──
+  walkthroughProgress: () =>
+    request<{ progress: import("@nnact/shared").WalkthroughProgressMap }>("/api/me/walkthrough-progress"),
+  patchWalkthroughProgress: (progress: import("@nnact/shared").WalkthroughProgressMap) =>
+    request<{ progress: import("@nnact/shared").WalkthroughProgressMap }>("/api/me/walkthrough-progress", {
+      method: "PATCH",
+      body: JSON.stringify({ progress }),
+    }),
 
   notifications: () => request<NotificationDTO[]>("/api/notifications"),
   unreadNotificationCount: () => request<{ count: number }>("/api/notifications/unread-count"),

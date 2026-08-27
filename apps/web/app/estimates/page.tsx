@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/empty-state";
 import { Table, TableHeader, TableHead, TableBody, TableRow } from "@/components/ui/table";
 
@@ -241,7 +243,7 @@ export default function EstimatesPage() {
         title="Estimates"
         description={`${estimates.length} estimate${estimates.length !== 1 ? "s" : ""} · ${estimates.filter((e) => e.accepted).length} accepted`}
         actions={
-          <Button onClick={openCreate} size="sm">
+          <Button onClick={openCreate} size="sm" data-tour="estimates-add">
             ⊕ Create Estimate
           </Button>
         }
@@ -255,20 +257,23 @@ export default function EstimatesPage() {
             onClick={() => setShowCreate(false)}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md">
+            <Card className="w-full max-w-md" data-tour="estimates-form">
               <form
                 onSubmit={(e) => { e.preventDefault(); handleCreateEstimate(); }}
                 className="p-6"
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-fg">Create Estimate</h3>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-lg leading-none text-fg-muted hover:text-fg"
                     onClick={() => setShowCreate(false)}
-                    className="text-fg-muted hover:text-fg transition-colors cursor-pointer bg-transparent border-none text-lg leading-none"
+                    aria-label="Close"
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
 
                 {createError && (
@@ -280,24 +285,24 @@ export default function EstimatesPage() {
                 </p>
 
                 <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                  <Label htmlFor="create-job" className="mb-1.5 block text-xs font-semibold text-fg-muted">
                     Job *
-                  </label>
-                  <select
+                  </Label>
+                  <FormSelect
+                    id="create-job"
                     value={createJobId}
-                    onChange={(e) => setCreateJobId(e.target.value)}
-                    className="h-10 w-full rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-                  >
-                    <option value="">Select a job...</option>
-                    {unestimatedJobs.map((j) => {
+                    onChange={setCreateJobId}
+                    allowEmpty
+                    placeholder="Select a job..."
+                    emptyLabel="Select a job..."
+                    options={unestimatedJobs.map((j) => {
                       const cust = customerMap.get(j.customerId);
-                      return (
-                        <option key={j.id} value={j.id}>
-                          {j.title}{cust ? ` — ${cust.name}` : ""} · {formatMoney(j.total)}
-                        </option>
-                      );
+                      return {
+                        value: j.id,
+                        label: `${j.title}${cust ? ` — ${cust.name}` : ""} · ${formatMoney(j.total)}`,
+                      };
                     })}
-                  </select>
+                  />
                   {unestimatedJobs.length === 0 && (
                     <p className="text-xs text-fg-dim mt-1">All jobs already have estimates.</p>
                   )}
@@ -341,17 +346,12 @@ export default function EstimatesPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-xs flex-1"
             />
-            <select
+            <FormSelect
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="h-10 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setStatusFilter(value as StatusFilter)}
+              options={STATUS_OPTIONS}
+              className="sm:w-48"
+            />
           </div>
 
           {/* Desktop table */}
@@ -376,12 +376,15 @@ export default function EstimatesPage() {
                   <TableRow>
                     <td colSpan={6} className="text-center py-10">
                       <p className="text-sm text-fg-muted">No estimates match your filters</p>
-                      <button
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="mt-1 h-auto p-0 text-xs"
                         onClick={() => { setSearch(""); setStatusFilter("all"); }}
-                        className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
                       >
                         Clear filters
-                      </button>
+                      </Button>
                     </td>
                   </TableRow>
                 ) : (
@@ -442,12 +445,15 @@ export default function EstimatesPage() {
               <Card>
                 <div className="text-center py-10">
                   <p className="text-sm text-fg-muted">No estimates match your filters</p>
-                  <button
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="mt-1 h-auto p-0 text-xs"
                     onClick={() => { setSearch(""); setStatusFilter("all"); }}
-                    className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
                   >
                     Clear filters
-                  </button>
+                  </Button>
                 </div>
               </Card>
             ) : (

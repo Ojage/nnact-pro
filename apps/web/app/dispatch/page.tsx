@@ -6,8 +6,12 @@ import type { JobDTO, UserDTO } from "@nnact/shared";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ADVANCE_TAG } from "@nnact/shared";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 import { dispatchApi, type DispatchAppointment } from "@/lib/dispatch-api";
 import {
   buildConflictMap,
@@ -116,24 +120,26 @@ function DispatchCard({
       ) : null}
 
       <div className="mt-3 border-t border-border pt-3">
-        <label className="block text-[10px] font-bold uppercase tracking-wide text-fg-dim" htmlFor={`assign-${appointment.id}`}>
+        <Label htmlFor={`assign-${appointment.id}`} className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">
           Assigned technician
-        </label>
-        <select
-          id={`assign-${appointment.id}`}
-          aria-label={`Assign ${title}`}
-          value={appointment.technicianId ?? ""}
-          disabled={saving}
-          onChange={(event) => onAssign(appointment, event.target.value || null)}
-          className="mt-1.5 w-full rounded-lg border border-border bg-surface-100 px-2.5 py-2 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
-        >
-          <option value="">Unassigned</option>
-          {technicians.map((technician) => (
-            <option key={technician.id} value={technician.id}>
-              {technician.name}
-            </option>
-          ))}
-        </select>
+        </Label>
+        <div data-tour="dispatch-assign">
+          <FormSelect
+            id={`assign-${appointment.id}`}
+            value={appointment.technicianId ?? ""}
+            onChange={(technicianId) => onAssign(appointment, technicianId || null)}
+            allowEmpty
+            emptyLabel="Unassigned"
+            placeholder="Unassigned"
+            disabled={saving}
+            size="sm"
+            className="mt-1.5"
+            options={technicians.map((technician) => ({
+              value: technician.id,
+              label: technician.name,
+            }))}
+          />
+        </div>
       </div>
     </article>
   );
@@ -354,6 +360,7 @@ export default function DispatchPage() {
       const saved = await dispatchApi.assignAppointment(appointment.id, technicianId);
       setAppointments((current) => current.map((item) => (item.id === saved.id ? saved : item)));
       setAnnouncement(`${title} assigned to ${technician?.name ?? "Unassigned"}.`);
+      if (technicianId) emitWalkthroughDone(ADVANCE_TAG.technicianAssigned);
     } catch (caught) {
       setAppointments((current) =>
         current.map((item) => (item.id === appointment.id ? { ...item, technicianId: previous } : item)),
@@ -420,13 +427,15 @@ export default function DispatchPage() {
         <Card className="mb-5 border-red/30 bg-red/5" role="alert">
           <p className="text-sm font-semibold text-red">Dispatch attention required</p>
           <p className="mt-1 text-xs text-fg-muted">{error}</p>
-          <button
+          <Button
             type="button"
+            variant="link"
+            size="sm"
+            className="mt-3 h-auto p-0 text-xs font-semibold text-red"
             onClick={() => setError(null)}
-            className="mt-3 text-xs font-semibold text-red underline underline-offset-2"
           >
             Dismiss
-          </button>
+          </Button>
         </Card>
       ) : null}
 
@@ -494,7 +503,7 @@ export default function DispatchPage() {
           </Link>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" data-testid="dispatch-board">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" data-testid="dispatch-board" data-tour="dispatch-board">
           {columns.map((column) => (
             <DispatchLane
               key={column.id}

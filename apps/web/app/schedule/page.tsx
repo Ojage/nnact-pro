@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface Appointment {
   id: string;
@@ -274,47 +275,23 @@ export default function SchedulePage() {
         <>
           {/* ── View toggle + search ── */}
           <div className="mb-4 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="flex w-fit overflow-hidden rounded-lg border border-border" role="tablist" aria-label="Schedule view">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === "day"}
-                onClick={() => setView("day")}
-                className={`px-4 py-1.5 text-xs font-medium transition-colors cursor-pointer border-none ${
-                  view === "day"
-                    ? "bg-accent text-white"
-                    : "bg-surface-300 text-fg-muted hover:text-fg"
-                }`}
-              >
-                Day
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === "week"}
-                onClick={() => setView("week")}
-                className={`px-4 py-1.5 text-xs font-medium transition-colors cursor-pointer border-none ${
-                  view === "week"
-                    ? "bg-accent text-white"
-                    : "bg-surface-300 text-fg-muted hover:text-fg"
-                }`}
-              >
-                Week
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === "month"}
-                onClick={() => setView("month")}
-                className={`px-4 py-1.5 text-xs font-medium transition-colors cursor-pointer border-none ${
-                  view === "month"
-                    ? "bg-accent text-white"
-                    : "bg-surface-300 text-fg-muted hover:text-fg"
-                }`}
-              >
-                Month
-              </button>
-            </div>
+            <ToggleGroup
+              type="single"
+              value={view}
+              onValueChange={(value) => value && setView(value as ViewMode)}
+              className="w-fit overflow-hidden rounded-lg border border-border bg-surface-300"
+              aria-label="Schedule view"
+            >
+              {(["day", "week", "month"] as const).map((mode) => (
+                <ToggleGroupItem
+                  key={mode}
+                  value={mode}
+                  className="rounded-none px-4 py-1.5 text-xs capitalize data-[state=on]:bg-accent data-[state=on]:text-white"
+                >
+                  {mode}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" onClick={() => moveDate(-1)} aria-label={`Previous ${view}`}>← Previous</Button>
               <Button variant="secondary" size="sm" onClick={() => setFocusDate(new Date())}>Today</Button>
@@ -343,9 +320,15 @@ export default function SchedulePage() {
                       {search.trim() ? "No visits match your search on this day" : "No visits scheduled on this day"}
                     </p>
                     {search.trim() && (
-                      <button onClick={() => setSearch("")} className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none">
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="mt-1 h-auto p-0 text-xs"
+                        onClick={() => setSearch("")}
+                      >
                         Clear search
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </Card>
@@ -440,12 +423,15 @@ export default function SchedulePage() {
                 <Card>
                   <div className="text-center py-10">
                     <p className="text-sm text-fg-muted">No appointments match your search</p>
-                    <button
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="mt-1 h-auto p-0 text-xs"
                       onClick={() => setSearch("")}
-                      className="text-xs text-fg-link hover:text-fg mt-1 cursor-pointer bg-transparent border-none"
                     >
                       Clear search
-                    </button>
+                    </Button>
                   </div>
                 </Card>
               ) : (

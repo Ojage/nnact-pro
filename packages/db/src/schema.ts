@@ -30,7 +30,7 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   toDriver: (value: Buffer) => value,
   fromDriver: (value: Buffer) => value,
 });
-import type { PortalLinkScope, PricingSnapshot } from "@nnact/shared";
+import type { PortalLinkScope, PricingSnapshot, WalkthroughProgressMap } from "@nnact/shared";
 
 export const jobStatus = pgEnum("job_status", [
   "lead",
@@ -89,6 +89,11 @@ export const users = pgTable(
     role: userRole("role").default("technician").notNull(),
     passwordHash: text("password_hash"),
     active: boolean("active").default(true).notNull(),
+    /** Per-user guided-walkthrough progress, keyed by walkthrough id. */
+    walkthroughProgress: jsonb("walkthrough_progress")
+      .$type<WalkthroughProgressMap>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
     createdAt: ts(),
   },
   (t) => ({ orgEmail: index("users_org_email_idx").on(t.orgId, t.email) }),

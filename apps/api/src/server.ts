@@ -26,6 +26,7 @@ import { photoRoutes } from "./routes/photos.js";
 import { catalogRoutes } from "./routes/catalog.js";
 import { equipmentRoutes } from "./routes/equipment.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { walkthroughRoutes } from "./routes/walkthroughs.js";
 import { searchRoutes } from "./routes/search.js";
 import { pluginRoutes } from "./routes/plugins.js";
 import { pluginApiRoutes } from "./routes/plugin-api.js";
@@ -140,6 +141,7 @@ export function buildServer(
   app.register(diagnosticOutputRoutes, { prefix: "/api/diagnostics" });
   app.register(repairBrainRoutes, { prefix: "/api/repair-brain" });
   app.register(notificationRoutes, { prefix: "/api/notifications" });
+  app.register(walkthroughRoutes, { prefix: "/api/me" });
   app.register(searchRoutes, { prefix: "/api/search" });
   app.register(pluginRoutes, { prefix: "/api/plugins" });
   app.register(pluginApiRoutes, { prefix: "/api/plugin" });

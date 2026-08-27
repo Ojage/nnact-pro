@@ -136,7 +136,7 @@ export default async function JobDetailPage({
             <Card>
               <CardHeader><CardTitle>Job details</CardTitle></CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl bg-surface-200 p-4">
+                <div className="rounded-xl bg-surface-200 p-4" data-tour="job-detail-status">
                   <p className="text-xs text-fg-muted">Status</p>
                   <div className="mt-2"><JobStatusBadge status={job.status} /></div>
                 </div>
@@ -161,12 +161,14 @@ export default async function JobDetailPage({
               </CardContent>
             </Card>
 
+            <div data-tour="job-detail-diagnose">
             <JobRepairBrainWorkflow
               jobId={job.id}
               customerId={job.customerId}
               jobStatus={job.status}
               jobDescription={job.description}
             />
+            </div>
 
             <Card>
               <CardHeader className="flex-row items-center justify-between">

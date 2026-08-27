@@ -76,9 +76,6 @@ export default function LoginPage() {
               </p>
             )}
           </form>
-          <p className="mt-4 text-center text-xs leading-5 text-fg-muted">
-            New organization registration is controlled by the deployment owner and is disabled by default in production.
-          </p>
         </CardContent>
       </Card>
     </div>

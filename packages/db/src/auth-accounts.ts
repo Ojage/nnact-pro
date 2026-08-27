@@ -39,7 +39,7 @@ export const customerAccountLinks = pgTable(
       .notNull()
       .references(() => customerAccounts.id, { onDelete: "cascade" }),
     linkedVia: text("linked_via").default("signup").notNull(),
-    linkedAt: ts(),
+    linkedAt: timestamp("linked_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
     orgCustomer: uniqueIndex("customer_account_links_org_customer_idx").on(t.orgId, t.customerId),
