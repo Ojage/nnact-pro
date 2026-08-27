@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { diagnosticsApi, type DiagnosticWorkflow } from "@/lib/diagnostics-api";
@@ -15,10 +15,12 @@ type Equipment = Awaited<ReturnType<typeof api.equipment>>;
 
 export default function NewDiagnosticPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetJobId = searchParams.get("jobId") ?? "";
   const [jobs, setJobs] = useState<Jobs>([]);
   const [equipment, setEquipment] = useState<Equipment>([]);
   const [workflows, setWorkflows] = useState<DiagnosticWorkflow[]>([]);
-  const [jobId, setJobId] = useState("");
+  const [jobId, setJobId] = useState(presetJobId);
   const [equipmentId, setEquipmentId] = useState("");
   const [workflowId, setWorkflowId] = useState("");
   const [complaint, setComplaint] = useState("");

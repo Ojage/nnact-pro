@@ -349,6 +349,19 @@ export const activities = pgTable(
   }),
 );
 
+export const photoCategory = pgEnum("photo_category", [
+  "nameplate",
+  "before_repair",
+  "after_repair",
+  "component",
+  "board",
+  "wiring",
+  "damage",
+  "measurement",
+  "part",
+  "other",
+]);
+
 export const photos = pgTable(
   "photos",
   {
@@ -361,6 +374,8 @@ export const photos = pgTable(
     contentType: text("content_type").notNull(),
     fileName: text("file_name"),
     fileSize: integer("file_size"),
+    category: photoCategory("category").default("other").notNull(),
+    equipmentId: uuid("equipment_id"),
     uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt: ts(),
   },
@@ -375,16 +390,27 @@ export const equipment = pgTable(
     customerId: uuid("customer_id")
       .notNull()
       .references(() => customers.id, { onDelete: "cascade" }),
+    propertyId: uuid("property_id").references(() => properties.id, { onDelete: "set null" }),
+    equipmentModelId: uuid("equipment_model_id"),
     type: text("type").notNull(),
     make: text("make"),
     model: text("model"),
     serialNumber: text("serial_number"),
+    assetTag: text("asset_tag"),
     installDate: timestamp("install_date", { withTimezone: true }),
     warrantyExpiry: timestamp("warranty_expiry", { withTimezone: true }),
+    condition: text("condition"),
+    lastMaintenance: timestamp("last_maintenance", { withTimezone: true }),
+    nextMaintenance: timestamp("next_maintenance", { withTimezone: true }),
+    nameplatePhotoId: uuid("nameplate_photo_id"),
     notes: text("notes"),
     createdAt: ts(),
   },
-  (t) => ({ customer: index("equipment_customer_idx").on(t.orgId, t.customerId) }),
+  (t) => ({
+    customer: index("equipment_customer_idx").on(t.orgId, t.customerId),
+    model: index("equipment_model_idx").on(t.orgId, t.equipmentModelId),
+    serial: index("equipment_serial_idx").on(t.orgId, t.serialNumber),
+  }),
 );
 
 export const notifications = pgTable(

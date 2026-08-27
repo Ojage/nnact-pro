@@ -7,6 +7,7 @@ import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
 import { useSessionUser } from "@/lib/use-session-user";
+import { BrandMark } from "@/components/brand-mark";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -17,13 +18,7 @@ export function Sidebar() {
   return (
     <aside className="fixed bottom-0 left-0 top-0 z-40 hidden w-64 flex-col border-r border-border bg-surface-50 md:flex">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
-        <Link href="/" className="flex items-center gap-2.5 no-underline">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-xs font-black text-white">OF</span>
-          <div>
-            <span className="block text-sm font-semibold text-fg">NNACT Pro</span>
-            <span className="block text-[10px] text-fg-dim">Open field-service operations</span>
-          </div>
-        </Link>
+        <BrandMark href="/" size="md" />
         <NotificationsPopover />
       </div>
 

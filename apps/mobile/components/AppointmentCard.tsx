@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from "react-native";
 import type { JobDTO } from "@nnact/shared";
+import { colors, fonts } from "../src/theme";
 
 interface Appointment {
   id: string;
@@ -57,7 +58,7 @@ export function AppointmentCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#141b33",
+    backgroundColor: colors.card,
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -67,7 +68,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   timeBlock: {
-    backgroundColor: "rgba(26,35,64,0.5)",
+    backgroundColor: colors.borderAlpha,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -75,36 +76,36 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   timeBlockToday: {
-    backgroundColor: "rgba(59,86,176,0.2)",
+    backgroundColor: colors.primaryAlpha,
   },
   day: {
-    color: "#8a97c2",
+    color: colors.mutedForeground,
     fontSize: 10,
-    fontWeight: "600",
+    fontFamily: fonts.semibold,
   },
   dayToday: {
-    color: "#7ab8ff",
+    color: colors.focus,
   },
   time: {
-    color: "#e6e9f0",
+    color: colors.foreground,
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: fonts.bold,
   },
   timeToday: {
-    color: "#7ab8ff",
+    color: colors.focus,
   },
   details: {
     flex: 1,
   },
   title: {
-    color: "#e6e9f0",
+    color: colors.foreground,
     fontSize: 14,
-    fontWeight: "500",
+    fontFamily: fonts.medium,
   },
   today: {
-    color: "#7ab8ff",
+    color: colors.focus,
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: fonts.semibold,
     marginTop: 2,
   },
 });

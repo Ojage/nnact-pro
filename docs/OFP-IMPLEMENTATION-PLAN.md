@@ -1,4 +1,4 @@
-# OpenFieldPro — Bracketed Structure & Implementation Plan
+# NnactPro — Bracketed Structure & Implementation Plan
 
 _Companion to `docs/HCP-PARITY-AND-PLUGIN-PORTAL.md` (the what/why). This is the **how**: a
 bracketed work-breakdown structure (WBS) for (1) cleaning up the repo, (2) integrating every
@@ -14,14 +14,14 @@ that fails if the logic breaks (Ponytail rule). `→[id]` = depends on.
 ## PART 0 — Ground truth (verified 2026-06-28)
 
 ```
-[repo] niko4244/openfieldpro   (origin has ONLY: ofp-monorepo [default], archive/odysseus-original)
+[repo] niko4244/nnactpro   (origin has ONLY: ofp-monorepo [default], archive/odysseus-original)
 │
-├── [clone A] ~/openfieldpro          branch ofp-monorepo @6223a28   ← THE RUNNING APP (web :3000)
+├── [clone A] ~/nnactpro          branch ofp-monorepo @6223a28   ← THE RUNNING APP (web :3000)
 │     ├─ BUG: apps/api/src/server.ts:41 buggy isMain → API never binds :3001 on Windows
 │     ├─ behind: missing the 6 commits that live only in clone B
 │     └─ dirty: uncommitted WIP on invoices.ts, customers/*, schedule, layout, login, api.ts, mobile
 │
-└── [clone B] ~/openfieldpro-app      branch phase-5a/answer-route @b4a5079  (= origin/ofp-monorepo +6)
+└── [clone B] ~/nnactpro-app      branch phase-5a/answer-route @b4a5079  (= origin/ofp-monorepo +6)
       ├─ HAS FIX: server.ts uses pathToFileURL (isMain correct) + atomic seed + exit-on-skip
       ├─ extra committed routes: apps/api/src/routes/{sync.ts, answer.ts}
       ├─ unpushed local branches: phase-5a/pr1-schema-sync, pr2-mobile-sync, pr4-photos,
@@ -42,7 +42,7 @@ Bracketed tree of the **end state**. New items marked `(+)`. Keep the monorepo +
 method (`db → api → web`).
 
 ```
-openfieldpro/
+nnactpro/
 ├── apps/
 │   ├── api/src/
 │   │   ├── routes/
@@ -106,17 +106,17 @@ explicit go-ahead (push, branch delete, deleting a clone).
 ```
 [R0] SAFETY NET — lose nothing                                                 S
      [R0.1] In BOTH clones, commit WIP to a dated branch (don't discard):
-            (A) git -C ~/openfieldpro        switch -c wip/clone-A-$(date +%F) && git add -A && git commit -m "WIP snapshot clone A"
-            (B) git -C ~/openfieldpro-app    switch -c wip/clone-B-$(date +%F) && git add -A && git commit -m "WIP snapshot clone B"
+            (A) git -C ~/nnactpro        switch -c wip/clone-A-$(date +%F) && git add -A && git commit -m "WIP snapshot clone A"
+            (B) git -C ~/nnactpro-app    switch -c wip/clone-B-$(date +%F) && git add -A && git commit -m "WIP snapshot clone B"
      [R0.2] Belt & suspenders: git bundle BOTH clones to scratchpad (full history backup).
      ✓check: `git -C <each> status` clean; two wip/* branches exist; two .bundle files on disk.
 
 [R1] PICK THE CANONICAL LINE                                                    S   →[R0]
      Decision (see §Decisions): recommend clone B's line as canonical because it already
-     contains origin + the isMain/seed fixes (commit 21dcc34) + sync route. Keep ~/openfieldpro
-     as the SINGLE working dir (it's what's wired to run); retire ~/openfieldpro-app.
+     contains origin + the isMain/seed fixes (commit 21dcc34) + sync route. Keep ~/nnactpro
+     as the SINGLE working dir (it's what's wired to run); retire ~/nnactpro-app.
      [R1.1] In clone A: git fetch, then create integration branch:
-            git -C ~/openfieldpro switch -c chore/consolidate origin/ofp-monorepo
+            git -C ~/nnactpro switch -c chore/consolidate origin/ofp-monorepo
      ✓check: chore/consolidate exists off the published base.
 
 [R2] LAND THE BOOT FIX (the actual "repo issue")                               S   →[R1]
@@ -156,9 +156,9 @@ explicit go-ahead (push, branch delete, deleting a clone).
      ✓check: origin/ofp-monorepo boots clean on a fresh clone; CI green.
 
 [R7] ⚠ RETIRE THE SECOND CLONE (needs your yes — deletes a working dir)        S   →[R6]
-     [R7.1] Confirm ~/openfieldpro-app has nothing unique not captured by wip/clone-B-* + branches.
+     [R7.1] Confirm ~/nnactpro-app has nothing unique not captured by wip/clone-B-* + branches.
      [R7.2] Archive it (zip to backup) then remove, OR repoint it to a fresh clone.
-     [R7.3] Update CLAUDE.md / launchers / memory to name ~/openfieldpro as the ONLY OFP dir.
+     [R7.3] Update CLAUDE.md / launchers / memory to name ~/nnactpro as the ONLY OFP dir.
      ✓check: only one OFP working dir remains; launcher + docs reference it.
 ```
 
@@ -375,8 +375,8 @@ ordered by dependency; within a phase, tasks can mostly parallelize unless `→`
 ---
 
 ## Decisions needed (blocking [R1]/[E1]/[B2]/[X])
-1. **Canonical clone/branch** — adopt clone B's line as canonical and keep **`~/openfieldpro`** as
-   the single working dir, retiring `~/openfieldpro-app`? (Recommended.)
+1. **Canonical clone/branch** — adopt clone B's line as canonical and keep **`~/nnactpro`** as
+   the single working dir, retiring `~/nnactpro-app`? (Recommended.)
 2. **`answer-pipeline`** — park it on a branch (recommended; it's experimental NLP, not HCP parity)
    or is it meant to be core?
 3. **Plugin model v1** — confirm **manifest + signed webhook + scoped token** (no third-party code

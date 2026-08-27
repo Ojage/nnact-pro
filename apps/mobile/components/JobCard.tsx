@@ -1,13 +1,14 @@
 import { View, Text, StyleSheet } from "react-native";
 import type { JobDTO } from "@nnact/shared";
 import { formatMoney } from "@nnact/shared";
+import { colors, fonts } from "../src/theme";
 
 const badgeColors: Record<string, { bg: string; fg: string }> = {
-  lead: { bg: "#1a2340", fg: "#6b7aa8" },
-  scheduled: { bg: "rgba(122,184,255,0.12)", fg: "#7ab8ff" },
-  in_progress: { bg: "rgba(224,179,79,0.12)", fg: "#e0b34f" },
-  completed: { bg: "rgba(134,226,154,0.12)", fg: "#86e29a" },
-  canceled: { bg: "rgba(255,128,128,0.12)", fg: "#ff8080" },
+  lead: { bg: colors.borderAlpha, fg: colors.dimForeground },
+  scheduled: { bg: colors.primaryAlpha, fg: colors.focus },
+  in_progress: { bg: colors.warningAlpha, fg: colors.warning },
+  completed: { bg: colors.successAlpha, fg: colors.success },
+  canceled: { bg: colors.dangerAlpha, fg: colors.danger },
 };
 
 export function JobCard({ job }: { job: JobDTO }) {
@@ -32,7 +33,7 @@ export function JobCard({ job }: { job: JobDTO }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#141b33",
+    backgroundColor: colors.card,
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 14,
@@ -54,18 +55,18 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: fonts.semibold,
     textTransform: "capitalize",
   },
   title: {
-    color: "#e6e9f0",
+    color: colors.foreground,
     fontSize: 15,
-    fontWeight: "500",
+    fontFamily: fonts.medium,
   },
   amount: {
-    color: "#8a97c2",
+    color: colors.mutedForeground,
     fontSize: 15,
-    fontWeight: "600",
+    fontFamily: fonts.semibold,
     fontVariant: ["tabular-nums"],
   },
 });

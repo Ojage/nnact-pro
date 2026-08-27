@@ -4,7 +4,9 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, orgs } from "@nnact/db";
 import {
+  CURRENCY_CODES,
   DEFAULT_BUSINESS_SETTINGS,
+  DEFAULT_CURRENCY,
   mergeBusinessSettings,
   validateMessageTemplate,
   type MessageTemplateKind,
@@ -33,6 +35,7 @@ const savedDiscount = z.object({
 });
 
 export const businessSettingsSchema = z.object({
+  currency: z.enum(CURRENCY_CODES).default(DEFAULT_CURRENCY),
   businessHours: z.object({
     timezone: z.string().min(1).max(80),
     workDays: z.array(z.enum(["sun", "mon", "tue", "wed", "thu", "fri", "sat"])).max(7),

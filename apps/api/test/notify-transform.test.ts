@@ -12,20 +12,20 @@ test("isNotifyTransform recognizes native targets only", () => {
   for (const t of ["generic", "", "webhook"]) assert.equal(isNotifyTransform(t), false);
 });
 
-test("formatNotification renders money in dollars and includes key fields", () => {
+test("formatNotification renders money in the default (XAF) currency and includes key fields", () => {
   assert.match(formatNotification("job.created", { title: "AC tune-up" }), /AC tune-up/);
   assert.equal(
     formatNotification("invoice.paid", { number: "INV-1001", total: 18900 }),
-    "✅ Invoice INV-1001 paid — $189.00",
+    "✅ Invoice INV-1001 paid — FCFA 189",
   );
   assert.equal(
     formatNotification("payment.received", { number: "INV-1001", amount: 5000, method: "card" }),
-    "💵 Payment $50.00 (card) on INV-1001",
+    "💵 Payment FCFA 50 (card) on INV-1001",
   );
 });
 
 test("formatNotification tolerates missing fields", () => {
-  assert.equal(formatNotification("invoice.created", {}), "🧾 Invoice  created — $0.00");
+  assert.equal(formatNotification("invoice.created", {}), "🧾 Invoice  created — FCFA 0");
   assert.equal(formatNotification("unknown.event", {}), "NNACT Pro: unknown.event");
 });
 
@@ -44,5 +44,5 @@ test("toNotificationDelivery shapes ntfy as plain text with a title header", () 
   const d = toNotificationDelivery("ntfy", "invoice.paid", { number: "INV-2", total: 1000 });
   assert.equal(d.headers["content-type"], "text/plain");
   assert.equal(d.headers.Title, "NNACT Pro · invoice.paid");
-  assert.equal(d.body, "✅ Invoice INV-2 paid — $10.00");
+  assert.equal(d.body, "✅ Invoice INV-2 paid — FCFA 10");
 });

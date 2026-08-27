@@ -223,6 +223,8 @@ export const diagnosticSessions = pgTable(
       onDelete: "set null",
     }),
     workflowVersion: integer("workflow_version"),
+    knownFaultId: uuid("known_fault_id"),
+    equipmentModelId: uuid("equipment_model_id"),
     status: diagnosticSessionStatus("status").default("not_started").notNull(),
     customerComplaint: text("customer_complaint"),
     technicianObservation: text("technician_observation"),

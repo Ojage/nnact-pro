@@ -74,7 +74,7 @@ export class SyncService {
 
   private async database(): Promise<SQLite.SQLiteDatabase> {
     if (!this.databasePromise) {
-      this.databasePromise = SQLite.openDatabaseAsync("openfieldpro-field.db").then(
+      this.databasePromise = SQLite.openDatabaseAsync("nnactpro-field.db").then(
         async (database) => {
           await database.execAsync(`
             PRAGMA journal_mode = WAL;

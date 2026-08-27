@@ -28,6 +28,33 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "canceled", label: "Canceled" },
 ];
 
+type SortHeadProps = {
+  field: SortField;
+  label: string;
+  active: boolean;
+  direction: SortDir;
+  align?: "left" | "right";
+  onSort: (field: SortField) => void;
+};
+
+function SortHead({ field, label, active, direction, align = "left", onSort }: SortHeadProps) {
+  return (
+    <TableHead
+      className={`cursor-pointer select-none hover:text-fg transition-colors ${
+        align === "right" ? "text-right" : ""
+      }`}
+      onClick={() => onSort(field)}
+    >
+      <span className={`inline-flex items-center gap-1 ${align === "right" ? "justify-end" : ""}`}>
+        {label}
+        <span className="text-fg-dim text-[10px] w-3 text-center">
+          {active ? (direction === "asc" ? "↑" : "↓") : " "}
+        </span>
+      </span>
+    </TableHead>
+  );
+}
+
 export default function JobsPage() {
   const [jobs, setJobs] = useState<JobDTO[]>([]);
   const [customers, setCustomers] = useState<CustomerDTO[]>([]);
@@ -128,22 +155,12 @@ export default function JobsPage() {
     }
   };
 
-  const SortHead = ({ field, label }: { field: SortField; label: string }) => {
-    const active = sortField === field;
-    return (
-      <TableHead
-        className="cursor-pointer select-none hover:text-fg transition-colors"
-        onClick={() => handleSort(field)}
-      >
-        <span className="inline-flex items-center gap-1">
-          {label}
-          <span className="text-fg-dim text-[10px] w-3 text-center">
-            {active ? (sortDir === "asc" ? "↑" : "↓") : " "}
-          </span>
-        </span>
-      </TableHead>
-    );
-  };
+  // ── Pagination (must be before any early return: rules of hooks) ──
+  const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
+
+  const noResults =
+    (jobs.length > 0 && search.trim() && filteredSorted.length === 0) ||
+    (statusFilter !== "all" && filteredSorted.length === 0);
 
   // ── Loading ──
   if (loading) {
@@ -172,12 +189,6 @@ export default function JobsPage() {
   }
 
   // ── No results state ──
-  const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
-
-  const noResults =
-    (jobs.length > 0 && search.trim() && filteredSorted.length === 0) ||
-    (statusFilter !== "all" && filteredSorted.length === 0);
-
   return (
     <div>
       <PageHeader
@@ -242,20 +253,35 @@ export default function JobsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortHead field="title" label="Title" />
-                  <SortHead field="status" label="Status" />
-                  <SortHead field="customer" label="Customer" />
-                  <TableHead className="text-right">
-                    <span
-                      className="inline-flex items-center gap-1 cursor-pointer select-none hover:text-fg transition-colors"
-                      onClick={() => handleSort("total")}
-                    >
-                      Total
-                      <span className="text-fg-dim text-[10px] w-3 text-center">
-                        {sortField === "total" ? (sortDir === "asc" ? "↑" : "↓") : " "}
-                      </span>
-                    </span>
-                  </TableHead>
+                  <SortHead
+                    field="title"
+                    label="Title"
+                    active={sortField === "title"}
+                    direction={sortDir}
+                    onSort={handleSort}
+                  />
+                  <SortHead
+                    field="status"
+                    label="Status"
+                    active={sortField === "status"}
+                    direction={sortDir}
+                    onSort={handleSort}
+                  />
+                  <SortHead
+                    field="customer"
+                    label="Customer"
+                    active={sortField === "customer"}
+                    direction={sortDir}
+                    onSort={handleSort}
+                  />
+                  <SortHead
+                    field="total"
+                    label="Total"
+                    align="right"
+                    active={sortField === "total"}
+                    direction={sortDir}
+                    onSort={handleSort}
+                  />
                   <TableHead className="text-right">Detail</TableHead>
                 </TableRow>
               </TableHeader>

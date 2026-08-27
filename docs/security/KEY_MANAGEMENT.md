@@ -1,8 +1,8 @@
 # Signing Key Management
 
-OpenFieldPro includes Ed25519 tooling for optional, locally verified support-entitlement keys. These keys can represent sponsor recognition, support benefits, or premium plugin access. They are **never required to run the AGPL-licensed core** and must never gate user counts, job counts, CRM, scheduling, dispatch, work orders, estimates, invoices, payments, self-hosting, or other core field-service parity.
+NnactPro includes Ed25519 tooling for optional, locally verified support-entitlement keys. These keys can represent sponsor recognition, support benefits, or premium plugin access. They are **never required to run the AGPL-licensed core** and must never gate user counts, job counts, CRM, scheduling, dispatch, work orders, estimates, invoices, payments, self-hosting, or other core field-service parity.
 
-Verification is fully offline. OpenFieldPro must not contact a license server, phone home, transmit usage, or require telemetry to validate a key.
+Verification is fully offline. NnactPro must not contact a license server, phone home, transmit usage, or require telemetry to validate a key.
 
 ## Threat model
 
@@ -12,7 +12,7 @@ Primary controls:
 
 - Generate keys on an administrator-controlled offline or hardened machine.
 - Keep the private key at `~/.ofp/license-signing-key.pem` unless a separately secured path is explicitly supplied.
-- Never provide the private key to OpenFieldPro application runtimes, CI, hosted deployments, customers, or support tools.
+- Never provide the private key to NnactPro application runtimes, CI, hosted deployments, customers, or support tools.
 - Restrict private-key files to the owning user.
 - Store encrypted offline backups in separate locations.
 - Distribute only the public key to verification environments.
@@ -117,7 +117,7 @@ export NNPLICENSE_KEY='ofp1...'
 pnpm --filter @ofp/api license:verify
 ```
 
-Verification occurs locally. No request is sent to OpenFieldPro, the project owner, a payment processor, or any license server. Do not place the private signing key in the runtime.
+Verification occurs locally. No request is sent to NnactPro, the project owner, a payment processor, or any license server. Do not place the private signing key in the runtime.
 
 ## What keys may and may not control
 

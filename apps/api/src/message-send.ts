@@ -258,7 +258,7 @@ export async function buildInvoiceEmail(orgId: string, invoiceId: string): Promi
     totalCents: invoice.total,
     balanceCents: balance,
     dueDate: invoice.dueAt,
-    formattedMoney: formatMoney,
+    formattedMoney: (cents) => formatMoney(cents, settings.currency),
   });
   return {
     ok: true,
@@ -299,7 +299,7 @@ export async function buildEstimateEmail(orgId: string, estimateId: string): Pro
     optionCount: optionLabels.length,
     optionLabels,
     expiresAt: estimate.expiresAt,
-    formattedMoney: formatMoney,
+    formattedMoney: (cents) => formatMoney(cents, settings.currency),
   });
   return {
     ok: true,

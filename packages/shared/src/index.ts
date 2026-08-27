@@ -1,8 +1,11 @@
+export * from "./brand.js";
 export * from "./sponsors.js";
 export * from "./documents.js";
 export * from "./business-settings.js";
 export * from "./operations.js";
 export * from "./message-templates.js";
+export * from "./currency.js";
+export * from "./repair-brain.js";
 
 // Shared domain enums + DTO types used by api, web, and mobile.
 
@@ -28,11 +31,6 @@ export const PORTAL_LINK_SCOPES = ["balance", "checkout", "receipts", "service_p
 export type PortalLinkScope = (typeof PORTAL_LINK_SCOPES)[number];
 
 export type Money = number; // cents, integer
-
-/** Render integer cents as a dollar string. Canonical formatter for web/mobile. */
-export function formatMoney(cents: Money): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export interface CustomerDTO {
   id: string;

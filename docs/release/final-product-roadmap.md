@@ -1,6 +1,6 @@
-# OpenFieldPro Final Product Roadmap
+# NnactPro Final Product Roadmap
 
-OpenFieldPro is an open-source field service management platform for service businesses, with appliance-service workflows as one supported vertical.
+NnactPro is an open-source field service management platform for service businesses, with appliance-service workflows as one supported vertical.
 
 The product advances two connected tracks:
 
@@ -111,7 +111,7 @@ The current product parity gap audit is `docs/release/PRODUCT_PARITY_GAP_AUDIT.m
 
 A service business can:
 
-1. Install or update OpenFieldPro without editing application code.
+1. Install or update NnactPro without editing application code.
 2. Create an organization, users, roles, branding, and service settings.
 3. Add customers, properties, equipment, jobs, estimates, invoices, payments, reviews, and service plans.
 4. Schedule and dispatch technicians while detecting assignment and time conflicts.
@@ -134,7 +134,7 @@ An appliance-service company can additionally:
 
 ## Release gate
 
-OpenFieldPro is ready for broader use when the operations core supports a complete lead-to-payment loop:
+NnactPro is ready for broader use when the operations core supports a complete lead-to-payment loop:
 
 - customer and property intake,
 - scheduling and dispatch,

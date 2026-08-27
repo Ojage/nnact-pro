@@ -69,10 +69,10 @@ services:
       NNPUPLOAD_DIR: /uploads
       NNPUPLOAD_MAX_BYTES: ${NNPUPLOAD_MAX_BYTES:-26214400}
       NNPHEALTH_PROBE_TIMEOUT_MS: ${NNPHEALTH_PROBE_TIMEOUT_MS:-2000}
-      NNPMAINTENANCE_FILE: /var/lib/openfieldpro-ops/state/maintenance.json
+      NNPMAINTENANCE_FILE: /var/lib/nnactpro-ops/state/maintenance.json
     volumes:
       - ../data/uploads:/uploads
-      - operations_state:/var/lib/openfieldpro-ops/state:ro
+      - operations_state:/var/lib/nnactpro-ops/state:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,12 +117,12 @@ services:
       DATABASE_URL: postgres://ofp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ofp
       REDIS_URL: redis://redis:6379
       NTFY_URL: ${NTFY_URL:-}
-      NNPMAINTENANCE_FILE: /var/lib/openfieldpro-ops/state/maintenance.json
+      NNPMAINTENANCE_FILE: /var/lib/nnactpro-ops/state/maintenance.json
       WORKER_STATUS_PORT: 3020
     expose:
       - "3020"
     volumes:
-      - operations_state:/var/lib/openfieldpro-ops/state:ro
+      - operations_state:/var/lib/nnactpro-ops/state:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,7 +133,7 @@ services:
   caddy:
     image: caddy:2-alpine
     environment:
-      NNPSITE_ADDRESS: ${NNPSITE_ADDRESS:?Set the production domain, for example openfieldpro.example.com}
+      NNPSITE_ADDRESS: ${NNPSITE_ADDRESS:?Set the production domain, for example nnactpro.example.com}
     ports:
       - "80:80"
       - "443:443"

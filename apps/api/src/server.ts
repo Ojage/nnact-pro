@@ -34,7 +34,9 @@ import { operationRoutes } from "./routes/operations.js";
 import { diagnosticRoutes } from "./routes/diagnostics.js";
 import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
 import { diagnosticOutputRoutes } from "./routes/diagnostic-outputs.js";
+import { repairBrainRoutes } from "./routes/repair-brain.js";
 import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
+import { repairBrainAuthorizationGuard } from "./repair-brain-authorization.js";
 import { operationalAuthorizationGuard } from "./operational-authorization.js";
 import { resolveCorsOrigin, resolveJwtSecret } from "./runtime-security.js";
 import { applyApiSecurityHeaders } from "./security-headers.js";
@@ -107,6 +109,7 @@ export function buildServer(
   app.addHook("onRequestAbort", async (request) => releaseMutation(request));
   app.addHook("preHandler", operationalAuthorizationGuard);
   app.addHook("preHandler", diagnosticAuthoringGuard);
+  app.addHook("preHandler", repairBrainAuthorizationGuard);
   app.register(healthRoutes, { probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
   app.get("/internal/drain", async () => apiDrain.status());
   app.register(authRoutes, { prefix: "/api/auth" });
@@ -133,6 +136,7 @@ export function buildServer(
   app.register(diagnosticRoutes, { prefix: "/api/diagnostics" });
   app.register(diagnosticOfflineRoutes, { prefix: "/api/diagnostics" });
   app.register(diagnosticOutputRoutes, { prefix: "/api/diagnostics" });
+  app.register(repairBrainRoutes, { prefix: "/api/repair-brain" });
   app.register(notificationRoutes, { prefix: "/api/notifications" });
   app.register(searchRoutes, { prefix: "/api/search" });
   app.register(pluginRoutes, { prefix: "/api/plugins" });

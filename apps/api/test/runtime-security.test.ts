@@ -38,25 +38,25 @@ test("production requires explicit HTTPS CORS origins", () => {
   assert.deepEqual(
     resolveCorsOrigin({
       NODE_ENV: "production",
-      CORS_ORIGIN: "https://app.openfieldpro.example,https://admin.openfieldpro.example",
+      CORS_ORIGIN: "https://app.nnactpro.example,https://admin.nnactpro.example",
     } as NodeJS.ProcessEnv),
-    ["https://app.openfieldpro.example", "https://admin.openfieldpro.example"],
+    ["https://app.nnactpro.example", "https://admin.nnactpro.example"],
   );
 });
 
 test("payment redirects require an exact HTTPS web origin in production", () => {
   assert.throws(() => resolvePublicWebUrl({ NODE_ENV: "production" } as NodeJS.ProcessEnv), /PUBLIC_WEB_URL/);
   assert.throws(
-    () => resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "http://openfieldpro.example" } as NodeJS.ProcessEnv),
+    () => resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "http://nnactpro.example" } as NodeJS.ProcessEnv),
     /HTTPS/,
   );
   assert.throws(
-    () => resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "https://openfieldpro.example/path" } as NodeJS.ProcessEnv),
+    () => resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "https://nnactpro.example/path" } as NodeJS.ProcessEnv),
     /without a path/,
   );
   assert.equal(
-    resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "https://openfieldpro.example/" } as NodeJS.ProcessEnv),
-    "https://openfieldpro.example",
+    resolvePublicWebUrl({ NODE_ENV: "production", PUBLIC_WEB_URL: "https://nnactpro.example/" } as NodeJS.ProcessEnv),
+    "https://nnactpro.example",
   );
 });
 

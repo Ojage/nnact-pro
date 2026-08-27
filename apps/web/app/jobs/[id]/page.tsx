@@ -6,6 +6,7 @@ import type { ActivityDTO, CustomerDTO, JobDTO } from "@nnact/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { JobStatusBadge, InvoiceStatusBadge } from "@/components/status-badge";
+import { JobRepairBrainWorkflow } from "@/components/job-repair-brain-workflow";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 
@@ -33,13 +34,6 @@ interface LineItem {
   unitPrice: number;
   unitCost: number;
   createdAt: string;
-}
-
-function diagnosticTone(status: string) {
-  if (["blocked", "escalated"].includes(status)) return "border-red/30 bg-red/5 text-red";
-  if (["diagnosed", "completed"].includes(status)) return "border-green/30 bg-green/5 text-green";
-  if (["workflow_ready", "testing"].includes(status)) return "border-blue/30 bg-blue/5 text-blue";
-  return "border-yellow/30 bg-yellow/5 text-yellow";
 }
 
 export default async function JobDetailPage({
@@ -112,11 +106,11 @@ export default async function JobDetailPage({
             <div className="flex flex-wrap gap-2">
               {diagnostic ? (
                 <Link href={`/diagnostics/${diagnostic.session.id}`}>
-                  <Button size="sm">Continue equipment record</Button>
+                  <Button size="sm" variant="secondary">Full diagnostic UI</Button>
                 </Link>
               ) : (
-                <Link href="/diagnostics/new">
-                  <Button size="sm">Add equipment record</Button>
+                <Link href={`/diagnostics/new?jobId=${jobId}`}>
+                  <Button size="sm" variant="secondary">Add equipment record</Button>
                 </Link>
               )}
               {customer && (
@@ -167,54 +161,12 @@ export default async function JobDetailPage({
               </CardContent>
             </Card>
 
-            <Card className={diagnostic ? "border-accent/25" : "border-border"}>
-              <CardHeader className="flex-row items-start justify-between">
-                <div>
-                  <CardTitle>Optional equipment record</CardTitle>
-                  <CardDescription>Technical evidence stays attached to this commercial work order without replacing status or billing.</CardDescription>
-                </div>
-                {diagnostic && (
-                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold capitalize ${diagnosticTone(diagnostic.session.status)}`}>
-                    {diagnostic.session.status.replaceAll("_", " ")}
-                  </span>
-                )}
-              </CardHeader>
-              <CardContent>
-                {diagnostic ? (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-border bg-surface-200 p-4">
-                      <p className="text-lg font-bold text-fg">
-                        {[diagnostic.equipment.make, diagnostic.equipment.model].filter(Boolean).join(" ") || diagnostic.equipment.type}
-                      </p>
-                      <p className="mt-1 text-xs text-fg-muted">
-                        {diagnostic.equipment.serialNumber ? `Serial ${diagnostic.equipment.serialNumber}` : "Serial number not recorded"}
-                      </p>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-border bg-surface-200 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-dim">Customer complaint</p>
-                        <p className="mt-2 text-sm text-fg">{diagnostic.session.customerComplaint || "Not recorded"}</p>
-                      </div>
-                      <div className="rounded-xl border border-border bg-surface-200 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-dim">Applicable workflow</p>
-                        <p className="mt-2 text-sm text-fg">{diagnostic.workflow?.name || "Coverage required"}</p>
-                      </div>
-                    </div>
-                    <Link href={`/diagnostics/${diagnostic.session.id}`}>
-                      <Button>{diagnostic.session.status === "completed" ? "Review equipment record" : "Open equipment workflow"}</Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-border p-8 text-center">
-                    <p className="font-semibold text-fg">No equipment record is attached</p>
-                    <p className="mt-1 text-sm text-fg-muted">Add one only when model, serial, measurements, or technical evidence are useful for this work order.</p>
-                    <Link href="/diagnostics/new" className="mt-4 inline-flex">
-                      <Button size="sm">Add equipment record</Button>
-                    </Link>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <JobRepairBrainWorkflow
+              jobId={job.id}
+              customerId={job.customerId}
+              jobStatus={job.status}
+              jobDescription={job.description}
+            />
 
             <Card>
               <CardHeader className="flex-row items-center justify-between">

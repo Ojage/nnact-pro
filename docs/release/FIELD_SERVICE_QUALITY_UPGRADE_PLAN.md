@@ -1,4 +1,4 @@
-# OpenFieldPro field-service quality upgrade plan
+# NnactPro field-service quality upgrade plan
 
 Status: active implementation
 Product owner: Nikolas Marconcini
@@ -6,7 +6,7 @@ Validation profile: Marco's Appliance Repair Company
 
 ## Outcome
 
-OpenFieldPro must feel credible for daily use by an independent service company, not merely demonstrate that the underlying records exist. The benchmark is the operational depth users expect from mature field-service software while preserving OpenFieldPro's own product promise: self-hostable, practical, data-owned, and free of artificial core limits.
+NnactPro must feel credible for daily use by an independent service company, not merely demonstrate that the underlying records exist. The benchmark is the operational depth users expect from mature field-service software while preserving NnactPro's own product promise: self-hostable, practical, data-owned, and free of artificial core limits.
 
 This plan closes the gap through small vertical slices. Each slice must leave a real workflow working end to end, include failure and mobile states, and pass the public release gates.
 

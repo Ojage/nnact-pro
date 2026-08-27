@@ -4,6 +4,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type BusinessSettingsDTO, type OrgSettingsDTO } from "@/lib/api";
+import { CURRENCY_CATALOG, CURRENCY_CODES, DEFAULT_CURRENCY, formatMoney, type CurrencyCode } from "@nnact/shared";
 import { normalizeServiceAreas, validateBusinessHours } from "@/lib/business-settings-form";
 import { estimateDocumentHtml, invoiceDocumentHtml } from "@/lib/document-data";
 import { DocumentPreviewWorkbench, type DocumentPreviewItem } from "@/components/document-preview-workbench";
@@ -15,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
-type Tab = "company" | "hours" | "areas" | "invoice" | "estimate" | "payments" | "taxes" | "messages" | "numbering" | "portal" | "team";
+type Tab = "company" | "hours" | "areas" | "invoice" | "estimate" | "payments" | "taxes" | "messages" | "numbering" | "portal" | "currency" | "team";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "company", label: "Company" },
@@ -28,12 +29,13 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "messages", label: "Messages" },
   { id: "numbering", label: "Numbering" },
   { id: "portal", label: "Portal" },
+  { id: "currency", label: "Currency" },
   { id: "team", label: "Team" },
 ];
 
 const TAB_GROUPS: { label: string; tabs: Tab[] }[] = [
   { label: "Business", tabs: ["company", "hours", "areas", "team"] },
-  { label: "Sales & payments", tabs: ["invoice", "estimate", "payments", "taxes"] },
+  { label: "Sales & payments", tabs: ["invoice", "estimate", "payments", "taxes", "currency"] },
   { label: "Customer experience", tabs: ["messages", "numbering", "portal"] },
 ];
 
@@ -271,6 +273,7 @@ function BusinessSettingsTab({ tab, onDirtyChange }: { tab: Exclude<Tab, "team">
           {tab === "taxes" && <TaxesSection settings={settings} updateSettings={updateSettings} />}
           {tab === "messages" && <MessageTemplatesEditor settings={settings} updateSettings={updateSettings} companyName={org.name} />}
           {tab === "numbering" && <NumberingSection settings={settings} updateSettings={updateSettings} />}
+          {tab === "currency" && <CurrencySection settings={settings} updateSettings={updateSettings} />}
           {tab === "portal" && <PortalSection settings={settings} updateSettings={updateSettings} />}
 
           {(message || error) && <p aria-live="polite" role={error ? "alert" : "status"} className={`mt-4 text-sm ${error ? "text-red" : "text-green"}`}>{error ?? message}</p>}
@@ -752,6 +755,45 @@ function PortalSection({ settings, updateSettings }: SettingsProps) {
   );
 }
 
+function CurrencySection({ settings, updateSettings }: SettingsProps) {
+  const currency: CurrencyCode = settings.currency;
+  const selectCurrency = (code: string) => updateSettings({ ...settings, currency: code as CurrencyCode });
+  const samples = [
+    { label: "Invoice total", cents: 42_700 },
+    { label: "Partial payment", cents: 10_000 },
+    { label: "Small service fee", cents: 1_250 },
+  ];
+  return (
+    <div className="grid gap-6">
+      <SelectField label="Display currency" value={currency} onChange={selectCurrency}>
+        {CURRENCY_CODES.map((code) => (
+          <option key={code} value={code}>
+            {code} — {CURRENCY_CATALOG[code].name}
+          </option>
+        ))}
+      </SelectField>
+      <section className="rounded-xl border border-border bg-surface-100 p-4">
+        <h3 className="text-sm font-semibold text-fg">Formatting preview</h3>
+        <p className="mt-1 text-xs text-fg-muted">
+          Amounts below show how money renders on estimates, invoices, emails, and payments.
+        </p>
+        <ul className="mt-3 grid gap-2">
+          {samples.map((sample) => (
+            <li key={sample.label} className="flex items-center justify-between rounded-lg bg-surface-200 px-3 py-2 text-sm">
+              <span className="text-fg-muted">{sample.label}</span>
+              <strong className="text-fg">{formatMoney(sample.cents, currency)}</strong>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <p className="rounded-lg border border-border bg-surface-200 p-3 text-sm text-fg-muted">
+        Amounts are stored in cents and grouped per the currency's conventions. New organizations start with{" "}
+        <strong className="text-fg">{CURRENCY_CATALOG[DEFAULT_CURRENCY].symbol} ({DEFAULT_CURRENCY})</strong> — change it here at any time.
+      </p>
+    </div>
+  );
+}
+
 const ROLE_SUMMARY: { role: string; label: string; description: string }[] = [
   { role: "owner", label: "Owner", description: "Full access: settings, team, finances, and every workflow." },
   { role: "dispatcher", label: "Dispatcher", description: "Runs the schedule, dispatch board, jobs, and customer records." },
@@ -1010,6 +1052,13 @@ function SettingsPreview({ form, tab }: { form: OrgSettingsDTO; tab: Exclude<Tab
               ].filter(Boolean).join(", ") || "none enabled"}</p>
               <p><strong className="text-fg">Partial payments:</strong> {form.businessSettings.payments.allowPartialPayments ? "allowed" : "blocked — full balance required"}</p>
               <p><strong className="text-fg">Tips:</strong> {form.businessSettings.payments.tipsEnabled ? "enabled" : "disabled"}</p>
+            </div>
+          ) : tab === "currency" ? (
+            <div className="mt-4 grid gap-2 text-sm text-fg-muted">
+              <p><strong className="text-fg">Currency:</strong> {form.businessSettings.currency} — {CURRENCY_CATALOG[form.businessSettings.currency].name}</p>
+              <p><strong className="text-fg">Sample invoice:</strong> {formatMoney(42_700, form.businessSettings.currency)}</p>
+              <p><strong className="text-fg">Sample balance due:</strong> {formatMoney(32_700, form.businessSettings.currency)}</p>
+              <p><strong className="text-fg">Sample payment:</strong> {formatMoney(10_000, form.businessSettings.currency)}</p>
             </div>
           ) : (
             <div className="mt-4 grid gap-2 text-xs text-fg-muted">

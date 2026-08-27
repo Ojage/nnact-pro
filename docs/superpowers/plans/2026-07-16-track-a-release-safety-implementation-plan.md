@@ -3,7 +3,7 @@
 ## Context
 
 - **Approved design:** `docs/superpowers/specs/2026-07-16-track-a-release-safety-design.md`.
-- **Repository boundary:** `niko4244/openfieldpro` remains public. Create a separate private repository, `niko4244/openfieldpro-ops`, for the host controller, scheduler, durable journal, backup destinations, sponsor controls, and operational credentials. The public repository exposes only fixed, owner-authorized contracts and contains no controller secret, age identity, S3 credential, SMTP credential, or unrestricted host command.
+- **Repository boundary:** `niko4244/nnactpro` remains public. Create a separate private repository, `niko4244/nnactpro-ops`, for the host controller, scheduler, durable journal, backup destinations, sponsor controls, and operational credentials. The public repository exposes only fixed, owner-authorized contracts and contains no controller secret, age identity, S3 credential, SMTP credential, or unrestricted host command.
 - **Current public entry points:** `scripts/install.sh:1-35`, `scripts/update.sh:1-20`, `scripts/backup.sh:1-85`, `scripts/restore.sh:1-107`, `infra/compose.prod.yml:1-146`, `apps/api/src/routes/health.ts:1-5`, `apps/api/src/server.ts:39-85`, and `apps/web/lib/nav.ts`.
 - **Patterns to follow:** Node's built-in test runner (`apps/api/test/*.test.ts`), Fastify route modules, Zod validation, fixed argument arrays for child processes, existing `migrate` Compose profile, and filesystem uploads at `data/uploads`.
 - **Testing strategy:** TDD for every state transition and trust boundary; dependency injection for filesystem/process/network probes; integration tests with disposable PostgreSQL, Redis, uploads, and S3-compatible containers; Playwright for owner authorization and restore confirmation; one destructive drill only against an isolated fixture deployment.
@@ -22,7 +22,7 @@
 ### Task 2: Establish the public/private controller contract
 
 - **Public files:** create `packages/shared/src/operations.ts`, `apps/api/src/routes/operations.ts`, `apps/api/src/operations-client.ts`, `apps/api/test/operations-client.test.ts`; modify `packages/shared/src/index.ts` and `apps/api/src/server.ts`.
-- **Private files:** create `openfieldpro-ops/package.json`, `src/contracts.ts`, `src/server.ts`, `src/auth.ts`, `src/idempotency.ts`, and `test/contracts.test.ts`.
+- **Private files:** create `nnactpro-ops/package.json`, `src/contracts.ts`, `src/server.ts`, `src/auth.ts`, `src/idempotency.ts`, and `test/contracts.test.ts`.
 - **What:** define the approved `/v1` request/response schemas and operation states once in the public shared package; copy the versioned contract into the private package through a pinned public package version, not a filesystem link. The API proxy exposes only status, history, backup, restore-proof, upgrade, restore-validation/commit, and maintenance actions. Reject extra keys, raw paths, container names, shell arguments, and unknown operation kinds. Authenticate API-to-controller requests with a mounted 32-byte-or-longer secret and constant-time comparison. Require an idempotency key on mutations.
 - **Test first:** prove non-owners receive 403; malformed/extra fields receive 400; duplicate idempotency keys return the same operation; different payloads with the same key receive 409; unavailable controller returns sanitized 503; no public route accepts an arbitrary command.
 - **Verify:** run public API tests/build and private `pnpm test && pnpm build`; inspect `infra/Caddyfile.prod` to prove no `/v1` controller route is published.
@@ -117,7 +117,7 @@
 ## Verification
 
 1. Run public checks: `pnpm install --frozen-lockfile && pnpm test && pnpm build && pnpm release:safety`.
-2. Run private checks: `pnpm install --frozen-lockfile && pnpm test && pnpm build` in `openfieldpro-ops`.
+2. Run private checks: `pnpm install --frozen-lockfile && pnpm test && pnpm build` in `nnactpro-ops`.
 3. Start a disposable production-like deployment with separate temporary volumes and no host production mounts.
 4. Demonstrate accurate readiness for PostgreSQL, uploads, Redis, and schema failures without leaking internal details.
 5. Demonstrate an encrypted coordinated backup, S3-compatible replica, retention selection, and weekly isolated proof with no plaintext combined archive.

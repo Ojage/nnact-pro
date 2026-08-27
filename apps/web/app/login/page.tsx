@@ -6,6 +6,8 @@ import { login } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { BrandMark } from "@/components/brand-mark";
+import { NNACT_COMPANY } from "@nnact/shared";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,11 +35,11 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-surface-100 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-sm font-black text-white">
-            OF
-          </div>
+          <BrandMark size="lg" showSubtitle={false} className="mb-2" />
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>Access your NNACT Pro workspace.</CardDescription>
+          <CardDescription>
+            Access the {NNACT_COMPANY.shortName} technical operations workspace — HVAC, refrigeration, energy, and field maintenance.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">

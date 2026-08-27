@@ -1,10 +1,10 @@
-# OpenFieldPro Brand Kit
+# NnactPro Brand Kit
 
 Business model, positioning, and public voice are governed by `docs/product/BUSINESS_PLAN_AND_VOICE.md`. This brand kit should be read as the visual and copy companion to that canon.
 
 ## Brand position
 
-OpenFieldPro is an open-source field service command center for service businesses that want to own their software, data, workflows, and customer experience.
+NnactPro is an open-source field service command center for service businesses that want to own their software, data, workflows, and customer experience.
 
 **Primary idea:** Own your field operations.
 
@@ -14,7 +14,7 @@ OpenFieldPro is an open-source field service command center for service business
 
 ## Voice
 
-OpenFieldPro should sound practical, direct, and field-ready.
+NnactPro should sound practical, direct, and field-ready.
 
 Use:
 
@@ -95,7 +95,7 @@ Current repo implementation uses system-safe Inter-first stacks through `apps/we
 
 ## Logo direction
 
-Use a compact OpenFieldPro mark that reads as an operational field tile: an open square, field grid, route point, or `OF` lockup. The mark should work inside the app sidebar, favicon, docs, and landing page.
+Use a compact NnactPro mark that reads as an operational field tile: an open square, field grid, route point, or `OF` lockup. The mark should work inside the app sidebar, favicon, docs, and landing page.
 
 Current implemented mark: `OF` inside a rounded Field Green command tile.
 

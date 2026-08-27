@@ -1,5 +1,8 @@
 // Pure money math, shared by job/estimate/invoice totals. Cents in, cents out.
-// Kept dependency-free so it's unit-testable without a database.
+// Kept dependency-free of the database so it's unit-testable without one.
+import { formatMoney } from "@nnact/shared";
+
+export { formatMoney }; // shared formatter: org currency (default Central African CFA franc, XAF)
 export interface LineLike {
   quantity: number;
   unitPrice: number; // cents (revenue side)
@@ -33,10 +36,6 @@ export function jobCost(lines: LineLike[], laborCostCents: number): number {
 // downstream code never needs to clamp to zero (which would hide losses).
 export function jobMargin(total: number, cost: number): number {
   return total - cost;
-}
-
-export function formatMoney(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 // ── Discounts and taxes ────────────────────────────────────────────────────

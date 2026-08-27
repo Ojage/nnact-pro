@@ -4,7 +4,7 @@ umask 077
 
 if [ $# -ne 2 ] || [ "$2" != "--confirm-destroy-current-data" ]; then
   cat >&2 <<'USAGE'
-Usage: scripts/restore.sh backups/openfieldpro-YYYYMMDDTHHMMSSZ.tar.gz.age --confirm-destroy-current-data
+Usage: scripts/restore.sh backups/nnactpro-YYYYMMDDTHHMMSSZ.tar.gz.age --confirm-destroy-current-data
 
 Restore stops application services, replaces the current database and upload directory, verifies the
 backup checksums, applies the reviewed current schema, and restarts the stack. Run it first in an
@@ -47,7 +47,7 @@ if [ -z "${BACKUP_AGE_IDENTITY_FILE:-}" ] || [ ! -f "${BACKUP_AGE_IDENTITY_FILE}
   exit 1
 fi
 
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/openfieldpro-restore.XXXXXX")"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/nnactpro-restore.XXXXXX")"
 trap 'rm -rf "$WORK_DIR"' EXIT
 age --decrypt -i "$BACKUP_AGE_IDENTITY_FILE" -o "$WORK_DIR/payload.tar.gz" "$BACKUP_FILE"
 tar -xzf "$WORK_DIR/payload.tar.gz" -C "$WORK_DIR"
@@ -58,7 +58,7 @@ for required in manifest.txt SHA256SUMS ofp.dump; do
     exit 1
   fi
 done
-if ! grep -qx 'format=openfieldpro-backup-v2' "$WORK_DIR/manifest.txt"; then
+if ! grep -qx 'format=nnactpro-backup-v2' "$WORK_DIR/manifest.txt"; then
   echo "Unsupported backup format." >&2
   exit 1
 fi

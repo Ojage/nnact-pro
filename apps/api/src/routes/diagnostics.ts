@@ -104,6 +104,8 @@ const sessionCreateSchema = z.object({
   jobId: z.string().uuid(),
   equipmentId: z.string().uuid(),
   workflowId: z.string().uuid().optional(),
+  knownFaultId: z.string().uuid().optional(),
+  equipmentModelId: z.string().uuid().optional(),
   customerComplaint: z.string().optional(),
   technicianObservation: z.string().optional(),
   errorCodes: z.array(z.string()).optional(),
@@ -135,6 +137,9 @@ const sessionPatchSchema = z.object({
     .optional(),
   disposition: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
+  knownFaultId: z.string().uuid().nullable().optional(),
+  equipmentModelId: z.string().uuid().nullable().optional(),
+  workflowId: z.string().uuid().nullable().optional(),
 });
 
 const measurementCreateSchema = z.object({

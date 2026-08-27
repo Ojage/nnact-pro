@@ -1,14 +1,14 @@
-# OpenFieldPro business plan and voice
+# NnactPro business plan and voice
 
 This is the public product canon for business model, positioning, and tone. If a README section, sponsor pitch, product page, entitlement copy, or UI message conflicts with this document, this document wins.
 
 ## Position
 
-OpenFieldPro is an open-source, self-hostable field-service management platform for independent service businesses that want to own their software, data, workflows, and customer experience.
+NnactPro is an open-source, self-hostable field-service management platform for independent service businesses that want to own their software, data, workflows, and customer experience.
 
 Primary idea: **Own your field operations.**
 
-OpenFieldPro covers the lead-to-payment workflow: customer intake, properties, scheduling, dispatch, work orders, estimates, invoices, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows.
+NnactPro covers the lead-to-payment workflow: customer intake, properties, scheduling, dispatch, work orders, estimates, invoices, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows.
 
 Appliance-service depth is an optional vertical workflow, not the whole product definition.
 
@@ -16,7 +16,7 @@ Appliance-service depth is an optional vertical workflow, not the whole product 
 
 The AGPL core is free to self-host and complete enough to run real field-service operations.
 
-OpenFieldPro must not charge by user, technician, customer, job, invoice, location, or core operational feature. The core must not depend on OpenFieldPro infrastructure, telemetry, a license server, or phone-home checks.
+NnactPro must not charge by user, technician, customer, job, invoice, location, or core operational feature. The core must not depend on NnactPro infrastructure, telemetry, a license server, or phone-home checks.
 
 Revenue can come from:
 
@@ -58,7 +58,7 @@ Only approved public sponsor copy may enter an official build. Sponsor operation
 
 ## Voice
 
-OpenFieldPro should sound practical, direct, and field-ready.
+NnactPro should sound practical, direct, and field-ready.
 
 Use:
 
@@ -87,7 +87,7 @@ Preferred phrases:
 
 ## Product promises
 
-OpenFieldPro can promise:
+NnactPro can promise:
 
 - self-hostable source under AGPL;
 - no mandatory per-user subscriptions for the core;
@@ -96,7 +96,7 @@ OpenFieldPro can promise:
 - data ownership and export-friendly architecture;
 - release gates for security, dependency, build, and product checks.
 
-OpenFieldPro must not promise:
+NnactPro must not promise:
 
 - managed hosting unless that service exists;
 - automatic compliance with trade, tax, accounting, or privacy laws;

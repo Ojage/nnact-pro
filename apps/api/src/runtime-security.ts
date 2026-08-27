@@ -31,7 +31,7 @@ export function resolveJwtSecret(env: NodeJS.ProcessEnv = process.env) {
     }
     return configured;
   }
-  return configured || "openfieldpro-development-only-secret";
+  return configured || "nnactpro-development-only-secret";
 }
 
 export function resolveCorsOrigin(env: NodeJS.ProcessEnv = process.env): true | string | string[] {

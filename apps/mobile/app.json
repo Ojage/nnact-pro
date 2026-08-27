@@ -3,10 +3,20 @@
     "name": "NNACT Pro",
     "slug": "nnact-pro",
     "version": "0.1.0",
+    "description": "NNACT Pro — field operations for HVAC, refrigeration, electrical, solar, and maintenance teams. Dispatch, diagnostics, Repair Brain, and mobile technician workflows.",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "splash": { "backgroundColor": "#0b1020" },
-    "ios": { "supportsTablet": true },
-    "android": {}
+    "splash": { "backgroundColor": "#0f172a" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nnact.pro"
+    },
+    "android": {
+      "package": "com.nnact.pro"
+    },
+    "extra": {
+      "companyName": "NNACT",
+      "tagline": "The Power of Dreams"
+    }
   }
 }

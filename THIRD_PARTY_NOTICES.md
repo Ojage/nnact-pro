@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-NNACT Pro (derived from OpenFieldPro) is licensed under the GNU Affero General Public License,
+NNACT Pro (derived from NnactPro) is licensed under the GNU Affero General Public License,
 version 3.0 only (see `LICENSE`). This notice lists the principal third-party
 libraries the project depends on at runtime. Full license texts are
 distributed with the packages in `node_modules` and are also available from

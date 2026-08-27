@@ -6,23 +6,35 @@ import { resolveOrgId } from "./org.js";
 
 const createSchema = z.object({
   customerId: z.string().uuid(),
+  propertyId: z.string().uuid().optional(),
+  equipmentModelId: z.string().uuid().optional(),
   type: z.string().min(1),
   make: z.string().optional(),
   model: z.string().optional(),
   serialNumber: z.string().optional(),
+  assetTag: z.string().optional(),
   installDate: z.string().datetime().optional(),
   warrantyExpiry: z.string().datetime().optional(),
+  condition: z.string().optional(),
+  lastMaintenance: z.string().datetime().optional(),
+  nextMaintenance: z.string().datetime().optional(),
   notes: z.string().optional(),
 });
 
 const patchSchema = z.object({
   customerId: z.string().uuid().optional(),
+  propertyId: z.string().uuid().nullable().optional(),
+  equipmentModelId: z.string().uuid().nullable().optional(),
   type: z.string().min(1).optional(),
   make: z.string().optional(),
   model: z.string().optional(),
   serialNumber: z.string().optional(),
+  assetTag: z.string().optional(),
   installDate: z.string().datetime().optional(),
   warrantyExpiry: z.string().datetime().optional(),
+  condition: z.string().optional(),
+  lastMaintenance: z.string().datetime().optional(),
+  nextMaintenance: z.string().datetime().optional(),
   notes: z.string().optional(),
 });
 
@@ -54,7 +66,7 @@ export async function equipmentRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    const { installDate, warrantyExpiry, ...rest } = parsed.data;
+    const { installDate, warrantyExpiry, lastMaintenance, nextMaintenance, ...rest } = parsed.data;
     const [row] = await db
       .insert(equipment)
       .values({
@@ -62,6 +74,8 @@ export async function equipmentRoutes(app: FastifyInstance) {
         ...rest,
         installDate: installDate ? new Date(installDate) : undefined,
         warrantyExpiry: warrantyExpiry ? new Date(warrantyExpiry) : undefined,
+        lastMaintenance: lastMaintenance ? new Date(lastMaintenance) : undefined,
+        nextMaintenance: nextMaintenance ? new Date(nextMaintenance) : undefined,
       })
       .returning();
     return reply.code(201).send(row);
@@ -72,7 +86,7 @@ export async function equipmentRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const parsed = patchSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    const { installDate, warrantyExpiry, ...rest } = parsed.data;
+    const { installDate, warrantyExpiry, lastMaintenance, nextMaintenance, ...rest } = parsed.data;
     const [row] = await db
       .update(equipment)
       .set({
@@ -82,6 +96,12 @@ export async function equipmentRoutes(app: FastifyInstance) {
           : {}),
         ...(warrantyExpiry !== undefined
           ? { warrantyExpiry: warrantyExpiry ? new Date(warrantyExpiry) : null }
+          : {}),
+        ...(lastMaintenance !== undefined
+          ? { lastMaintenance: lastMaintenance ? new Date(lastMaintenance) : null }
+          : {}),
+        ...(nextMaintenance !== undefined
+          ? { nextMaintenance: nextMaintenance ? new Date(nextMaintenance) : null }
           : {}),
       })
       .where(and(eq(equipment.orgId, orgId), eq(equipment.id, id)))

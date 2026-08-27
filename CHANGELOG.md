@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to OpenFieldPro are recorded here. This project follows
+All notable changes to NnactPro are recorded here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for release tags.
 
@@ -62,5 +62,5 @@ profile.
 - No public demo deployment or independent penetration test has been run.
 - The repository remains private; making it public is a separate decision.
 
-[Unreleased]: https://github.com/niko4244/openfieldpro/compare/v0.1.0-rc.1...ofp-monorepo
-[v0.1.0-rc.1]: https://github.com/niko4244/openfieldpro/tree/v0.1.0-rc.1
+[Unreleased]: https://github.com/niko4244/nnactpro/compare/v0.1.0-rc.1...ofp-monorepo
+[v0.1.0-rc.1]: https://github.com/niko4244/nnactpro/tree/v0.1.0-rc.1

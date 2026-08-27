@@ -2,7 +2,7 @@
 
 This document captures the file-level and commit-level diff between
 `archive/odysseus-original` (the preserved Odysseus project) and `ofp-monorepo`
-(the new Turborepo-based OpenFieldPro monorepo). It exists because these two
+(the new Turborepo-based NnactPro monorepo). It exists because these two
 branches share **no common history** (OFP was force-pushed as a clean
 replacement), so GitHub's PR review UI and the compare URL cannot render the
 diff. This file is the recovery mechanism.
@@ -139,7 +139,7 @@ Most recent Odysseus work at the time the archive ref was created. Full history:
 ## How to recover the full diff locally
 
 ```bash
-# from a clone of https://github.com/niko4244/openfieldpro
+# from a clone of https://github.com/niko4244/nnactpro
 git fetch origin
 
 # file-level diff (works for unrelated histories)
@@ -155,7 +155,7 @@ git checkout origin/archive/odysseus-original -- .
 
 ## Why no PR?
 
-`POST /repos/niko4244/openfieldpro/pulls` returned **HTTP 422**:
+`POST /repos/niko4244/nnactpro/pulls` returned **HTTP 422**:
 
 > The ofp-monorepo branch has no history in common with archive/odysseus-original
 
@@ -165,7 +165,7 @@ returns **404** for unrelated histories. This file replaces that gap.
 
 ## Background
 
-- **Default branch** on `niko4244/openfieldpro`: `ofp-monorepo`.
+- **Default branch** on `niko4244/nnactpro`: `ofp-monorepo`.
 - The original `main` (which held 426 Odysseus commits + 3 OFP-document commits) was renamed to `archive/odysseus-original` to preserve the work under a descriptive name.
 - The OFP monorepo replaces Odysseus entirely; no code is shared between the two branches.
 - This file is the user-facing artifact of the diff. The 426-commit Odysseus history remains on `archive/odysseus-original` for `git log` / `git checkout` / `git diff`.

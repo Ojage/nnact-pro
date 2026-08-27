@@ -7,7 +7,7 @@ on:
     branches: [ofp-monorepo]
 
 concurrency:
-  group: openfieldpro-release-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: nnactpro-release-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -88,9 +88,9 @@ jobs:
       - name: Build API
         run: |
           set +e
-          pnpm --filter @nnact/api build > /tmp/openfieldpro-api-build.log 2>&1
+          pnpm --filter @nnact/api build > /tmp/nnactpro-api-build.log 2>&1
           code=$?
-          tail -n 160 /tmp/openfieldpro-api-build.log
+          tail -n 160 /tmp/nnactpro-api-build.log
           exit $code
       - name: Run API tests
         run: pnpm --filter @nnact/api test
@@ -99,7 +99,7 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: api-compiler-log
-          path: /tmp/openfieldpro-api-build.log
+          path: /tmp/nnactpro-api-build.log
           if-no-files-found: ignore
 
   web:
@@ -120,9 +120,9 @@ jobs:
       - name: Build web application
         run: |
           set +e
-          pnpm --filter @nnact/web build > /tmp/openfieldpro-web-build.log 2>&1
+          pnpm --filter @nnact/web build > /tmp/nnactpro-web-build.log 2>&1
           code=$?
-          tail -n 180 /tmp/openfieldpro-web-build.log
+          tail -n 180 /tmp/nnactpro-web-build.log
           exit $code
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001
@@ -131,7 +131,7 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: web-compiler-log
-          path: /tmp/openfieldpro-web-build.log
+          path: /tmp/nnactpro-web-build.log
           if-no-files-found: ignore
 
   operations-visual-qa:
@@ -185,14 +185,14 @@ jobs:
       - name: Type-check technician app
         run: |
           set +e
-          pnpm --filter @nnact/mobile typecheck > /tmp/openfieldpro-mobile-typecheck.log 2>&1
+          pnpm --filter @nnact/mobile typecheck > /tmp/nnactpro-mobile-typecheck.log 2>&1
           code=$?
-          tail -n 160 /tmp/openfieldpro-mobile-typecheck.log
+          tail -n 160 /tmp/nnactpro-mobile-typecheck.log
           exit $code
       - name: Upload mobile compiler log
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: mobile-typecheck-log
-          path: /tmp/openfieldpro-mobile-typecheck.log
+          path: /tmp/nnactpro-mobile-typecheck.log
           if-no-files-found: ignore

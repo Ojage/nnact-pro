@@ -26,9 +26,16 @@ test("sumLines adds every line", () => {
   );
 });
 
-test("formatMoney renders cents as dollars", () => {
-  assert.equal(formatMoney(18900), "$189.00");
-  assert.equal(formatMoney(0), "$0.00");
+test("formatMoney defaults to the XAF (FCFA) currency with no minor units", () => {
+  assert.equal(formatMoney(18900), "FCFA 189");
+  assert.equal(formatMoney(0), "FCFA 0");
+});
+
+test("formatMoney renders the given currency explicitly", () => {
+  assert.equal(formatMoney(18900, "USD"), "$189.00");
+  assert.equal(formatMoney(18900, "EUR"), "€189,00"); // fr-FR digit grouping
+  assert.equal(formatMoney(18900, "JPY"), "¥189");
+  assert.equal(formatMoney(1_890_000, "NGN"), "₦18,900.00");
 });
 
 test("sumCosts computes per-line costs and tolerates missing unitCost", () => {

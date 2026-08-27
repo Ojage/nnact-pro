@@ -1,95 +1,391 @@
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
 
-/* ── NNACT Pro Field Command brand tokens ── */
-@theme {
-  --color-surface-50: #ffffff;
-  --color-surface-100: #f7f3ea;
-  --color-surface-200: #ede8dc;
-  --color-surface-300: #e3ddcf;
-  --color-surface-400: #d5cebd;
-  --color-surface-500: #c2baa8;
-  --color-surface-600: #9d9584;
+:root {
+  --font-size: 16px;
 
-  --color-border: #d1c9b8;
-  --color-border-light: #bcb39f;
+  /* ── Banking Design System: Light ── */
+  --background: #f8fafc;
+  --foreground: #1e293b;
+  --card: #ffffff;
+  --card-foreground: #1e293b;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --popover: #ffffff;
+  --popover-foreground: #1e293b;
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #e2e8f0;
+  --accent-foreground: #1e293b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --input-background: #ffffff;
+  --switch-background: #d1d5db;
+  --font-weight-medium: 600;
+  --font-weight-normal: 400;
+  --ring: #2563eb;
+  --radius: 0.75rem;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #1e293b;
+  --sidebar-primary: #1d4ed8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e2e8f0;
+  --sidebar-accent-foreground: #1e293b;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #2563eb;
+  --chart-1: #1d4ed8;
+  --chart-2: #16a34a;
+  --chart-3: #7c3aed;
+  --chart-4: #f59e0b;
+  --chart-5: #dc2626;
 
-  --color-fg: #111827;
-  --color-fg-muted: #526257;
-  --color-fg-dim: #7a887f;
-  --color-fg-link: #036672;
+  /* ── Banking Design System Tokens: Light ── */
+  --color-canvas-default: #ffffff;
+  --color-canvas-subtle: #f8fafc;
+  --color-fg-default: #1e293b;
+  --color-fg-muted: #64748b;
+  --color-fg-on-emphasis: #ffffff;
+  --color-border-default: #e5e7eb;
+  --color-neutral-muted: rgba(107, 114, 128, 0.15);
+  --color-neutral-emphasis: rgba(107, 114, 128, 0.3);
+  --color-nav-hover: #f1f5f9;
+  --color-nav-active: #e2e8f0;
+  --color-accent-fg: #1d4ed8;
+  --color-accent-subtle: #eff6ff;
+  --color-accent-emphasis: #1d4ed8;
+  --color-success-fg: #16a34a;
+  --color-success-subtle: #f0fdf4;
+  --color-success-emphasis: #16a34a;
+  --color-attention-fg: #d97706;
+  --color-attention-subtle: #fffbeb;
+  --color-attention-emphasis: #f59e0b;
+  --color-danger-fg: #dc2626;
+  --color-danger-subtle: #fef2f2;
+  --color-danger-emphasis: #dc2626;
 
-  --color-accent: #047857;
-  --color-accent-hover: #065f46;
-  --color-accent-muted: #dff7e8;
-
-  --color-green: #15803d;
-  --color-yellow: #9a5b13;
-  --color-red: #dc2626;
-  --color-blue: #087f99;
+  /* ── NNACT app aliases: light (resolved from the Banking palette above) ── */
+  --surface-50: #ffffff;
+  --surface-100: #f8fafc;
+  --surface-200: #f1f5f9;
+  --surface-300: #e2e8f0;
+  --surface-400: #cbd5e1;
+  --surface-500: #94a3b8;
+  --surface-600: #64748b;
+  --fg: #1e293b;
+  --fg-muted: #64748b;
+  --fg-dim: #94a3b8;
+  --fg-link: #1d4ed8;
+  --accent-app: #1d4ed8;
+  --accent-app-hover: #1e40af;
+  --accent-muted: #eff6ff;
+  --blue-app: #2563eb;
+  --border-light: #cbd5e1;
 }
 
-/* ── Dark theme ── */
-[data-theme="dark"] {
-  color-scheme: dark;
-  --color-surface-50: #0b1115;
-  --color-surface-100: #101820;
-  --color-surface-200: #132026;
-  --color-surface-300: #162a2f;
-  --color-surface-400: #1d3439;
-  --color-surface-500: #28464c;
-  --color-surface-600: #355a61;
+.dark {
+  /* ── Banking Design System: Dark ── */
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --card: #1e293b;
+  --card-foreground: #e2e8f0;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --popover: #0f172a;
+  --popover-foreground: #e2e8f0;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #334155;
+  --accent-foreground: #e2e8f0;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #334155;
+  --input: #334155;
+  --input-background: #0f172a;
+  --switch-background: #475569;
+  --ring: #60a5fa;
+  --sidebar: #0f172a;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #334155;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: #334155;
+  --sidebar-ring: #60a5fa;
+  --chart-1: #3b82f6;
+  --chart-2: #22c55e;
+  --chart-3: #a78bfa;
+  --chart-4: #fbbf24;
+  --chart-5: #f87171;
 
-  --color-border: #24383d;
-  --color-border-light: #355a61;
+  /* ── Banking Design System Tokens: Dark ── */
+  --color-canvas-default: #0f172a;
+  --color-canvas-subtle: #1e293b;
+  --color-fg-default: #e2e8f0;
+  --color-fg-muted: #94a3b8;
+  --color-fg-on-emphasis: #ffffff;
+  --color-border-default: #334155;
+  --color-neutral-muted: rgba(148, 163, 184, 0.15);
+  --color-neutral-emphasis: rgba(148, 163, 184, 0.3);
+  --color-nav-hover: #1e293b;
+  --color-nav-active: #334155;
+  --color-accent-fg: #60a5fa;
+  --color-accent-subtle: #1e3a5f;
+  --color-accent-emphasis: #3b82f6;
+  --color-success-fg: #22c55e;
+  --color-success-subtle: #052e16;
+  --color-success-emphasis: #16a34a;
+  --color-attention-fg: #fbbf24;
+  --color-attention-subtle: #451a03;
+  --color-attention-emphasis: #f59e0b;
+  --color-danger-fg: #f87171;
+  --color-danger-subtle: #450a0a;
+  --color-danger-emphasis: #dc2626;
 
-  --color-fg: #f5f7f2;
-  --color-fg-muted: #a9b7ae;
-  --color-fg-dim: #728179;
-  --color-fg-link: #7ee7f2;
+  /* ── NNACT app aliases: dark ── */
+  --surface-50: #0f172a;
+  --surface-100: #0f172a;
+  --surface-200: #1e293b;
+  --surface-300: #334155;
+  --surface-400: #475569;
+  --surface-500: #64748b;
+  --surface-600: #94a3b8;
+  --fg: #e2e8f0;
+  --fg-muted: #94a3b8;
+  --fg-dim: #64748b;
+  --fg-link: #60a5fa;
+  --accent-app: #3b82f6;
+  --accent-app-hover: #2563eb;
+  --accent-muted: #1e3a5f;
+  --blue-app: #60a5fa;
+  --border-light: #475569;
+}
 
-  --color-accent: #22c55e;
-  --color-accent-hover: #16a34a;
-  --color-accent-muted: #123826;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  /* "accent" is the NNACT primary action color (Banking accent-emphasis).
+     The design system's quiet gray accent is exposed via --color-secondary. */
+  --color-accent: var(--accent-app);
+  --color-accent-hover: var(--accent-app-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-light: var(--border-light);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
 
-  --color-green: #22c55e;
-  --color-yellow: #f59e0b;
-  --color-red: #ef4444;
-  --color-blue: #06b6d4;
+/* ── App-facing aliases → Tailwind utilities (surface-, fg-, status colors) ── */
+@theme {
+  --font-sans:
+    "Source Sans 3 Variable", "Source Sans Pro", "Source Sans 3", ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --color-surface-50: var(--surface-50);
+  --color-surface-100: var(--surface-100);
+  --color-surface-200: var(--surface-200);
+  --color-surface-300: var(--surface-300);
+  --color-surface-400: var(--surface-400);
+  --color-surface-500: var(--surface-500);
+  --color-surface-600: var(--surface-600);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-dim: var(--fg-dim);
+  --color-fg-link: var(--fg-link);
+  --color-green: var(--color-success-fg);
+  --color-yellow: var(--color-attention-fg);
+  --color-red: var(--color-danger-fg);
+  --color-blue: var(--blue-app);
 }
 
 @layer base {
-  * { @apply border-border; }
-
-  html {
-    @apply bg-surface-100;
-    color-scheme: light;
+  * {
+    @apply border-border outline-ring/50;
   }
 
   body {
-    @apply bg-surface-100 text-fg antialiased;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
 
-  ::selection { @apply bg-accent/30; }
+  ::selection { @apply bg-primary/20; }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-surface-500 rounded-full; }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+    border: 4px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: var(--muted-foreground); }
+  * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
   code { @apply text-fg-dim text-xs; }
   a { @apply text-fg-link no-underline hover:underline; }
 }
 
+/**
+ * Base typography. This is not applied to elements which have an ancestor
+ * with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      font-family: var(--font-sans);
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      font-family: var(--font-sans);
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      font-family: var(--font-sans);
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      font-family: var(--font-sans);
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+      font-family: var(--font-sans);
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      font-family: var(--font-sans);
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      font-family: var(--font-sans);
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+      font-family: var(--font-sans);
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* GitHub-style loader animations */
+@keyframes github-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes github-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0.2); opacity: 0.8; }
+  70% { transform: scale(1); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes collapsible-down {
+  from { height: 0; }
+  to { height: var(--radix-collapsible-content-height); }
+}
+
+@keyframes collapsible-up {
+  from { height: var(--radix-collapsible-content-height); }
+  to { height: 0; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes caret-blink {
+  0%, 70%, 100% { opacity: 1; }
+  20%, 50% { opacity: 0; }
+}
+
+.animate-caret-blink {
+  animation: caret-blink 1.2s ease-out infinite;
+}
+
 @layer components {
   .ofp-brand-mark {
-    @apply inline-grid place-items-center rounded-xl border border-accent/40 bg-accent text-surface-100 font-black tracking-tight shadow-sm;
+    @apply inline-grid place-items-center rounded-xl border border-accent/40 bg-accent text-white font-black tracking-tight shadow-sm;
   }
 
   .ofp-command-gradient {
     background:
       radial-gradient(circle at 20% 10%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 34%),
       radial-gradient(circle at 80% 20%, color-mix(in srgb, var(--color-blue) 12%, transparent), transparent 28%),
-      linear-gradient(135deg, var(--color-surface-100) 0%, var(--color-surface-200) 48%, var(--color-surface-300) 100%);
+      linear-gradient(135deg, var(--surface-100) 0%, var(--surface-200) 48%, var(--surface-300) 100%);
   }
 
   .ofp-grid-surface {

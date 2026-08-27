@@ -1,0 +1,41 @@
+@keyframes caret-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scaleY(1);
+    background-color: var(--primary);
+    box-shadow: 0 0 10px var(--primary);
+  }
+  50% {
+    opacity: 0;
+    transform: scaleY(0.7);
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+.animate-caret-blink {
+  animation: caret-blink 1.2s ease-out infinite !important;
+}
+
+.input-otp-slot-fancy {
+  transition: all 300ms ease;
+  border: 2px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background-color: #f8fafc;
+}
+
+.input-otp-slot-fancy[data-active="true"] {
+  border-color: var(--primary);
+  background-color: #ffffff;
+  transform: scale(1.05);
+  z-index: 10;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 20%, transparent);
+}
+
+.dark .input-otp-slot-fancy {
+  background-color: #0f172a;
+}
+
+.dark .input-otp-slot-fancy[data-active="true"] {
+  background-color: #1e293b;
+}

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import type { JobDTO } from "@nnact/shared";
 import { SyncService, type FieldPackage } from "./src/sync";
+import { colors, fonts } from "./src/theme";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
 const AUTH_TOKEN = process.env.EXPO_PUBLIC_AUTH_TOKEN ?? "";
@@ -63,10 +64,10 @@ function humanize(value: string) {
 }
 
 function statusColor(status: string) {
-  if (["blocked", "escalated", "suspended"].includes(status)) return "#ff8080";
-  if (["diagnosed", "completed"].includes(status)) return "#86e29a";
-  if (["testing", "workflow_ready"].includes(status)) return "#7ab8ff";
-  return "#e0b34f";
+  if (["blocked", "escalated", "suspended"].includes(status)) return colors.danger;
+  if (["diagnosed", "completed"].includes(status)) return colors.success;
+  if (["testing", "workflow_ready"].includes(status)) return colors.focus;
+  return colors.warning;
 }
 
 function packageToDiagnostic(fieldPackage: FieldPackage): DiagnosticListItem | null {
@@ -215,7 +216,7 @@ export default function App() {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading today’s field work…</Text>
         </View>
         <StatusBar style="light" />
@@ -236,14 +237,14 @@ export default function App() {
               setRefreshing(true);
               void load();
             }}
-            tintColor="#22c55e"
+            tintColor={colors.primary}
           />
         }
       >
         <View style={styles.header}>
           <View style={styles.headerStatusRow}>
-            <Text style={styles.eyebrow}>OPENFIELDPRO FIELD</Text>
-            <Text style={[styles.connectivity, { color: offline ? "#e0b34f" : "#86e29a" }]}>
+            <Text style={styles.eyebrow}>NNAC FIELD</Text>
+            <Text style={[styles.connectivity, { color: offline ? colors.warning : colors.success }]}>
               {offline ? "OFFLINE" : "ONLINE"}
             </Text>
           </View>
@@ -409,46 +410,46 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0b1020" },
+  container: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 58, paddingBottom: 24 },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { color: "#8a97c2", fontSize: 14 },
+  loadingText: { color: colors.mutedForeground, fontSize: 14, fontFamily: fonts.regular },
   header: { paddingHorizontal: 20, marginBottom: 22 },
   headerStatusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  eyebrow: { color: "#22c55e", fontSize: 10, fontWeight: "800", letterSpacing: 2 },
-  connectivity: { fontSize: 9, fontWeight: "900", letterSpacing: 1.4 },
-  headerTitle: { color: "#e6e9f0", fontSize: 32, fontWeight: "800", letterSpacing: -0.8, marginTop: 4 },
-  headerSub: { color: "#8a97c2", fontSize: 12, marginTop: 5 },
-  errorBanner: { marginHorizontal: 20, marginBottom: 18, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,128,128,.28)", backgroundColor: "rgba(255,128,128,.08)", padding: 14 },
-  offlineBanner: { borderColor: "rgba(224,179,79,.28)", backgroundColor: "rgba(224,179,79,.08)" },
-  errorTitle: { color: "#ff8080", fontSize: 13, fontWeight: "700" },
-  offlineTitle: { color: "#e0b34f" },
-  errorMessage: { color: "#8a97c2", fontSize: 11, marginTop: 4 },
+  eyebrow: { color: colors.primary, fontSize: 10, fontFamily: fonts.extraBold, letterSpacing: 2 },
+  connectivity: { fontSize: 9, fontFamily: fonts.black, letterSpacing: 1.4 },
+  headerTitle: { color: colors.foreground, fontSize: 32, fontFamily: fonts.extraBold, letterSpacing: -0.8, marginTop: 4 },
+  headerSub: { color: colors.mutedForeground, fontSize: 12, marginTop: 5, fontFamily: fonts.regular },
+  errorBanner: { marginHorizontal: 20, marginBottom: 18, borderRadius: 12, borderWidth: 1, borderColor: colors.dangerAlpha, backgroundColor: colors.dangerAlpha, padding: 14 },
+  offlineBanner: { borderColor: colors.warningAlpha, backgroundColor: colors.warningAlpha },
+  errorTitle: { color: colors.danger, fontSize: 13, fontFamily: fonts.bold },
+  offlineTitle: { color: colors.warning },
+  errorMessage: { color: colors.mutedForeground, fontSize: 11, marginTop: 4, fontFamily: fonts.regular },
   section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionTitle: { color: "#e6e9f0", fontSize: 16, fontWeight: "700", marginBottom: 11 },
-  sectionCount: { color: "#6b7aa8", fontSize: 12, fontWeight: "700", marginBottom: 11 },
-  primaryCard: { borderRadius: 18, borderWidth: 1, borderColor: "rgba(34,197,94,.35)", backgroundColor: "#141b33", padding: 16 },
+  sectionTitle: { color: colors.foreground, fontSize: 16, fontFamily: fonts.bold, marginBottom: 11 },
+  sectionCount: { color: colors.dimForeground, fontSize: 12, fontFamily: fonts.bold, marginBottom: 11 },
+  primaryCard: { borderRadius: 18, borderWidth: 1, borderColor: colors.focus, backgroundColor: colors.card, padding: 16 },
   rowBetween: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   flexOne: { flex: 1, minWidth: 0 },
-  timeBlock: { width: 72, borderRadius: 12, backgroundColor: "#0f1630", paddingVertical: 9, alignItems: "center" },
-  timeText: { color: "#e6e9f0", fontSize: 16, fontWeight: "800" },
-  timeLabel: { color: "#6b7aa8", fontSize: 9, marginTop: 2, textTransform: "uppercase" },
-  cardTitle: { color: "#e6e9f0", fontSize: 17, fontWeight: "700" },
-  cardMeta: { color: "#8a97c2", fontSize: 11, marginTop: 3 },
-  appliancePanel: { marginTop: 14, borderRadius: 13, backgroundColor: "#0f1630", padding: 13 },
-  applianceTitle: { color: "#e6e9f0", fontSize: 14, fontWeight: "700" },
+  timeBlock: { width: 72, borderRadius: 12, backgroundColor: colors.cardMuted, paddingVertical: 9, alignItems: "center" },
+  timeText: { color: colors.foreground, fontSize: 16, fontFamily: fonts.extraBold },
+  timeLabel: { color: colors.dimForeground, fontSize: 9, marginTop: 2, textTransform: "uppercase" },
+  cardTitle: { color: colors.foreground, fontSize: 17, fontFamily: fonts.bold },
+  cardMeta: { color: colors.mutedForeground, fontSize: 11, marginTop: 3, fontFamily: fonts.regular },
+  appliancePanel: { marginTop: 14, borderRadius: 13, backgroundColor: colors.cardMuted, padding: 13 },
+  applianceTitle: { color: colors.foreground, fontSize: 14, fontFamily: fonts.bold },
   statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
-  statusText: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
-  complaintText: { color: "#aab4d0", fontSize: 12, lineHeight: 17, marginTop: 10 },
-  warningPanel: { marginTop: 14, borderRadius: 13, backgroundColor: "rgba(224,179,79,.08)", padding: 13 },
-  warningTitle: { color: "#e0b34f", fontSize: 13, fontWeight: "700" },
-  emptyCard: { borderRadius: 14, backgroundColor: "#141b33", paddingVertical: 28, paddingHorizontal: 18, alignItems: "center" },
-  emptyTitle: { color: "#8a97c2", fontSize: 14, fontWeight: "700", textAlign: "center" },
-  emptyText: { color: "#6b7aa8", fontSize: 11, lineHeight: 16, marginTop: 5, textAlign: "center" },
-  listCard: { borderRadius: 14, backgroundColor: "#141b33", borderWidth: 1, borderColor: "#1d2440", padding: 14, marginBottom: 9 },
-  listTitle: { color: "#e6e9f0", fontSize: 13, fontWeight: "700" },
-  smallStatus: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
-  routeCard: { flexDirection: "row", alignItems: "center", gap: 13, borderRadius: 13, backgroundColor: "#141b33", padding: 13, marginBottom: 8 },
-  routeTime: { width: 70, color: "#7ab8ff", fontSize: 13, fontWeight: "800" },
+  statusText: { fontSize: 9, fontFamily: fonts.extraBold, textTransform: "uppercase" },
+  complaintText: { color: colors.mutedForeground, fontSize: 12, lineHeight: 17, marginTop: 10, fontFamily: fonts.regular },
+  warningPanel: { marginTop: 14, borderRadius: 13, backgroundColor: colors.warningAlpha, padding: 13 },
+  warningTitle: { color: colors.warning, fontSize: 13, fontFamily: fonts.bold },
+  emptyCard: { borderRadius: 14, backgroundColor: colors.card, paddingVertical: 28, paddingHorizontal: 18, alignItems: "center" },
+  emptyTitle: { color: colors.mutedForeground, fontSize: 14, fontFamily: fonts.bold, textAlign: "center" },
+  emptyText: { color: colors.dimForeground, fontSize: 11, lineHeight: 16, marginTop: 5, textAlign: "center", fontFamily: fonts.regular },
+  listCard: { borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 9 },
+  listTitle: { color: colors.foreground, fontSize: 13, fontFamily: fonts.bold },
+  smallStatus: { fontSize: 9, fontFamily: fonts.extraBold, textTransform: "uppercase" },
+  routeCard: { flexDirection: "row", alignItems: "center", gap: 13, borderRadius: 13, backgroundColor: colors.card, padding: 13, marginBottom: 8 },
+  routeTime: { width: 70, color: colors.focus, fontSize: 13, fontFamily: fonts.extraBold },
 });

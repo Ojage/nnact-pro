@@ -50,11 +50,67 @@ pnpm infra:up
 pnpm db:push
 pnpm db:seed
 pnpm dev
-# Web: http://localhost:3000
-# API: http://localhost:3001
 ```
 
 `pnpm install:verified` regenerates the lockfile from committed manifests, verifies its pinned SHA-256, and then performs a frozen install. Dependency changes must update both the generated lockfile and `pnpm-lock.expected.sha256`.
+
+## Run the applications
+
+All commands run from the repository root (pnpm workspaces). Every app reads its
+port and URL configuration from `.env`; the local example used in this repository
+is `API_PORT=3003` and `PUBLIC_WEB_URL=http://localhost:3006`, so **adjust the
+URLs below if your `.env` differs** (`.env.example` ships with 3000/3001 defaults).
+
+| App | Command | URL |
+|---|---|---|
+| API (Fastify) | `pnpm dev:api` | http://localhost:3003 |
+| Web (Next.js) | `pnpm dev:web` | http://localhost:3006 |
+| Mobile (Expo Metro) | `pnpm --filter @nnact/mobile dev` | http://localhost:8081 |
+| All apps together | `pnpm dev` | see rows above |
+
+### API
+
+```bash
+pnpm dev:api
+curl http://localhost:3003/api/health   # { ok: true, service: "ofp-api", ... }
+```
+
+Also available: `API_PORT=4000 pnpm dev:api` to override `API_PORT` for one run.
+For a physical phone to reach the API during mobile development, the API must
+listen on your LAN address (bind `0.0.0.0`); the local example uses
+`http://192.168.1.191:3003`.
+
+### Web
+
+```bash
+pnpm dev:web   # http://localhost:3006
+```
+
+The browser origin must match `CORS_ORIGIN` (and `PUBLIC_WEB_URL`) in `.env`;
+the API only accepts the configured origins. Any change to `.env` requires
+restarting the dev servers.
+
+### Mobile (Expo / React Native)
+
+```bash
+# LAN IP of the machine running the API, or your phone's tunnel to it:
+EXPO_PUBLIC_API_URL=http://localhost:3003 pnpm --filter @nnact/mobile dev
+```
+
+- With Expo Go installed, scan the QR code from `localhost:8081`.
+- The app defaults to `http://localhost:3001` when `EXPO_PUBLIC_API_URL` is
+  unset (`apps/mobile/App.tsx`). For a physical device point it at the API host's
+  LAN IP, e.g. `EXPO_PUBLIC_API_URL=http://192.168.1.191:3003`.
+- No emulator is required; the app runs through Expo Go on the phone.
+
+### One-time prerequisites and teardown
+
+```bash
+pnpm infra:up    # Postgres (5433), Redis (6379), MinIO (9100/9101), Caddy (8080)
+pnpm db:push     # sync Drizzle schema to the local database
+pnpm db:seed     # demo org, users, customers, and work orders
+pnpm infra:down  # stop only the containers; keep it, else restart with infra:up
+```
 
 Run the primary validation gates:
 

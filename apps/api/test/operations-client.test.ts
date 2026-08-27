@@ -57,7 +57,7 @@ async function withAuthenticatedApp(
   const priorCorsOrigin = process.env.CORS_ORIGIN;
   process.env.NODE_ENV = "production";
   process.env.JWT_SECRET = "j".repeat(32);
-  process.env.CORS_ORIGIN = "https://openfieldpro.test";
+  process.env.CORS_ORIGIN = "https://nnactpro.test";
   const app = buildServer({ operationsClient });
   try {
     await app.ready();

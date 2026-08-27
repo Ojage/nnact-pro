@@ -1,6 +1,6 @@
-# OpenFieldPro Self-Hosting Operations
+# NnactPro Self-Hosting Operations
 
-This guide covers the first production-grade operator tasks for a self-hosted OpenFieldPro install.
+This guide covers the first production-grade operator tasks for a self-hosted NnactPro install.
 
 ## Install
 
@@ -24,7 +24,7 @@ The script pulls the latest code, rebuilds containers, and restarts the producti
 scripts/backup.sh
 ```
 
-Backups are written as encrypted `backups/openfieldpro-YYYYMMDDTHHMMSSZ.tar.gz.age` archives and include:
+Backups are written as encrypted `backups/nnactpro-YYYYMMDDTHHMMSSZ.tar.gz.age` archives and include:
 
 - PostgreSQL custom-format dump
 - Upload filesystem archive when present
@@ -33,7 +33,7 @@ Backups are written as encrypted `backups/openfieldpro-YYYYMMDDTHHMMSSZ.tar.gz.a
 ## Restore
 
 ```bash
-scripts/restore.sh backups/openfieldpro-YYYYMMDDTHHMMSSZ.tar.gz.age --confirm-destroy-current-data
+scripts/restore.sh backups/nnactpro-YYYYMMDDTHHMMSSZ.tar.gz.age --confirm-destroy-current-data
 ```
 
 Restore drops and recreates the public schema, imports the SQL dump, restores the upload filesystem archive if present, and restarts the stack.

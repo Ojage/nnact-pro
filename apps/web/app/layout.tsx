@@ -1,18 +1,18 @@
 import type { ReactNode } from "react";
+import "@fontsource-variable/source-sans-3";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/app-shell";
+import { SiteJsonLd } from "@/components/json-ld";
+import { buildRootMetadata } from "@/lib/site-metadata";
 
-export const metadata = {
-  title: "NNACT Pro — Open-source field service management",
-  description:
-    "Open-source field service management with CRM, scheduling, dispatch, estimates, invoices, payments, service plans, reporting, and technician mobile workflows.",
-};
+export const metadata = buildRootMetadata();
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning>
+    <html lang="en-CM" data-theme="light" suppressHydrationWarning>
       <body>
+        <SiteJsonLd />
         <ThemeProvider>
           <AppShell>{children}</AppShell>
         </ThemeProvider>

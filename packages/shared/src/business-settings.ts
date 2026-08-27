@@ -3,6 +3,9 @@ export type InvoiceDueTerm = "on_receipt" | "work_start" | "work_completion" | "
 export type EstimateApprovalMode = "single_option" | "multiple_options";
 export type DepositMode = "none" | "fixed" | "percent";
 
+import type { CurrencyCode } from "./currency.js";
+import { DEFAULT_CURRENCY, isCurrencyCode } from "./currency.js";
+
 export interface BusinessHoursSettings {
   timezone: string;
   workDays: string[];
@@ -137,6 +140,8 @@ export interface PortalSettings {
 }
 
 export interface BusinessSettings {
+  /** ISO 4217 currency used for estimates, invoices, payments, and emails. */
+  currency: CurrencyCode;
   businessHours: BusinessHoursSettings;
   serviceAreas: string[];
   invoice: InvoiceSettings;
@@ -149,6 +154,7 @@ export interface BusinessSettings {
 }
 
 export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
+  currency: DEFAULT_CURRENCY,
   businessHours: {
     timezone: "America/New_York",
     workDays: ["mon", "tue", "wed", "thu", "fri"],
@@ -240,6 +246,7 @@ export function mergeBusinessSettings(input: unknown): BusinessSettings {
   return {
     ...DEFAULT_BUSINESS_SETTINGS,
     ...value,
+    currency: isCurrencyCode(value.currency) ? value.currency : DEFAULT_CURRENCY,
     businessHours: {
       ...DEFAULT_BUSINESS_SETTINGS.businessHours,
       ...(isRecord(value.businessHours) ? value.businessHours : {}),

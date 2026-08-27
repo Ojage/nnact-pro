@@ -50,7 +50,7 @@ test("invoice document uses configured message and hides customer info when disa
   assert.match(html, /Configured invoice message/);
   assert.match(html, /<img class="logo"[^>]+marcos-logo\.png[^>]+Marco&#039;s Appliance Repair Company logo/);
   assert.match(html, /Configured payment instructions/);
-  assert.match(html, /\$189\.00/);
+  assert.match(html, /FCFA 189/);
   assert.match(html, />Hidden<\/td>/);
   assert.doesNotMatch(html, /Private Customer/);
   assert.doesNotMatch(html, /private@example\.test/);
@@ -73,5 +73,18 @@ test("estimate document renders Good, Better, Best and marks the approved option
   assert.match(html, /Good/);
   assert.match(html, /<h2>Better<\/h2><span>Approved<\/span>/);
   assert.match(html, /Best/);
+  assert.match(html, /FCFA 300/);
+});
+
+test("estimate document renders totals in the org currency override", () => {
+  const html = estimateDocumentHtml({
+    estimate: { id: "estimate-2", number: "EST-1002", total: 30_000, accepted: false, status: "sent", options: [] },
+    customer: { name: "Customer" },
+    job: { title: "Cooling repair" },
+    lineItems: [{ description: "Replacement", quantity: 1, unitPrice: 30_000 }],
+    org: orgWith({ currency: "USD" }),
+  });
+
   assert.match(html, /\$300\.00/);
+  assert.doesNotMatch(html, /FCFA/);
 });

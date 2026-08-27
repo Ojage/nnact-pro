@@ -1,6 +1,6 @@
-# OpenFieldPro — Feature Comparison, Gap Analysis & Improvement Plan
+# NnactPro — Feature Comparison, Gap Analysis & Improvement Plan
 
-_Generated 2026-06-28. Source of truth: the running build at `C:\Users\nikma\openfieldpro`
+_Generated 2026-06-28. Source of truth: the running build at `C:\Users\nikma\nnactpro`
 (web on :3000, served by Next 15 / PID confirmed). Goal is **not** to clone incumbent
 field-service SaaS. It is to ship a leaner, open, profitability-first alternative that wins on
 price transparency, open extensibility, visible margins, and data ownership._
@@ -14,17 +14,17 @@ price transparency, open extensibility, visible margins, and data ownership._
   `page.tsx` (200–570 lines each, plus `[id]` detail pages), the `apps/worker` reminder loop,
   and the README roadmap.
 - **Live UI**: the web frontend renders, but every data panel shows **"API unreachable."**
-  Root cause found: this checkout (`~/openfieldpro` @ `6223a28`) still ships the buggy
+  Root cause found: this checkout (`~/nnactpro` @ `6223a28`) still ships the buggy
   `isMain` guard in `apps/api/src/server.ts:41` —
   `import.meta.url === \`file://${process.argv[1]}\`` never matches on Windows (drive-letter +
   backslash vs `file:///C:/…` forward-slash URL), so `.listen()` is never called and the API
-  never binds :3001. The `pathToFileURL()` fix exists only in the parallel `~/openfieldpro-app`
+  never binds :3001. The `pathToFileURL()` fix exists only in the parallel `~/nnactpro-app`
   checkout and was never merged here. **One-line fix** unblocks the live stack — call it Quick
   Win #0.
 
 ---
 
-## 1. What OpenFieldPro has today (the 10 tabs + backend)
+## 1. What NnactPro has today (the 10 tabs + backend)
 
 | Tab / module | Backend | Status |
 |---|---|---|
@@ -281,7 +281,7 @@ A **Developer** sub-tab to sideload a manifest, validate it, and watch delivery 
 5. **Attachments/photos** — MinIO is wired; mobile already does presigned PUT.
 
 ## 8. Decisions needed from you
-- **Repo**: merge `~/openfieldpro-app` and `~/openfieldpro` into one canonical checkout? (They've
+- **Repo**: merge `~/nnactpro-app` and `~/nnactpro` into one canonical checkout? (They've
   diverged — the API fix lives in one, the latest features in the other.)
 - **Plugin model**: confirm **webhook + scoped-token + manifest** as v1 (recommended) vs trying to
   support in-process third-party code from the start (riskier).

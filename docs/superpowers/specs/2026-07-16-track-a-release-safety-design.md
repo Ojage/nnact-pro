@@ -1,4 +1,4 @@
-# OpenFieldPro Track A: Release Safety Foundation
+# NnactPro Track A: Release Safety Foundation
 
 Date: 2026-07-16  
 Status: Approved; implementation plan ready
@@ -6,9 +6,9 @@ Sequence: Track A precedes Track B financial integrity and customer documents
 
 ## Purpose
 
-OpenFieldPro must protect customer records, invoices, payments, and uploads before broader public use. The current backup and deployment scripts contain useful pieces, but they do not provide a coordinated recovery boundary, proven restores, migration-gated upgrades, dependency-aware health reporting, retention, off-site replication, or reliable failure alerts.
+NnactPro must protect customer records, invoices, payments, and uploads before broader public use. The current backup and deployment scripts contain useful pieces, but they do not provide a coordinated recovery boundary, proven restores, migration-gated upgrades, dependency-aware health reporting, retention, off-site replication, or reliable failure alerts.
 
-Track A adds a private operations controller that remains usable when the main application or database is unhealthy. It owns install, upgrade, backup, migration, restore, validation, retention, replication, and operational alerts. OpenFieldPro displays status and requests operations through an owner-only proxy, but it never receives raw host access.
+Track A adds a private operations controller that remains usable when the main application or database is unhealthy. It owns install, upgrade, backup, migration, restore, validation, retention, replication, and operational alerts. NnactPro displays status and requests operations through an owner-only proxy, but it never receives raw host access.
 
 ## Goals
 
@@ -49,7 +49,7 @@ The new `ofp-ops` component is a small private service and host CLI. It runs on 
 - operational email, webhook, and ntfy alerts;
 - a durable operations journal stored outside the application database.
 
-The OpenFieldPro API provides an owner-only proxy for status and operation requests. The proxy never accepts arbitrary commands, paths, credentials, container names, or shell arguments. The host CLI talks directly to `ofp-ops` and remains available when OpenFieldPro or PostgreSQL is unavailable.
+The NnactPro API provides an owner-only proxy for status and operation requests. The proxy never accepts arbitrary commands, paths, credentials, container names, or shell arguments. The host CLI talks directly to `ofp-ops` and remains available when NnactPro or PostgreSQL is unavailable.
 
 ### Private API contract
 
@@ -210,7 +210,7 @@ The restore wizard requires backup selection, completed isolated validation, vis
 ## Security requirements
 
 - The controller is not publicly exposed.
-- Only owners may request operations through OpenFieldPro.
+- Only owners may request operations through NnactPro.
 - Restore commit requires recent reauthentication and a short-lived confirmation grant.
 - All controller mutations are idempotent and audited.
 - Archive encryption is mandatory; plaintext combined archives are forbidden.

@@ -1,4 +1,4 @@
-# OpenFieldPro Release Checklist
+# NnactPro Release Checklist
 
 A release is ready only when every required gate below is complete and evidence is attached to the release or pull request. A green build alone is insufficient.
 
@@ -121,7 +121,7 @@ When Stripe is enabled:
 - [ ] Webhook amount must equal the current outstanding balance.
 - [ ] Partial, full, duplicate, overpayment, paid, void, and refund behavior is tested.
 - [ ] Concurrent manual and online payments cannot overpay the invoice.
-- [ ] No raw card number or CVC passes through OpenFieldPro servers.
+- [ ] No raw card number or CVC passes through NnactPro servers.
 
 ## 8. Data protection
 

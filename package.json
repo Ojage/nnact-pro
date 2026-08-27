@@ -2,7 +2,7 @@
   "name": "nnact-pro",
   "private": true,
   "version": "0.1.0",
-  "description": "NNACT Pro -- self-hostable field service operations (renamed from OpenFieldPro)",
+  "description": "NNACT Pro — technical operations platform for HVAC, refrigeration, electrical, solar, and field maintenance teams.",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "pnpm --parallel --filter ./apps/* dev",

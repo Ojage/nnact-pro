@@ -1,6 +1,6 @@
 # Documents
 
-OpenFieldPro documents use a shared HTML renderer in `packages/shared/src/documents.ts`.
+NnactPro documents use a shared HTML renderer in `packages/shared/src/documents.ts`.
 
 ## Implemented surfaces
 
@@ -36,7 +36,7 @@ Every document accepts a `branding` object with:
 
 The invoice and estimate preview/export routes now pull organization branding from `/api/org/me`, so customer-facing documents reflect the organization name, brand color, footer, optional logo, and attribution setting.
 
-Free installs can keep the OpenFieldPro attribution. Pro can remove it and apply company branding.
+Free installs can keep the NnactPro attribution. Pro can remove it and apply company branding.
 
 ## API surfaces
 

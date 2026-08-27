@@ -1,4 +1,4 @@
-# OpenFieldPro product parity gap audit
+# NnactPro product parity gap audit
 
 Status: release candidate (v0.1.0-rc.1, 2026-08-22) — P0 parity repair substantially delivered; final release still gated on the remaining items below.
 
@@ -36,7 +36,7 @@ The comparison target is the operational depth expected from mature incumbent fi
 - dispatch/schedule depth;
 - reporting and accounting handoff.
 
-OpenFieldPro should not copy a closed SaaS model, but it must meet the operational expectations that independent service businesses already understand.
+NnactPro should not copy a closed SaaS model, but it must meet the operational expectations that independent service businesses already understand.
 
 ## Benchmark
 
@@ -52,11 +52,11 @@ The comparison target is the operational depth expected from mature incumbent fi
 - dispatch/schedule depth;
 - reporting and accounting handoff.
 
-OpenFieldPro should not copy a closed SaaS model, but it must meet the operational expectations that independent service businesses already understand.
+NnactPro should not copy a closed SaaS model, but it must meet the operational expectations that independent service businesses already understand.
 
 ## Current gap summary
 
-| Area | Current OpenFieldPro state | Required state before public push |
+| Area | Current NnactPro state | Required state before public push |
 |---|---|---|
 | Settings | Team plus basic company branding | Full business configuration center |
 | Invoice settings | Basic invoice list/detail/payment state | Customer-view defaults, due terms, visibility, messages, numbering, PDF/print settings |

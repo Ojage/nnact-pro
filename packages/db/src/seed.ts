@@ -9,6 +9,16 @@ import {
   diagnosticSteps,
   diagnosticWorkflows,
   equipment,
+  equipmentModels,
+  knownFaults,
+  symptoms,
+  faultSymptoms,
+  repairProcedures,
+  testPoints,
+  fieldMeasurements,
+  modelParts,
+  repairOutcomes,
+  diagnosticWorkflowExtensions,
   invoices,
   jobEquipmentLinks,
   jobs,
@@ -334,6 +344,185 @@ async function main() {
       body: "The exact appliance and validated demonstration workflow are linked to today’s appointment.",
       link: "/diagnostics",
     });
+
+    // ── Repair Brain demo knowledge (fictional sample records) ──────────
+    const [samsungWasher, lgFridge, daikinAc, cworthInverter] = await tx
+      .insert(equipmentModels)
+      .values([
+        {
+          orgId: org.id,
+          manufacturer: "Samsung",
+          brand: "Samsung",
+          modelNumber: "WW90T4040CE",
+          modelName: "EcoBubble Washing Machine 9kg",
+          category: "washing_machine",
+          subcategory: "front_load",
+          specifications: { capacity_kg: 9, voltage: "220-240V", spin_speed_rpm: 1400, motor_type: "digital_inverter" },
+          aliases: ["WW90T4040", "WW90T"],
+          normalizedIdentifier: "samsungww90t4040ce",
+          createdBy: owner.id,
+        },
+        {
+          orgId: org.id,
+          manufacturer: "LG",
+          brand: "LG",
+          modelNumber: "GC-B247SLUV",
+          modelName: "InstaView Refrigerator",
+          category: "refrigerator",
+          specifications: { capacity_liters: 247, refrigerant: "R600a", voltage: "220-240V" },
+          normalizedIdentifier: "lggcb247sluv",
+          createdBy: owner.id,
+        },
+        {
+          orgId: org.id,
+          manufacturer: "Daikin",
+          modelNumber: "FTKF35",
+          modelName: "Split AC 1.5HP",
+          category: "ac_unit",
+          specifications: { cooling_capacity_btu: 12000, refrigerant: "R32", voltage: "220-240V" },
+          normalizedIdentifier: "daikinftkf35",
+          createdBy: owner.id,
+        },
+        {
+          orgId: org.id,
+          manufacturer: "Cworth",
+          modelNumber: "CW-HYB-5K",
+          modelName: "5kW Hybrid Inverter",
+          category: "inverter",
+          specifications: { rated_power_kw: 5, battery_voltage: 48, battery_chemistry: "LiFePO4", pv_input_max_kw: 6.5 },
+          normalizedIdentifier: "cworthcwhyb5k",
+          createdBy: owner.id,
+        },
+      ])
+      .returning();
+
+    await tx
+      .update(equipment)
+      .set({ equipmentModelId: lgFridge.id })
+      .where(eq(equipment.id, refrigerator.id));
+
+    const [drainSymptom, waterRemainSymptom] = await tx
+      .insert(symptoms)
+      .values([
+        { orgId: org.id, label: "Machine does not drain", normalizedLabel: "machine does not drain", category: "drainage" },
+        { orgId: org.id, label: "Water remains in drum", normalizedLabel: "water remains in drum", category: "drainage" },
+      ])
+      .returning();
+
+    const [drainFault] = await tx
+      .insert(knownFaults)
+      .values({
+        orgId: org.id,
+        equipmentModelId: samsungWasher.id,
+        faultCode: "5C",
+        normalizedFaultCode: "5c",
+        title: "Does not drain",
+        description: "Water remains in drum after cycle. Drain pump may be blocked or failed.",
+        severity: "medium",
+        frequency: "common",
+        probableCauses: ["blocked filter", "blocked hose", "failed drain pump", "wiring fault", "control board issue"],
+        safetyWarnings: ["electrical_hazard"],
+        confidenceStatus: "repeated_success",
+        verificationStatus: "verified",
+        sourceType: "field_job",
+        createdBy: owner.id,
+        verifiedBy: owner.id,
+        verifiedAt: new Date(),
+      })
+      .returning();
+
+    await tx.insert(faultSymptoms).values([
+      { orgId: org.id, faultId: drainFault.id, symptomId: drainSymptom.id },
+      { orgId: org.id, faultId: drainFault.id, symptomId: waterRemainSymptom.id },
+    ]);
+
+    await tx.insert(repairProcedures).values({
+      orgId: org.id,
+      equipmentModelId: samsungWasher.id,
+      knownFaultId: drainFault.id,
+      title: "Replace drain pump",
+      description: "Replace failed drain pump after confirming open circuit on winding.",
+      safetyWarnings: ["electrical_hazard"],
+      requiredTools: ["multimeter", "Torx T20", "pliers"],
+      requiredParts: [{ partName: "Drain pump", oemPartNumber: "DC31-00181A" }],
+      steps: [
+        { sequence: 1, instruction: "Unplug machine and isolate water supply.", warning: "electrical_hazard" },
+        { sequence: 2, instruction: "Remove bottom access panel and drain filter." },
+        { sequence: 3, instruction: "Disconnect pump wiring and hoses." },
+        { sequence: 4, instruction: "Install replacement pump DC31-00181A." },
+        { sequence: 5, instruction: "Run drain/spin test cycle.", verification: "No 5C error; drum drains completely." },
+      ],
+      expectedDurationMinutes: 45,
+      skillLevel: "intermediate",
+      verificationSteps: ["Run full drain cycle", "Confirm no error code"],
+      confidenceStatus: "repeated_success",
+      verificationStatus: "verified",
+      createdBy: owner.id,
+      verifiedBy: owner.id,
+      verifiedAt: new Date(),
+    });
+
+    await tx.insert(testPoints).values({
+      orgId: org.id,
+      equipmentModelId: samsungWasher.id,
+      component: "Drain pump",
+      description: "Pump winding resistance at connector CN3",
+      connector: "CN3",
+      pin: "1-2",
+      expectedMin: "150",
+      expectedMax: "220",
+      unit: "Ω",
+      confidenceStatus: "technician_verified",
+      verificationStatus: "verified",
+      createdBy: owner.id,
+    });
+
+    const [drainPumpPart] = await tx
+      .insert(modelParts)
+      .values({
+        orgId: org.id,
+        equipmentModelId: samsungWasher.id,
+        partName: "Drain pump assembly",
+        oemPartNumber: "DC31-00181A",
+        manufacturer: "Samsung",
+        alternativePartNumber: "Askoll M231 XP",
+        lastKnownPriceCents: 8500,
+        reliabilityNotes: "OEM preferred; aftermarket Askoll acceptable when OEM unavailable.",
+        confidenceStatus: "repeated_success",
+        verificationStatus: "verified",
+        createdBy: owner.id,
+        verifiedBy: owner.id,
+        verifiedAt: new Date(),
+      })
+      .returning();
+
+    await tx.insert(repairOutcomes).values({
+      orgId: org.id,
+      jobId: completedJob.id,
+      equipmentId: dryer.id,
+      equipmentModelId: samsungWasher.id,
+      knownFaultId: drainFault.id,
+      outcome: "successful",
+      whatWasDone: "Replaced drain pump after measuring open circuit on winding.",
+      partsUsed: [{ partName: "Drain pump", oemPartNumber: "DC31-00181A", quantity: 1 }],
+      laborMinutes: 50,
+      technicianId: owner.id,
+      machineStatus: "operational",
+      technicianConfidence: 5,
+      customerOutcome: "Satisfied — machine drains normally",
+      conclusion: "Drain pump failed — open circuit confirmed.",
+      isFailedAttempt: false,
+    });
+
+    await tx.insert(diagnosticWorkflowExtensions).values({
+      orgId: org.id,
+      workflowId: workflow.id,
+      equipmentModelId: lgFridge.id,
+    });
+
+    console.log(
+      `seed: Repair Brain demo — ${samsungWasher.modelNumber}, ${lgFridge.modelNumber}, ${daikinAc.modelNumber}, ${cworthInverter.modelNumber}; drain pump ${drainPumpPart.oemPartNumber}`,
+    );
 
     console.log(
       `seed: created appliance-service org ${org.id} with workflow ${workflow.id} and diagnostic session`,

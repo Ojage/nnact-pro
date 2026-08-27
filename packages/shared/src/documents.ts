@@ -1,4 +1,6 @@
 import type { BusinessSettings } from "./business-settings.js";
+import type { CurrencyCode } from "./currency.js";
+import { CURRENCY_CATALOG, DEFAULT_CURRENCY, formatMoney } from "./currency.js";
 
 export type FieldDocumentKind = "estimate" | "invoice" | "receipt" | "work_order" | "service_plan";
 type DocumentMoney = number;
@@ -54,6 +56,8 @@ export interface FieldDocumentData {
   paymentsCents?: DocumentMoney;
   pricing?: DocumentPricing;
   branding: FieldDocumentBranding;
+  /** Display currency (defaults to XAF). Mirrors the org business setting. */
+  currency?: CurrencyCode;
   presentation?: {
     format?: "email" | "envelope";
     showBusinessInfo?: boolean;
@@ -107,6 +111,7 @@ export function documentPricingRows(pricing: DocumentPricing | undefined): Array
 export function renderFieldDocumentHtml(data: FieldDocumentData): string {
   const title = fieldDocumentTitle(data.kind);
   const totals = fieldDocumentTotals(data);
+  const formatter = (cents: DocumentMoney): string => formatCents(cents, data.currency);
   const color = data.branding.brandColor ?? "#22C55E";
   const logo = data.branding.logoUrl
     ? `<img class="logo" src="${escapeHtml(data.branding.logoUrl)}" alt="${escapeHtml(data.branding.companyName)} logo" />`
@@ -125,8 +130,8 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
         <tr>
           <td>${escapeHtml(item.description)}</td>
           <td class="num">${item.quantity}</td>
-          <td class="num">${showLineItemPrices ? formatCents(item.unitPriceCents) : "Hidden"}</td>
-          <td class="num">${showLineItemPrices ? formatCents(item.quantity * item.unitPriceCents) : "Hidden"}</td>
+          <td class="num">${showLineItemPrices ? formatter(item.unitPriceCents) : "Hidden"}</td>
+          <td class="num">${showLineItemPrices ? formatter(item.quantity * item.unitPriceCents) : "Hidden"}</td>
         </tr>`,
     )
     .join("");
@@ -134,9 +139,9 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
     ? data.options.map((option) => {
       const optionTotal = option.pricing?.totalCents ?? option.lineItems.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
       const optionRows = option.lineItems.map((item) => `
-        <tr><td>${escapeHtml(item.description)}</td><td class="num">${item.quantity}</td><td class="num">${showLineItemPrices ? formatCents(item.unitPriceCents) : "Hidden"}</td><td class="num">${showLineItemPrices ? formatCents(item.quantity * item.unitPriceCents) : "Hidden"}</td></tr>`).join("");
+        <tr><td>${escapeHtml(item.description)}</td><td class="num">${item.quantity}</td><td class="num">${showLineItemPrices ? formatter(item.unitPriceCents) : "Hidden"}</td><td class="num">${showLineItemPrices ? formatter(item.quantity * item.unitPriceCents) : "Hidden"}</td></tr>`).join("");
       const selectedLabel = data.status === "approved" ? "Approved" : "Selected";
-      return `<section class="option${option.selected ? " selected" : ""}"><div class="option-heading"><h2>${escapeHtml(option.label)}</h2>${option.selected ? `<span>${selectedLabel}</span>` : ""}</div><table><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>${optionRows}</tbody></table><p class="option-total">Option total <strong>${formatCents(optionTotal)}</strong></p></section>`;
+      return `<section class="option${option.selected ? " selected" : ""}"><div class="option-heading"><h2>${escapeHtml(option.label)}</h2>${option.selected ? `<span>${selectedLabel}</span>` : ""}</div><table><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>${optionRows}</tbody></table><p class="option-total">Option total <strong>${formatter(optionTotal)}</strong></p></section>`;
     }).join("")
     : null;
   const businessContact = [data.branding.publicPhone, data.branding.publicEmail, data.branding.publicAddress]
@@ -177,10 +182,10 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
       <tbody>${rows}</tbody>
     </table>`}
     ${optionSections ? "" : `<section class="totals">
-      <div class="total-row"><span>Subtotal</span><strong>${formatCents(totals.subtotalCents)}</strong></div>
-      ${documentPricingRows(data.pricing).map((row) => `<div class="total-row${row.strong ? " strong" : ""}"><span>${escapeHtml(row.label)}</span><strong>${formatCents(row.value)}</strong></div>`).join("\n      ")}
-      ${showPayments && !data.pricing ? `<div class="total-row"><span>Paid</span><strong>${formatCents(totals.paidCents)}</strong></div>` : ""}
-      ${showBalance ? `<div class="total-row strong"><span>Balance</span><strong>${formatCents(totals.balanceCents)}</strong></div>` : ""}
+      <div class="total-row"><span>Subtotal</span><strong>${formatter(totals.subtotalCents)}</strong></div>
+      ${documentPricingRows(data.pricing).map((row) => `<div class="total-row${row.strong ? " strong" : ""}"><span>${escapeHtml(row.label)}</span><strong>${formatter(row.value)}</strong></div>`).join("\n      ")}
+      ${showPayments && !data.pricing ? `<div class="total-row"><span>Paid</span><strong>${formatter(totals.paidCents)}</strong></div>` : ""}
+      ${showBalance ? `<div class="total-row strong"><span>Balance</span><strong>${formatter(totals.balanceCents)}</strong></div>` : ""}
     </section>`}
     ${data.notes ? `<section class="notes">${escapeHtml(data.notes)}</section>` : ""}
     <footer class="footer"><span>${escapeHtml(data.branding.footerText ?? "Field service document")}</span>${attribution}</footer>
@@ -189,12 +194,12 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
 </html>`;
 }
 
-export function formatDocumentCents(cents: DocumentMoney): string {
-  return `$${(cents / 100).toFixed(2)}`;
+export function formatDocumentCents(cents: DocumentMoney, currency: CurrencyCode = "XAF"): string {
+  return formatMoney(cents, currency);
 }
 
-function formatCents(cents: DocumentMoney): string {
-  return formatDocumentCents(cents);
+function formatCents(cents: DocumentMoney, currency: CurrencyCode = "XAF"): string {
+  return formatDocumentCents(cents, currency);
 }
 
 function escapeHtml(value: string): string {
@@ -269,7 +274,7 @@ function documentIssuedDate(value?: string | Date | null) {
 
 function documentBranding(org?: DocumentOrgLike | null, fallbackFooter = "Field service command center document"): FieldDocumentData["branding"] {
   return {
-    companyName: org?.name ?? "NNACT Pro Demo Co.",
+    companyName: org?.name ?? "NNACT",
     logoUrl: org?.logoUrl ?? undefined,
     brandColor: org?.brandColor ?? "#22C55E",
     footerText: org?.documentFooter ?? fallbackFooter,
@@ -338,6 +343,7 @@ export function invoiceDocumentData({
     paymentsCents: paid,
     pricing: documentPricing(invoice.pricing),
     branding: documentBranding(org),
+    currency: settings?.currency ?? DEFAULT_CURRENCY,
     presentation: {
       format: settings?.invoice.format,
       showBusinessInfo: visibility?.showBusinessInfo ?? true,
@@ -404,7 +410,9 @@ export function estimateDocumentData({
       settings?.estimate.defaultMessage ?? "Estimate is valid pending final service conditions and customer approval.",
       estimate.acceptedAt ? `Accepted ${new Date(estimate.acceptedAt).toLocaleDateString()}${estimate.acceptedByName ? ` by ${estimate.acceptedByName}` : ""}.` : null,
       settings?.estimate.signatureRequired ? "Customer signature required for approval." : null,
-      settings?.estimate.depositMode !== "none" ? `Deposit required: ${settings?.estimate.depositValue}${settings?.estimate.depositMode === "percent" ? "%" : " cents"}` : null,
+      settings?.estimate.depositMode !== "none"
+        ? `Deposit required: ${settings?.estimate.depositValue}${settings?.estimate.depositMode === "percent" ? "%" : ` ${CURRENCY_CATALOG[settings?.currency ?? DEFAULT_CURRENCY].symbol}`}`
+        : null,
     ]),
     lineItems: visibleDocumentLineItems(lineItems, estimate.total, {
       showLineItems: visibility?.showLineItems ?? true,
@@ -419,6 +427,7 @@ export function estimateDocumentData({
     pricing: documentPricing(estimate.pricing),
     paymentsCents: 0,
     branding: documentBranding(org, "Estimate generated from NNACT Pro"),
+    currency: settings?.currency ?? DEFAULT_CURRENCY,
     presentation: {
       format: settings?.estimate.format,
       showBusinessInfo: visibility?.showBusinessInfo ?? true,

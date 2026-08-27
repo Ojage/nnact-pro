@@ -1,8 +1,8 @@
-# OpenFieldPro Sponsorship Playbook
+# NnactPro Sponsorship Playbook
 
 This playbook follows the public business-plan and voice canon in `docs/product/BUSINESS_PLAN_AND_VOICE.md`.
 
-OpenFieldPro is an AGPL-licensed, self-hostable field-service platform for independent service businesses. Sponsorship should fund maintenance, security, documentation, testing, accessibility, and reliable releases without selling project control or restricting the free core.
+NnactPro is an AGPL-licensed, self-hostable field-service platform for independent service businesses. Sponsorship should fund maintenance, security, documentation, testing, accessibility, and reliable releases without selling project control or restricting the free core.
 
 ## 1. Apply for GitHub Sponsors
 
@@ -16,9 +16,9 @@ GitHub's personal-account process requires joining GitHub Sponsors, completing a
 6. Submit the applicable tax form.
 7. Build the sponsor profile:
    - Short bio
-   - Why OpenFieldPro exists
+   - Why NnactPro exists
    - What sponsorship revenue funds
-   - OpenFieldPro as featured work
+   - NnactPro as featured work
    - A concrete, budget-backed sponsor goal
 8. Publish monthly and one-time tiers.
 9. Choose **Request approval**.
@@ -35,11 +35,11 @@ Official references:
 
 ### Short bio
 
-> Building OpenFieldPro, an open-source and self-hostable field-service platform for small service businesses: CRM, scheduling, dispatch, work orders, estimates, invoices, payments, and technician workflows without mandatory per-user subscriptions.
+> Building NnactPro, an open-source and self-hostable field-service platform for small service businesses: CRM, scheduling, dispatch, work orders, estimates, invoices, payments, and technician workflows without mandatory per-user subscriptions.
 
 ### Introduction
 
-> OpenFieldPro exists so independent service businesses can own their operational data and run a complete lead-to-payment workflow on infrastructure they control. Sponsorship funds security reviews, reliable releases, mobile and offline workflows, documentation, accessibility, integrations, and the test infrastructure needed to make self-hosting practical. The core remains AGPL-licensed and usable without a sponsorship or entitlement key.
+> NnactPro exists so independent service businesses can own their operational data and run a complete lead-to-payment workflow on infrastructure they control. Sponsorship funds security reviews, reliable releases, mobile and offline workflows, documentation, accessibility, integrations, and the test infrastructure needed to make self-hosting practical. The core remains AGPL-licensed and usable without a sponsorship or entitlement key.
 
 ### Initial sponsor goal
 
@@ -152,13 +152,13 @@ Subject: Sponsor an open-source field-service platform for independent service b
 
 > Hi [Name],
 >
-> I maintain OpenFieldPro, an AGPL-licensed, self-hostable field-service platform covering customer management, scheduling, dispatch, work orders, estimates, invoicing, payments, and technician workflows.
+> I maintain NnactPro, an AGPL-licensed, self-hostable field-service platform covering customer management, scheduling, dispatch, work orders, estimates, invoicing, payments, and technician workflows.
 >
 > The project is designed for independent service businesses that want control of their data and an alternative to mandatory per-user SaaS subscriptions. [Company] is relevant because [specific connection to their customers, product, or open-source work].
 >
 > I am opening a limited group of project sponsorships to fund security work, release testing, documentation, mobile/offline reliability, and integrations. Business sponsorship includes public recognition, quarterly group briefings, and a transparent impact report; it does not buy roadmap control or access to customer data.
 >
-> Project: https://github.com/niko4244/openfieldpro
+> Project: https://github.com/niko4244/nnactpro
 > Sponsorship details: [GitHub Sponsors URL after approval]
 >
 > Would a 20-minute conversation about a $250 or $500 monthly sponsorship be appropriate?
@@ -168,11 +168,11 @@ Subject: Sponsor an open-source field-service platform for independent service b
 
 ### Follow-up
 
-Subject: Re: OpenFieldPro sponsorship
+Subject: Re: NnactPro sponsorship
 
 > Hi [Name],
 >
-> I wanted to follow up once on the OpenFieldPro sponsorship note below. The most relevant current milestone for [Company] is [specific release, integration, or user benefit].
+> I wanted to follow up once on the NnactPro sponsorship note below. The most relevant current milestone for [Company] is [specific release, integration, or user benefit].
 >
 > A sponsorship would directly fund [one or two concrete deliverables]. I am also open to an in-kind infrastructure or testing sponsorship if that fits better than cash support.
 >
@@ -182,7 +182,7 @@ Subject: Re: OpenFieldPro sponsorship
 
 ## 8. Grants and fiscal hosting
 
-A fiscal host can receive and administer funds, but it may charge fees and impose reporting or spending rules. Decide whether OpenFieldPro needs one before GitHub Sponsors enrollment. Compare eligibility, legal structure, fees, tax handling, reimbursements, ownership of funds/assets, reporting, corporate-grant support, and exit terms.
+A fiscal host can receive and administer funds, but it may charge fees and impose reporting or spending rules. Decide whether NnactPro needs one before GitHub Sponsors enrollment. Compare eligibility, legal structure, fees, tax handling, reimbursements, ownership of funds/assets, reporting, corporate-grant support, and exit terms.
 
 Do not describe sponsorship payments as tax-deductible unless the receiving structure and applicable law support that claim.
 

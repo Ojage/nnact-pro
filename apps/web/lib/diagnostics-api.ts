@@ -307,6 +307,8 @@ export const diagnosticsApi = {
     jobId: string;
     equipmentId: string;
     workflowId?: string;
+    knownFaultId?: string;
+    equipmentModelId?: string;
     customerComplaint?: string;
     technicianObservation?: string;
     errorCodes?: string[];
@@ -367,4 +369,13 @@ export const diagnosticsApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  linkJobEquipment: (jobId: string, equipmentId: string) =>
+    diagnosticRequest<{ jobId: string; equipmentId: string }>("/api/diagnostics/job-equipment", {
+      method: "POST",
+      body: JSON.stringify({ jobId, equipmentId }),
+    }),
+  getJobEquipment: (jobId: string) =>
+    diagnosticRequest<{ link: { jobId: string; equipmentId: string }; equipment: EquipmentSummary }>(
+      `/api/diagnostics/job-equipment/${jobId}`,
+    ),
 };

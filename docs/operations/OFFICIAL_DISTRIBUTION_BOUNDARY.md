@@ -1,15 +1,15 @@
 # Official distribution boundary
 
-The public `niko4244/openfieldpro` repository contains the complete AGPL source, generic sponsor-display support, public verification keys, release schemas, documentation, and reproducible build inputs.
+The public `niko4244/nnactpro` repository contains the complete AGPL source, generic sponsor-display support, public verification keys, release schemas, documentation, and reproducible build inputs.
 
-The private `niko4244/openfieldpro-ops` repository is the maintainer control plane. It contains sponsor campaign selection, outreach and contract records, official release scheduling, token inventories, entitlement issuance records, incident notes, and the workflow that builds official distributions.
+The private `niko4244/nnactpro-ops` repository is the maintainer control plane. It contains sponsor campaign selection, outreach and contract records, official release scheduling, token inventories, entitlement issuance records, incident notes, and the workflow that builds official distributions.
 
 ## Information flow
 
 Only explicitly approved public values may flow from private operations into an official build:
 
 ```text
-openfieldpro-ops (private)
+nnactpro-ops (private)
   approved sponsor name, message, URL, optional local asset
   release channel, public source ref, version
                    |
@@ -19,7 +19,7 @@ official build workflow
   runs public release gates, builds and signs release metadata
                    |
                    v
-OpenFieldPro official package / GitHub Release
+NnactPro official package / GitHub Release
 ```
 
 No contracts, prospect lists, payment records, API tokens, private signing keys, customer data, sponsor contacts, or internal notes may cross this boundary.

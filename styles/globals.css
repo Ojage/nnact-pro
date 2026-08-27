@@ -1,0 +1,436 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+
+  /* ── Banking Design System: Light ── */
+  --background: #f8fafc;
+  --foreground: #1e293b;
+  --card: #ffffff;
+  --card-foreground: #1e293b;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --popover: #ffffff;
+  --popover-foreground: #1e293b;
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #e2e8f0;
+  --accent-foreground: #1e293b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --input-background: #ffffff;
+  --switch-background: #d1d5db;
+  --font-weight-medium: 600;
+  --font-weight-normal: 400;
+  --ring: #2563eb;
+  --radius: 0.75rem;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #1e293b;
+  --sidebar-primary: #1d4ed8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e2e8f0;
+  --sidebar-accent-foreground: #1e293b;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #2563eb;
+  --chart-1: #1d4ed8;
+  --chart-2: #16a34a;
+  --chart-3: #7c3aed;
+  --chart-4: #f59e0b;
+  --chart-5: #dc2626;
+  
+  /* ── Banking Design System Tokens: Light ── */
+  --color-canvas-default: #ffffff;
+  --color-canvas-subtle: #f8fafc;
+  --color-fg-default: #1e293b;
+  --color-fg-muted: #64748b;
+  --color-fg-on-emphasis: #ffffff;
+  --color-border-default: #e5e7eb;
+  --color-neutral-muted: rgba(107, 114, 128, 0.15);
+  --color-neutral-emphasis: rgba(107, 114, 128, 0.3);
+  --color-nav-hover: #f1f5f9;
+  --color-nav-active: #e2e8f0;
+  --color-accent-fg: #1d4ed8;
+  --color-accent-subtle: #eff6ff;
+  --color-accent-emphasis: #1d4ed8;
+  --color-success-fg: #16a34a;
+  --color-success-subtle: #f0fdf4;
+  --color-success-emphasis: #16a34a;
+  --color-attention-fg: #d97706;
+  --color-attention-subtle: #fffbeb;
+  --color-attention-emphasis: #f59e0b;
+  --color-danger-fg: #dc2626;
+  --color-danger-subtle: #fef2f2;
+  --color-danger-emphasis: #dc2626;
+}
+
+.dark {
+  /* ── Banking Design System: Dark ── */
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --card: #1e293b;
+  --card-foreground: #e2e8f0;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --popover: #0f172a;
+  --popover-foreground: #e2e8f0;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #334155;
+  --accent-foreground: #e2e8f0;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #334155;
+  --input: #334155;
+  --input-background: #0f172a;
+  --switch-background: #475569;
+  --ring: #60a5fa;
+  --sidebar: #0f172a;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #334155;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: #334155;
+  --sidebar-ring: #60a5fa;
+  --chart-1: #3b82f6;
+  --chart-2: #22c55e;
+  --chart-3: #a78bfa;
+  --chart-4: #fbbf24;
+  --chart-5: #f87171;
+  
+  /* ── Banking Design System Tokens: Dark ── */
+  --color-canvas-default: #0f172a;
+  --color-canvas-subtle: #1e293b;
+  --color-fg-default: #e2e8f0;
+  --color-fg-muted: #94a3b8;
+  --color-fg-on-emphasis: #ffffff;
+  --color-border-default: #334155;
+  --color-neutral-muted: rgba(148, 163, 184, 0.15);
+  --color-neutral-emphasis: rgba(148, 163, 184, 0.3);
+  --color-nav-hover: #1e293b;
+  --color-nav-active: #334155;
+  --color-accent-fg: #60a5fa;
+  --color-accent-subtle: #1e3a5f;
+  --color-accent-emphasis: #3b82f6;
+  --color-success-fg: #22c55e;
+  --color-success-subtle: #052e16;
+  --color-success-emphasis: #16a34a;
+  --color-attention-fg: #fbbf24;
+  --color-attention-subtle: #451a03;
+  --color-attention-emphasis: #f59e0b;
+  --color-danger-fg: #f87171;
+  --color-danger-subtle: #450a0a;
+  --color-danger-emphasis: #dc2626;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* GitHub-style loader animations */
+@keyframes github-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes github-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes collapsible-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+/* Language Switch Animations */
+@keyframes borderGlow {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes borderPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+  }
+}
+
+.github-loader {
+  animation: github-spin 1s linear infinite;
+}
+
+.github-pulse {
+  animation: github-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-collapsible-down {
+  animation: collapsible-down 0.2s ease-out;
+}
+
+.animate-collapsible-up {
+  animation: collapsible-up 0.2s ease-out;
+}
+
+/* Shimmer animation for category badge */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* Caret blinking for InputOTP */
+@keyframes caret-blink {
+  0%, 70%, 100% {
+    opacity: 1;
+  }
+  20%, 50% {
+    opacity: 0;
+  }
+}
+
+.animate-caret-blink {
+  animation: caret-blink 1.2s ease-out infinite;
+}
+
+/* Opening cash OTP: more visible beeping cursor */
+.opening-cash-otp [data-slot="input-otp-slot"][data-active="true"] .animate-caret-blink,
+.opening-cash-otp .opening-cash-otp-slot[data-active="true"] .animate-caret-blink {
+  width: 3px;
+  height: 1.25rem;
+  background: var(--color-accent-emphasis, hsl(var(--primary)));
+  opacity: 1;
+  box-shadow: 0 0 0 1px var(--color-accent-emphasis, hsl(var(--primary)));
+}
+.opening-cash-otp [data-slot="input-otp-slot"] .animate-caret-blink,
+.opening-cash-otp .opening-cash-otp-slot .animate-caret-blink {
+  width: 3px;
+  height: 1rem;
+  background: var(--color-fg-default);
+  opacity: 1;
+}
+
+/* Opening cash OTP: professional blue outline when clicked/focused and when typing */
+.opening-cash-otp-wrapper:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+
+@keyframes goldShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.gold-shimmer-badge {
+  background: linear-gradient(90deg, #B8860B 0%, #FFD700 25%, #FFFFFF 50%, #FFD700 75%, #B8860B 100%);
+  background-size: 200% auto;
+  animation: goldShimmer 3s linear infinite;
+  border: 1px solid #FFD700 !important;
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  font-weight: 700 !important;
+}
+
+@keyframes glisten {
+  0% { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(200%) skewX(-15deg); }
+}
+
+.reactivate-glisten {
+  position: relative;
+  overflow: hidden;
+  background-color: #16a34a !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px 0 rgba(22, 163, 74, 0.5) !important;
+  transition: all 0.3s ease !important;
+}
+
+.reactivate-glisten::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: glisten 2s infinite;
+}

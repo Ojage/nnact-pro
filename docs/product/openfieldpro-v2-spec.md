@@ -1,8 +1,8 @@
-# OpenFieldPro v2 Product Specification
+# NnactPro v2 Product Specification
 
 ## Product definition
 
-OpenFieldPro is an open-source, self-hostable field service management platform. It is intended to cover the operational workflow businesses expect from established field-service platforms while preserving data ownership, extensibility, and deployability.
+NnactPro is an open-source, self-hostable field service management platform. It is intended to cover the operational workflow businesses expect from established field-service platforms while preserving data ownership, extensibility, and deployability.
 
 The universal product is the operations system:
 

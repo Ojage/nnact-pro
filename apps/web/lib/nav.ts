@@ -40,6 +40,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Quality",
     links: [
+      { href: "/repair-brain", label: "Repair Brain", icon: "◉" },
       { href: "/diagnostic-library", label: "Diagnostic Library", icon: "⌘" },
       { href: "/coverage", label: "Coverage & Quality", icon: "◇" },
       { href: "/reviews", label: "Reviews", icon: "★" },
