@@ -5,7 +5,7 @@ async function diagnosticRequest<T>(path: string, init?: RequestInit): Promise<T
     ...(init?.headers as Record<string, string> | undefined),
   };
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("ofp_token");
+    const token = localStorage.getItem("NNPtoken");
     if (token) headers.authorization = `Bearer ${token}`;
   }
 

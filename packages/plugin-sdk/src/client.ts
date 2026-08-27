@@ -3,7 +3,7 @@
 export interface OFPClientOptions {
   /** OFP API base, e.g. "https://app.example.com" or "http://localhost:3001". */
   baseUrl: string;
-  /** The install's scoped token (ofp_…). */
+  /** The install's scoped token (NNP…). */
   token: string;
   /** Injectable for tests; defaults to global fetch. */
   fetch?: typeof fetch;

@@ -3,7 +3,7 @@ import { open, mkdir, readFile, rm } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { sql, type SQL } from "drizzle-orm";
-import { db } from "@ofp/db";
+import { db } from "@nnact/db";
 
 type ComponentStatus = "ok" | "failed" | "skipped";
 type ComponentName = "postgres" | "uploads" | "migrations" | "redis";
@@ -27,7 +27,7 @@ export interface HealthReport {
 const MIN_TIMEOUT_MS = 100;
 const MAX_TIMEOUT_MS = 10_000;
 
-export function healthProbeTimeoutMs(value = process.env.OFP_HEALTH_PROBE_TIMEOUT_MS) {
+export function healthProbeTimeoutMs(value = process.env.NNPHEALTH_PROBE_TIMEOUT_MS) {
   const configured = Number(value);
   if (!Number.isFinite(configured)) return 2_000;
   return Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, configured));
@@ -69,7 +69,7 @@ async function postgresProbe() {
 }
 
 async function uploadsProbe() {
-  const directory = process.env.OFP_UPLOAD_DIR ?? "./.ofp-uploads";
+  const directory = process.env.NNPUPLOAD_DIR ?? "./.ofp-uploads";
   const path = join(directory, `.health-${randomUUID()}`);
   await mkdir(directory, { recursive: true, mode: 0o750 });
   let handle: Awaited<ReturnType<typeof open>> | undefined;

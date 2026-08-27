@@ -1,8 +1,8 @@
-# OpenFieldPro
+# NNACT Pro
 
 Open-source, self-hostable **field service management** for service businesses.
 
-OpenFieldPro provides CRM, customers and properties, equipment history, scheduling and dispatch, work orders, estimates, invoicing, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows without mandatory per-user subscriptions.
+NNACT Pro provides CRM, customers and properties, equipment history, scheduling and dispatch, work orders, estimates, invoicing, payments, documents, service plans, reviews, reporting, integrations, and technician mobile workflows without mandatory per-user subscriptions.
 
 Appliance-service organizations can attach equipment-specific technical records to work orders, but those tools remain optional workflow depth—not the product definition.
 
@@ -61,10 +61,10 @@ Run the primary validation gates:
 ```bash
 pnpm release:safety
 pnpm audit --prod --audit-level=high
-pnpm --filter @ofp/api test
-pnpm --filter @ofp/web test:unit
-pnpm --filter @ofp/web test:e2e
-pnpm --filter @ofp/mobile typecheck
+pnpm --filter @nnact/api test
+pnpm --filter @nnact/web test:unit
+pnpm --filter @nnact/web test:e2e
+pnpm --filter @nnact/mobile typecheck
 ```
 
 ## What works today
@@ -117,7 +117,7 @@ The AGPL core is free to self-host and is never limited by users, technicians, c
 
 Optional signed entitlements are verified locally without a license server, telemetry, or phone-home. They may represent sponsor recognition, bounded support benefits, or premium first-party plugins; they cannot disable or restrict the core.
 
-A free dashboard may show one clearly labeled, locally configured sponsor placement. OpenFieldPro does not use ad networks, tracking pixels, behavioral targeting, or sponsor access to operational data. See `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
+A free dashboard may show one clearly labeled, locally configured sponsor placement. NNACT Pro does not use ad networks, tracking pixels, behavioral targeting, or sponsor access to operational data. See `docs/funding/SPONSORSHIP_PLAYBOOK.md`.
 
 Official sponsorship campaigns, release scheduling, and token inventories are maintained in a separate private operations repository. Only approved public sponsor copy and immutable source identifiers enter official builds; the boundary is documented in `docs/operations/OFFICIAL_DISTRIBUTION_BOUNDARY.md`.
 

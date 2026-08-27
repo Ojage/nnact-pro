@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { db, lineItems, jobs } from "@ofp/db";
+import { db, lineItems, jobs } from "@nnact/db";
 import { sumLines, jobCost, jobMargin } from "../totals.js";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";

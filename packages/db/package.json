@@ -1,5 +1,5 @@
 {
-  "name": "@ofp/db",
+  "name": "@nnact/db",
   "version": "0.1.0",
   "type": "module",
   "main": "src/index.ts",
@@ -13,7 +13,7 @@
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {
-    "@ofp/shared": "workspace:*",
+    "@nnact/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.5"
   },

@@ -29,7 +29,7 @@ const { values } = parseArgs({
 });
 
 function fail(message: string): never {
-  console.error(`OpenFieldPro key generation failed: ${message}`);
+  console.error(`NNACT Pro key generation failed: ${message}`);
   process.exit(1);
 }
 
@@ -56,11 +56,11 @@ if (values["generate-keypair"]) {
   console.error(`Private key written to ${privatePath}`);
   console.error(`Public key written to ${publicPath}`);
   console.error(`Public key fingerprint: ${publicKeyFingerprint(pair.publicKey)}`);
-  console.error("Back up the private key offline. Never commit it, upload it, or provide it to an OpenFieldPro runtime.");
+  console.error("Back up the private key offline. Never commit it, upload it, or provide it to an NNACT Pro runtime.");
   process.exit(0);
 }
 
-const privateKeyPath = values["private-key"] ?? process.env.OFP_LICENSE_PRIVATE_KEY_PATH ?? DEFAULT_PRIVATE_KEY;
+const privateKeyPath = values["private-key"] ?? process.env.NNPLICENSE_PRIVATE_KEY_PATH ?? DEFAULT_PRIVATE_KEY;
 if (!values.organization) fail("provide --organization");
 
 const resolvedPrivateKeyPath = resolve(privateKeyPath);

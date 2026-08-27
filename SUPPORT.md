@@ -1,6 +1,6 @@
 # Support
 
-OpenFieldPro is pre-1.0 software.
+NNACT Pro is pre-1.0 software.
 
 - Use GitHub Discussions for setup questions and community help once Discussions are enabled.
 - Use GitHub Issues for reproducible defects and approved feature proposals.

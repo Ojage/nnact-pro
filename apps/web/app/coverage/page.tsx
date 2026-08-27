@@ -34,7 +34,7 @@ export default async function CoveragePage() {
     <div>
       <PageHeader
         title="Coverage & quality"
-        description="See what OpenFieldPro can support, where field demand exceeds coverage, and which workflows require review."
+        description="See what NNACT Pro can support, where field demand exceeds coverage, and which workflows require review."
         actions={
           <Link href="/diagnostics">
             <Button variant="secondary" size="sm">Back to diagnostics</Button>

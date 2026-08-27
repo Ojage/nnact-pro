@@ -1,4 +1,4 @@
-name: OpenFieldPro release CI
+name: NNACT Pro release CI
 
 on:
   pull_request:
@@ -35,15 +35,15 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf /tmp/ofp-license-smoke
-          pnpm --filter @ofp/api license:keypair --output-dir /tmp/ofp-license-smoke
-          pnpm --filter @ofp/api license:generate \
+          pnpm --filter @nnact/api license:keypair --output-dir /tmp/ofp-license-smoke
+          pnpm --filter @nnact/api license:generate \
             --private-key /tmp/ofp-license-smoke/license-signing-key.pem \
-            --organization "OpenFieldPro CI" \
+            --organization "NNACT Pro CI" \
             --tier supporter \
             --seats 1 \
             --expires-at "2030-01-01T00:00:00.000Z" \
             --output /tmp/ofp-license-smoke/ci.ofp-license
-          pnpm --filter @ofp/api license:verify \
+          pnpm --filter @nnact/api license:verify \
             --public-key /tmp/ofp-license-smoke/license-signing-public.pem \
             --license-file /tmp/ofp-license-smoke/ci.ofp-license
           test "$(stat -c '%a' /tmp/ofp-license-smoke/license-signing-key.pem)" = "600"
@@ -88,12 +88,12 @@ jobs:
       - name: Build API
         run: |
           set +e
-          pnpm --filter @ofp/api build > /tmp/openfieldpro-api-build.log 2>&1
+          pnpm --filter @nnact/api build > /tmp/openfieldpro-api-build.log 2>&1
           code=$?
           tail -n 160 /tmp/openfieldpro-api-build.log
           exit $code
       - name: Run API tests
-        run: pnpm --filter @ofp/api test
+        run: pnpm --filter @nnact/api test
       - name: Upload API compiler log
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -116,11 +116,11 @@ jobs:
       - name: Install verified workspace
         run: pnpm install:verified
       - name: Run operations unit tests
-        run: pnpm --filter @ofp/web test:unit
+        run: pnpm --filter @nnact/web test:unit
       - name: Build web application
         run: |
           set +e
-          pnpm --filter @ofp/web build > /tmp/openfieldpro-web-build.log 2>&1
+          pnpm --filter @nnact/web build > /tmp/openfieldpro-web-build.log 2>&1
           code=$?
           tail -n 180 /tmp/openfieldpro-web-build.log
           exit $code
@@ -148,13 +148,13 @@ jobs:
       - name: Install verified workspace
         run: pnpm install:verified
       - name: Install Chromium
-        run: pnpm --filter @ofp/web exec playwright install --with-deps chromium
+        run: pnpm --filter @nnact/web exec playwright install --with-deps chromium
       - name: Build operations web application
-        run: pnpm --filter @ofp/web build
+        run: pnpm --filter @nnact/web build
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
       - name: Run operations browser and visual tests
-        run: pnpm --filter @ofp/web test:e2e
+        run: pnpm --filter @nnact/web test:e2e
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
       - name: Upload operations visual evidence
@@ -185,7 +185,7 @@ jobs:
       - name: Type-check technician app
         run: |
           set +e
-          pnpm --filter @ofp/mobile typecheck > /tmp/openfieldpro-mobile-typecheck.log 2>&1
+          pnpm --filter @nnact/mobile typecheck > /tmp/openfieldpro-mobile-typecheck.log 2>&1
           code=$?
           tail -n 160 /tmp/openfieldpro-mobile-typecheck.log
           exit $code

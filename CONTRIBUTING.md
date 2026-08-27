@@ -1,4 +1,4 @@
-# Contributing to OpenFieldPro
+# Contributing to NNACT Pro
 
 Thank you for helping build a dependable, self-hostable field-service platform.
 
@@ -16,11 +16,11 @@ Use Node 22 and the package manager version declared in `package.json`.
 ```bash
 pnpm install:verified
 pnpm release:safety
-pnpm --filter @ofp/api build
-pnpm --filter @ofp/api test
-pnpm --filter @ofp/web test:unit
-pnpm --filter @ofp/web build
-pnpm --filter @ofp/mobile typecheck
+pnpm --filter @nnact/api build
+pnpm --filter @nnact/api test
+pnpm --filter @nnact/web test:unit
+pnpm --filter @nnact/web build
+pnpm --filter @nnact/mobile typecheck
 ```
 
 Changes affecting user workflows should include the smallest useful automated test. Database changes must be additive migrations that preserve upgrades from released versions; never rewrite published migration history.

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-OpenFieldPro is pre-1.0 software. Security fixes are applied to the latest release and the current default branch. Older commits and unmaintained forks are not supported.
+NNACT Pro is pre-1.0 software. Security fixes are applied to the latest release and the current default branch. Older commits and unmaintained forks are not supported.
 
 ## Reporting a vulnerability
 
@@ -41,9 +41,9 @@ A production deployment must:
 
 ## Sensitive data
 
-OpenFieldPro can contain customer contact information, addresses, equipment history, photos, notes, invoices, and payment metadata. Operators are responsible for access control, retention, deletion, backups, regional privacy requirements, breach notification, and vendor agreements.
+NNACT Pro can contain customer contact information, addresses, equipment history, photos, notes, invoices, and payment metadata. Operators are responsible for access control, retention, deletion, backups, regional privacy requirements, breach notification, and vendor agreements.
 
-OpenFieldPro does not store raw card data. Online card collection must remain on a PCI-capable payment provider's hosted surface.
+NNACT Pro does not store raw card data. Online card collection must remain on a PCI-capable payment provider's hosted surface.
 
 ## Signed entitlement keys
 

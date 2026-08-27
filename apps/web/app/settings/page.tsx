@@ -366,7 +366,7 @@ function CompanySection({ form, updateOrg, updateSettings, logoBusy, onUploadLog
           checked={form.removeOpenFieldProAttribution}
           onChange={(event) => updateOrg("removeOpenFieldProAttribution", event.target.checked)}
         />
-        Remove OpenFieldPro attribution on customer-facing documents
+        Remove NNACT Pro attribution on customer-facing documents
       </label>
     </div>
   );

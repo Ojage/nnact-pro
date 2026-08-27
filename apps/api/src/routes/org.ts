@@ -4,7 +4,7 @@
 // ponytail: header/first-org fallback is dev-only. Ceiling: do NOT ship with the
 // fallback enabled in prod — gate it behind NODE_ENV !== "production".
 import type { FastifyRequest } from "fastify";
-import { db, orgs } from "@ofp/db";
+import { db, orgs } from "@nnact/db";
 import type { JwtClaims } from "../auth.js";
 
 export async function resolveOrgId(req: FastifyRequest): Promise<string> {

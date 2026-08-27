@@ -1,5 +1,5 @@
 {
-  "name": "@ofp/mobile",
+  "name": "@nnact/mobile",
   "version": "0.1.0",
   "private": true,
   "main": "App.tsx",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@ofp/shared": "workspace:*",
+    "@nnact/shared": "workspace:*",
     "expo": "~52.0.0",
     "expo-sqlite": "~15.1.4",
     "expo-status-bar": "~2.0.0",

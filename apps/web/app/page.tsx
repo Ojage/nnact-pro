@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { serverApi } from "@/lib/server-api";
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";

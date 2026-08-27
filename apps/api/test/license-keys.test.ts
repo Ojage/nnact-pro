@@ -12,7 +12,7 @@ const now = new Date("2026-07-11T12:00:00.000Z");
 
 function validPayload() {
   return createSupportEntitlement({
-    organization: "OpenFieldPro Test Sponsor",
+    organization: "NNACT Pro Test Sponsor",
     tier: "business",
     seats: 12,
     issuedAt: "2026-07-11T11:00:00.000Z",
@@ -27,7 +27,7 @@ test("a generated key verifies with the matching public key", () => {
   const result = verifySupportEntitlement(token, pair.publicKey, { now });
   assert.equal(result.valid, true);
   if (result.valid) {
-    assert.equal(result.payload.organization, "OpenFieldPro Test Sponsor");
+    assert.equal(result.payload.organization, "NNACT Pro Test Sponsor");
     assert.equal(result.payload.seats, 12);
     assert.equal(result.keyFingerprint.length, 64);
   }

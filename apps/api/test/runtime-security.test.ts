@@ -63,12 +63,12 @@ test("payment redirects require an exact HTTPS web origin in production", () => 
 test("public organization registration is disabled by default in production", () => {
   assert.equal(publicRegistrationEnabled({ NODE_ENV: "production" } as NodeJS.ProcessEnv), false);
   assert.equal(
-    publicRegistrationEnabled({ NODE_ENV: "production", OFP_ALLOW_PUBLIC_REGISTRATION: "true" } as NodeJS.ProcessEnv),
+    publicRegistrationEnabled({ NODE_ENV: "production", NNPALLOW_PUBLIC_REGISTRATION: "true" } as NodeJS.ProcessEnv),
     true,
   );
   assert.equal(publicRegistrationEnabled({ NODE_ENV: "development" } as NodeJS.ProcessEnv), true);
   assert.equal(
-    publicRegistrationEnabled({ NODE_ENV: "development", OFP_ALLOW_PUBLIC_REGISTRATION: "false" } as NodeJS.ProcessEnv),
+    publicRegistrationEnabled({ NODE_ENV: "development", NNPALLOW_PUBLIC_REGISTRATION: "false" } as NodeJS.ProcessEnv),
     false,
   );
 });

@@ -9,7 +9,7 @@ import {
   messageTemplateSampleVariables,
   validateMessageTemplate,
   type MessageTemplateKind,
-} from "@ofp/shared";
+} from "@nnact/shared";
 
 test("renders variables into the template", () => {
   assert.equal(

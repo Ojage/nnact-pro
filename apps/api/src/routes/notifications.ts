@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { eq, and, desc } from "drizzle-orm";
-import { db, notifications } from "@ofp/db";
+import { db, notifications } from "@nnact/db";
 
 // ponytail: no JWT fallback returns empty. Ceiling: unauthenticated users see nothing.
 function userId(req: any): string | null {

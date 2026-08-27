@@ -22,7 +22,7 @@ const contentSecurityPolicy = [
 const nextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   outputFileTracingRoot: path.join(__dirname, "../../"),
-  transpilePackages: ["@ofp/shared"],
+  transpilePackages: ["@nnact/shared"],
   async headers() {
     return [{
       source: "/(.*)",

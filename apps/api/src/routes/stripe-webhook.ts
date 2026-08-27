@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq, sql } from "drizzle-orm";
-import { db, invoices, payments } from "@ofp/db";
+import { db, invoices, payments } from "@nnact/db";
 import { applyPayment } from "../invoicing.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";

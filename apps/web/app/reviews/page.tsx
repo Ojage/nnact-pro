@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import type { JobDTO, CustomerDTO } from "@ofp/shared";
+import type { JobDTO, CustomerDTO } from "@nnact/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -1,19 +1,19 @@
 // Reference plugin — a complete, runnable OFP integration in ~50 lines, using
-// only @ofp/plugin-sdk and the Node stdlib (no framework). It proves the whole
+// only @nnact/plugin-sdk and the Node stdlib (no framework). It proves the whole
 // loop: OFP emits an event -> signed webhook -> we verify -> we call back into
 // OFP's scoped API with our install token.
 //
-//   Run:  OFP_WEBHOOK_SECRET=whsec_… OFP_TOKEN=ofp_… node --import tsx examples/webhook-receiver.ts
+//   Run:  NNPWEBHOOK_SECRET=whsec_… NNPTOKEN=NNP… node --import tsx examples/webhook-receiver.ts
 //   Then point a plugin install's webhook URL at http://localhost:4500
 import { createServer } from "node:http";
 import { createWebhookHandler, OFPClient, type PluginEventEnvelope } from "../src/index.js";
 
-const SECRET = process.env.OFP_WEBHOOK_SECRET ?? "whsec_dev";
-const TOKEN = process.env.OFP_TOKEN ?? "";
-const OFP_BASE = process.env.OFP_BASE ?? "http://localhost:3001";
+const SECRET = process.env.NNPWEBHOOK_SECRET ?? "whsec_dev";
+const TOKEN = process.env.NNPTOKEN ?? "";
+const NNPBASE = process.env.NNPBASE ?? "http://localhost:3001";
 const PORT = Number(process.env.PORT ?? 4500);
 
-const client = new OFPClient({ baseUrl: OFP_BASE, token: TOKEN });
+const client = new OFPClient({ baseUrl: NNPBASE, token: TOKEN });
 
 const handle = createWebhookHandler({
   secret: SECRET,

@@ -1,5 +1,5 @@
 // Canonical webhook wire format — the single source of truth shared by the
-// OpenFieldPro server (which signs outbound deliveries) and plugin authors
+// NNACT Pro server (which signs outbound deliveries) and plugin authors
 // (who verify them). Stripe-style:
 //
 //   header value:  t=<unix_ms>,v1=<hex>

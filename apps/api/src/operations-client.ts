@@ -13,7 +13,7 @@ import {
   type RestoreProofRequest,
   type RestoreValidateRequest,
   type UpgradeRequest,
-} from "@ofp/shared";
+} from "@nnact/shared";
 import { z } from "zod";
 
 export interface OperationsClientOptions {

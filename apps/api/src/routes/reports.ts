@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { eq, and, ne, gte, inArray, sql } from "drizzle-orm";
-import { db, jobs, invoices, reviews, lineItems, payments, estimates, appointments, users } from "@ofp/db";
+import { db, jobs, invoices, reviews, lineItems, payments, estimates, appointments, users } from "@nnact/db";
 import { jobCost, jobMargin } from "../totals.js";
 import {
   arAgingReport,

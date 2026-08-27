@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { CustomerDTO, JobDTO } from "@ofp/shared";
-import { formatMoney } from "@ofp/shared";
+import type { CustomerDTO, JobDTO } from "@nnact/shared";
+import { formatMoney } from "@nnact/shared";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

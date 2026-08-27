@@ -1,6 +1,6 @@
-# @ofp/plugin-sdk
+# @nnact/plugin-sdk
 
-Everything you need to build an [OpenFieldPro](../../README.md) plugin: verify
+Everything you need to build an [NNACT Pro](../../README.md) plugin: verify
 signed event webhooks, type the payloads, and call back into the scoped inbound
 API. The SDK is the **single source of truth** for the webhook wire format — the
 OFP server imports its signing from here, so verification can never drift.
@@ -11,13 +11,13 @@ OFP server imports its signing from here, so verification can never drift.
    which scopes you need.
 2. An OFP org **installs** your plugin. The install mints two secrets:
    - a **webhook signing secret** (`whsec_…`) — OFP signs every delivery with it;
-   - a **scoped API token** (`ofp_…`) — you use it to call back into OFP.
+   - a **scoped API token** (`NNP…`) — you use it to call back into OFP.
 3. OFP **POSTs signed events** to your webhook. You verify the signature and react.
 
 ## Manifest
 
 ```ts
-import { defineManifest } from "@ofp/plugin-sdk";
+import { defineManifest } from "@nnact/plugin-sdk";
 
 export default defineManifest({
   slug: "my-plugin",
@@ -32,10 +32,10 @@ export default defineManifest({
 ## Receiving events
 
 ```ts
-import { createWebhookHandler } from "@ofp/plugin-sdk";
+import { createWebhookHandler } from "@nnact/plugin-sdk";
 
 const handle = createWebhookHandler({
-  secret: process.env.OFP_WEBHOOK_SECRET!, // the install's whsec_…
+  secret: process.env.NNPWEBHOOK_SECRET!, // the install's whsec_…
   onEvent: async (event) => {
     if (event.kind === "invoice.paid") {
       // event.data is typed: { invoiceId, number, total, jobId }
@@ -55,9 +55,9 @@ throws (OFP then records the delivery as failed).
 ## Calling back into OFP
 
 ```ts
-import { OFPClient } from "@ofp/plugin-sdk";
+import { OFPClient } from "@nnact/plugin-sdk";
 
-const ofp = new OFPClient({ baseUrl: "https://app.example.com", token: process.env.OFP_TOKEN! });
+const ofp = new OFPClient({ baseUrl: "https://app.example.com", token: process.env.NNPTOKEN! });
 await ofp.me();         // { orgId, installId, scopes }
 await ofp.customers();  // requires the customers:read scope
 ```
@@ -77,8 +77,8 @@ Verify against the **raw** body bytes — not a re-serialized object.
 A complete reference plugin lives in [`examples/webhook-receiver.ts`](./examples/webhook-receiver.ts):
 
 ```bash
-OFP_WEBHOOK_SECRET=whsec_… OFP_TOKEN=ofp_… node --import tsx examples/webhook-receiver.ts
+NNPWEBHOOK_SECRET=whsec_… NNPTOKEN=NNP… node --import tsx examples/webhook-receiver.ts
 # then set a plugin install's webhook URL to http://localhost:4500
 ```
 
-Run the tests: `pnpm --filter @ofp/plugin-sdk test`
+Run the tests: `pnpm --filter @nnact/plugin-sdk test`

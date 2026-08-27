@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
-import { db, equipment } from "@ofp/db";
+import { db, equipment } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 
 const createSchema = z.object({

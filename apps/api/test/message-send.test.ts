@@ -1,7 +1,7 @@
 // Runnable check (no DB): node --import tsx --test test/message-send.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_BUSINESS_SETTINGS } from "@ofp/shared";
+import { DEFAULT_BUSINESS_SETTINGS } from "@nnact/shared";
 import {
   applyDeliveryOutcome,
   canRetryMessage,

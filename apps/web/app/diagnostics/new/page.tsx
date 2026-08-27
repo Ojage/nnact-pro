@@ -222,7 +222,7 @@ export default function NewDiagnosticPage() {
             <CardHeader><CardTitle>Safety boundary</CardTitle></CardHeader>
             <CardContent>
               <p className="text-sm text-fg-muted">
-                OpenFieldPro supports qualified technicians. The active check must still define power state,
+                NNACT Pro supports qualified technicians. The active check must still define power state,
                 operating condition, meter mode, exact points, and stop conditions.
               </p>
             </CardContent>

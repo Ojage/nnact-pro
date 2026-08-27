@@ -1,10 +1,10 @@
 // Scoped-token authentication for the INBOUND plugin API surface
 // (/api/plugin/*). A plugin presents its per-install token as
-// `Authorization: Bearer ofp_…`; we look it up by hash, enforce required
+// `Authorization: Bearer NNP…`; we look it up by hash, enforce required
 // scopes, and attach the resolved identity to the request.
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { and, eq, isNull } from "drizzle-orm";
-import { db, apiTokens } from "@ofp/db";
+import { db, apiTokens } from "@nnact/db";
 import { hashToken } from "./crypto.js";
 
 export interface PluginAuth {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

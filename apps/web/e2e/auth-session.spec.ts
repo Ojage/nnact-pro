@@ -44,13 +44,13 @@ async function mockSessionApi(page: Page) {
         { token: "header.payload.signature", user, orgId: "org-1" },
         200,
         {
-          "set-cookie": "ofp_session=header.payload.signature; Path=/; HttpOnly; SameSite=Lax",
+          "set-cookie": "NNPsession=header.payload.signature; Path=/; HttpOnly; SameSite=Lax",
         },
       );
     }
     if (pathname === "/api/auth/logout" && request.method() === "POST") {
       return fulfillJson(route, { ok: true }, 200, {
-        "set-cookie": "ofp_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+        "set-cookie": "NNPsession=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
       });
     }
     if (pathname === "/api/auth/me") return fulfillJson(route, user);
@@ -112,10 +112,10 @@ test("desktop login uses an HTTP-only session and exposes sign out", async ({ pa
   const accountPanel = page.getByRole("complementary");
   await expect(accountPanel.getByText("Morgan Owner")).toBeVisible();
   await expect(accountPanel.getByRole("button", { name: "Sign out" })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem("ofp_token"))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem("NNPtoken"))).toBeNull();
 
   const cookies = await page.context().cookies("http://127.0.0.1:3001");
-  const sessionCookie = cookies.find((cookie) => cookie.name === "ofp_session");
+  const sessionCookie = cookies.find((cookie) => cookie.name === "NNPsession");
   expect(sessionCookie).toBeTruthy();
   expect(sessionCookie?.httpOnly).toBe(true);
   expect(sessionCookie?.sameSite).toBe("Lax");
@@ -136,7 +136,7 @@ test("mobile drawer shows the authenticated user and secure sign out", async ({ 
   await mockSessionApi(page);
   await page.context().addCookies([
     {
-      name: "ofp_session",
+      name: "NNPsession",
       value: "header.payload.signature",
       domain: "127.0.0.1",
       path: "/",
@@ -165,7 +165,7 @@ test("mobile drawer shows the authenticated user and secure sign out", async ({ 
 
   await accountPanel.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/login");
-  expect(await page.evaluate(() => localStorage.getItem("ofp_token"))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem("NNPtoken"))).toBeNull();
   expect(runtimeErrors).toEqual([]);
 });
 

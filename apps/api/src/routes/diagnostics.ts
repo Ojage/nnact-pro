@@ -12,7 +12,7 @@ import {
   jobEquipmentLinks,
   jobs,
   traceRoutes,
-} from "@ofp/db";
+} from "@nnact/db";
 import {
   deriveInitialDiagnosticStatus,
   deriveStatusAfterMeasurement,

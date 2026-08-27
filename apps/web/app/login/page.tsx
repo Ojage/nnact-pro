@@ -37,7 +37,7 @@ export default function LoginPage() {
             OF
           </div>
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>Access your OpenFieldPro workspace.</CardDescription>
+          <CardDescription>Access your NNACT Pro workspace.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">

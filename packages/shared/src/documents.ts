@@ -113,7 +113,7 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
     : `<div class="logo-mark">${escapeHtml(data.branding.companyName.slice(0, 2).toUpperCase())}</div>`;
   const attribution = data.branding.removeOpenFieldProAttribution
     ? ""
-    : `<p class="attribution">Powered by OpenFieldPro</p>`;
+    : `<p class="attribution">Powered by NNACT Pro</p>`;
   const presentation = data.presentation ?? {};
   const showBusinessInfo = presentation.showBusinessInfo ?? true;
   const showLineItemPrices = presentation.showLineItemPrices ?? true;
@@ -269,7 +269,7 @@ function documentIssuedDate(value?: string | Date | null) {
 
 function documentBranding(org?: DocumentOrgLike | null, fallbackFooter = "Field service command center document"): FieldDocumentData["branding"] {
   return {
-    companyName: org?.name ?? "OpenFieldPro Demo Co.",
+    companyName: org?.name ?? "NNACT Pro Demo Co.",
     logoUrl: org?.logoUrl ?? undefined,
     brandColor: org?.brandColor ?? "#22C55E",
     footerText: org?.documentFooter ?? fallbackFooter,
@@ -418,7 +418,7 @@ export function estimateDocumentData({
     })),
     pricing: documentPricing(estimate.pricing),
     paymentsCents: 0,
-    branding: documentBranding(org, "Estimate generated from OpenFieldPro"),
+    branding: documentBranding(org, "Estimate generated from NNACT Pro"),
     presentation: {
       format: settings?.estimate.format,
       showBusinessInfo: visibility?.showBusinessInfo ?? true,

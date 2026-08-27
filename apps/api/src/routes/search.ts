@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { eq, and, ilike } from "drizzle-orm";
-import { db, jobs, customers, invoices } from "@ofp/db";
+import { db, jobs, customers, invoices } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 
 // ponytail: flat text search, no full-text index. Ceiling: slow on large datasets.

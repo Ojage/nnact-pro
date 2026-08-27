@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import type { JobDTO } from "@ofp/shared";
+import type { JobDTO } from "@nnact/shared";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";

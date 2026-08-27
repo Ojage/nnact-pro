@@ -26,7 +26,7 @@ test("formatNotification renders money in dollars and includes key fields", () =
 
 test("formatNotification tolerates missing fields", () => {
   assert.equal(formatNotification("invoice.created", {}), "🧾 Invoice  created — $0.00");
-  assert.equal(formatNotification("unknown.event", {}), "OpenFieldPro: unknown.event");
+  assert.equal(formatNotification("unknown.event", {}), "NNACT Pro: unknown.event");
 });
 
 test("toNotificationDelivery shapes Slack payload", () => {
@@ -43,6 +43,6 @@ test("toNotificationDelivery shapes Discord payload", () => {
 test("toNotificationDelivery shapes ntfy as plain text with a title header", () => {
   const d = toNotificationDelivery("ntfy", "invoice.paid", { number: "INV-2", total: 1000 });
   assert.equal(d.headers["content-type"], "text/plain");
-  assert.equal(d.headers.Title, "OpenFieldPro · invoice.paid");
+  assert.equal(d.headers.Title, "NNACT Pro · invoice.paid");
   assert.equal(d.body, "✅ Invoice INV-2 paid — $10.00");
 });

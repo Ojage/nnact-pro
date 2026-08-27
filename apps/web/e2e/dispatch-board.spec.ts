@@ -178,7 +178,7 @@ test("dispatch board surfaces existing conflicts and blocks a new overlap", asyn
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/dispatch");
 
-  await expect(page).toHaveTitle(/OpenFieldPro/i);
+  await expect(page).toHaveTitle(/NNACT Pro/i);
   await expect(page.getByRole("heading", { name: "Dispatch board" })).toBeVisible();
   await expect(page.getByTestId("dispatch-board")).toBeVisible();
   await expect(page.getByText("Schedule conflicts")).toBeVisible();

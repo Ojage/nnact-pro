@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatMoney, type CustomerServicePlanDTO, type ServicePlanDTO, type ServicePlanVisitDTO } from "@ofp/shared";
+import { formatMoney, type CustomerServicePlanDTO, type ServicePlanDTO, type ServicePlanVisitDTO } from "@nnact/shared";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("ofp_token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("NNPtoken") : null;
   const headers: Record<string, string> = {
     "content-type": "application/json",
     ...(token ? { authorization: `Bearer ${token}` } : {}),

@@ -6,7 +6,7 @@ import type {
   ArAgingReport,
   EstimateConversionReport,
   RevenueTrendPoint,
-} from "@ofp/shared";
+} from "@nnact/shared";
 
 export const AR_AGING_LABELS: ArAgingBucketLabel[] = ["current", "1-30", "31-60", "61-90", "90+"];
 

@@ -14,8 +14,8 @@ import {
   customers,
   orgs,
   payments,
-} from "@ofp/db";
-import { formatMoney, mergeBusinessSettings } from "@ofp/shared";
+} from "@nnact/db";
+import { formatMoney, mergeBusinessSettings } from "@nnact/shared";
 import {
   renderEstimateMessage,
   renderInvoiceMessage,

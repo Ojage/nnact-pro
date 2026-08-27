@@ -7,12 +7,12 @@
 // Mirrors `safeEmitActivity`: fire-and-forget, never throws. A flaky third-party
 // integration must never break the user-visible action that triggered it.
 import { and, eq } from "drizzle-orm";
-import { db, plugins, pluginInstalls, pluginEvents } from "@ofp/db";
+import { db, plugins, pluginInstalls, pluginEvents } from "@nnact/db";
 import { buildDeliveryRequest, attemptDelivery, backoffMs, MAX_ATTEMPTS } from "./delivery.js";
 
 // Canonical event vocabulary lives in the SDK so emitter and receivers share one
 // contract; re-exported for internal callers.
-export { PLUGIN_EVENTS, type PluginEventKind } from "@ofp/plugin-sdk";
+export { PLUGIN_EVENTS, type PluginEventKind } from "@nnact/plugin-sdk";
 
 interface InstallRow {
   installId: string;

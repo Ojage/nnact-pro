@@ -59,6 +59,6 @@ export function resolvePublicWebUrl(env: NodeJS.ProcessEnv = process.env) {
 }
 
 export function publicRegistrationEnabled(env: NodeJS.ProcessEnv = process.env) {
-  if (env.NODE_ENV !== "production") return env.OFP_ALLOW_PUBLIC_REGISTRATION !== "false";
-  return env.OFP_ALLOW_PUBLIC_REGISTRATION === "true";
+  if (env.NODE_ENV !== "production") return env.NNPALLOW_PUBLIC_REGISTRATION !== "false";
+  return env.NNPALLOW_PUBLIC_REGISTRATION === "true";
 }

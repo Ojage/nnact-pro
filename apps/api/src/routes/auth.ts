@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
-import { db, orgs, users } from "@ofp/db";
+import { db, orgs, users } from "@nnact/db";
 import { hashPassword, verifyPassword, type JwtClaims } from "../auth.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 import { publicRegistrationEnabled } from "../runtime-security.js";
@@ -62,7 +62,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!publicRegistrationEnabled()) {
       return reply.code(403).send({
         error: "public registration is disabled",
-        hint: "An owner can temporarily enable OFP_ALLOW_PUBLIC_REGISTRATION during controlled onboarding.",
+        hint: "An owner can temporarily enable NNPALLOW_PUBLIC_REGISTRATION during controlled onboarding.",
       });
     }
 

@@ -6,7 +6,7 @@ import {
   servicePlans,
   customerServicePlans,
   servicePlanVisits,
-} from "@ofp/db";
+} from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 
 const createPlanBody = z.object({

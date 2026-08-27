@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_BUSINESS_SETTINGS, type BusinessSettings } from "@ofp/shared";
+import { DEFAULT_BUSINESS_SETTINGS, type BusinessSettings } from "@nnact/shared";
 import type { OrgSettingsDTO } from "./api";
 import { estimateDocumentHtml, invoiceDocumentHtml } from "./document-data";
 

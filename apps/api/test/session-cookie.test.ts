@@ -11,7 +11,7 @@ test("session cookie is HTTP-only, same-site, scoped, and secure in production",
     maxAgeSeconds: 3600,
     env: { NODE_ENV: "production" } as NodeJS.ProcessEnv,
   });
-  assert.match(header, /^ofp_session=/);
+  assert.match(header, /^NNPsession=/);
   assert.match(header, /Path=\//);
   assert.match(header, /HttpOnly/);
   assert.match(header, /SameSite=Lax/);
@@ -30,7 +30,7 @@ test("development session cookie omits Secure for local HTTP", () => {
 
 test("logout cookie expires the same session name and path", () => {
   const header = clearSessionCookieHeader({ NODE_ENV: "production" } as NodeJS.ProcessEnv);
-  assert.match(header, /^ofp_session=/);
+  assert.match(header, /^NNPsession=/);
   assert.match(header, /Max-Age=0/);
   assert.match(header, /Expires=Thu, 01 Jan 1970 00:00:00 GMT/);
   assert.match(header, /Path=\//);

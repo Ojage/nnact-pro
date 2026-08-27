@@ -43,7 +43,7 @@ set -a
 source .env
 set +a
 
-required=(POSTGRES_PASSWORD JWT_SECRET CORS_ORIGIN PUBLIC_WEB_URL PUBLIC_API_URL OFP_SITE_ADDRESS)
+required=(POSTGRES_PASSWORD JWT_SECRET CORS_ORIGIN PUBLIC_WEB_URL PUBLIC_API_URL NNPSITE_ADDRESS)
 for name in "${required[@]}"; do
   if [ -z "${!name:-}" ]; then
     echo "Missing required production setting: $name" >&2
@@ -116,10 +116,10 @@ if [ "$healthy" != true ]; then
 fi
 
 cat <<EOF
-OpenFieldPro deployment started.
-App:     https://${OFP_SITE_ADDRESS}
-Landing: https://${OFP_SITE_ADDRESS}/welcome
-API:     https://${OFP_SITE_ADDRESS}/api/health
+NNACT Pro deployment started.
+App:     https://${NNPSITE_ADDRESS}
+Landing: https://${NNPSITE_ADDRESS}/welcome
+API:     https://${NNPSITE_ADDRESS}/api/health
 
 Complete the post-deploy smoke tests in docs/release/RELEASE_CHECKLIST.md before directing users here.
 EOF

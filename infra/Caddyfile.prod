@@ -1,4 +1,4 @@
-{$OFP_SITE_ADDRESS} {
+{$NNPSITE_ADDRESS} {
 	encode zstd gzip
 
 	header {

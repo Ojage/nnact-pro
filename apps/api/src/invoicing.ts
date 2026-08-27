@@ -1,5 +1,5 @@
 // Pure invoice/payment state logic — testable without a DB or Stripe.
-import type { InvoiceStatus } from "@ofp/shared";
+import type { InvoiceStatus } from "@nnact/shared";
 
 export interface PaymentApplication {
   paidSoFar: number; // cents, after applying this payment

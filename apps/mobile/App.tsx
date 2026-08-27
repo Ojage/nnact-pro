@@ -1,4 +1,4 @@
-// OpenFieldPro technician app — next-action field dashboard with a durable
+// NNACT Pro technician app — next-action field dashboard with a durable
 // diagnostic-package fallback for low-signal service locations.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import type { JobDTO } from "@ofp/shared";
+import type { JobDTO } from "@nnact/shared";
 import { SyncService, type FieldPackage } from "./src/sync";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";

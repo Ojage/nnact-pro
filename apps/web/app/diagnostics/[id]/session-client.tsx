@@ -168,7 +168,7 @@ export function DiagnosticSessionClient({ initialDetail }: { initialDetail: Diag
         <CardHeader><CardTitle>Coverage required</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-fg-muted">
-            This appliance is linked to the work order, but no validated workflow applies. OpenFieldPro will not generate an unreviewed field path or imply a part diagnosis.
+            This appliance is linked to the work order, but no validated workflow applies. NNACT Pro will not generate an unreviewed field path or imply a part diagnosis.
           </p>
           <div className="rounded-xl border border-border bg-surface-200 p-4 text-sm">
             <p className="font-semibold text-fg">Required fallback</p>

@@ -1,6 +1,6 @@
 # Code of Conduct
 
-OpenFieldPro is committed to a respectful, harassment-free project community.
+NNACT Pro is committed to a respectful, harassment-free project community.
 
 Be considerate, discuss technical disagreements in good faith, respect privacy, and focus criticism on the work rather than the person. Harassment, threats, discriminatory language, deliberate exposure of private information, and sustained disruption are not acceptable.
 

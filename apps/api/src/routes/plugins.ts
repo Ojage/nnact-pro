@@ -4,12 +4,12 @@
 //
 // Installing a plugin mints two secrets:
 //   • a per-install webhook signing secret (whsec_…), stored to sign deliveries;
-//   • a scoped API token (ofp_…) the plugin uses for inbound calls — the
+//   • a scoped API token (NNP…) the plugin uses for inbound calls — the
 //     plaintext is returned exactly once here and only its hash is persisted.
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
-import { db, plugins, pluginInstalls, apiTokens, pluginEvents } from "@ofp/db";
+import { db, plugins, pluginInstalls, apiTokens, pluginEvents } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 import { generateToken, generateWebhookSecret } from "../plugins/crypto.js";
 

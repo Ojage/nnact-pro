@@ -1,4 +1,4 @@
-import type { DepositMode } from "@ofp/shared";
+import type { DepositMode } from "@nnact/shared";
 
 export function estimateNumber(seq: number, prefix = "EST", nextNumber = 1000): string {
   return `${prefix}-${String(nextNumber + seq).padStart(4, "0")}`;

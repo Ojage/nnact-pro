@@ -26,7 +26,7 @@ export default function WelcomePage() {
           <Link href="/welcome" className="flex items-center gap-3 text-fg no-underline">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-xs font-black text-white">OF</span>
             <div>
-              <span className="block font-black tracking-tight">OpenFieldPro</span>
+              <span className="block font-black tracking-tight">NNACT Pro</span>
               <span className="block text-[10px] text-fg-dim">Open field service operations</span>
             </div>
           </Link>
@@ -52,7 +52,7 @@ export default function WelcomePage() {
               Run the business. Execute the diagnosis.
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-fg-muted md:text-xl">
-              OpenFieldPro is a self-hostable field service platform with the complete operational workflow service companies expect—plus appliance-specific diagnostic execution that connects the complaint, exact test points, measured readings, and wiring evidence.
+              NNACT Pro is a self-hostable field service platform with the complete operational workflow service companies expect—plus appliance-specific diagnostic execution that connects the complaint, exact test points, measured readings, and wiring evidence.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/login" className="rounded-full bg-accent px-5 py-3 text-sm font-black text-white no-underline hover:bg-accent-hover">
@@ -124,7 +124,7 @@ export default function WelcomePage() {
             <p className="text-xs font-black uppercase tracking-[.2em] text-blue">Complete operations core</p>
             <h2 className="mt-3 text-4xl font-black tracking-tight text-fg md:text-6xl">The business system is not an afterthought.</h2>
             <p className="mt-5 text-lg leading-8 text-fg-muted">
-              OpenFieldPro retains the full work-order and customer lifecycle expected from a modern field service platform. Diagnostic execution is integrated into that lifecycle instead of replacing it.
+              NNACT Pro retains the full work-order and customer lifecycle expected from a modern field service platform. Diagnostic execution is integrated into that lifecycle instead of replacing it.
             </p>
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -144,7 +144,7 @@ export default function WelcomePage() {
             <p className="text-xs font-black uppercase tracking-[.2em] text-accent">Appliance-specific differentiator</p>
             <h2 className="mt-3 text-4xl font-black tracking-tight text-fg md:text-6xl">Technical information becomes an executable workflow.</h2>
             <p className="mt-5 text-lg leading-8 text-fg-muted">
-              Static manuals, error-code tables, and wiring diagrams remain the evidence. OpenFieldPro connects them into a field-ready sequence without hiding the meter points, operating conditions, measured values, or route validation.
+              Static manuals, error-code tables, and wiring diagrams remain the evidence. NNACT Pro connects them into a field-ready sequence without hiding the meter points, operating conditions, measured values, or route validation.
             </p>
           </div>
           <div className="grid gap-3">
@@ -190,7 +190,7 @@ export default function WelcomePage() {
 
       <footer className="border-t border-border py-8">
         <div className="mx-auto flex w-[min(1180px,calc(100%-32px))] flex-wrap items-center justify-between gap-3 text-sm text-fg-dim">
-          <span>OpenFieldPro</span>
+          <span>NNACT Pro</span>
           <span>Open field service operations with visible diagnostic evidence.</span>
         </div>
       </footer>

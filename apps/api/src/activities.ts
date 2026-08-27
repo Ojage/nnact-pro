@@ -10,7 +10,7 @@
 // emitter auto-resolves the customerId via a cheap select, so the customer
 // timeline page stays complete without callers having to re-look it up.
 import { eq } from "drizzle-orm";
-import { db, activities, jobs } from "@ofp/db";
+import { db, activities, jobs } from "@nnact/db";
 
 export interface ActivityRefs {
   customerId?: string | null;

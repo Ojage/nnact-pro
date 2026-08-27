@@ -111,7 +111,7 @@ export default function IntegrationsPage() {
   if (loading) {
     return (
       <div>
-        <PageHeader title="Integrations" description="Connect OpenFieldPro to the tools you already use." />
+        <PageHeader title="Integrations" description="Connect NNACT Pro to the tools you already use." />
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
@@ -121,7 +121,7 @@ export default function IntegrationsPage() {
 
   return (
     <div>
-      <PageHeader title="Integrations" description="Connect OpenFieldPro to the tools you already use — open plugin architecture, not a closed store." />
+      <PageHeader title="Integrations" description="Connect NNACT Pro to the tools you already use — open plugin architecture, not a closed store." />
 
       <div className="grid gap-3 md:grid-cols-2">
         {catalog.map((p) => (

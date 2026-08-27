@@ -1,15 +1,15 @@
 // Outbound customer message rendering. Rendering and variable validation are
-// implemented in @ofp/shared so the web editor previews exactly what the API
+// implemented in @nnact/shared so the web editor previews exactly what the API
 // sends; this module adds the document-specific variable builders.
 import {
   renderMessageTemplate,
   type TemplateVariables,
   type MessageSettings,
-} from "@ofp/shared";
+} from "@nnact/shared";
 
-export { renderMessageTemplate, type TemplateVariables } from "@ofp/shared";
+export { renderMessageTemplate, type TemplateVariables } from "@nnact/shared";
 
-export type { MessageSettings } from "@ofp/shared";
+export type { MessageSettings } from "@nnact/shared";
 
 export interface MessageRenderResult {
   subject: string;

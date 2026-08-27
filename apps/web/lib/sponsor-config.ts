@@ -7,11 +7,11 @@ export interface SponsorConfig {
 export function readSponsorConfig(
   env: Record<string, string | undefined> = process.env,
 ): SponsorConfig | null {
-  if (env.OFP_SPONSOR_ENABLED?.toLowerCase() !== "true") return null;
+  if (env.NNPSPONSOR_ENABLED?.toLowerCase() !== "true") return null;
 
-  const name = env.OFP_SPONSOR_NAME?.trim();
-  const message = env.OFP_SPONSOR_MESSAGE?.trim();
-  const rawUrl = env.OFP_SPONSOR_URL?.trim();
+  const name = env.NNPSPONSOR_NAME?.trim();
+  const message = env.NNPSPONSOR_MESSAGE?.trim();
+  const rawUrl = env.NNPSPONSOR_URL?.trim();
   if (!name || !message || !rawUrl) return null;
   if (name.length > 80 || message.length > 180) return null;
 

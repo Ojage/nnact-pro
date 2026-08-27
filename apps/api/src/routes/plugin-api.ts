@@ -1,11 +1,11 @@
 // Public plugin API surface (INBOUND). Authenticated by a per-install scoped
-// token (Authorization: Bearer ofp_…), NOT the owner JWT. This is the half of
+// token (Authorization: Bearer NNP…), NOT the owner JWT. This is the half of
 // the foundation a real plugin calls to read OFP data. v1 ships the identity
 // echo plus one scoped read so the auth + scope path is exercised end-to-end;
 // resource coverage grows as plugins need it.
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
-import { db, customers } from "@ofp/db";
+import { db, customers } from "@nnact/db";
 import { requireToken } from "../plugins/auth.js";
 
 export async function pluginApiRoutes(app: FastifyInstance) {

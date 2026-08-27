@@ -14,7 +14,7 @@ import {
 
 test("generateToken returns plaintext, its hash, and a display prefix", () => {
   const t = generateToken();
-  assert.ok(t.token.startsWith("ofp_"));
+  assert.ok(t.token.startsWith("NNP"));
   assert.equal(t.tokenHash, hashToken(t.token));
   assert.equal(t.prefix, t.token.slice(0, 12));
   assert.notEqual(t.token, t.tokenHash); // never store the plaintext
@@ -23,7 +23,7 @@ test("generateToken returns plaintext, its hash, and a display prefix", () => {
 test("tokenMatches accepts the right token and rejects a wrong one", () => {
   const t = generateToken();
   assert.equal(tokenMatches(t.token, t.tokenHash), true);
-  assert.equal(tokenMatches("ofp_wrong", t.tokenHash), false);
+  assert.equal(tokenMatches("NNPwrong", t.tokenHash), false);
 });
 
 test("two tokens are distinct", () => {

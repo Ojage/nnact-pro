@@ -1,5 +1,5 @@
 // Shared navigation and auth helpers used by Sidebar, MobileNav, and CommandPalette.
-// OpenFieldPro is an open-source field-service operations platform with appliance-service workflows.
+// NNACT Pro is an open-source field-service operations platform with appliance-service workflows.
 
 export interface NavLink {
   href: string;

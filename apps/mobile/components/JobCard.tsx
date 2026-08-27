@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from "react-native";
-import type { JobDTO } from "@ofp/shared";
-import { formatMoney } from "@ofp/shared";
+import type { JobDTO } from "@nnact/shared";
+import { formatMoney } from "@nnact/shared";
 
 const badgeColors: Record<string, { bg: string; fg: string }> = {
   lead: { bg: "#1a2340", fg: "#6b7aa8" },

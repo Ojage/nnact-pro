@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import type { JobStatus, InvoiceStatus } from "@ofp/shared";
+import type { JobStatus, InvoiceStatus } from "@nnact/shared";
 
 const jobStatusMap: Record<JobStatus, "lead" | "scheduled" | "in_progress" | "completed" | "canceled"> = {
   lead: "lead",

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 
 interface PayButtonProps {
   token: string;

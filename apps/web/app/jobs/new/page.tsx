@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CustomerDTO, JobDTO, UserDTO } from "@ofp/shared";
+import type { CustomerDTO, JobDTO, UserDTO } from "@nnact/shared";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +22,7 @@ async function createJob(body: {
   description?: string;
   status: "lead";
 }) {
-  const token = localStorage.getItem("ofp_token");
+  const token = localStorage.getItem("NNPtoken");
   const response = await fetch(`${BASE}/api/jobs`, {
     method: "POST",
     headers: {
@@ -309,7 +309,7 @@ export default function NewJobPage() {
             <CardContent className="space-y-3 pt-5">
               <p className="text-sm font-semibold text-fg">What happens next</p>
               <p className="text-xs leading-5 text-fg-muted">
-                OpenFieldPro creates the customer when needed, creates the work order, adds the appointment when scheduled, and opens the job detail for estimates, notes, photos, invoices, and payment.
+                NNACT Pro creates the customer when needed, creates the work order, adds the appointment when scheduled, and opens the job detail for estimates, notes, photos, invoices, and payment.
               </p>
               <Button type="submit" className="w-full" disabled={saving || loading}>
                 {saving ? "Creating job…" : scheduleNow ? "Create and schedule job" : "Create unscheduled job"}

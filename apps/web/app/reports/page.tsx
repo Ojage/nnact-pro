@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { formatMoney } from "@ofp/shared";
-import type { ArAgingReport, EstimateConversionReport, RevenueTrendReport, ReportSummaryDTO, TechnicianScorecardsReport } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
+import type { ArAgingReport, EstimateConversionReport, RevenueTrendReport, ReportSummaryDTO, TechnicianScorecardsReport } from "@nnact/shared";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";

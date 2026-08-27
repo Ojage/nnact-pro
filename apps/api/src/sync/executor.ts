@@ -2,13 +2,13 @@ import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
-import * as dbSchema from "@ofp/db/schema";
+import * as dbSchema from "@nnact/db/schema";
 import type {
   SyncOpDTO,
   SyncResultDTO,
   SyncOpTable,
   SyncErrorKind,
-} from "@ofp/shared";
+} from "@nnact/shared";
 import type { UserRole } from "../operational-authorization.js";
 
 type Db = NodePgDatabase<typeof dbSchema>;

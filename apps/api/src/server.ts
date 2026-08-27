@@ -97,7 +97,7 @@ export function buildServer(
         .header("Retry-After", "30")
         .code(503)
         .send({
-          error: "OpenFieldPro is temporarily in maintenance mode. Please try again shortly.",
+          error: "NNACT Pro is temporarily in maintenance mode. Please try again shortly.",
           retryable: true,
         });
     }

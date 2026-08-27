@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/pagination";
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
-import type { ActivityDTO, CustomerDTO } from "@ofp/shared";
+import type { ActivityDTO, CustomerDTO } from "@nnact/shared";
 
 type SortField = "name" | "createdAt" | "lastActivity";
 type SortDir = "asc" | "desc";

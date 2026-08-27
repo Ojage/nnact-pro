@@ -1,7 +1,7 @@
 // Runnable check (no DB): node --import tsx --test test/documents.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { FieldDocumentData } from "@ofp/shared";
+import type { FieldDocumentData } from "@nnact/shared";
 import {
   documentFilename,
   documentSha256,
