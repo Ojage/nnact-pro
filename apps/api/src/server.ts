@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
+import { customerAuthRoutes } from "./routes/customer-auth.js";
 import { customerRoutes } from "./routes/customers.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { appointmentRoutes } from "./routes/appointments.js";
@@ -40,7 +41,7 @@ import { repairBrainAuthorizationGuard } from "./repair-brain-authorization.js";
 import { operationalAuthorizationGuard } from "./operational-authorization.js";
 import { resolveCorsOrigin, resolveJwtSecret } from "./runtime-security.js";
 import { applyApiSecurityHeaders } from "./security-headers.js";
-import { sessionCookieAuthenticationHook } from "./session-cookie.js";
+import { unifiedSessionCookieAuthenticationHook } from "./customer-session-cookie.js";
 import type { HealthProbes } from "./health.js";
 import {
   createOperationsClient,
@@ -76,7 +77,7 @@ export function buildServer(
     secret: resolveJwtSecret(),
     sign: { expiresIn: process.env.JWT_EXPIRES_IN ?? "12h" },
   });
-  app.addHook("onRequest", sessionCookieAuthenticationHook);
+  app.addHook("onRequest", unifiedSessionCookieAuthenticationHook);
   app.addHook("onSend", async (_request, reply, payload) => {
     applyApiSecurityHeaders(reply);
     return payload;
@@ -113,6 +114,7 @@ export function buildServer(
   app.register(healthRoutes, { probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
   app.get("/internal/drain", async () => apiDrain.status());
   app.register(authRoutes, { prefix: "/api/auth" });
+  app.register(customerAuthRoutes, { prefix: "/api/customer-auth" });
   app.register(customerRoutes, { prefix: "/api/customers" });
   app.register(jobRoutes, { prefix: "/api/jobs" });
   app.register(appointmentRoutes, { prefix: "/api/appointments" });

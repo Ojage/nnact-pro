@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { JwtClaims } from "./auth.js";
+import type { JwtClaims, StaffJwtClaims } from "./auth.js";
+import { isStaffClaims } from "./auth.js";
 
 export type UserRole = "owner" | "dispatcher" | "technician";
 
@@ -44,15 +45,19 @@ export async function verifiedClaims(
 ): Promise<JwtClaims | null> {
   try {
     await request.jwtVerify();
-    const claims = request.user as JwtClaims;
-    if (!claims?.orgId || !claims?.userId || !["owner", "dispatcher", "technician"].includes(claims.role)) {
+    if (!isStaffClaims(request.user)) {
+      await reply.code(401).send({ error: "staff session required" });
+      return null;
+    }
+    const claims = request.user as StaffJwtClaims;
+    if (!claims.orgId || !claims.userId || !["owner", "dispatcher", "technician"].includes(claims.role)) {
       await reply.code(401).send({ error: "invalid authentication claims" });
       return null;
     }
     return claims;
   } catch {
     if (process.env.NODE_ENV !== "production" && !request.headers.authorization) {
-      return { userId: "development-owner", orgId: "development", role: "owner" };
+      return { aud: "staff", userId: "development-owner", orgId: "development", role: "owner" };
     }
     await reply.code(401).send({ error: "authentication required" });
     return null;

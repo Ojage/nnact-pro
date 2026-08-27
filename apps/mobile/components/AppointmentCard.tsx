@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from "react-native";
+import { useMemo } from "react";
 import type { JobDTO } from "@nnact/shared";
-import { colors, fonts } from "../src/theme";
+import { useTheme, fonts, type Palette } from "../src/theme";
 
 interface Appointment {
   id: string;
@@ -31,6 +32,8 @@ export function AppointmentCard({
   appt: Appointment;
   job?: JobDTO;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const start = new Date(appt.startsAt);
   const isToday = new Date().toDateString() === start.toDateString();
 
@@ -56,56 +59,57 @@ export function AppointmentCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  timeBlock: {
-    backgroundColor: colors.borderAlpha,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignItems: "center",
-    minWidth: 80,
-  },
-  timeBlockToday: {
-    backgroundColor: colors.primaryAlpha,
-  },
-  day: {
-    color: colors.mutedForeground,
-    fontSize: 10,
-    fontFamily: fonts.semibold,
-  },
-  dayToday: {
-    color: colors.focus,
-  },
-  time: {
-    color: colors.foreground,
-    fontSize: 15,
-    fontFamily: fonts.bold,
-  },
-  timeToday: {
-    color: colors.focus,
-  },
-  details: {
-    flex: 1,
-  },
-  title: {
-    color: colors.foreground,
-    fontSize: 14,
-    fontFamily: fonts.medium,
-  },
-  today: {
-    color: colors.focus,
-    fontSize: 11,
-    fontFamily: fonts.semibold,
-    marginTop: 2,
-  },
-});
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      marginBottom: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    timeBlock: {
+      backgroundColor: colors.borderAlpha,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      alignItems: "center",
+      minWidth: 80,
+    },
+    timeBlockToday: {
+      backgroundColor: colors.primaryAlpha,
+    },
+    day: {
+      color: colors.mutedForeground,
+      fontSize: 10,
+      fontFamily: fonts.semibold,
+    },
+    dayToday: {
+      color: colors.focus,
+    },
+    time: {
+      color: colors.foreground,
+      fontSize: 15,
+      fontFamily: fonts.bold,
+    },
+    timeToday: {
+      color: colors.focus,
+    },
+    details: {
+      flex: 1,
+    },
+    title: {
+      color: colors.foreground,
+      fontSize: 14,
+      fontFamily: fonts.medium,
+    },
+    today: {
+      color: colors.focus,
+      fontSize: 11,
+      fontFamily: fonts.semibold,
+      marginTop: 2,
+    },
+  });

@@ -11,6 +11,11 @@ export interface MaintenanceReader {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const EXEMPT_MUTATIONS = new Set([
   "POST /api/auth/login",
+  "POST /api/auth/register",
+  "POST /api/auth/refresh",
+  "POST /api/customer-auth/login",
+  "POST /api/customer-auth/register",
+  "POST /api/customer-auth/refresh",
   "POST /api/operations/maintenance/exit",
 ]);
 

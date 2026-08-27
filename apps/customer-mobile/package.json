@@ -1,0 +1,30 @@
+{
+  "name": "@nnact/customer-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.tsx",
+  "scripts": {
+    "dev": "expo start --port 8082",
+    "android": "expo start --android --port 8082",
+    "ios": "expo start --ios --port 8082",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.29.7",
+    "@expo-google-fonts/source-sans-3": "^0.4.1",
+    "@nnact/shared": "workspace:*",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "expo": "~52.0.0",
+    "expo-font": "~13.0.3",
+    "expo-linking": "~7.0.5",
+    "expo-secure-store": "~14.0.1",
+    "expo-status-bar": "~2.0.0",
+    "expo-web-browser": "~14.0.2",
+    "react": "18.3.1",
+    "react-native": "0.76.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "typescript": "^5.6.0"
+  }
+}

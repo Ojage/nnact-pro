@@ -21,7 +21,7 @@ export default function DocumentPreviewPage() {
     ],
     paymentsCents: 0,
     branding: {
-      companyName: "NNACT Pro Demo Co.",
+      companyName: "NNACT",
       brandColor: "#22C55E",
       footerText: "Field service command center document preview",
       removeOpenFieldProAttribution: false,

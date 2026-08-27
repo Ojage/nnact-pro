@@ -1,9 +1,8 @@
 // Password hashing with Node's stdlib scrypt — no bcrypt/argon dependency.
 // Format stored in users.password_hash:  "<saltHex>:<hashHex>".
-// scrypt is the right call here: memory-hard, in the standard library, and we
-// verify with a constant-time compare. (Security is explicitly not a place to be lazy.)
 import { scrypt, randomBytes, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { AUTH_AUDIENCES } from "@nnact/shared";
 
 const scryptAsync = promisify(scrypt);
 const KEYLEN = 64;
@@ -20,11 +19,11 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const salt = Buffer.from(saltHex, "hex");
   const expected = Buffer.from(hashHex, "hex");
   const derived = (await scryptAsync(password, salt, KEYLEN)) as Buffer;
-  // Lengths must match before timingSafeEqual or it throws.
   return derived.length === expected.length && timingSafeEqual(derived, expected);
 }
 
-export interface JwtClaims {
+export interface StaffJwtClaims {
+  aud: typeof AUTH_AUDIENCES.staff;
   userId: string;
   orgId: string;
   role: string;
@@ -32,10 +31,34 @@ export interface JwtClaims {
   email?: string;
 }
 
-// Type the JWT payload/user across the app so req.user is JwtClaims, not `any`.
+export interface CustomerJwtClaims {
+  aud: typeof AUTH_AUDIENCES.customer;
+  accountId: string;
+  name?: string;
+  email?: string;
+}
+
+/** @deprecated Use StaffJwtClaims — kept for backward compatibility during migration. */
+export type JwtClaims = StaffJwtClaims;
+
+export function isStaffClaims(claims: unknown): claims is StaffJwtClaims {
+  if (!claims || typeof claims !== "object") return false;
+  const aud = (claims as { aud?: unknown }).aud;
+  return aud === AUTH_AUDIENCES.staff || aud === undefined;
+}
+
+export function isCustomerClaims(claims: unknown): claims is CustomerJwtClaims {
+  return Boolean(
+    claims &&
+      typeof claims === "object" &&
+      (claims as { aud?: unknown }).aud === AUTH_AUDIENCES.customer &&
+      typeof (claims as { accountId?: unknown }).accountId === "string",
+  );
+}
+
 declare module "@fastify/jwt" {
   interface FastifyJWT {
-    payload: JwtClaims;
-    user: JwtClaims;
+    payload: StaffJwtClaims | CustomerJwtClaims;
+    user: StaffJwtClaims | CustomerJwtClaims;
   }
 }

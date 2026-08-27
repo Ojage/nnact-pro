@@ -338,6 +338,7 @@ interface PluginEvent {
 }
 
 export type PortalLinkScope = import("@nnact/shared").PortalLinkScope;
+export type PublicBookingConfigDTO = import("@nnact/shared").PublicBookingConfigDTO;
 
 export interface PortalLinkDTO {
   id: string;
@@ -415,13 +416,15 @@ export interface PortalSessionDTO {
     renewsAt: string | null;
     nextVisit: { title: string; dueAt: string | null; status: string } | null;
   }>;
+  estimates: import("@nnact/shared").PortalEstimateDTO[];
+  serviceHistory: import("@nnact/shared").PortalServiceHistoryDTO[];
 }
 
 export const api = {
   health: () => request<{ ok: boolean }>("/api/health"),
 
   // ── Public (no auth) ──
-  publicOrg: () => request<{ org: { id: string; name: string } }>("/api/public/org/default"),
+  publicOrg: () => request<PublicBookingConfigDTO>("/api/public/default"),
   publicBook: (orgId: string, body: { name: string; email?: string; phone?: string; title?: string; description?: string }) =>
     request<{ ok: boolean }>(`/api/public/${orgId}/book`, { method: "POST", body: JSON.stringify(body) }),
 

@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "NNACT Customer",
+    "slug": "nnact-customer",
+    "version": "0.1.0",
+    "description": "NNACT customer app — request service, approve estimates, pay invoices, and track maintenance visits.",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "nnactcustomer",
+    "splash": { "backgroundColor": "#0f172a" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nnact.customer"
+    },
+    "android": {
+      "package": "com.nnact.customer",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [{ "scheme": "nnactcustomer", "host": "portal" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "extra": {
+      "companyName": "NNACT",
+      "tagline": "The Power of Dreams"
+    }
+  }
+}

@@ -5,14 +5,17 @@
 // fallback enabled in prod — gate it behind NODE_ENV !== "production".
 import type { FastifyRequest } from "fastify";
 import { db, orgs } from "@nnact/db";
-import type { JwtClaims } from "../auth.js";
+import type { JwtClaims, StaffJwtClaims } from "../auth.js";
+import { isStaffClaims } from "../auth.js";
 
 export async function resolveOrgId(req: FastifyRequest): Promise<string> {
-  // 1. Verified JWT (the real path once a client logs in).
   try {
     await req.jwtVerify();
-    const claims = req.user as JwtClaims;
-    if (claims?.orgId) return claims.orgId;
+    if (!isStaffClaims(req.user)) {
+      throw Object.assign(new Error("staff session required"), { statusCode: 401 });
+    }
+    const claims = req.user as StaffJwtClaims;
+    if (claims.orgId) return claims.orgId;
   } catch {
     /* no/invalid token — fall through to dev fallbacks */
   }

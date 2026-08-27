@@ -3,7 +3,7 @@
 // token itself, which is stored only as a SHA-256 hash.
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
   db,
   portalLinks,
@@ -11,9 +11,8 @@ import {
   orgs,
   invoices,
   payments,
-  servicePlans,
-  customerServicePlans,
-  servicePlanVisits,
+  estimates,
+  estimateOptions,
 } from "@nnact/db";
 import { mergeBusinessSettings, type PortalLinkScope } from "@nnact/shared";
 import {
@@ -27,20 +26,34 @@ import {
   portalLinkExpiry,
   portalLinkStatus,
 } from "../portal-links.js";
+import {
+  assertEstimateBelongsToCustomer,
+  assertPortalLinkActive,
+  buildPortalSession,
+  requirePortalScope,
+  resolveActivePortalLink,
+  touchPortalLink,
+} from "../portal-session.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
-import { resolveJwtSecret, resolvePublicWebUrl } from "../runtime-security.js";
+import { resolveJwtSecret, resolvePublicCustomerUrl } from "../runtime-security.js";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { renderMessageTemplate } from "../message-templates.js";
 import { resolveSmtpConfig, sendEmail } from "../mailer.js";
+import { nextEstimateLifecycle } from "./estimates.js";
+import { createDepositInvoiceTx } from "../estimate-approval.js";
 
 const createLinkBody = z.object({
   customerId: z.string().uuid(),
-  scopes: z.array(z.enum(["balance", "checkout", "receipts", "service_plans"])).min(1),
+  scopes: z.array(z.enum(["balance", "checkout", "receipts", "service_plans", "estimates", "service_history"])).min(1),
   expiresInDays: z.number().int().min(1).max(3650).nullish(),
 });
 
 const checkoutBody = z.object({ invoiceId: z.string().uuid() });
+const portalEstimateDecisionBody = z.object({
+  optionId: z.string().uuid(),
+  signatureName: z.string().trim().max(160).optional(),
+});
 
 function portalLinkRow(row: typeof portalLinks.$inferSelect) {
   return {
@@ -57,16 +70,6 @@ function portalLinkRow(row: typeof portalLinks.$inferSelect) {
   };
 }
 
-async function resolveTokenLink(token: string) {
-  const tokenHash = hashPortalToken(token);
-  const [link] = await db
-    .select()
-    .from(portalLinks)
-    .where(eq(portalLinks.tokenHash, tokenHash))
-    .limit(1);
-  return link ?? null;
-}
-
 const portalSessionRateLimit = createFixedWindowRateLimit({
   max: 60,
   windowMs: 60 * 1000,
@@ -81,6 +84,17 @@ const portalCheckoutRateLimit = createFixedWindowRateLimit({
     return `${requestIpKey(request)}:${token}`;
   },
 });
+
+function assertEstimateApprovalAllowed(input: {
+  status: string;
+  expiresAt: Date | null;
+  signatureRequired: boolean;
+  signatureName?: string | null;
+}) {
+  if (input.status !== "sent") throw new Error("only sent estimates can be approved from the portal");
+  if (input.expiresAt && input.expiresAt.getTime() < Date.now()) throw new Error("estimate has expired");
+  if (input.signatureRequired && !input.signatureName?.trim()) throw new Error("signature is required to approve this estimate");
+}
 
 export async function portalRoutes(app: FastifyInstance) {
   // ---- Owner management ---------------------------------------------------
@@ -118,9 +132,6 @@ export async function portalRoutes(app: FastifyInstance) {
 
     const generated = generatePortalToken();
     const ttl = parsed.data.expiresInDays ?? DEFAULT_PORTAL_LINK_TTL_DAYS;
-    // The raw token is stored encrypted (AES-256-GCM under the server secret)
-    // so the owner can email the link to the customer later without exposing
-    // usable tokens in the database.
     const tokenCipher = encryptPortalToken(generated.token, portalLinkEncryptionKey(resolveJwtSecret()));
     const [row] = await db
       .insert(portalLinks)
@@ -157,9 +168,6 @@ export async function portalRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  // Emails the customer their signed portal link using the org's message
-  // templates. Fails closed when SMTP is unconfigured or the link can't be
-  // safely re-derived.
   app.post("/links/:id/send", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const { id } = req.params as { id: string };
@@ -197,8 +205,8 @@ export async function portalRoutes(app: FastifyInstance) {
       });
     }
 
-    const webOrigin = resolvePublicWebUrl();
-    const portalUrl = `${webOrigin}/p/${token}`;
+    const customerOrigin = resolvePublicCustomerUrl();
+    const portalUrl = `${customerOrigin}/p/${token}`;
     const variables = {
       companyName: org.name,
       customerName: customer.name,
@@ -229,141 +237,27 @@ export async function portalRoutes(app: FastifyInstance) {
   // ---- Anonymous token routes ---------------------------------------------
   app.get("/:token", { preHandler: portalSessionRateLimit }, async (req, reply) => {
     const { token } = req.params as { token: string };
-    const link = await resolveTokenLink(token);
-    if (!link) return reply.code(404).send({ error: "portal link not found" });
-
-    const status = portalLinkStatus(link);
-    if (status !== "active") {
-      return reply.code(410).send({ error: `portal link ${status === "revoked" ? "has been revoked" : "has expired"}` });
-    }
-
-    const [org] = await db.select().from(orgs).where(eq(orgs.id, link.orgId));
-    if (!org) return reply.code(404).send({ error: "portal link not found" });
-    const settings = mergeBusinessSettings(org.businessSettings);
-    if (settings.portal.enabled === false) {
-      return reply.code(410).send({ error: "customer portal is disabled by the service company" });
-    }
-
-    const [customer] = await db
-      .select({ name: customers.name, email: customers.email, phone: customers.phone })
-      .from(customers)
-      .where(and(eq(customers.orgId, link.orgId), eq(customers.id, link.customerId)));
-    if (!customer) return reply.code(404).send({ error: "portal link not found" });
-
-    await db
-      .update(portalLinks)
-      .set({ lastUsedAt: new Date() })
-      .where(eq(portalLinks.id, link.id));
-
-    const scopes = parsePortalLinkScopes(link.scopes);
-    const invoiceViews = settings.portal.allowInvoicePayment !== false;
-    const views: PortalLinkScope[] = [];
-    if (invoiceViews) {
-      if (scopes.includes("balance")) views.push("balance");
-      if (scopes.includes("checkout")) views.push("checkout");
-      if (scopes.includes("receipts")) views.push("receipts");
-    }
-    if (scopes.includes("service_plans")) views.push("service_plans");
-    if (views.length === 0) return reply.code(410).send({ error: "this portal link does not grant any views" });
-
-    const orgInvoices = await db
-      .select()
-      .from(invoices)
-      .where(and(eq(invoices.orgId, link.orgId), eq(invoices.status, "sent")))
-      .orderBy(desc(invoices.createdAt));
-
-    const balanceInvoices: Array<{ id: string; number: string; total: number; paid: number; remaining: number; dueAt: string | null }> = [];
-    const receipts: Array<{ id: string; number: string; total: number; paidAt: string | null; payments: Array<{ amount: number; method: string; paidAt: string }> }> = [];
-
-    if (invoiceViews) {
-      for (const inv of orgInvoices) {
-        const paidRows = await db
-          .select({ amount: payments.amount, method: payments.method, paidAt: payments.paidAt })
-          .from(payments)
-          .where(and(eq(payments.orgId, link.orgId), eq(payments.invoiceId, inv.id)))
-          .orderBy(asc(payments.paidAt));
-        const paid = paidRows.reduce((sum, p) => sum + p.amount, 0);
-        const remaining = inv.total - paid;
-        if (remaining > 0 && scopes.includes("balance")) {
-          balanceInvoices.push({ id: inv.id, number: inv.number, total: inv.total, paid, remaining, dueAt: inv.dueAt ? inv.dueAt.toISOString() : null });
-        }
-        if (scopes.includes("receipts") && inv.status === "paid") {
-          receipts.push({
-            id: inv.id,
-            number: inv.number,
-            total: inv.total,
-            paidAt: paidRows.length ? paidRows[paidRows.length - 1].paidAt.toISOString() : null,
-            payments: paidRows.map((p) => ({ amount: p.amount, method: p.method, paidAt: p.paidAt.toISOString() })),
-          });
-        }
+    const active = await resolveActivePortalLink(token);
+    if (!active) {
+      const tokenHash = hashPortalToken(token);
+      const [link] = await db.select().from(portalLinks).where(eq(portalLinks.tokenHash, tokenHash)).limit(1);
+      if (!link) return reply.code(404).send({ error: "portal link not found" });
+      const status = portalLinkStatus(link);
+      if (status !== "active") {
+        return reply.code(410).send({ error: `portal link ${status === "revoked" ? "has been revoked" : "has expired"}` });
       }
-    }
-
-    const planViews: Array<{
-      id: string;
-      planName: string;
-      status: string;
-      visitsIncluded: number;
-      visitsCompleted: number;
-      renewsAt: string | null;
-      nextVisit: { title: string; dueAt: string | null; status: string } | null;
-    }> = [];
-    if (scopes.includes("service_plans")) {
-      const enrollments = await db
-        .select()
-        .from(customerServicePlans)
-        .where(and(eq(customerServicePlans.orgId, link.orgId), eq(customerServicePlans.customerId, link.customerId), eq(customerServicePlans.status, "active")))
-        .orderBy(asc(customerServicePlans.createdAt));
-      for (const enrollment of enrollments) {
-        const [plan] = await db
-          .select({ name: servicePlans.name })
-          .from(servicePlans)
-          .where(and(eq(servicePlans.orgId, link.orgId), eq(servicePlans.id, enrollment.servicePlanId)));
-        const [nextVisit] = await db
-          .select({ title: servicePlanVisits.title, dueAt: servicePlanVisits.dueAt, status: servicePlanVisits.status })
-          .from(servicePlanVisits)
-          .where(and(eq(servicePlanVisits.orgId, link.orgId), eq(servicePlanVisits.customerServicePlanId, enrollment.id), eq(servicePlanVisits.status, "planned")))
-          .orderBy(asc(servicePlanVisits.dueAt))
-          .limit(1);
-        planViews.push({
-          id: enrollment.id,
-          planName: plan?.name ?? "Service plan",
-          status: enrollment.status,
-          visitsIncluded: enrollment.visitsIncluded,
-          visitsCompleted: enrollment.visitsCompleted,
-          renewsAt: enrollment.renewsAt ? enrollment.renewsAt.toISOString() : null,
-          nextVisit: nextVisit ? { title: nextVisit.title, dueAt: nextVisit.dueAt ? nextVisit.dueAt.toISOString() : null, status: nextVisit.status } : null,
-        });
+      const [org] = await db.select().from(orgs).where(eq(orgs.id, link.orgId));
+      const settings = mergeBusinessSettings(org?.businessSettings);
+      if (settings.portal.enabled === false) {
+        return reply.code(410).send({ error: "customer portal is disabled by the service company" });
       }
+      return reply.code(410).send({ error: "this portal link does not grant any views" });
     }
 
-    const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET);
-    const totalRemaining = balanceInvoices.reduce((sum, inv) => sum + inv.remaining, 0);
-
-    return {
-      org: {
-        id: org.id,
-        name: org.name,
-        logoUrl: org.logoUrl,
-        publicEmail: org.publicEmail,
-        publicPhone: org.publicPhone,
-        publicAddress: org.publicAddress,
-        sponsorEnabled: settings.portal.showSponsorSlot !== false,
-      },
-      customer,
-      views,
-      balance: {
-        invoices: balanceInvoices,
-        totalRemaining,
-        paymentInstructions: settings.invoice.paymentInstructions,
-      },
-      checkout: {
-        available: invoiceViews && stripeConfigured && settings.payments.onlinePaymentsEnabled !== false,
-        totalRemaining,
-      },
-      receipts,
-      servicePlans: planViews,
-    };
+    await touchPortalLink(active.link.id);
+    const session = await buildPortalSession(active);
+    if (!session) return reply.code(410).send({ error: "this portal link does not grant any views" });
+    return session;
   });
 
   app.post("/:token/checkout", { preHandler: portalCheckoutRateLimit }, async (req, reply) => {
@@ -371,19 +265,11 @@ export async function portalRoutes(app: FastifyInstance) {
     const parsed = checkoutBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-    const link = await resolveTokenLink(token);
-    if (!link) return reply.code(404).send({ error: "portal link not found" });
-    const status = portalLinkStatus(link);
-    if (status !== "active") {
-      return reply.code(410).send({ error: `portal link ${status === "revoked" ? "has been revoked" : "has expired"}` });
-    }
+    const active = await resolveActivePortalLink(token);
+    if (!assertPortalLinkActive(active, reply)) return;
+    if (!(await requirePortalScope(active!, "checkout", reply))) return;
 
-    const scopes = parsePortalLinkScopes(link.scopes);
-    if (!scopes.includes("checkout")) return reply.code(403).send({ error: "this portal link does not allow checkout" });
-
-    const [org] = await db.select().from(orgs).where(eq(orgs.id, link.orgId));
-    if (!org) return reply.code(404).send({ error: "portal link not found" });
-    const settings = mergeBusinessSettings(org.businessSettings);
+    const settings = active!.settings;
     if (settings.portal.enabled === false || settings.portal.allowInvoicePayment === false) {
       return reply.code(403).send({ error: "online payment is not available for this portal link" });
     }
@@ -400,7 +286,7 @@ export async function portalRoutes(app: FastifyInstance) {
     const [inv] = await db
       .select()
       .from(invoices)
-      .where(and(eq(invoices.orgId, link.orgId), eq(invoices.id, parsed.data.invoiceId)));
+      .where(and(eq(invoices.orgId, active!.link.orgId), eq(invoices.id, parsed.data.invoiceId)));
     if (!inv) return reply.code(404).send({ error: "invoice not found" });
     if (inv.status === "paid" || inv.status === "void") {
       return reply.code(409).send({ error: `cannot create checkout for a ${inv.status} invoice` });
@@ -408,12 +294,12 @@ export async function portalRoutes(app: FastifyInstance) {
     const paidRows = await db
       .select({ amount: payments.amount })
       .from(payments)
-      .where(and(eq(payments.orgId, link.orgId), eq(payments.invoiceId, inv.id)));
+      .where(and(eq(payments.orgId, active!.link.orgId), eq(payments.invoiceId, inv.id)));
     const paid = paidRows.reduce((sum, p) => sum + p.amount, 0);
     const remaining = inv.total - paid;
     if (remaining <= 0) return reply.code(409).send({ error: "invoice has no remaining balance" });
 
-    const webOrigin = resolvePublicWebUrl();
+    const customerOrigin = resolvePublicCustomerUrl();
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(key);
     const session = await stripe.checkout.sessions.create(
@@ -429,12 +315,118 @@ export async function portalRoutes(app: FastifyInstance) {
             quantity: 1,
           },
         ],
-        success_url: `${webOrigin}/p/${token}?paid=1`,
-        cancel_url: `${webOrigin}/p/${token}`,
-        metadata: { invoiceId: inv.id, orgId: link.orgId },
+        success_url: `${customerOrigin}/p/${token}?paid=1`,
+        cancel_url: `${customerOrigin}/p/${token}`,
+        metadata: { invoiceId: inv.id, orgId: active!.link.orgId },
       },
       { idempotencyKey: `portal-checkout:${token}:${inv.id}:${remaining}` },
     );
     return { url: session.url };
+  });
+
+  app.post("/:token/estimates/:estimateId/approve", { preHandler: portalCheckoutRateLimit }, async (req, reply) => {
+    const { token, estimateId } = req.params as { token: string; estimateId: string };
+    const parsed = portalEstimateDecisionBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const active = await resolveActivePortalLink(token);
+    if (!assertPortalLinkActive(active, reply)) return;
+    if (!(await requirePortalScope(active!, "estimates", reply))) return;
+    if (active!.settings.portal.allowEstimateApproval === false) {
+      return reply.code(403).send({ error: "estimate approval is disabled for this business" });
+    }
+
+    const belongs = await assertEstimateBelongsToCustomer(active!.link.orgId, active!.link.customerId, estimateId);
+    if (!belongs) return reply.code(404).send({ error: "estimate not found" });
+
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`estimate-approval:${estimateId}`}))`);
+      const [estimate] = await tx.select().from(estimates).where(and(eq(estimates.orgId, active!.link.orgId), eq(estimates.id, estimateId)));
+      if (!estimate) return { kind: "missing" as const };
+      const [option] = await tx.select().from(estimateOptions).where(and(
+        eq(estimateOptions.orgId, active!.link.orgId),
+        eq(estimateOptions.estimateId, estimateId),
+        eq(estimateOptions.id, parsed.data.optionId),
+      ));
+      if (!option) return { kind: "option" as const };
+
+      try {
+        if (estimate.status === "approved") {
+          nextEstimateLifecycle(estimate.status, estimate.selectedOptionId, option.id);
+          return { kind: "approved" as const, estimate };
+        }
+        assertEstimateApprovalAllowed({
+          status: estimate.status,
+          expiresAt: estimate.expiresAt,
+          signatureRequired: active!.settings.estimate.signatureRequired,
+          signatureName: parsed.data.signatureName,
+        });
+        nextEstimateLifecycle(estimate.status, estimate.selectedOptionId, option.id);
+      } catch (error) {
+        return { kind: "invalid" as const, error: (error as Error).message };
+      }
+
+      const now = new Date();
+      const [approved] = await tx.update(estimates).set({
+        status: "approved",
+        accepted: true,
+        acceptedAt: now,
+        acceptedByName: parsed.data.signatureName ?? active!.customer.name,
+        signatureName: parsed.data.signatureName ?? active!.customer.name,
+        selectedOptionId: option.id,
+        total: option.total,
+        updatedAt: now,
+      }).where(and(eq(estimates.orgId, active!.link.orgId), eq(estimates.id, estimateId))).returning();
+
+      const deposit = await createDepositInvoiceTx(tx, {
+        orgId: active!.link.orgId,
+        estimateId,
+        estimateNumberValue: estimate.number,
+        jobId: estimate.jobId,
+        optionTotal: option.total,
+        depositMode: active!.settings.estimate.depositMode,
+        depositValue: active!.settings.estimate.depositValue,
+        netDays: active!.settings.invoice.netDays,
+        invoicePrefix: active!.settings.numbering.invoicePrefix,
+        invoiceNextNumber: active!.settings.numbering.invoiceNextNumber,
+        existingDepositInvoiceId: estimate.depositInvoiceId,
+      });
+      const [finalEstimate] = await tx.update(estimates).set({
+        depositCents: deposit.deposit,
+        depositInvoiceId: deposit.invoiceId ?? estimate.depositInvoiceId,
+        updatedAt: now,
+      }).where(and(eq(estimates.orgId, active!.link.orgId), eq(estimates.id, estimateId))).returning();
+      return { kind: "approved" as const, estimate: finalEstimate, deposit };
+    });
+
+    if (result.kind === "missing") return reply.code(404).send({ error: "not found" });
+    if (result.kind === "option") return reply.code(404).send({ error: "option not found" });
+    if (result.kind === "invalid") return reply.code(409).send({ error: result.error });
+    const depositInvoice = "deposit" in result ? result.deposit : undefined;
+    if (depositInvoice?.invoiceId) {
+      safeEmitActivity(
+        active!.link.orgId,
+        "estimate.deposit_created",
+        `Created ${(depositInvoice.deposit / 100).toFixed(2)} deposit invoice for ${result.estimate.number}`,
+        { jobId: result.estimate.jobId },
+      );
+    }
+    return result.estimate;
+  });
+
+  app.post("/:token/estimates/:estimateId/decline", { preHandler: portalCheckoutRateLimit }, async (req, reply) => {
+    const { token, estimateId } = req.params as { token: string; estimateId: string };
+    const active = await resolveActivePortalLink(token);
+    if (!assertPortalLinkActive(active, reply)) return;
+    if (!(await requirePortalScope(active!, "estimates", reply))) return;
+
+    const belongs = await assertEstimateBelongsToCustomer(active!.link.orgId, active!.link.customerId, estimateId);
+    if (!belongs) return reply.code(404).send({ error: "estimate not found" });
+
+    const [estimate] = await db.update(estimates).set({ status: "declined", declinedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(estimates.orgId, active!.link.orgId), eq(estimates.id, estimateId), eq(estimates.status, "sent")))
+      .returning();
+    if (!estimate) return reply.code(409).send({ error: "estimate cannot be declined" });
+    return estimate;
   });
 }

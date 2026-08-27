@@ -58,6 +58,23 @@ export function resolvePublicWebUrl(env: NodeJS.ProcessEnv = process.env) {
   return validateOrigin(configured, "PUBLIC_WEB_URL", production);
 }
 
+/** Customer-facing app origin for portal links, checkout redirects, and booking. */
+export function resolvePublicCustomerUrl(env: NodeJS.ProcessEnv = process.env) {
+  const production = env.NODE_ENV === "production";
+  const configured =
+    env.PUBLIC_CUSTOMER_URL?.trim() ||
+    env.PUBLIC_WEB_URL?.trim() ||
+    (production ? "" : "http://localhost:3002");
+  if (!configured) {
+    throw new Error("PUBLIC_CUSTOMER_URL or PUBLIC_WEB_URL is required in production for customer portal links");
+  }
+  return validateOrigin(configured, "PUBLIC_CUSTOMER_URL", production);
+}
+
+export function resolveDefaultOrgId(env: NodeJS.ProcessEnv = process.env) {
+  return env.DEFAULT_ORG_ID?.trim() || null;
+}
+
 export function publicRegistrationEnabled(env: NodeJS.ProcessEnv = process.env) {
   if (env.NODE_ENV !== "production") return env.NNPALLOW_PUBLIC_REGISTRATION !== "false";
   return env.NNPALLOW_PUBLIC_REGISTRATION === "true";

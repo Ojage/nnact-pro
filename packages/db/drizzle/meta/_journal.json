@@ -134,6 +134,13 @@
       "when": 1787420000000,
       "tag": "0019_repair_brain",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1787500000000,
+      "tag": "0020_auth_accounts",
+      "breakpoints": true
     }
   ]
 }

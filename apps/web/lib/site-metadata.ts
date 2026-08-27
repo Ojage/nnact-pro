@@ -51,7 +51,7 @@ export function buildRootMetadata(): Metadata {
       template: `%s · ${SITE_CONFIG.productName}`,
     },
     description: SITE_CONFIG.description,
-    keywords: SITE_CONFIG.keywords,
+    keywords: [...SITE_CONFIG.keywords],
     applicationName: SITE_CONFIG.productName,
     authors: [{ name: NNACT_COMPANY.shortName, url: NNACT_COMPANY.contact.website }],
     creator: NNACT_COMPANY.shortName,

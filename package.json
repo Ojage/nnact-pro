@@ -8,6 +8,8 @@
     "dev": "pnpm --parallel --filter ./apps/* dev",
     "dev:api": "pnpm --filter @nnact/api dev",
     "dev:web": "pnpm --filter @nnact/web dev",
+    "dev:customer": "pnpm --filter @nnact/customer dev",
+    "dev:customer-mobile": "pnpm --filter @nnact/customer-mobile dev",
     "build": "pnpm -r build",
     "db:generate": "pnpm --filter @nnact/db generate",
     "db:check": "pnpm --filter @nnact/db check",

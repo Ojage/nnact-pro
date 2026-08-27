@@ -8,15 +8,22 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import type { JobDTO } from "@nnact/shared";
 import { SyncService, type FieldPackage } from "./src/sync";
-import { colors, fonts } from "./src/theme";
+import { useTheme, fonts, type Palette } from "./src/theme";
+import { staffFetch, staffLogout, staffRefresh } from "./src/auth-api";
+import {
+  clearStaffSession,
+  loadStaffSession,
+  saveStaffSession,
+  type StoredStaffSession,
+} from "./src/auth-storage";
+import { AuthBootScreen, LoginScreen } from "./src/screens/LoginScreen";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
-const AUTH_TOKEN = process.env.EXPO_PUBLIC_AUTH_TOKEN ?? "";
-const ORG_ID = process.env.EXPO_PUBLIC_ORG_ID ?? "";
 
 interface Appointment {
   id: string;
@@ -48,22 +55,24 @@ interface DiagnosticListItem {
   } | null;
 }
 
-async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    headers: {
-      ...(AUTH_TOKEN ? { authorization: `Bearer ${AUTH_TOKEN}` } : {}),
-      ...(ORG_ID ? { "x-org-id": ORG_ID } : {}),
-    },
-  });
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-  return response.json() as Promise<T>;
+async function fetchJson<T>(session: StoredStaffSession, path: string): Promise<T> {
+  try {
+    return await staffFetch<T>(session, path);
+  } catch (error) {
+    if (error instanceof Error && error.message === "session_expired") {
+      const refreshed = await staffRefresh(session.refreshToken);
+      await saveStaffSession(refreshed);
+      return staffFetch<T>(refreshed, path);
+    }
+    throw error;
+  }
 }
 
 function humanize(value: string) {
   return value.replaceAll("_", " ");
 }
 
-function statusColor(status: string) {
+function statusColor(status: string, colors: Palette) {
   if (["blocked", "escalated", "suspended"].includes(status)) return colors.danger;
   if (["diagnosed", "completed"].includes(status)) return colors.success;
   if (["testing", "workflow_ready"].includes(status)) return colors.focus;
@@ -95,7 +104,15 @@ function packageToAppointment(fieldPackage: FieldPackage): Appointment | null {
   };
 }
 
-export default function App() {
+function FieldDashboard({
+  session,
+  onSession,
+  onSignOut,
+}: {
+  session: StoredStaffSession;
+  onSession: (next: StoredStaffSession) => void;
+  onSignOut: () => void;
+}) {
   const [jobs, setJobs] = useState<JobDTO[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [diagnostics, setDiagnostics] = useState<DiagnosticListItem[]>([]);
@@ -106,6 +123,8 @@ export default function App() {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [queuedWrites, setQueuedWrites] = useState(0);
   const syncRef = useRef<SyncService | null>(null);
+  const { colors, scheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const loadCached = useCallback(async (): Promise<boolean> => {
     const packages = await syncRef.current?.listCachedPackages();
@@ -133,9 +152,9 @@ export default function App() {
     try {
       setError(null);
       const [jobRows, appointmentRows, diagnosticRows] = await Promise.all([
-        fetchJson<JobDTO[]>("/api/jobs"),
-        fetchJson<Appointment[]>("/api/appointments"),
-        fetchJson<DiagnosticListItem[]>("/api/diagnostics/sessions").catch(() => []),
+        fetchJson<JobDTO[]>(session, "/api/jobs"),
+        fetchJson<Appointment[]>(session, "/api/appointments"),
+        fetchJson<DiagnosticListItem[]>(session, "/api/diagnostics/sessions").catch(() => []),
       ]);
       setJobs(jobRows);
       setAppointments(appointmentRows);
@@ -219,7 +238,7 @@ export default function App() {
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading today’s field work…</Text>
         </View>
-        <StatusBar style="light" />
+        <StatusBar style={scheme === "light" ? "dark" : "light"} />
       </View>
     );
   }
@@ -303,13 +322,13 @@ export default function App() {
                     <View
                       style={[
                         styles.statusPill,
-                        { borderColor: statusColor(nextDiagnostic.session.status) },
+                        { borderColor: statusColor(nextDiagnostic.session.status, colors) },
                       ]}
                     >
                       <Text
                         style={[
                           styles.statusText,
-                          { color: statusColor(nextDiagnostic.session.status) },
+                          { color: statusColor(nextDiagnostic.session.status, colors) },
                         ]}
                       >
                         {humanize(nextDiagnostic.session.status)}
@@ -364,7 +383,7 @@ export default function App() {
                       {item.workflow?.name ?? "Unsupported / unresolved"}
                     </Text>
                   </View>
-                  <Text style={[styles.smallStatus, { color: statusColor(item.session.status) }]}>
+                  <Text style={[styles.smallStatus, { color: statusColor(item.session.status, colors) }]}>
                     {humanize(item.session.status)}
                   </Text>
                 </View>
@@ -404,13 +423,14 @@ export default function App() {
         </View>
         <View style={{ height: 48 }} />
       </ScrollView>
-      <StatusBar style="light" />
+      <StatusBar style={scheme === "light" ? "dark" : "light"} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 58, paddingBottom: 24 },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },

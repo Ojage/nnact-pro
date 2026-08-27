@@ -1,11 +1,23 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db, orgs, users } from "@nnact/db";
-import { hashPassword, verifyPassword, type JwtClaims } from "../auth.js";
+import { validatePasswordStrength } from "@nnact/shared";
+import {
+  hashPassword,
+  verifyPassword,
+  isStaffClaims,
+  type StaffJwtClaims,
+} from "../auth.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 import { publicRegistrationEnabled } from "../runtime-security.js";
 import { clearSessionCookie, setSessionCookie } from "../session-cookie.js";
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  issueRefreshToken,
+  revokeRefreshToken,
+  rotateRefreshToken,
+} from "../refresh-tokens.js";
 
 const registerBody = z.object({
   orgName: z.string().trim().min(1).max(200),
@@ -17,6 +29,10 @@ const registerBody = z.object({
 const loginBody = z.object({
   email: z.string().trim().email().max(320),
   password: z.string().min(1).max(128),
+});
+
+const refreshBody = z.object({
+  refreshToken: z.string().trim().min(10).max(512),
 });
 
 const registerRateLimit = createFixedWindowRateLimit({
@@ -36,24 +52,54 @@ const loginRateLimit = createFixedWindowRateLimit({
   },
 });
 
-function signUserToken(app: FastifyInstance, user: {
-  id: string;
-  orgId: string;
-  role: string;
-  name: string;
-  email: string;
-}) {
-  return app.jwt.sign({
-    userId: user.id,
-    orgId: user.orgId,
-    role: user.role,
-    name: user.name,
-    email: user.email,
-  } as Parameters<typeof app.jwt.sign>[0]);
+const WEB_STAFF_SESSION_SECONDS = 12 * 60 * 60;
+
+function signStaffAccessToken(
+  app: FastifyInstance,
+  user: { id: string; orgId: string; role: string; name: string; email: string },
+  expiresInSeconds: number = ACCESS_TOKEN_TTL_SECONDS,
+) {
+  return app.jwt.sign(
+    {
+      aud: "staff",
+      userId: user.id,
+      orgId: user.orgId,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+    } satisfies StaffJwtClaims,
+    { expiresIn: expiresInSeconds },
+  );
 }
 
-function publicUser(user: { id: string; name: string; email: string; role: string }) {
-  return { id: user.id, name: user.name, email: user.email, role: user.role };
+function publicUser(user: { id: string; name: string; email: string; role: string; orgId: string }) {
+  return { id: user.id, name: user.name, email: user.email, role: user.role, orgId: user.orgId };
+}
+
+async function staffAuthResponse(
+  app: FastifyInstance,
+  reply: FastifyReply,
+  user: { id: string; orgId: string; role: string; name: string; email: string },
+  req: FastifyRequest,
+  setCookie: boolean,
+) {
+  const sessionSeconds = setCookie ? WEB_STAFF_SESSION_SECONDS : ACCESS_TOKEN_TTL_SECONDS;
+  const accessToken = signStaffAccessToken(app, user, sessionSeconds);
+  const refresh = await issueRefreshToken({
+    subjectType: "staff",
+    subjectId: user.id,
+    userAgent: req.headers["user-agent"] ?? null,
+    ipAddress: requestIpKey(req),
+  });
+  if (setCookie) setSessionCookie(reply, accessToken);
+  return {
+    token: accessToken,
+    accessToken,
+    refreshToken: refresh.token,
+    expiresIn: sessionSeconds,
+    user: publicUser(user),
+    orgId: user.orgId,
+  };
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -68,6 +114,10 @@ export async function authRoutes(app: FastifyInstance) {
 
     const parsed = registerBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const passwordError = validatePasswordStrength(parsed.data.password);
+    if (passwordError) return reply.code(400).send({ error: passwordError });
+
     const { orgName, name, password } = parsed.data;
     const email = parsed.data.email.toLowerCase();
 
@@ -90,17 +140,10 @@ export async function authRoutes(app: FastifyInstance) {
       return { conflict: false as const, org, user };
     });
 
-    if (result.conflict) {
-      return reply.code(409).send({ error: "an account with this email already exists" });
-    }
+    if (result.conflict) return reply.code(409).send({ error: "an account with this email already exists" });
 
-    const token = signUserToken(app, result.user);
-    setSessionCookie(reply, token);
-    return reply.code(201).send({
-      token,
-      user: publicUser(result.user),
-      orgId: result.org.id,
-    });
+    const payload = await staffAuthResponse(app, reply, result.user, req, true);
+    return reply.code(201).send(payload);
   });
 
   app.post("/login", { preHandler: loginRateLimit }, async (req, reply) => {
@@ -113,17 +156,43 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user || !user.active || !user.passwordHash || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
       return reply.code(401).send({ error: "invalid credentials" });
     }
-    const token = signUserToken(app, user);
-    setSessionCookie(reply, token);
+
+    return staffAuthResponse(app, reply, user, req, true);
+  });
+
+  app.post("/refresh", async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const parsed = refreshBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const rotated = await rotateRefreshToken({
+      presentedToken: parsed.data.refreshToken,
+      userAgent: req.headers["user-agent"] ?? null,
+      ipAddress: requestIpKey(req),
+    });
+    if (rotated.kind !== "ok" || rotated.subjectType !== "staff") {
+      return reply.code(401).send({ error: "invalid refresh token" });
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.id, rotated.subjectId)).limit(1);
+    if (!user?.active || !user.passwordHash) return reply.code(401).send({ error: "account inactive" });
+
+    const accessToken = signStaffAccessToken(app, user, WEB_STAFF_SESSION_SECONDS);
+    setSessionCookie(reply, accessToken);
     return {
-      token,
+      token: accessToken,
+      accessToken,
+      refreshToken: rotated.refreshToken,
+      expiresIn: WEB_STAFF_SESSION_SECONDS,
       user: publicUser(user),
       orgId: user.orgId,
     };
   });
 
-  app.post("/logout", async (_req, reply) => {
+  app.post("/logout", async (req, reply) => {
     reply.header("Cache-Control", "no-store");
+    const parsed = refreshBody.safeParse(req.body ?? {});
+    if (parsed.success) await revokeRefreshToken(parsed.data.refreshToken);
     clearSessionCookie(reply);
     return { ok: true };
   });
@@ -132,15 +201,19 @@ export async function authRoutes(app: FastifyInstance) {
     reply.header("Cache-Control", "no-store");
     try {
       await req.jwtVerify();
-      const claims = req.user as JwtClaims;
-      return publicUser({
-        id: claims.userId,
-        name: claims.name ?? "Team member",
-        email: claims.email ?? "",
-        role: claims.role,
-      });
     } catch {
       return reply.code(401).send({ error: "unauthorized" });
     }
+    if (!isStaffClaims(req.user)) {
+      return reply.code(401).send({ error: "staff session required" });
+    }
+    const claims = req.user;
+    return publicUser({
+      id: claims.userId,
+      name: claims.name ?? "Team member",
+      email: claims.email ?? "",
+      role: claims.role,
+      orgId: claims.orgId,
+    });
   });
 }

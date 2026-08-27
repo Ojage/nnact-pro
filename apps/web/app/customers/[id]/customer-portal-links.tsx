@@ -11,6 +11,8 @@ const SCOPE_LABELS: Record<PortalLinkScope, string> = {
   checkout: "Checkout / pay",
   receipts: "Receipts",
   service_plans: "Service plans",
+  estimates: "Estimate approval",
+  service_history: "Service history",
 };
 
 const TTL_OPTIONS = [
@@ -33,7 +35,14 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedScopes, setSelectedScopes] = useState<PortalLinkScope[]>(["balance", "checkout", "receipts", "service_plans"]);
+  const [selectedScopes, setSelectedScopes] = useState<PortalLinkScope[]>([
+    "balance",
+    "checkout",
+    "receipts",
+    "service_plans",
+    "estimates",
+    "service_history",
+  ]);
   const [ttl, setTtl] = useState("30");
   const [creating, setCreating] = useState(false);
 
@@ -87,7 +96,8 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
 
   async function copyToken() {
     if (!newToken) return;
-    const url = `${window.location.origin}/p/${newToken}`;
+    const customerOrigin = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL?.replace(/\/$/, "") ?? window.location.origin.replace(":3000", ":3002");
+    const url = `${customerOrigin}/p/${newToken}`;
     await navigator.clipboard.writeText(url).catch(() => undefined);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -242,7 +252,7 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <code className="min-w-0 flex-1 truncate rounded-lg bg-surface-300 px-3 py-2 text-xs text-fg" data-testid="new-portal-link">
-                  {window.location.origin}/p/{newToken}
+                  {(process.env.NEXT_PUBLIC_CUSTOMER_APP_URL ?? "http://localhost:3002").replace(/\/$/, "")}/p/{newToken}
                 </code>
                 <Button size="sm" variant="secondary" onClick={() => void copyToken()}>
                   {copied ? "Copied" : "Copy"}

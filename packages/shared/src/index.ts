@@ -1,3 +1,5 @@
+export * from "./auth.js";
+export * from "./portal.js";
 export * from "./brand.js";
 export * from "./sponsors.js";
 export * from "./documents.js";
@@ -27,7 +29,7 @@ export type ServicePlanStatus = (typeof SERVICE_PLAN_STATUS)[number];
 export const SERVICE_VISIT_STATUS = ["planned", "scheduled", "completed", "skipped"] as const;
 export type ServiceVisitStatus = (typeof SERVICE_VISIT_STATUS)[number];
 
-export const PORTAL_LINK_SCOPES = ["balance", "checkout", "receipts", "service_plans"] as const;
+export const PORTAL_LINK_SCOPES = ["balance", "checkout", "receipts", "service_plans", "estimates", "service_history"] as const;
 export type PortalLinkScope = (typeof PORTAL_LINK_SCOPES)[number];
 
 export type Money = number; // cents, integer
