@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
-import { db, jobs } from "@ofp/db";
-import { JOB_STATUS } from "@ofp/shared";
+import { db, jobs } from "@nnact/db";
+import { JOB_STATUS } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";

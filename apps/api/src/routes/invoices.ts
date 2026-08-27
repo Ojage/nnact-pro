@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq, and, asc, desc, ne, sql } from "drizzle-orm";
-import { db, invoices, invoiceLineItems, payments, jobs, lineItems, orgs } from "@ofp/db";
-import { mergeBusinessSettings } from "@ofp/shared";
+import { db, invoices, invoiceLineItems, payments, jobs, lineItems, orgs } from "@nnact/db";
+import { mergeBusinessSettings } from "@nnact/shared";
 import {
   applyPaymentWithRules,
   defaultInvoiceDueAt,

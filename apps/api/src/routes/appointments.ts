@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, gte, lte, asc, lt, gt, ne, inArray } from "drizzle-orm";
-import { db, appointments, jobs, users } from "@ofp/db";
+import { db, appointments, jobs, users } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { resolveAppointmentWindow } from "./appointment-validation.js";

@@ -10,8 +10,8 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 
 test("organization logo storage validates, replaces, reads, and deletes images", async () => {
   const directory = await mkdtemp(join(tmpdir(), "ofp-logo-"));
-  const previous = process.env.OFP_UPLOAD_DIR;
-  process.env.OFP_UPLOAD_DIR = directory;
+  const previous = process.env.NNPUPLOAD_DIR;
+  process.env.NNPUPLOAD_DIR = directory;
   try {
     const saved = await saveOrgLogo("org-1", { stream: Readable.from(PNG), filenameHint: "logo.png" });
     assert.equal(saved.contentType, "image/png");
@@ -30,8 +30,8 @@ test("organization logo storage validates, replaces, reads, and deletes images",
     await deleteOrgLogo("org-1");
     assert.equal(await getOrgLogo("org-1"), null);
   } finally {
-    if (previous === undefined) delete process.env.OFP_UPLOAD_DIR;
-    else process.env.OFP_UPLOAD_DIR = previous;
+    if (previous === undefined) delete process.env.NNPUPLOAD_DIR;
+    else process.env.NNPUPLOAD_DIR = previous;
     await rm(directory, { recursive: true, force: true });
   }
 });

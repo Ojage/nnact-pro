@@ -10,7 +10,7 @@ The scope doc estimated ~30 files across server, schema, and mobile. That's a si
 
 1. **Each PR has its own story.** "Sync route exists", "Mobile reads offline", "Mobile writes offline", "Photos work offline".
 2. **Each PR is revertable.** If PR 3 (outbox) hits a flaky non-determinism, you revert one PR instead of 30 files of diff.
-3. **Each PR can stand behind a feature flag** if needed (e.g. `OFP_OFFLINE_OUTBOX`).
+3. **Each PR can stand behind a feature flag** if needed (e.g. `NNPOFFLINE_OUTBOX`).
 4. **Each PR ships its own test suite** — server-side tests in PRs 1+4, mobile-side tests in PRs 2+3.
 
 ## 2. Sequencing at a glance

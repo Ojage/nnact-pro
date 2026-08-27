@@ -52,7 +52,7 @@ async function mockSettingsApi(page: Page, patches: unknown[]) {
 test("company operations settings deep-link, validate, save, and fit mobile", async ({ page }) => {
   const patches: unknown[] = [];
   await mockSettingsApi(page, patches);
-  await page.context().addCookies([{ name: "ofp_session", value: "session", domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+  await page.context().addCookies([{ name: "NNPsession", value: "session", domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/settings?section=hours");
 
@@ -81,7 +81,7 @@ test("company operations settings deep-link, validate, save, and fit mobile", as
 
 test("invoice and estimate settings provide an interactive live customer preview", async ({ page }) => {
   await mockSettingsApi(page, []);
-  await page.context().addCookies([{ name: "ofp_session", value: "session", domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+  await page.context().addCookies([{ name: "NNPsession", value: "session", domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
   await page.goto("/settings?section=invoice");
 
   const preview = page.getByTestId("document-preview-workbench");
@@ -107,7 +107,7 @@ test("invoice and estimate settings provide an interactive live customer preview
 
 test("company settings upload, preview, and remove a logo", async ({ page }) => {
   await mockSettingsApi(page, []);
-  await page.context().addCookies([{ name: "ofp_session", value: "session", domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+  await page.context().addCookies([{ name: "NNPsession", value: "session", domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
   await page.goto("/settings?section=company");
 
   await page.locator('input[type="file"]').setInputFiles({

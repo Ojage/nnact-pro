@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { api } from "../../lib/api";
-import type { JobDTO, CustomerDTO, UserDTO, RecurringJobDTO, JobStatus } from "@ofp/shared";
-import { JOB_STATUS, formatMoney } from "@ofp/shared";
+import type { JobDTO, CustomerDTO, UserDTO, RecurringJobDTO, JobStatus } from "@nnact/shared";
+import { JOB_STATUS, formatMoney } from "@nnact/shared";
 import { parseRRule, expandRRule } from "../../lib/rrule";
 
 type ViewMode = "week" | "day" | "month" | "tech" | "workweek";

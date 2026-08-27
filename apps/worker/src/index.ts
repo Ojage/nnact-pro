@@ -1,10 +1,10 @@
-// OpenFieldPro background worker: materializes due recurring jobs and sends
+// NNACT Pro background worker: materializes due recurring jobs and sends
 // appointment reminders. Polling-based (no BullMQ dependency yet) — a tick runs
 // every WORKER_INTERVAL_MS. ponytail: polling is fine at this cadence; the
 // upgrade path is BullMQ + Redis (already in the infra) when volume demands it.
 import { and, eq, lte, gte } from "drizzle-orm";
 import { createServer } from "node:http";
-import { db, recurringJobs, jobs, appointments } from "@ofp/db";
+import { db, recurringJobs, jobs, appointments } from "@nnact/db";
 import { catchUp } from "../../api/src/recurrence.ts";
 import {
   WorkerDrainTracker,

@@ -1,7 +1,7 @@
 // Runnable check (no DB needed):  node --import tsx --test test/pricing.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_BUSINESS_SETTINGS, type BusinessSettings } from "@ofp/shared";
+import { DEFAULT_BUSINESS_SETTINGS, type BusinessSettings } from "@nnact/shared";
 import { buildPricingSnapshot, resolveDiscount, resolveTaxRate } from "../src/pricing.ts";
 
 function settings(overrides: Partial<BusinessSettings["taxes"]> = {}): BusinessSettings {

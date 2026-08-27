@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { db } from "@ofp/db";
+import { db } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 import { applyOps } from "../sync/executor.js";
 import {

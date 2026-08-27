@@ -6,7 +6,7 @@ import { Transform, type Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { eq, and } from "drizzle-orm";
 import { fileTypeFromBuffer } from "file-type";
-import { db, jobs, photos } from "@ofp/db";
+import { db, jobs, photos } from "@nnact/db";
 
 export interface PhotoRecord {
   id: string;
@@ -40,13 +40,13 @@ const ORG_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const ORG_LOGO_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function maxBytes() {
-  const configured = Number(process.env.OFP_UPLOAD_MAX_BYTES);
+  const configured = Number(process.env.NNPUPLOAD_MAX_BYTES);
   if (!Number.isFinite(configured) || configured <= 0) return MAX_BYTES_DEFAULT;
   return Math.min(configured, MAX_BYTES_CEIL);
 }
 
 function uploadDir() {
-  return process.env.OFP_UPLOAD_DIR ?? "./.ofp-uploads";
+  return process.env.NNPUPLOAD_DIR ?? "./.ofp-uploads";
 }
 
 function httpError(statusCode: number, message: string): Error & { statusCode: number } {

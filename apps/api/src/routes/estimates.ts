@@ -12,8 +12,8 @@ import {
   jobs,
   lineItems,
   orgs,
-} from "@ofp/db";
-import { mergeBusinessSettings, type PricingSnapshot } from "@ofp/shared";
+} from "@nnact/db";
+import { mergeBusinessSettings, type PricingSnapshot } from "@nnact/shared";
 import { defaultEstimateExpiresAt, depositAmountFor, depositSummary, estimateNumber } from "../estimates.js";
 import { defaultInvoiceDueAt, invoiceNumber } from "../invoicing.js";
 import { buildPricingSnapshot } from "../pricing.js";

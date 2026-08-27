@@ -1,5 +1,5 @@
 {
-  "name": "@ofp/worker",
+  "name": "@nnact/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,9 +9,9 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "@ofp/db": "workspace:*",
-    "@ofp/plugin-sdk": "workspace:*",
-    "@ofp/shared": "workspace:*",
+    "@nnact/db": "workspace:*",
+    "@nnact/plugin-sdk": "workspace:*",
+    "@nnact/shared": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {

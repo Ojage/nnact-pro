@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, sql, count } from "drizzle-orm";
-import { db, users } from "@ofp/db";
+import { db, users } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 import { guardTeamChange, type TeamChange, type UserRole } from "../team-safeguards.js";
 import type { JwtClaims } from "../auth.js";

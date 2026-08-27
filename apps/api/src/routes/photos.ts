@@ -13,7 +13,7 @@ interface PhotoIdParams {
 }
 
 function multipartMaxBytes(): number {
-  const raw = process.env.OFP_UPLOAD_MAX_BYTES;
+  const raw = process.env.NNPUPLOAD_MAX_BYTES;
   const n = raw == null ? NaN : Number(raw);
   if (!Number.isFinite(n) || n <= 0) return 25 * 1024 * 1024;
   return Math.min(n, 100 * 1024 * 1024);

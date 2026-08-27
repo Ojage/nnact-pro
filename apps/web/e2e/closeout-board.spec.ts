@@ -97,7 +97,7 @@ test("desktop closeout moves completed work into invoicing", async ({ page }) =>
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/closeout");
 
-  await expect(page).toHaveTitle(/OpenFieldPro/i);
+  await expect(page).toHaveTitle(/NNACT Pro/i);
   await expect(page.getByRole("heading", { name: "Job closeout" })).toBeVisible();
   await expect(page.getByTestId("closeout-board")).toBeVisible();
   await expect(page.getByText("Awaiting start").first()).toBeVisible();

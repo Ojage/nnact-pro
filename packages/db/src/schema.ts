@@ -1,4 +1,4 @@
-// OpenFieldPro relational schema — the field-service domain.
+// NNACT Pro relational schema — the field-service domain.
 // Multi-tenant (org_id everywhere). Money stored as integer cents.
 //
 // Phase-1 modules covered: orgs, users/technicians, customers, properties,
@@ -30,7 +30,7 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   toDriver: (value: Buffer) => value,
   fromDriver: (value: Buffer) => value,
 });
-import type { PortalLinkScope, PricingSnapshot } from "@ofp/shared";
+import type { PortalLinkScope, PricingSnapshot } from "@nnact/shared";
 
 export const jobStatus = pgEnum("job_status", [
   "lead",

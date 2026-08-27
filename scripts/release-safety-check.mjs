@@ -182,7 +182,7 @@ try {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  console.log("OpenFieldPro release safety checks");
+  console.log("NNACT Pro release safety checks");
   for (const message of passes) console.log(`PASS  ${message}`);
   for (const message of failures) console.error(`FAIL  ${message}`);
 

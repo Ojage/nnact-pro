@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { JobStatusBadge } from "@/components/status-badge";

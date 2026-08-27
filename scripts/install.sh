@@ -29,7 +29,7 @@ fi
 
 $COMPOSE -f infra/compose.prod.yml up -d --build
 
-echo "OpenFieldPro is starting."
+echo "NNACT Pro is starting."
 echo "App:      http://localhost:8080"
 echo "Landing:  http://localhost:8080/welcome"
 echo "API:      http://localhost:8080/api/health"

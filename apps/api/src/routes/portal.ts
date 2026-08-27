@@ -14,8 +14,8 @@ import {
   servicePlans,
   customerServicePlans,
   servicePlanVisits,
-} from "@ofp/db";
-import { mergeBusinessSettings, type PortalLinkScope } from "@ofp/shared";
+} from "@nnact/db";
+import { mergeBusinessSettings, type PortalLinkScope } from "@nnact/shared";
 import {
   DEFAULT_PORTAL_LINK_TTL_DAYS,
   decryptPortalToken,

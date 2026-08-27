@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
-import type { JobDTO } from "@ofp/shared";
+import type { JobDTO } from "@nnact/shared";
 
 interface Appointment {
   id: string;

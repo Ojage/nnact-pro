@@ -89,17 +89,17 @@ export async function logout(): Promise<void> {
   await request("/api/auth/logout", { method: "POST" });
 }
 
-type JobDTO = import("@ofp/shared").JobDTO;
-type CustomerDTO = import("@ofp/shared").CustomerDTO;
-type ActivityDTO = import("@ofp/shared").ActivityDTO;
-type ReportSummaryDTO = import("@ofp/shared").ReportSummaryDTO;
-type ArAgingReport = import("@ofp/shared").ArAgingReport;
-type EstimateConversionReport = import("@ofp/shared").EstimateConversionReport;
-type RevenueTrendReport = import("@ofp/shared").RevenueTrendReport;
-type TechnicianScorecardsReport = import("@ofp/shared").TechnicianScorecardsReport;
-type UserDTO = import("@ofp/shared").UserDTO;
-type RecurringJobDTO = import("@ofp/shared").RecurringJobDTO;
-export type BusinessSettingsDTO = import("@ofp/shared").BusinessSettings;
+type JobDTO = import("@nnact/shared").JobDTO;
+type CustomerDTO = import("@nnact/shared").CustomerDTO;
+type ActivityDTO = import("@nnact/shared").ActivityDTO;
+type ReportSummaryDTO = import("@nnact/shared").ReportSummaryDTO;
+type ArAgingReport = import("@nnact/shared").ArAgingReport;
+type EstimateConversionReport = import("@nnact/shared").EstimateConversionReport;
+type RevenueTrendReport = import("@nnact/shared").RevenueTrendReport;
+type TechnicianScorecardsReport = import("@nnact/shared").TechnicianScorecardsReport;
+type UserDTO = import("@nnact/shared").UserDTO;
+type RecurringJobDTO = import("@nnact/shared").RecurringJobDTO;
+export type BusinessSettingsDTO = import("@nnact/shared").BusinessSettings;
 
 export interface OrgSettingsDTO {
   id: string;
@@ -142,9 +142,9 @@ interface Invoice {
   id: string;
   jobId: string;
   number: string;
-  status: import("@ofp/shared").InvoiceStatus;
+  status: import("@nnact/shared").InvoiceStatus;
   total: number;
-  pricing?: import("@ofp/shared").PricingSnapshot | null;
+  pricing?: import("@nnact/shared").PricingSnapshot | null;
   dueAt?: string | null;
   createdAt?: string;
 }
@@ -165,7 +165,7 @@ export interface EstimateOption {
   label: string;
   position: number;
   total: number;
-  pricing?: import("@ofp/shared").PricingSnapshot | null;
+  pricing?: import("@nnact/shared").PricingSnapshot | null;
   lineItems: EstimateOptionLineItem[];
 }
 
@@ -175,7 +175,7 @@ export interface Estimate {
   jobId: string;
   number: string;
   total: number;
-  pricing?: import("@ofp/shared").PricingSnapshot | null;
+  pricing?: import("@nnact/shared").PricingSnapshot | null;
   accepted: boolean;
   expiresAt?: string | null;
   acceptedAt?: string | null;
@@ -337,7 +337,7 @@ interface PluginEvent {
   createdAt: string;
 }
 
-export type PortalLinkScope = import("@ofp/shared").PortalLinkScope;
+export type PortalLinkScope = import("@nnact/shared").PortalLinkScope;
 
 export interface PortalLinkDTO {
   id: string;

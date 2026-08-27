@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 
 interface Service {
   id: string;
@@ -22,7 +22,7 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-const STORAGE_KEY = "ofp_services";
+const STORAGE_KEY = "NNPservices";
 
 function loadServices(): Service[] {
   if (typeof window === "undefined") return [];

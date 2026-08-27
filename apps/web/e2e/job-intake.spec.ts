@@ -117,7 +117,7 @@ test("dispatcher creates and schedules a job for an existing customer", async ({
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/jobs/new");
 
-  await expect(page).toHaveTitle(/OpenFieldPro/i);
+  await expect(page).toHaveTitle(/NNACT Pro/i);
   await expect(page.getByRole("heading", { name: "New job" })).toBeVisible();
   await expect(page.getByText("Create the work order, customer record, and appointment in one intake flow.")).toBeVisible();
   await expect(page.getByLabel("Customer", { exact: true })).toHaveValue("customer-1");

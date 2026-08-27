@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { api, type PortalSessionDTO } from "@/lib/api";
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { SponsorSlot } from "@/components/sponsor-slot";
 import { PayButton } from "./pay-button";
@@ -16,7 +16,7 @@ function UnavailableCard({ title, message }: { title: string; message: string })
   return (
     <main className="min-h-screen bg-surface-100 px-4 py-16 text-fg">
       <Card className="mx-auto max-w-xl text-center">
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">OpenFieldPro Portal</p>
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">NNACT Pro Portal</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight">{title}</h1>
         <p className="mt-3 text-sm text-fg-muted">{message}</p>
       </Card>

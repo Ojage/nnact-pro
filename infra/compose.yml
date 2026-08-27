@@ -1,4 +1,4 @@
-# OpenFieldPro infrastructure — Postgres+PostGIS, Redis, MinIO, Caddy.
+# NNACT Pro infrastructure — Postgres+PostGIS, Redis, MinIO, Caddy.
 # Works with podman compose or docker compose.
 #   podman compose -f infra/compose.yml up -d
 services:
@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: ofp
       POSTGRES_PASSWORD: ofp
       POSTGRES_DB: ofp
-    ports: ["5432:5432"]
+    ports: ["5433:5432"]
     volumes: ["../data/pg:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ofp"]
@@ -26,7 +26,7 @@ services:
     environment:
       MINIO_ROOT_USER: ofpminio
       MINIO_ROOT_PASSWORD: ofpminio-secret
-    ports: ["9000:9000", "9001:9001"]
+    ports: ["9100:9000", "9101:9001"]
     volumes: ["../data/minio:/data"]
 
   caddy:

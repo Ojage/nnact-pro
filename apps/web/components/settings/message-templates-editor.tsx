@@ -10,7 +10,7 @@ import {
   renderMessageTemplate,
   validateMessageTemplate,
   type MessageTemplateKind,
-} from "@ofp/shared";
+} from "@nnact/shared";
 import type { BusinessSettingsDTO } from "@/lib/api";
 
 interface EditorProps {

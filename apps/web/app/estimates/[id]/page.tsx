@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 import { api, type BusinessSettingsDTO, type EstimateOption } from "@/lib/api";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";

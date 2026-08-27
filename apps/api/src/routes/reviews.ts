@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { db, reviews, jobs } from "@ofp/db";
+import { db, reviews, jobs } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 
 const createBody = z.object({

@@ -111,7 +111,7 @@ test("maintenance blocks writes but keeps reads, liveness, owner status, and rec
   assert.equal(blocked.statusCode, 503);
   assert.equal(blocked.headers["retry-after"], "30");
   assert.deepEqual(blocked.json(), {
-    error: "OpenFieldPro is temporarily in maintenance mode. Please try again shortly.",
+    error: "NNACT Pro is temporarily in maintenance mode. Please try again shortly.",
     retryable: true,
   });
   assert.equal(recovery.statusCode, 202);

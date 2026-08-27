@@ -1,7 +1,7 @@
 // Settings-aware pricing: resolves the org's tax profile and saved discount
 // into a durable PricingSnapshot for estimates and invoices. Pure (no DB) so
 // it is unit-testable without a database.
-import type { BusinessSettings, PricingSnapshot, SavedDiscount, TaxProfile } from "@ofp/shared";
+import type { BusinessSettings, PricingSnapshot, SavedDiscount, TaxProfile } from "@nnact/shared";
 import { applyPricing } from "./totals.js";
 
 export interface ResolvedTax {

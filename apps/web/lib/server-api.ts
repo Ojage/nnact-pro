@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
-import type { ActivityDTO, CustomerDTO, JobDTO } from "@ofp/shared";
+import type { ActivityDTO, CustomerDTO, JobDTO } from "@nnact/shared";
 import type {
   DiagnosticSessionDetail,
   DiagnosticSessionListItem,

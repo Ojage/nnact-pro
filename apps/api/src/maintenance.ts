@@ -44,7 +44,7 @@ export class FileMaintenanceReader implements MaintenanceReader {
 }
 
 export function maintenanceReaderFromEnvironment(): MaintenanceReader {
-  const path = process.env.OFP_MAINTENANCE_FILE;
+  const path = process.env.NNPMAINTENANCE_FILE;
   return path
     ? new FileMaintenanceReader(path)
     : { read: () => ({ active: false }) };

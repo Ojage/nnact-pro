@@ -100,7 +100,7 @@ async function main() {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "user-agent": "OpenFieldPro release audit",
+      "user-agent": "NNACT Pro release audit",
     },
     body: JSON.stringify(packages),
     signal: AbortSignal.timeout(30_000),

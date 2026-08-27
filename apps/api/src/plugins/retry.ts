@@ -2,7 +2,7 @@
 // with exponential backoff, then dead-letters once MAX_ATTEMPTS is exhausted.
 // Called on each background-worker tick. Idempotent and never throws.
 import { and, eq, inArray, lt, lte, or, isNull } from "drizzle-orm";
-import { db, plugins, pluginInstalls, pluginEvents } from "@ofp/db";
+import { db, plugins, pluginInstalls, pluginEvents } from "@nnact/db";
 import { buildDeliveryRequest, attemptDelivery, backoffMs, MAX_ATTEMPTS } from "./delivery.js";
 
 // Statuses eligible for (re)delivery: a transient failure, or a row that was

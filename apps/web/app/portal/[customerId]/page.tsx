@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 import { Card } from "@/components/ui/card";
 import { JobStatusBadge } from "@/components/status-badge";
 import { SponsorSlot } from "@/components/sponsor-slot";
@@ -27,7 +27,7 @@ export default async function CustomerPortalPage({
     return (
       <main className="min-h-screen bg-surface-100 px-4 py-16 text-fg">
         <Card className="mx-auto max-w-xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">OpenFieldPro Portal</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">NNACT Pro Portal</p>
           <h1 className="mt-3 text-3xl font-black tracking-tight">This portal link is unavailable</h1>
           <p className="mt-3 text-sm text-fg-muted">
             Ask the service company for a new secure portal link. No customer or billing information has been displayed.
@@ -54,7 +54,7 @@ export default async function CustomerPortalPage({
         <div className="mx-auto flex h-16 w-[min(1080px,calc(100%-32px))] items-center justify-between">
           <Link href="/welcome" className="flex items-center gap-3 text-fg no-underline hover:no-underline">
             <span className="ofp-brand-mark h-9 w-9 text-xs">OF</span>
-            <span className="font-bold tracking-tight">OpenFieldPro Portal</span>
+            <span className="font-bold tracking-tight">NNACT Pro Portal</span>
           </Link>
           <span className="text-xs text-fg-muted">Customer view scaffold</span>
         </div>

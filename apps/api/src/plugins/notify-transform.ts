@@ -4,7 +4,7 @@
 // request so the bus can POST it directly to the user's incoming webhook.
 //
 // Pure + deterministic (no Date.now, no signing) → unit-testable.
-import { formatMoney } from "@ofp/shared";
+import { formatMoney } from "@nnact/shared";
 
 export type NotifyTransform = "slack" | "discord" | "ntfy";
 
@@ -39,13 +39,13 @@ export function formatNotification(kind: string, data: Record<string, unknown>):
     case "estimate.accepted":
       return `📝 Estimate accepted — ${formatMoney(num(data.total))}`;
     default:
-      return `OpenFieldPro: ${kind}`;
+      return `NNACT Pro: ${kind}`;
   }
 }
 
 /** Short title for channels that support one (ntfy). */
 export function titleFor(kind: string): string {
-  return `OpenFieldPro · ${kind}`;
+  return `NNACT Pro · ${kind}`;
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, desc, eq, ilike } from "drizzle-orm";
-import { db, catalogCategories, catalogItems } from "@ofp/db";
+import { db, catalogCategories, catalogItems } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 
 const categoryBody = z.object({

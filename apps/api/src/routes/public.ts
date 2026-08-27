@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { db, orgs, customers, jobs } from "@ofp/db";
+import { db, orgs, customers, jobs } from "@nnact/db";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 import { getOrgLogo } from "../uploads.js";
 

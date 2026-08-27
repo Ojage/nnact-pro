@@ -1,5 +1,5 @@
 // Web preview layer for durable field documents. The document *data*
-// assembly lives in @ofp/shared so the API generates byte-identical PDFs for
+// assembly lives in @nnact/shared so the API generates byte-identical PDFs for
 // email attachments; this module only renders the branded HTML preview.
 import {
   estimateDocumentData,
@@ -10,7 +10,7 @@ import {
   type DocumentInvoiceLike,
   type DocumentJobLike,
   type DocumentLineItemLike,
-} from "@ofp/shared";
+} from "@nnact/shared";
 import type { OrgSettingsDTO } from "@/lib/api";
 
 export function invoiceDocumentHtml({

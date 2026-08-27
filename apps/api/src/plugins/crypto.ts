@@ -3,18 +3,18 @@
 // Scoped API tokens (INBOUND): plaintext shown once, only the SHA-256 hash is
 // ever stored. Lookups hash the presented token and compare in constant time.
 //
-// Webhook signing (OUTBOUND) lives in @ofp/plugin-sdk so the server and plugin
+// Webhook signing (OUTBOUND) lives in @nnact/plugin-sdk so the server and plugin
 // authors share ONE wire-format implementation — re-exported here for callers.
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
-export { generateWebhookSecret, signWebhook, verifyWebhook } from "@ofp/plugin-sdk";
+export { generateWebhookSecret, signWebhook, verifyWebhook } from "@nnact/plugin-sdk";
 
-const TOKEN_PREFIX = "ofp_";
+const TOKEN_PREFIX = "NNP";
 
 export interface MintedToken {
   token: string; // plaintext — return to the caller once, never persist
   tokenHash: string; // store this
-  prefix: string; // store for display, e.g. "ofp_AbC12345"
+  prefix: string; // store for display, e.g. "NNPAbC12345"
 }
 
 /** Mint a new scoped API token. The plaintext is returned once; persist only the hash. */

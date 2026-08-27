@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible OpenFieldPro defect
+description: Report a reproducible NNACT Pro defect
 title: "[Bug]: "
 labels: [bug, triage]
 body:

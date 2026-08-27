@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 
-export const SESSION_COOKIE_NAME = "ofp_session";
+export const SESSION_COOKIE_NAME = "NNPsession";
 const DEFAULT_MAX_AGE_SECONDS = 12 * 60 * 60;
 
 function parseCookieHeader(header: string | undefined) {

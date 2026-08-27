@@ -1,4 +1,4 @@
-# One-command OpenFieldPro deploy (Windows). Mirrors deploy.sh.
+# One-command NNACT Pro deploy (Windows). Mirrors deploy.sh.
 #   .\deploy.ps1            # build + up
 #   .\deploy.ps1 down       # tear down
 param([string]$Action = "up")
@@ -21,7 +21,7 @@ Write-Host "-> building + starting stack with: $compose compose"
 & $compose compose -f infra/compose.prod.yml up -d --build
 
 Write-Host ""
-Write-Host "OpenFieldPro is starting."
+Write-Host "NNACT Pro is starting."
 Write-Host "  App:      http://localhost:8080"
 Write-Host "  Landing:  http://localhost:8080/welcome"
 Write-Host "  API:      http://localhost:8080/api/health"

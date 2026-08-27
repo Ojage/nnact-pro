@@ -2,13 +2,13 @@ import type { FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { db, orgs } from "@ofp/db";
+import { db, orgs } from "@nnact/db";
 import {
   DEFAULT_BUSINESS_SETTINGS,
   mergeBusinessSettings,
   validateMessageTemplate,
   type MessageTemplateKind,
-} from "@ofp/shared";
+} from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { deleteOrgLogo, saveOrgLogo } from "../uploads.js";
 

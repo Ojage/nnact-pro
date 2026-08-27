@@ -1,4 +1,4 @@
-import { renderFieldDocumentHtml } from "@ofp/shared";
+import { renderFieldDocumentHtml } from "@nnact/shared";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 
@@ -21,7 +21,7 @@ export default function DocumentPreviewPage() {
     ],
     paymentsCents: 0,
     branding: {
-      companyName: "OpenFieldPro Demo Co.",
+      companyName: "NNACT Pro Demo Co.",
       brandColor: "#22C55E",
       footerText: "Field service command center document preview",
       removeOpenFieldProAttribution: false,
@@ -40,7 +40,7 @@ export default function DocumentPreviewPage() {
         </p>
       </Card>
       <iframe
-        title="OpenFieldPro document preview"
+        title="NNACT Pro document preview"
         srcDoc={html}
         className="h-[900px] w-full rounded-2xl border border-border bg-white"
       />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
-import type { JobDTO, UserDTO } from "@ofp/shared";
+import type { JobDTO, UserDTO } from "@nnact/shared";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

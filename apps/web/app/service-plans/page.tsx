@@ -6,13 +6,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
-import { formatMoney, type ServicePlanDTO } from "@ofp/shared";
+import { formatMoney, type ServicePlanDTO } from "@nnact/shared";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
-  const token = typeof window !== "undefined" ? localStorage.getItem("ofp_token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("NNPtoken") : null;
   if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
     ...init,

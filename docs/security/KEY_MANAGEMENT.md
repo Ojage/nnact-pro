@@ -66,7 +66,7 @@ pnpm --filter @ofp/api license:generate -- \
   --output ~/.ofp/example-service-company.ofp-license
 ```
 
-A different private key can be supplied with `--private-key` or `OFP_LICENSE_PRIVATE_KEY_PATH` for a controlled signing session.
+A different private key can be supplied with `--private-key` or `NNPLICENSE_PRIVATE_KEY_PATH` for a controlled signing session.
 
 Supported entitlement tiers are `supporter`, `business`, and `partner`. Tier names are administrative metadata; they do not alter AGPL rights. The generator:
 
@@ -112,8 +112,8 @@ Do not trust decoded payload fields before signature and time checks pass.
 A deployment that uses an optional entitlement receives only the public key and entitlement token:
 
 ```bash
-export OFP_LICENSE_PUBLIC_KEY_PATH=/run/secrets/license-signing-public.pem
-export OFP_LICENSE_KEY='ofp1...'
+export NNPLICENSE_PUBLIC_KEY_PATH=/run/secrets/license-signing-public.pem
+export NNPLICENSE_KEY='ofp1...'
 pnpm --filter @ofp/api license:verify
 ```
 

@@ -9,13 +9,13 @@ COPY apps ./apps
 COPY packages ./packages
 
 RUN pnpm install:verified \
-  && pnpm --filter @ofp/api build \
+  && pnpm --filter @nnact/api build \
   && mkdir -p /uploads \
   && chown -R node:node /uploads /app/apps/api/dist
 
 ENV NODE_ENV=production
 ENV API_PORT=3001
-ENV OFP_UPLOAD_DIR=/uploads
+ENV NNPUPLOAD_DIR=/uploads
 EXPOSE 3001
 
 USER node
@@ -26,4 +26,4 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
 # The API source is executed through the pinned tsx runtime because workspace
 # packages currently export TypeScript source. The build above remains a
 # mandatory type/emit gate until all workspace packages publish compiled output.
-CMD ["pnpm", "--filter", "@ofp/api", "exec", "tsx", "src/server.ts"]
+CMD ["pnpm", "--filter", "@nnact/api", "exec", "tsx", "src/server.ts"]

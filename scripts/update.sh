@@ -17,4 +17,4 @@ git pull --ff-only
 $COMPOSE -f infra/compose.prod.yml build
 $COMPOSE -f infra/compose.prod.yml up -d
 
-echo "OpenFieldPro updated. Check health at http://localhost:8080/api/health"
+echo "NNACT Pro updated. Check health at http://localhost:8080/api/health"

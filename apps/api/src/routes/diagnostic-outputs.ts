@@ -11,7 +11,7 @@ import {
   equipment,
   estimates,
   jobs,
-} from "@ofp/db";
+} from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 
 const completeSchema = z.object({

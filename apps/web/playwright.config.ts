@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const webPort = Number(process.env.OFP_WEB_E2E_PORT ?? 3000);
-const webHost = process.env.OFP_WEB_E2E_HOST ?? "127.0.0.1";
+const webPort = Number(process.env.NNPWEB_E2E_PORT ?? 3000);
+const webHost = process.env.NNPWEB_E2E_HOST ?? "127.0.0.1";
 const urlHost = webHost.includes(":") ? `[${webHost}]` : webHost;
 const baseURL = `http://${urlHost}:${webPort}`;
 

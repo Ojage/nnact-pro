@@ -1,4 +1,4 @@
-import type { JobDTO, UserDTO } from "@ofp/shared";
+import type { JobDTO, UserDTO } from "@nnact/shared";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -54,7 +54,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   };
 
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("ofp_token");
+    const token = localStorage.getItem("NNPtoken");
     if (token) headers.authorization = `Bearer ${token}`;
   }
 

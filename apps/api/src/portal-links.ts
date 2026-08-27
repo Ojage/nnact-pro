@@ -2,7 +2,7 @@
 // form, expire by default, and can be revoked by the owner at any time.
 // Only the SHA-256 hash and a short display prefix are persisted.
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
-import { PORTAL_LINK_SCOPES, type PortalLinkScope } from "@ofp/shared";
+import { PORTAL_LINK_SCOPES, type PortalLinkScope } from "@nnact/shared";
 
 const CIPHER_ALGO = "aes-256-gcm";
 const CIPHER_VERSION = "v1";
