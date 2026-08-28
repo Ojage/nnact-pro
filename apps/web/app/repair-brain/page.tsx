@@ -2,8 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Brain, Check } from "lucide-react";
+import {
+  AlertCircle,
+  BookOpenCheck,
+  Boxes,
+  Brain,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  FileText,
+  History,
+  ListChecks,
+  Package,
+  Search,
+  Sparkles,
+  TriangleAlert,
+  Wrench,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSelect } from "@/components/ui/form-select";
@@ -32,6 +52,14 @@ const EMPTY: RepairBrainSearchResults = {
   repairHistory: [],
 };
 
+const POPULAR_QUERIES = [
+  "Samsung WW90",
+  "E21 error",
+  "drain pump",
+  "compressor overheating",
+  "dryer not heating",
+];
+
 const PROPOSAL_TYPE_LABELS: Record<string, string> = {
   fault: "Known fault",
   symptom: "Symptom observation",
@@ -42,6 +70,29 @@ const PROPOSAL_TYPE_LABELS: Record<string, string> = {
   test_point: "Test point",
   document: "Reference document",
 };
+
+const CATEGORY_META: Array<{ key: keyof RepairBrainSearchResults; label: string; icon: LucideIcon }> = [
+  { key: "models", label: "Models", icon: Boxes },
+  { key: "faults", label: "Known faults", icon: TriangleAlert },
+  { key: "parts", label: "Parts", icon: Package },
+  { key: "procedures", label: "Procedures", icon: ListChecks },
+  { key: "documents", label: "Documents", icon: FileText },
+  { key: "repairHistory", label: "Past repairs", icon: History },
+];
+
+function timeAgo(iso: string): string {
+  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "yesterday" : `${days}d ago`;
+}
+
+function isRecent(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() < 24 * 60 * 60 * 1000;
+}
 
 export default function RepairBrainPage() {
   const session = useSessionUser();
@@ -110,6 +161,17 @@ export default function RepairBrainPage() {
     void triggerSearch(query.trim());
   };
 
+  const runQuery = (next: string) => {
+    setQuery(next);
+    setSearched(true);
+    void triggerSearch(next);
+  };
+
+  const clearSearch = () => {
+    setQuery("");
+    setSearched(false);
+  };
+
   const total =
     results.models.length +
     results.faults.length +
@@ -125,151 +187,337 @@ export default function RepairBrainPage() {
         description="Search NNACT's institutional repair knowledge — models, faults, parts, procedures, and field history."
       />
 
-      <Card className="mb-6">
+      {/* ── Search ── */}
+      <Card className="mb-6" data-tour="rb-search">
         <CardContent className="pt-6">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Samsung WW90, E21, drain pump, DC31-00181A, compressor overheating…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && search()}
-              className="flex-1"
-              data-tour="rb-search"
-            />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-dim"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  if (!e.target.value) setSearched(false);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && search()}
+                placeholder="Search models, fault codes, parts, procedures…"
+                className="pl-9 pr-9"
+                aria-label="Search Repair Brain"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-fg-dim transition-colors hover:bg-surface-300 hover:text-fg"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              )}
+            </div>
             <Button onClick={search} loading={searching} disabled={query.trim().length < 2}>
+              <Search aria-hidden />
               Search
             </Button>
           </div>
-          {searched && (
-            <p className="mt-2 text-sm text-fg-muted">{total} results across all categories</p>
-          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-fg-muted">Popular</span>
+            {POPULAR_QUERIES.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => runQuery(q)}
+                className="rounded-full border border-border bg-surface-200 px-3 py-1 text-xs text-fg-muted transition-colors hover:border-fg-dim hover:text-fg"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {searched && (
+      {/* ── Results summary / status ── */}
+      {searched && !searchQuery.isError && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-fg-muted">
+            {searching
+              ? "Searching the knowledge base…"
+              : `${total} result${total === 1 ? "" : "s"} for “${query.trim()}”`}
+          </p>
+          {!searching && total > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORY_META.filter((c) => results[c.key].length > 0).map((c) => (
+                <Badge key={c.key} variant="secondary">
+                  {c.label} · {results[c.key].length}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {searched && searchQuery.isError && (
+        <div
+          className="mb-4 flex flex-col gap-3 rounded-lg border border-red/30 bg-red/5 p-4 text-sm text-red sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <span className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>Couldn't reach the Repair Brain. Check your connection and try again.</span>
+          </span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={clearSearch}>
+              Clear
+            </Button>
+            <Button size="sm" onClick={search} loading={searching}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {searched && !searchQuery.isError && !searching && total === 0 && (
+        <Card className="mb-4">
+          <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+            <Search className="size-6 text-fg-dim" aria-hidden />
+            <p className="font-medium">No results for “{query.trim()}”</p>
+            <p className="max-w-sm text-sm text-fg-muted">
+              Try a broader term — a model number, error code, or part name — or browse the equipment catalog.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Link href="/repair-brain/models">
+                <Button size="sm" variant="secondary">
+                  Browse models
+                </Button>
+              </Link>
+              <Button size="sm" variant="ghost" onClick={clearSearch}>
+                Back to start
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Results ── */}
+      {searched && !searchQuery.isError && (
         <div className="grid gap-4 md:grid-cols-2">
-          <ResultSection title="Models" count={results.models.length}>
+          <ResultSection title="Models" count={results.models.length} icon={Boxes}>
             {results.models.map((m) => (
               <Link
                 key={m.id}
                 href={`/repair-brain/models/${m.id}`}
-                className="block rounded-md border border-border p-3 hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
               >
-                <div className="font-medium">
-                  {m.manufacturer} {m.modelNumber}
-                </div>
-                {m.modelName && <div className="text-sm text-fg-muted">{m.modelName}</div>}
-                <div className="text-xs text-fg-muted mt-1">{m.category}</div>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">
+                    {m.manufacturer} {m.modelNumber}
+                  </span>
+                  {m.modelName && <span className="block truncate text-sm text-fg-muted">{m.modelName}</span>}
+                  <span className="mt-0.5 block text-xs text-fg-dim">{m.category}</span>
+                </span>
+                <ChevronRight
+                  className="mt-1 size-4 shrink-0 text-fg-dim transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
               </Link>
             ))}
           </ResultSection>
 
-          <ResultSection title="Known Faults" count={results.faults.length}>
+          <ResultSection title="Known Faults" count={results.faults.length} icon={TriangleAlert}>
             {results.faults.map((f) => (
               <Link
                 key={f.id}
                 href={`/repair-brain/models/${f.equipmentModelId}`}
-                className="block rounded-md border border-border p-3 hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
               >
-                <div className="font-medium">{f.title}</div>
-                {f.faultCode && <div className="text-sm text-fg-muted">Code: {f.faultCode}</div>}
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate font-medium">{f.title}</span>
+                    {f.faultCode && (
+                      <span className="rounded bg-surface-300 px-1.5 py-0.5 font-mono text-[11px] font-medium text-fg">
+                        {f.faultCode}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-fg-dim">View model profile</span>
+                </span>
+                <ChevronRight
+                  className="mt-1 size-4 shrink-0 text-fg-dim transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
               </Link>
             ))}
           </ResultSection>
 
-          <ResultSection title="Parts" count={results.parts.length}>
+          <ResultSection title="Parts" count={results.parts.length} icon={Package}>
             {results.parts.map((p) => (
               <Link
                 key={p.id}
                 href={`/repair-brain/models/${p.equipmentModelId}`}
-                className="block rounded-md border border-border p-3 hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
               >
-                <div className="font-medium">{p.partName}</div>
-                {p.oemPartNumber && (
-                  <div className="text-sm text-fg-muted">OEM: {p.oemPartNumber}</div>
-                )}
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{p.partName}</span>
+                  {p.oemPartNumber && (
+                    <span className="mt-0.5 block font-mono text-xs text-fg-dim">OEM {p.oemPartNumber}</span>
+                  )}
+                </span>
+                <ChevronRight
+                  className="mt-1 size-4 shrink-0 text-fg-dim transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
               </Link>
             ))}
           </ResultSection>
 
-          <ResultSection title="Procedures" count={results.procedures.length}>
+          <ResultSection title="Procedures" count={results.procedures.length} icon={ListChecks}>
             {results.procedures.map((p) => (
-              <div key={p.id} className="rounded-md border border-border p-3">
-                <div className="font-medium">{p.title}</div>
-                <div className="text-xs text-fg-muted mt-1 capitalize">{p.type}</div>
+              <div key={p.id} className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+                <span className="min-w-0 truncate font-medium">{p.title}</span>
+                <Badge variant="outline" className="shrink-0 capitalize">
+                  {p.type}
+                </Badge>
               </div>
             ))}
           </ResultSection>
 
-          <ResultSection title="Documents" count={results.documents.length}>
+          <ResultSection title="Documents" count={results.documents.length} icon={FileText}>
             {results.documents.map((d) => (
-              <div key={d.id} className="rounded-md border border-border p-3">
-                <div className="font-medium">{d.title}</div>
-                <div className="text-xs text-fg-muted mt-1">{d.documentType.replaceAll("_", " ")}</div>
+              <div key={d.id} className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+                <span className="min-w-0 truncate font-medium">{d.title}</span>
+                <Badge variant="outline" className="shrink-0 capitalize">
+                  {d.documentType.replaceAll("_", " ")}
+                </Badge>
               </div>
             ))}
           </ResultSection>
 
-          <ResultSection title="Previous Repairs" count={results.repairHistory.length}>
+          <ResultSection title="Previous Repairs" count={results.repairHistory.length} icon={History}>
             {results.repairHistory.map((r) => (
               <div key={r.id} className="rounded-md border border-border p-3">
-                <div className="font-medium capitalize">{r.outcome.replaceAll("_", " ")}</div>
-                {r.conclusion && <div className="text-sm text-fg-muted">{r.conclusion}</div>}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <Badge variant="secondary" className="shrink-0 capitalize">
+                    {r.outcome.replaceAll("_", " ")}
+                  </Badge>
+                  {r.conclusion && <span className="min-w-0 flex-1 text-sm text-fg-muted">{r.conclusion}</span>}
+                </div>
               </div>
             ))}
           </ResultSection>
         </div>
       )}
 
+      {/* ── Landing: get started + review + contribute ── */}
       {!searched && (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Quick access</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary" aria-hidden />
+                  Get started
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="flex flex-wrap gap-2">
-                  <Link href="/repair-brain/models">
-                    <Button variant="secondary" size="sm" data-tour="rb-models">
-                      Browse all equipment models
-                    </Button>
-                  </Link>
-                  <Link href="/jobs">
-                    <Button variant="secondary" size="sm" data-tour="rb-diagnose">
-                      Open a job to diagnose
-                    </Button>
-                  </Link>
-                  <Button variant="secondary" size="sm" data-tour="rb-contribute" onClick={() => setContributeOpen((v) => !v)}>
-                    {contributeOpen ? "Close composer" : "Contribute knowledge"}
-                  </Button>
-                </div>
+                <QuickLink
+                  href="/repair-brain/models"
+                  icon={Boxes}
+                  title="Browse equipment models"
+                  description="Explore NNACT's supported appliance catalog"
+                  dataTour="rb-models"
+                />
+                <QuickLink
+                  href="/jobs"
+                  icon={Wrench}
+                  title="Open a job to diagnose"
+                  description="Pull up a work order and run a diagnosis"
+                  dataTour="rb-diagnose"
+                />
+                <button
+                  type="button"
+                  data-tour="rb-contribute"
+                  onClick={() => setContributeOpen((v) => !v)}
+                  className={`group flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+                    contributeOpen
+                      ? "border-primary bg-primary/10"
+                      : "border-primary/40 bg-primary/5 hover:border-primary hover:bg-primary/10"
+                  }`}
+                >
+                  <Sparkles
+                    className={`mt-0.5 size-4 shrink-0 ${contributeOpen ? "text-primary" : "text-primary/70"}`}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                      {contributeOpen ? "Close composer" : "Contribute knowledge"}
+                      <ChevronRight
+                        className={`size-4 shrink-0 text-fg-dim transition-transform ${
+                          contributeOpen ? "rotate-90" : "group-hover:translate-x-0.5"
+                        }`}
+                        aria-hidden
+                      />
+                    </span>
+                    <span className="mt-0.5 block text-xs text-fg-muted">
+                      {contributeOpen ? "Hide the proposal form" : "Share a field repair tip for review"}
+                    </span>
+                  </span>
+                </button>
               </CardContent>
             </Card>
 
             {canReview && (
               <Card data-tour="rb-review">
                 <CardHeader>
-                  <CardTitle>
-                    Pending knowledge <span className="text-fg-muted font-normal">({proposals.length})</span>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpenCheck className="size-4 text-primary" aria-hidden />
+                    Pending review
+                    {proposals.length > 0 && <Badge variant="secondary">{proposals.length}</Badge>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2" data-tour="rb-proposals">
-                  {proposalsQuery.isFetching ? <p className="text-sm text-fg-muted">Loading…</p> : null}
-                  {!proposalsQuery.isFetching && proposals.length === 0 ? (
-                    <p className="text-sm text-fg-muted">No proposals waiting for review.</p>
-                  ) : null}
-                  {proposals.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-fg">{p.title}</div>
-                        <div className="text-xs text-fg-muted capitalize">{PROPOSAL_TYPE_LABELS[p.proposalType] ?? p.proposalType}</div>
-                      </div>
-                      <Button size="sm" variant="secondary" loading={verifyId === p.id} onClick={() => void handleVerify(p.id)}>
-                        Verify
-                      </Button>
+                  {proposalsQuery.isFetching ? (
+                    <p className="text-sm text-fg-muted">Loading proposals…</p>
+                  ) : proposals.length === 0 ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-3 text-sm text-fg-muted">
+                      <CheckCircle2 className="size-4 shrink-0 text-chart-2" aria-hidden />
+                      No proposals waiting for review.
                     </div>
-                  ))}
+                  ) : (
+                    proposals.map((p) => (
+                      <div key={p.id} className="rounded-lg border border-border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="truncate text-sm font-medium text-fg">{p.title}</span>
+                              {isRecent(p.createdAt) && <Badge variant="sent">New</Badge>}
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-fg-muted">
+                              <Badge variant="outline" className="capitalize">
+                                {PROPOSAL_TYPE_LABELS[p.proposalType] ?? p.proposalType}
+                              </Badge>
+                              <span className="flex items-center gap-1">
+                                <Clock3 className="size-3" aria-hidden />
+                                {timeAgo(p.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            loading={verifyId === p.id}
+                            onClick={() => void handleVerify(p.id)}
+                          >
+                            Verify
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -382,21 +630,57 @@ export default function RepairBrainPage() {
 function ResultSection({
   title,
   count,
+  icon,
   children,
 }: {
   title: string;
   count: number;
+  icon: LucideIcon;
   children: React.ReactNode;
 }) {
   if (count === 0) return null;
+  const Icon = icon;
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">
-          {title} <span className="text-fg-muted font-normal">({count})</span>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Icon className="size-4 text-primary" aria-hidden />
+          {title} <span className="font-normal text-fg-muted">({count})</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">{children}</CardContent>
     </Card>
+  );
+}
+
+function QuickLink({
+  href,
+  icon,
+  title,
+  description,
+  dataTour,
+}: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  dataTour?: string;
+}) {
+  const Icon = icon;
+  return (
+    <Link
+      href={href}
+      data-tour={dataTour}
+      className="group flex items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-200"
+    >
+      <Icon className="mt-0.5 size-4 shrink-0 text-fg-muted" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center justify-between gap-2 text-sm font-medium text-fg">
+          {title}
+          <ChevronRight className="size-4 shrink-0 text-fg-dim transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </span>
+        <span className="mt-0.5 block text-xs text-fg-muted">{description}</span>
+      </span>
+    </Link>
   );
 }
