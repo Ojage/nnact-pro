@@ -23,14 +23,23 @@ export interface CustomerSummary {
 }
 
 export class OFPApiError extends Error {
-  constructor(public status: number, public path: string, body: string) {
+  readonly status: number;
+  readonly path: string;
+
+  constructor(status: number, path: string, body: string) {
     super(`OFP ${path} -> HTTP ${status}: ${body}`);
+    this.status = status;
+    this.path = path;
     this.name = "OFPApiError";
   }
 }
 
 export class OFPClient {
-  constructor(private opts: OFPClientOptions) {}
+  readonly opts: OFPClientOptions;
+
+  constructor(opts: OFPClientOptions) {
+    this.opts = opts;
+  }
 
   private async get<T>(path: string): Promise<T> {
     const f = this.opts.fetch ?? fetch;

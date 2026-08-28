@@ -14,4 +14,4 @@ RUN pnpm install:verified
 ENV NODE_ENV=production
 USER node
 
-CMD ["node", "--experimental-strip-types", "apps/worker/src/index.ts"]
+CMD ["pnpm", "--filter", "@nnact/worker", "exec", "tsx", "src/index.ts"]
