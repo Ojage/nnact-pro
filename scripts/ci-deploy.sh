@@ -40,13 +40,13 @@ export ALLOW_SCHEMA_PUSH=true
 "${COMPOSE[@]}" -f infra/compose.prod.yml config >/dev/null
 
 echo "Building production images (this may take several minutes)..."
-"${COMPOSE[@]}" -f infra/compose.prod.yml build api web worker
+"${COMPOSE[@]}" -f infra/compose.prod.yml build api web worker migrate
 
 echo "Starting data services..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml up -d postgres redis
 
 echo "Applying database migrations..."
-"${COMPOSE[@]}" -f infra/compose.prod.yml --profile tools run --rm -e ALLOW_SCHEMA_PUSH=true migrate
+"${COMPOSE[@]}" -f infra/compose.prod.yml --profile tools run --build --rm -e ALLOW_SCHEMA_PUSH=true migrate
 
 echo "Starting application stack..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml up -d api web worker caddy --remove-orphans
