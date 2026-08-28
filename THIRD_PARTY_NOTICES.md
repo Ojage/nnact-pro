@@ -10,7 +10,7 @@ the npm registry or the upstream project repositories.
 
 | Package | License | Used for |
 |---|---|---|
-| pdfkit | MIT | Server-generated invoice and estimate PDF documents |
+| puppeteer | Apache-2.0 | Server-generated invoice and estimate PDFs from the same HTML templates as web previews |
 | drizzle-orm / drizzle-kit | Apache-2.0 | Database schema, queries, and migrations |
 | fastify | MIT | API framework |
 | zod | MIT | Schema validation |

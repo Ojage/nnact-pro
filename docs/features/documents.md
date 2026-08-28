@@ -5,52 +5,43 @@ NnactPro documents use a shared HTML renderer in `packages/shared/src/documents.
 ## Implemented surfaces
 
 - Document hub: `/documents`
-- Generic renderer preview: `/documents/preview`
+- Template preview: `/documents/preview`
 - Invoice preview: `/invoices/:id/preview`
 - Invoice HTML export: `/invoices/:id/document.html`
 - Estimate preview: `/estimates/:id/preview`
 - Estimate HTML export: `/estimates/:id/document.html`
-- Organization branding settings: `/settings` → General & Branding
+- Organization branding settings: `/settings` → Company, Invoices, Estimates
 
-## Current capability
+## Renderer pipeline
 
-The renderer supports these document kinds:
+1. **Data assembly** — `invoiceDocumentData()` / `estimateDocumentData()` in `@nnact/shared` merge invoice/estimate rows, customer, job, line items, org branding, and visibility settings.
+2. **HTML** — `renderFieldDocumentHtml()` produces the customer-facing layout used by web previews and exports.
+3. **PDF** — the API renders the same HTML with Puppeteer (Chromium) and stores the bytes in the `documents` table for download and email attachments.
 
-- estimate
-- invoice
-- receipt
-- work order
-- service plan
-
-The current implementation renders HTML and supports browser print/save-as-PDF. This keeps the first version dependency-light and self-host friendly.
+Regenerate stored PDFs from the Documents hub after changing branding or template settings so existing artifacts pick up the new layout.
 
 ## Branding behavior
 
 Every document accepts a `branding` object with:
 
 - company name
-- optional logo URL
+- optional logo URL (uploaded logos are inlined as data URLs for PDF rendering)
 - brand color
 - footer text
+- public contact fields
 - attribution removal flag
 
-The invoice and estimate preview/export routes now pull organization branding from `/api/org/me`, so customer-facing documents reflect the organization name, brand color, footer, optional logo, and attribution setting.
-
-Free installs can keep the NnactPro attribution. Pro can remove it and apply company branding.
+Invoice and estimate previews pull organization settings from `/api/org/me`, including default messages, payment instructions, visibility toggles, and customer view format (`email` vs `envelope`).
 
 ## API surfaces
 
-- `GET /api/org/me` returns the current organization settings.
-- `PATCH /api/org/me` updates name, timezone, public contact fields, document branding, and attribution removal.
+- `GET /api/org/me` — organization settings
+- `PATCH /api/org/me` — update branding and business settings
+- `GET /api/invoices/:id/document` — stored PDF (generated on first request)
+- `GET /api/estimates/:id/document` — stored PDF (generated on first request)
+- `POST /api/invoices|estimates/:id/document/regenerate` — rebuild PDF from current data and settings
 
-## Next production layer
+## Production requirements
 
-1. Add server-side PDF rendering using the same HTML renderer.
-2. Add email delivery for estimates, invoices, receipts, and service-plan summaries.
-3. Persist document-send history and customer-visible portal links.
-4. Add signed public links for customer-facing document access.
-5. Add per-document template variants for Pro.
-
-## Notes
-
-The direct HTML routes are intended as a stable intermediate export layer. Any future PDF service should call the same `renderFieldDocumentHtml` helper so PDF, portal, email, and print views stay visually consistent.
+- **Chromium** for PDF generation (`PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` in Docker)
+- **Regenerate** after template changes; stored PDFs are immutable until regenerated

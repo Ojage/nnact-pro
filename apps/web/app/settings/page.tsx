@@ -369,6 +369,14 @@ function CompanySection({ form, updateOrg, updateSettings, logoBusy, onUploadLog
       <div className="md:col-span-2">
         <TextField label="Public address" name="street-address" autoComplete="street-address" value={form.publicAddress ?? ""} onChange={(value) => updateOrg("publicAddress", value || null)} />
       </div>
+      <div className="md:col-span-2">
+        <TextArea
+          label="Document footer"
+          value={form.documentFooter ?? ""}
+          onChange={(value) => updateOrg("documentFooter", value || null)}
+        />
+        <p className="mt-1 text-xs text-fg-dim">Shown at the bottom of invoices, estimates, and PDF downloads.</p>
+      </div>
       <label className="flex items-center gap-2 text-sm text-fg-muted md:col-span-2">
         <input
           type="checkbox"
@@ -539,6 +547,10 @@ function EstimateSection({ settings, updateSettings }: SettingsProps) {
         Require customer signature
         <InfoTip label="About customer signature">Collects an e-signature before the estimate can be approved.</InfoTip>
       </label>
+      <SelectField label="Customer view format" info={'\"Email optimized\" reads best on phones and in email clients. \"Envelope\" is tuned for printing and mailing.'} value={settings.estimate.format} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, format: value as BusinessSettingsDTO["estimate"]["format"] } })}>
+        <option value="email">Email optimized</option>
+        <option value="envelope">Envelope / print optimized</option>
+      </SelectField>
       <TextArea label="Default estimate message" value={settings.estimate.defaultMessage} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, defaultMessage: value } })} />
       <VisibilityGroup
         title="Customer estimate view"

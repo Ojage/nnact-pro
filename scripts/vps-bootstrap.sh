@@ -5,7 +5,9 @@ set -euo pipefail
 
 APP_USER="${APP_USER:-nnact}"
 APP_DIR="${APP_DIR:-/srv/nnact-pro}"
+MARKETING_DIR="${MARKETING_DIR:-/srv/nnact-webapp}"
 REPO_URL="${REPO_URL:-git@github.com:Ojage/nnact-pro.git}"
+MARKETING_REPO="${MARKETING_REPO:-https://github.com/Ojage/nnact-webapp.git}"
 DEPLOY_PUB_KEY_FILE="${DEPLOY_PUB_KEY_FILE:-}"
 GITHUB_DEPLOY_KEY_FILE="${GITHUB_DEPLOY_KEY_FILE:-}"
 
@@ -28,6 +30,7 @@ usermod -aG docker "$APP_USER"
 install -d -m 755 /srv
 install -d -m 755 "$APP_DIR"
 install -d -m 755 "$APP_DIR/data/pg" "$APP_DIR/data/redis" "$APP_DIR/data/uploads"
+install -d -m 755 "$MARKETING_DIR"
 
 if [ -n "$DEPLOY_PUB_KEY_FILE" ] && [ -f "$DEPLOY_PUB_KEY_FILE" ]; then
   install -d -m 700 -o "$APP_USER" -g "$APP_USER" "/home/$APP_USER/.ssh"
@@ -67,6 +70,11 @@ fi
 
 chown -R "$APP_USER:$APP_USER" "$APP_DIR/data"
 
+if [ ! -d "$MARKETING_DIR/.git" ]; then
+  git clone "$MARKETING_REPO" "$MARKETING_DIR"
+  chown -R "$APP_USER:$APP_USER" "$MARKETING_DIR"
+fi
+
 if command -v ufw >/dev/null 2>&1; then
   ufw allow OpenSSH
   ufw allow 80/tcp
@@ -76,7 +84,9 @@ fi
 
 cat <<EOF
 Bootstrap complete.
-  App user:  $APP_USER
-  App path:  $APP_DIR
-  Next: set GitHub secrets and push to main (deploy workflow), or run scripts/ci-deploy.sh on the server.
+  App user:       $APP_USER
+  NNACT Pro path: $APP_DIR
+  Marketing path: $MARKETING_DIR
+  Domains:        pro.nnact.com, api.pro.nnact.com, nnact.com
+  Next: copy infra/production.env.example → $APP_DIR/.env, set secrets, then run scripts/ci-deploy.sh
 EOF

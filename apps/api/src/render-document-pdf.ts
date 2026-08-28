@@ -31,7 +31,16 @@ export async function closeDocumentPdfBrowser(): Promise<void> {
 
 export async function renderFieldDocumentPdfFromHtml(html: string): Promise<Buffer> {
   const ownsBrowser = process.env.NODE_ENV === "test";
-  const browser = await getBrowser();
+  let browser: Awaited<ReturnType<typeof getBrowser>>;
+  try {
+    browser = await getBrowser();
+  } catch (cause) {
+    const hint =
+      process.env.PUPPETEER_EXECUTABLE_PATH
+        ? `Could not launch Chromium at ${process.env.PUPPETEER_EXECUTABLE_PATH}.`
+        : "Could not launch Chromium. Install puppeteer or set PUPPETEER_EXECUTABLE_PATH to a system browser.";
+    throw new Error(`${hint} ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
   const page = await browser.newPage();
   try {
     await page.setContent(html, { waitUntil: "networkidle0", timeout: 30_000 });

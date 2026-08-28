@@ -60,8 +60,9 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?Set a unique JWT_SECRET of at least 32 characters}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
-      CORS_ORIGIN: ${CORS_ORIGIN:?Set the exact HTTPS web origin}
-      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?Set the exact HTTPS web origin}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set comma-separated HTTPS web origins (e.g. https://pro.nnact.com)}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?Set the staff web origin, e.g. https://pro.nnact.com}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?Set the public API origin, e.g. https://api.pro.nnact.com}
       TRUST_PROXY: "true"
       NNPALLOW_PUBLIC_REGISTRATION: ${NNPALLOW_PUBLIC_REGISTRATION:-false}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
@@ -133,7 +134,10 @@ services:
   caddy:
     image: caddy:2-alpine
     environment:
-      NNPSITE_ADDRESS: ${NNPSITE_ADDRESS:?Set the production domain, for example nnactpro.example.com}
+      NNPSITE_ADDRESS: ${NNPSITE_ADDRESS:?Set the staff web domain, e.g. pro.nnact.com}
+      NNPAPI_ADDRESS: ${NNPAPI_ADDRESS:?Set the API domain, e.g. api.pro.nnact.com}
+      NNPMARKETING_ADDRESS: ${NNPMARKETING_ADDRESS:?Set the marketing apex domain, e.g. nnact.com}
+      NNPMARKETING_WWW: ${NNPMARKETING_WWW:-www.nnact.com}
     ports:
       - "80:80"
       - "443:443"
@@ -141,6 +145,7 @@ services:
     volumes:
       - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - ../landing:/srv/landing:ro
+      - ${NNPMARKETING_ROOT:-../data/marketing/dist}:/srv/marketing:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { renderFieldDocumentHtml } from "@nnact/shared";
 import { api } from "@/lib/api";
+import { estimateDocumentHtml, invoiceDocumentHtml } from "@/lib/document-data";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,40 +9,58 @@ import { DocumentPreviewWorkbench } from "@/components/document-preview-workbenc
 export default async function DocumentPreviewPage() {
   const org = await api.org().catch(() => null);
 
-  const html = renderFieldDocumentHtml({
-    kind: "invoice",
-    number: "INV-DEMO-1001",
-    status: "draft",
-    issuedAt: new Date().toLocaleDateString(),
-    dueAt: new Date(Date.now() + 14 * 86400000).toLocaleDateString(),
-    customerName: "Demo Customer",
-    customerEmail: "customer@example.com",
-    customerPhone: "(555) 010-1234",
-    jobTitle: "Seasonal HVAC tune-up",
-    notes: "Thank you for choosing our team. This sample uses your organization branding when settings are available.",
-    lineItems: [
-      { description: "Diagnostic and tune-up", quantity: 1, unitPriceCents: 129000 },
-      { description: "Filter replacement", quantity: 2, unitPriceCents: 24000 },
-    ],
-    paymentsCents: 0,
-    branding: {
-      companyName: org?.name ?? "NNACT",
-      logoUrl: org?.logoUrl ?? undefined,
-      brandColor: org?.brandColor ?? "#22C55E",
-      footerText: org?.documentFooter ?? "Field service command center document preview",
-      publicEmail: org?.publicEmail,
-      publicPhone: org?.publicPhone,
-      publicAddress: org?.publicAddress,
-      removeOpenFieldProAttribution: org?.removeOpenFieldProAttribution ?? false,
+  const invoiceHtml = invoiceDocumentHtml({
+    invoice: {
+      number: "INV-DEMO-1001",
+      status: "sent",
+      total: 185000,
+      dueAt: new Date(Date.now() + 14 * 86400000).toISOString(),
+      createdAt: new Date().toISOString(),
+      payments: [],
     },
-    currency: org?.businessSettings?.currency,
+    customer: { name: "Demo Customer", email: "customer@example.com", phone: "(555) 010-1234" },
+    job: { title: "Seasonal HVAC tune-up", description: "Sample customer-facing document using your saved invoice settings." },
+    lineItems: [
+      { description: "Diagnostic and tune-up", quantity: 1, unitPrice: 129000 },
+      { description: "Filter replacement", quantity: 2, unitPrice: 28000 },
+    ],
+    org,
+  });
+
+  const estimateHtml = estimateDocumentHtml({
+    estimate: {
+      id: "preview-estimate",
+      number: "EST-DEMO-2001",
+      accepted: false,
+      status: "sent",
+      total: 245000,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 21 * 86400000).toISOString(),
+      options: [
+        {
+          id: "good",
+          label: org?.businessSettings?.estimate?.optionLabels?.[0] ?? "Good",
+          lineItems: [{ description: "Basic repair", quantity: 1, unitPrice: 185000 }],
+        },
+        {
+          id: "better",
+          label: org?.businessSettings?.estimate?.optionLabels?.[1] ?? "Better",
+          lineItems: [{ description: "Repair + maintenance plan", quantity: 1, unitPrice: 245000 }],
+        },
+      ],
+      selectedOptionId: "better",
+    },
+    customer: { name: "Demo Customer", email: "customer@example.com", phone: "(555) 010-1234" },
+    job: { title: "Refrigerator cooling repair", description: "Sample estimate using your saved estimate settings." },
+    lineItems: [{ description: "Basic repair", quantity: 1, unitPrice: 185000 }],
+    org,
   });
 
   return (
     <div>
       <PageHeader
         title="Document template preview"
-        description="Standalone sample of the shared customer document renderer."
+        description="Invoice and estimate samples using the same renderer as previews, PDF downloads, and email attachments."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/documents">
@@ -57,13 +75,19 @@ export default async function DocumentPreviewPage() {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Renderer sample</CardTitle>
+          <CardTitle>Renderer samples</CardTitle>
           <CardDescription>
-            Uses the same HTML renderer as invoice and estimate previews. Download or print from the workbench controls.
+            Matches Settings previews and customer PDFs after you regenerate stored documents from the Documents hub.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DocumentPreviewWorkbench documents={[{ id: "invoice", label: "Invoice sample", html }]} fileName="document-sample.html" />
+          <DocumentPreviewWorkbench
+            documents={[
+              { id: "invoice", label: "Invoice sample", html: invoiceHtml },
+              { id: "estimate", label: "Estimate sample", html: estimateHtml },
+            ]}
+            fileName="document-sample.html"
+          />
         </CardContent>
       </Card>
     </div>

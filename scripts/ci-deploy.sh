@@ -73,6 +73,10 @@ if [ "$healthy" != true ]; then
   exit 1
 fi
 
+echo "Building marketing site..."
+bash scripts/deploy-marketing.sh
+
 echo "Deploy complete."
-echo "Site: https://${NNPSITE_ADDRESS:-unknown}"
-echo "API:  https://${NNPSITE_ADDRESS:-unknown}/api/health"
+echo "Staff app:  https://${NNPSITE_ADDRESS:-unknown}"
+echo "API:        https://${NNPAPI_ADDRESS:-unknown}/api/health"
+echo "Marketing:  https://${NNPMARKETING_ADDRESS:-nnact.com}"

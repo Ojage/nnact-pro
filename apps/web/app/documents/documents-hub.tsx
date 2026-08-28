@@ -317,7 +317,9 @@ export function DocumentsHub() {
               Every invoice and estimate in your organization. Preview the HTML customer view, download or regenerate the stored PDF, or email the customer with the PDF attached.
             </InfoTip>
           </CardTitle>
-          <CardDescription>Search, filter, and act on customer-facing documents.</CardDescription>
+          <CardDescription>
+            Search, filter, and act on customer-facing documents. After changing branding in Settings, use Regenerate so stored PDFs match the preview.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">

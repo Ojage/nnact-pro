@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { NNACT_COMPANY, NNACT_PRODUCT, NNACT_SEO_KEYWORDS } from "@nnact/shared";
 
-const DEFAULT_SITE_URL = "https://pro.nnactrepairs.com";
+const DEFAULT_SITE_URL = "https://pro.nnact.com";
 
 /** Resolve the public site origin for canonical URLs, OG tags, and sitemaps. */
 export function getSiteUrl(): string {

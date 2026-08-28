@@ -45,6 +45,7 @@ import { passwordChangeRequiredGuard } from "./password-change-guard.js";
 import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
 import { repairBrainAuthorizationGuard } from "./repair-brain-authorization.js";
 import { operationalAuthorizationGuard } from "./operational-authorization.js";
+import { closeDocumentPdfBrowser } from "./render-document-pdf.js";
 import { resolveCorsOrigin, resolveJwtSecret } from "./runtime-security.js";
 import { applyApiSecurityHeaders, applyDocsSecurityHeaders } from "./security-headers.js";
 import { unifiedSessionCookieAuthenticationHook } from "./customer-session-cookie.js";
@@ -334,6 +335,15 @@ if (isMain) {
   const port = Number(process.env.API_PORT ?? 3001);
   buildServer()
     .listen({ port, host: "0.0.0.0" })
+    .then((app) => {
+      const shutdown = async () => {
+        await closeDocumentPdfBrowser().catch(() => {});
+        await app.close();
+        process.exit(0);
+      };
+      process.on("SIGINT", () => void shutdown());
+      process.on("SIGTERM", () => void shutdown());
+    })
     .catch((err) => {
       console.error(err);
       process.exit(1);

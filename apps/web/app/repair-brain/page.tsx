@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { AlertCircle, Brain, Check } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormSelect } from "@/components/ui/form-select";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { LimitedTextarea } from "@/components/ui/limited-textarea";
 import {
   useCreateProposalMutation,
   useLazyRepairBrainSearchQuery,
@@ -55,7 +59,10 @@ export default function RepairBrainPage() {
   const [proposalTitle, setProposalTitle] = useState("");
   const [proposalNotes, setProposalNotes] = useState("");
   const [proposalError, setProposalError] = useState<string | null>(null);
+  const [proposalSuccess, setProposalSuccess] = useState(false);
   const [createProposal, { isLoading: proposalSubmitting }] = useCreateProposalMutation();
+  const successTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(successTimer.current), []);
 
   // ── Pending knowledge review ──
   const proposalsQuery = useRepairBrainProposalsQuery("proposed", { skip: !canReview });
@@ -63,9 +70,12 @@ export default function RepairBrainPage() {
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const [verifyProposal] = useVerifyProposalMutation();
 
-  const handleContribute = async () => {
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!proposalTitle.trim()) return;
     setProposalError(null);
+    setProposalSuccess(false);
+    window.clearTimeout(successTimer.current);
     try {
       await createProposal({
         proposalType,
@@ -74,8 +84,9 @@ export default function RepairBrainPage() {
       }).unwrap();
       setProposalTitle("");
       setProposalNotes("");
-      setContributeOpen(false);
+      setProposalSuccess(true);
       emitWalkthroughDone(ADVANCE_TAG.knowledgeContributed);
+      successTimer.current = window.setTimeout(() => setProposalSuccess(false), 5000);
     } catch {
       setProposalError("Failed to submit proposal");
     }
@@ -211,105 +222,154 @@ export default function RepairBrainPage() {
       )}
 
       {!searched && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick access</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex flex-wrap gap-2">
-                <Link href="/repair-brain/models">
-                  <Button variant="secondary" size="sm" data-tour="rb-models">
-                    Browse all equipment models
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick access</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <Link href="/repair-brain/models">
+                    <Button variant="secondary" size="sm" data-tour="rb-models">
+                      Browse all equipment models
+                    </Button>
+                  </Link>
+                  <Link href="/jobs">
+                    <Button variant="secondary" size="sm" data-tour="rb-diagnose">
+                      Open a job to diagnose
+                    </Button>
+                  </Link>
+                  <Button variant="secondary" size="sm" data-tour="rb-contribute" onClick={() => setContributeOpen((v) => !v)}>
+                    {contributeOpen ? "Close composer" : "Contribute knowledge"}
                   </Button>
-                </Link>
-                <Link href="/jobs">
-                  <Button variant="secondary" size="sm" data-tour="rb-diagnose">
-                    Open a job to diagnose
-                  </Button>
-                </Link>
-                <Button variant="secondary" size="sm" data-tour="rb-contribute" onClick={() => setContributeOpen((v) => !v)}>
-                  {contributeOpen ? "Close composer" : "Contribute knowledge"}
-                </Button>
-              </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {contributeOpen && (
-                <div className="mt-4 rounded-lg border border-border bg-surface-200 p-4">
-                  <p className="text-sm font-semibold text-fg mb-1">Contribute knowledge</p>
-                  <p className="text-xs text-fg-muted mb-3">
-                    Propose knowledge from a field repair. A reviewer will verify it before it becomes part of the Repair Brain.
+            {canReview && (
+              <Card data-tour="rb-review">
+                <CardHeader>
+                  <CardTitle>
+                    Pending knowledge <span className="text-fg-muted font-normal">({proposals.length})</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2" data-tour="rb-proposals">
+                  {proposalsQuery.isFetching ? <p className="text-sm text-fg-muted">Loading…</p> : null}
+                  {!proposalsQuery.isFetching && proposals.length === 0 ? (
+                    <p className="text-sm text-fg-muted">No proposals waiting for review.</p>
+                  ) : null}
+                  {proposals.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-fg">{p.title}</div>
+                        <div className="text-xs text-fg-muted capitalize">{PROPOSAL_TYPE_LABELS[p.proposalType] ?? p.proposalType}</div>
+                      </div>
+                      <Button size="sm" variant="secondary" loading={verifyId === p.id} onClick={() => void handleVerify(p.id)}>
+                        Verify
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {contributeOpen && (
+            <Card data-tour="rb-contribute-form">
+              <CardHeader className="border-b border-border">
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="size-4 text-primary" aria-hidden />
+                  Contribute knowledge
+                  <span className="text-xs font-normal text-fg-dim">Proposal</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-5">
+                <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4" noValidate>
+                  <p className="text-sm leading-relaxed text-fg-muted">
+                    Share what you learned from a field repair. A reviewer verifies each proposal before it
+                    becomes part of the Repair Brain.
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
-                    <label className="grid gap-1 text-xs text-fg-muted">
-                      Type
-                      <InfoTip label="About type" side="top">Categorizes what you learned so reviewers and future searches can find it. A procedure is a step-by-step fix; a measurement is a real-world reading from the field.</InfoTip>
-                      <select
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="proposal-type" className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                          Type
+                        </Label>
+                        <InfoTip label="About type" side="top">
+                          Categorizes what you learned so reviewers and future searches can find it. A procedure is a
+                          step-by-step fix; a measurement is a real-world reading from the field.
+                        </InfoTip>
+                      </div>
+                      <FormSelect
+                        id="proposal-type"
                         value={proposalType}
-                        onChange={(e) => setProposalType(e.target.value)}
-                        className="h-10 rounded-lg border border-border bg-surface-200 px-3 text-sm text-fg"
-                      >
-                        {KNOWLEDGE_PROPOSAL_TYPE.map((t) => (
-                          <option key={t} value={t}>
-                            {PROPOSAL_TYPE_LABELS[t] ?? t}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="grid gap-1 text-xs text-fg-muted">
-                      Title
+                        onChange={setProposalType}
+                        options={KNOWLEDGE_PROPOSAL_TYPE.map((t) => ({ value: t, label: PROPOSAL_TYPE_LABELS[t] ?? t }))}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="proposal-title" className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                        Title <span className="text-red">*</span>
+                      </Label>
                       <Input
+                        id="proposal-title"
                         value={proposalTitle}
                         onChange={(e) => setProposalTitle(e.target.value)}
                         placeholder="e.g. E21 drains slowly on mid-speed spin"
+                        maxLength={200}
                       />
-                    </label>
+                    </div>
                   </div>
-                  <label className="mt-3 grid gap-1 text-xs text-fg-muted">
-                    Notes (optional)
-                    <Input
+
+                  <div className="space-y-2">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <Label htmlFor="proposal-notes" className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                        Notes <span className="font-normal normal-case text-fg-dim">(optional)</span>
+                      </Label>
+                      <span className="text-xs text-fg-dim">Symptoms observed, steps tried, resolution</span>
+                    </div>
+                    <LimitedTextarea
+                      id="proposal-notes"
                       value={proposalNotes}
                       onChange={(e) => setProposalNotes(e.target.value)}
-                      placeholder="Symptoms observed, steps tried, resolution…"
+                      rows={4}
+                      maxLength={500}
+                      className="min-h-24"
+                      placeholder="What did you observe, what did you try, and what resolved it?"
                     />
-                  </label>
-                  {proposalError && <p className="mt-2 text-xs text-red">{proposalError}</p>}
-                  <Button
-                    size="sm"
-                    className="mt-3"
-                    loading={proposalSubmitting}
-                    disabled={!proposalTitle.trim()}
-                    onClick={() => void handleContribute()}
-                  >
-                    Submit proposal
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {canReview && (
-            <Card data-tour="rb-review">
-              <CardHeader>
-                <CardTitle>
-                  Pending knowledge <span className="text-fg-muted font-normal">({proposals.length})</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2" data-tour="rb-proposals">
-                {proposalsQuery.isFetching ? <p className="text-sm text-fg-muted">Loading…</p> : null}
-                {!proposalsQuery.isFetching && proposals.length === 0 ? (
-                  <p className="text-sm text-fg-muted">No proposals waiting for review.</p>
-                ) : null}
-                {proposals.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-fg">{p.title}</div>
-                      <div className="text-xs text-fg-muted capitalize">{PROPOSAL_TYPE_LABELS[p.proposalType] ?? p.proposalType}</div>
-                    </div>
-                    <Button size="sm" variant="secondary" loading={verifyId === p.id} onClick={() => void handleVerify(p.id)}>
-                      Verify
-                    </Button>
                   </div>
-                ))}
+
+                  {proposalError && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red/30 bg-red/5 p-3 text-sm text-red" role="alert">
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      {proposalError}
+                    </div>
+                  )}
+
+                  {proposalSuccess && (
+                    <div className="flex items-start gap-2 rounded-lg border border-chart-2/30 bg-chart-2/10 p-3 text-sm text-chart-2" role="status">
+                      <Check className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      Proposal submitted for review. It will show in the pending list once a reviewer picks it up.
+                    </div>
+                  )}
+
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-fg-dim">
+                      Submissions are attributed to you and require reviewer approval before going live.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="ghost" onClick={() => setContributeOpen(false)}>
+                        Close
+                      </Button>
+                      <Button type="submit" loading={proposalSubmitting} disabled={!proposalTitle.trim()}>
+                        Submit proposal
+                      </Button>
+                    </div>
+                  </div>
+                </form>
               </CardContent>
             </Card>
           )}

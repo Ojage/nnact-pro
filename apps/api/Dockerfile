@@ -1,4 +1,30 @@
-FROM node:22-alpine
+FROM node:22-bookworm-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    chromium \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    wget \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 WORKDIR /app
@@ -23,7 +49,4 @@ USER node
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD wget -q -O - http://127.0.0.1:3001/api/health >/dev/null 2>&1 || exit 1
 
-# The API source is executed through the pinned tsx runtime because workspace
-# packages currently export TypeScript source. The build above remains a
-# mandatory type/emit gate until all workspace packages publish compiled output.
 CMD ["pnpm", "--filter", "@nnact/api", "exec", "tsx", "src/server.ts"]
