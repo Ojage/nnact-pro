@@ -61,6 +61,19 @@ import {
   WorkerDrainTracker,
 } from "./maintenance.js";
 
+// API versioning constants
+const API_VERSION = "v1";
+const API_BASE = `/api/${API_VERSION}`;
+const LEGACY_API_BASE = "/api";
+
+function withVersion(path: string): string {
+  return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function withLegacy(path: string): string {
+  return `${LEGACY_API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export function buildServer(
   options: {
     healthProbes?: HealthProbes;
@@ -84,7 +97,16 @@ export function buildServer(
     sign: { expiresIn: process.env.JWT_EXPIRES_IN ?? "12h" },
   });
 
-  // OpenAPI / Swagger documentation
+  // Legacy path deprecation helper
+  function addDeprecationHeader(routePrefix: string) {
+    app.addHook("onRequest", async (request, reply) => {
+      if (request.url.startsWith(routePrefix)) {
+        reply.header("Deprecation", "true");
+        reply.header("Link", `<${withVersion(request.url.replace(routePrefix, ""))}>; rel="successor-version"; title="Version ${API_VERSION}"`);
+        reply.header("Sunset", "Sat, 01 Jan 2026 00:00:00 GMT");
+      }
+    });
+  }
   app.register(swagger, {
     openapi: {
       info: {
@@ -96,7 +118,10 @@ export function buildServer(
         contact: { name: "NNACT", url: "https://nnact.com" },
         license: { name: "Proprietary" },
       },
-      servers: [{ url: "/api", description: "API base path (relative)" }],
+      servers: [
+        { url: `/api/${API_VERSION}`, description: `Current stable version (${API_VERSION})` },
+        { url: "/api", description: "Legacy (unversioned) — deprecated, will be removed in v2" },
+      ],
       components: {
         securitySchemes: {
           bearerAuth: {
@@ -193,45 +218,47 @@ export function buildServer(
   app.addHook("preHandler", passwordChangeRequiredGuard);
   app.addHook("preHandler", diagnosticAuthoringGuard);
   app.addHook("preHandler", repairBrainAuthorizationGuard);
-  app.register(healthRoutes, { probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
-  app.get("/internal/drain", async () => apiDrain.status());
-  app.register(authRoutes, { prefix: "/api/auth" });
-  app.register(customerAuthRoutes, { prefix: "/api/customer-auth" });
-  app.register(customerRoutes, { prefix: "/api/customers" });
-  app.register(jobRoutes, { prefix: "/api/jobs" });
-  app.register(appointmentRoutes, { prefix: "/api/appointments" });
-  app.register(lineItemRoutes, { prefix: "/api" });
-  app.register(invoiceRoutes, { prefix: "/api/invoices" });
-  app.register(stripeWebhookRoute, { prefix: "/api" });
-  app.register(estimateRoutes, { prefix: "/api/estimates" });
-  app.register(reviewRoutes, { prefix: "/api/reviews" });
-  app.register(reportRoutes, { prefix: "/api/reports" });
-  app.register(recurringRoutes, { prefix: "/api/recurring" });
-  app.register(photoRoutes, { prefix: "/api/photos" });
-  app.register(catalogRoutes, { prefix: "/api/catalog" });
-  app.register(publicRoutes, { prefix: "/api/public" });
-  app.register(portalRoutes, { prefix: "/api/portal" });
-  app.register(messageRoutes, { prefix: "/api" });
-  app.register(documentRoutes, { prefix: "/api" });
-  app.register(activityRoutes, { prefix: "/api/activities" });
-  app.register(syncRoutes);
-  app.register(userRoutes, { prefix: "/api/users" });
-  app.register(equipmentRoutes, { prefix: "/api/equipment" });
-  app.register(diagnosticRoutes, { prefix: "/api/diagnostics" });
-  app.register(diagnosticOfflineRoutes, { prefix: "/api/diagnostics" });
-  app.register(diagnosticOutputRoutes, { prefix: "/api/diagnostics" });
-  app.register(voiceNoteRoutes, { prefix: "/api" });
-  app.register(repairBrainRoutes, { prefix: "/api/repair-brain" });
-  app.register(notificationRoutes, { prefix: "/api/notifications" });
-  app.register(pushTokenRoutes, { prefix: "/api/push-tokens" });
-  app.register(walkthroughRoutes, { prefix: "/api/me" });
-  app.register(searchRoutes, { prefix: "/api/search" });
-  app.register(pluginRoutes, { prefix: "/api/plugins" });
-  app.register(pluginApiRoutes, { prefix: "/api/plugin" });
-  app.register(servicePlanRoutes, { prefix: "/api/service-plans" });
-  app.register(orgSettingsRoutes, { prefix: "/api/org" });
+
+  // Register versioned API routes (v1)
+  app.register(healthRoutes, { prefix: withVersion("/health"), probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
+  app.get(withVersion("/internal/drain"), async () => apiDrain.status());
+  app.register(authRoutes, { prefix: withVersion("/auth") });
+  app.register(customerAuthRoutes, { prefix: withVersion("/customer-auth") });
+  app.register(customerRoutes, { prefix: withVersion("/customers") });
+  app.register(jobRoutes, { prefix: withVersion("/jobs") });
+  app.register(appointmentRoutes, { prefix: withVersion("/appointments") });
+  app.register(lineItemRoutes, { prefix: withVersion("") });
+  app.register(invoiceRoutes, { prefix: withVersion("/invoices") });
+  app.register(stripeWebhookRoute, { prefix: withVersion("") });
+  app.register(estimateRoutes, { prefix: withVersion("/estimates") });
+  app.register(reviewRoutes, { prefix: withVersion("/reviews") });
+  app.register(reportRoutes, { prefix: withVersion("/reports") });
+  app.register(recurringRoutes, { prefix: withVersion("/recurring") });
+  app.register(photoRoutes, { prefix: withVersion("/photos") });
+  app.register(catalogRoutes, { prefix: withVersion("/catalog") });
+  app.register(publicRoutes, { prefix: withVersion("/public") });
+  app.register(portalRoutes, { prefix: withVersion("/portal") });
+  app.register(messageRoutes, { prefix: withVersion("") });
+  app.register(documentRoutes, { prefix: withVersion("") });
+  app.register(activityRoutes, { prefix: withVersion("/activities") });
+  app.register(syncRoutes, { prefix: withVersion("/sync") });
+  app.register(userRoutes, { prefix: withVersion("/users") });
+  app.register(equipmentRoutes, { prefix: withVersion("/equipment") });
+  app.register(diagnosticRoutes, { prefix: withVersion("/diagnostics") });
+  app.register(diagnosticOfflineRoutes, { prefix: withVersion("/diagnostics") });
+  app.register(diagnosticOutputRoutes, { prefix: withVersion("/diagnostics") });
+  app.register(voiceNoteRoutes, { prefix: withVersion("") });
+  app.register(repairBrainRoutes, { prefix: withVersion("/repair-brain") });
+  app.register(notificationRoutes, { prefix: withVersion("/notifications") });
+  app.register(pushTokenRoutes, { prefix: withVersion("/push-tokens") });
+  app.register(walkthroughRoutes, { prefix: withVersion("/me") });
+  app.register(searchRoutes, { prefix: withVersion("/search") });
+  app.register(pluginRoutes, { prefix: withVersion("/plugins") });
+  app.register(pluginApiRoutes, { prefix: withVersion("/plugin") });
+  app.register(servicePlanRoutes, { prefix: withVersion("/service-plans") });
+  app.register(orgSettingsRoutes, { prefix: withVersion("/org") });
   app.register(operationRoutes, {
-    prefix: "/api/operations",
+    prefix: withVersion("/operations"),
     client:
       options.operationsClient ??
       createOperationsClient({
@@ -242,6 +269,59 @@ export function buildServer(
           "/run/secrets/openfieldpro_operations_controller",
       }),
   });
+
+  // Legacy (unversioned) routes — deprecated, redirect with headers
+  addDeprecationHeader(LEGACY_API_BASE);
+  app.register(healthRoutes, { prefix: withLegacy("/health"), probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
+  app.get(withLegacy("/internal/drain"), async () => apiDrain.status());
+  app.register(authRoutes, { prefix: withLegacy("/auth") });
+  app.register(customerAuthRoutes, { prefix: withLegacy("/customer-auth") });
+  app.register(customerRoutes, { prefix: withLegacy("/customers") });
+  app.register(jobRoutes, { prefix: withLegacy("/jobs") });
+  app.register(appointmentRoutes, { prefix: withLegacy("/appointments") });
+  app.register(lineItemRoutes, { prefix: withLegacy("") });
+  app.register(invoiceRoutes, { prefix: withLegacy("/invoices") });
+  app.register(stripeWebhookRoute, { prefix: withLegacy("") });
+  app.register(estimateRoutes, { prefix: withLegacy("/estimates") });
+  app.register(reviewRoutes, { prefix: withLegacy("/reviews") });
+  app.register(reportRoutes, { prefix: withLegacy("/reports") });
+  app.register(recurringRoutes, { prefix: withLegacy("/recurring") });
+  app.register(photoRoutes, { prefix: withLegacy("/photos") });
+  app.register(catalogRoutes, { prefix: withLegacy("/catalog") });
+  app.register(publicRoutes, { prefix: withLegacy("/public") });
+  app.register(portalRoutes, { prefix: withLegacy("/portal") });
+  app.register(messageRoutes, { prefix: withLegacy("") });
+  app.register(documentRoutes, { prefix: withLegacy("") });
+  app.register(activityRoutes, { prefix: withLegacy("/activities") });
+  app.register(syncRoutes, { prefix: withLegacy("/sync") });
+  app.register(userRoutes, { prefix: withLegacy("/users") });
+  app.register(equipmentRoutes, { prefix: withLegacy("/equipment") });
+  app.register(diagnosticRoutes, { prefix: withLegacy("/diagnostics") });
+  app.register(diagnosticOfflineRoutes, { prefix: withLegacy("/diagnostics") });
+  app.register(diagnosticOutputRoutes, { prefix: withLegacy("/diagnostics") });
+  app.register(voiceNoteRoutes, { prefix: withLegacy("") });
+  app.register(repairBrainRoutes, { prefix: withLegacy("/repair-brain") });
+  app.register(notificationRoutes, { prefix: withLegacy("/notifications") });
+  app.register(pushTokenRoutes, { prefix: withLegacy("/push-tokens") });
+  app.register(walkthroughRoutes, { prefix: withLegacy("/me") });
+  app.register(searchRoutes, { prefix: withLegacy("/search") });
+  app.register(pluginRoutes, { prefix: withLegacy("/plugins") });
+  app.register(pluginApiRoutes, { prefix: withLegacy("/plugin") });
+  app.register(servicePlanRoutes, { prefix: withLegacy("/service-plans") });
+  app.register(orgSettingsRoutes, { prefix: withLegacy("/org") });
+  app.register(operationRoutes, {
+    prefix: withLegacy("/operations"),
+    client:
+      options.operationsClient ??
+      createOperationsClient({
+        baseUrl:
+          process.env.OPERATIONS_CONTROLLER_URL ?? "http://operations-controller:3010",
+        secretFile:
+          process.env.OPERATIONS_CONTROLLER_SECRET_FILE ??
+          "/run/secrets/openfieldpro_operations_controller",
+      }),
+  });
+
   return app;
 }
 
