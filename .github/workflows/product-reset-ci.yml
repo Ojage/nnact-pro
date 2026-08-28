@@ -2,9 +2,9 @@ name: NNACT Pro release CI
 
 on:
   pull_request:
-    branches: [ofp-monorepo]
+    branches: [main, ofp-monorepo]
   push:
-    branches: [ofp-monorepo]
+    branches: [main, ofp-monorepo]
 
 concurrency:
   group: nnactpro-release-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}

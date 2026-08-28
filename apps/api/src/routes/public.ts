@@ -32,6 +32,97 @@ const bookBody = z.object({
   preferredTime: z.string().trim().max(40).optional(),
 });
 
+const bookBodySchema = {
+  type: "object",
+  required: ["name", "title"],
+  properties: {
+    name: { type: "string", minLength: 1, maxLength: 200 },
+    email: { type: "string", format: "email", maxLength: 320 },
+    phone: { type: "string", maxLength: 50 },
+    title: { type: "string", minLength: 1, maxLength: 250 },
+    description: { type: "string", maxLength: 5000 },
+    serviceCategory: { type: "string", maxLength: 120 },
+    address: { type: "string", maxLength: 500 },
+    preferredDate: { type: "string", maxLength: 40 },
+    preferredTime: { type: "string", maxLength: 40 },
+  },
+};
+
+const bookingConfigResponseSchema = {
+  type: "object",
+  properties: {
+    org: {
+      type: "object",
+      properties: {
+        id: { type: "string", format: "uuid" },
+        name: { type: "string" },
+        publicEmail: { type: "string", nullable: true },
+        publicPhone: { type: "string", nullable: true },
+        publicAddress: { type: "string", nullable: true },
+      },
+    },
+    serviceCategories: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          label: { type: "string" },
+          services: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+    serviceAreas: { type: "array", items: { type: "string" } },
+    businessHours: {
+      type: "object",
+      properties: {
+        timezone: { type: "string" },
+        workDays: { type: "array", items: { type: "string" } },
+        startTime: { type: "string" },
+        endTime: { type: "string" },
+      },
+    },
+    emergencyPhone: { type: "string", nullable: true },
+  },
+};
+
+const bookingResultSchema = {
+  type: "object",
+  required: ["ok", "requestId", "trackingToken"],
+  properties: {
+    ok: { type: "boolean", const: true },
+    requestId: { type: "string", format: "uuid" },
+    trackingToken: { type: "string", pattern: "^trk_" },
+    trackingUrl: { type: "string", format: "uri", nullable: true },
+    emailSent: { type: "boolean" },
+  },
+};
+
+const requestStatusSchema = {
+  type: "object",
+  required: ["ok", "requestId", "status", "title", "customerName", "createdAt", "updatedAt"],
+  properties: {
+    ok: { type: "boolean", const: true },
+    requestId: { type: "string", format: "uuid" },
+    status: { type: "string", enum: ["lead", "scheduled", "in_progress", "completed", "canceled"] },
+    title: { type: "string" },
+    customerName: { type: "string" },
+    serviceCategory: { type: "string", nullable: true },
+    serviceAddress: { type: "string", nullable: true },
+    preferredDate: { type: "string", nullable: true },
+    preferredTime: { type: "string", nullable: true },
+    createdAt: { type: "string", format: "date-time" },
+    scheduledAt: { type: "string", format: "date-time", nullable: true },
+    updatedAt: { type: "string", format: "date-time" },
+  },
+};
+
+const errorResponseSchema = {
+  type: "object",
+  required: ["error"],
+  properties: { error: { type: "string" } },
+};
+
 const bookingRateLimit = createFixedWindowRateLimit({
   max: 10,
   windowMs: 60 * 60 * 1000,
@@ -145,12 +236,19 @@ export async function publicRoutes(app: FastifyInstance) {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
   }));
 
-  app.get("/default", async (_req, reply) => {
-    const orgId = resolveDefaultOrgId();
-    if (!orgId) return reply.code(404).send({ error: "default organization is not configured" });
-    const [org] = await db.select().from(orgs).where(eq(orgs.id, orgId));
-    if (!org) return reply.code(404).send({ error: "business not found" });
-    return bookingConfigForOrg(org);
+  app.get("/default", {
+    schema: {
+      tags: ["Public"],
+      summary: "Get booking config for default organization",
+      response: { 200: bookingConfigResponseSchema, 404: errorResponseSchema },
+    },
+    handler: async (_req, reply) => {
+      const orgId = resolveDefaultOrgId();
+      if (!orgId) return reply.code(404).send({ error: "default organization is not configured" });
+      const [org] = await db.select().from(orgs).where(eq(orgs.id, orgId));
+      if (!org) return reply.code(404).send({ error: "business not found" });
+      return bookingConfigForOrg(org);
+    },
   });
 
   /** Resolve a tracking token that may arrive as a bare token or a pasted URL. */
@@ -166,7 +264,14 @@ export async function publicRoutes(app: FastifyInstance) {
     }
   }
 
-  app.get("/requests/:token", async (req, reply) => {
+  app.get("/requests/:token", {
+    schema: {
+      tags: ["Public"],
+      summary: "Get public service request status by tracking token",
+      params: { type: "object", required: ["token"], properties: { token: { type: "string", pattern: "^trk_" } } },
+      response: { 200: requestStatusSchema, 404: errorResponseSchema },
+    },
+    handler: async (req, reply) => {
     const { token } = req.params as { token: string };
     const raw = resolveTrackingToken(token);
     if (!raw) return reply.code(404).send({ error: "request not found" });
@@ -199,6 +304,7 @@ export async function publicRoutes(app: FastifyInstance) {
       scheduledAt: job.scheduledAt ? job.scheduledAt.toISOString() : null,
       updatedAt: job.updatedAt.toISOString(),
     } satisfies PublicRequestStatusDTO;
+    },
   });
 
   app.get("/:orgId/logo", async (req, reply) => {
@@ -209,11 +315,19 @@ export async function publicRoutes(app: FastifyInstance) {
     return reply.type(logo.contentType).send(logo.buffer);
   });
 
-  app.get("/:orgId/booking", async (req, reply) => {
-    const { orgId } = req.params as { orgId: string };
-    const [org] = await db.select().from(orgs).where(eq(orgs.id, orgId));
-    if (!org) return reply.code(404).send({ error: "business not found" });
-    return bookingConfigForOrg(org);
+  app.get("/:orgId/booking", {
+    schema: {
+      tags: ["Public"],
+      summary: "Get booking config for an organization",
+      params: { type: "object", required: ["orgId"], properties: { orgId: { type: "string", format: "uuid" } } },
+      response: { 200: bookingConfigResponseSchema, 404: errorResponseSchema },
+    },
+    handler: async (req, reply) => {
+      const { orgId } = req.params as { orgId: string };
+      const [org] = await db.select().from(orgs).where(eq(orgs.id, orgId));
+      if (!org) return reply.code(404).send({ error: "business not found" });
+      return bookingConfigForOrg(org);
+    },
   });
 
   app.get("/:orgId", async (req, reply) => {
@@ -223,10 +337,19 @@ export async function publicRoutes(app: FastifyInstance) {
     return { org };
   });
 
-  app.post("/:orgId/book", { preHandler: bookingRateLimit }, async (req, reply) => {
-    const { orgId } = req.params as { orgId: string };
-    const parsed = bookBody.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+  app.post("/:orgId/book", {
+    preHandler: bookingRateLimit,
+    schema: {
+      tags: ["Public"],
+      summary: "Submit a new service request (customer booking)",
+      params: { type: "object", required: ["orgId"], properties: { orgId: { type: "string", format: "uuid" } } },
+      body: bookBodySchema,
+      response: { 201: bookingResultSchema, 400: errorResponseSchema, 404: errorResponseSchema, 429: errorResponseSchema },
+    },
+    handler: async (req, reply) => {
+      const { orgId } = req.params as { orgId: string };
+      const parsed = bookBody.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
     const [org] = await db.select({ id: orgs.id, name: orgs.name, publicEmail: orgs.publicEmail }).from(orgs).where(eq(orgs.id, orgId));
     if (!org) return reply.code(404).send({ error: "business not found" });
@@ -350,5 +473,6 @@ export async function publicRoutes(app: FastifyInstance) {
       trackingUrl: customerAppUrl(`/track/${trackingToken}`),
       emailSent,
     } satisfies PublicBookingResultDTO);
+    },
   });
 }

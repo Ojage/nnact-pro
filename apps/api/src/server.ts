@@ -3,6 +3,8 @@ import { pathToFileURL } from "node:url";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { customerAuthRoutes } from "./routes/customer-auth.js";
@@ -80,6 +82,81 @@ export function buildServer(
   app.register(jwt, {
     secret: resolveJwtSecret(),
     sign: { expiresIn: process.env.JWT_EXPIRES_IN ?? "12h" },
+  });
+
+  // OpenAPI / Swagger documentation
+  app.register(swagger, {
+    openapi: {
+      info: {
+        title: "NNACT Pro API",
+        version: "0.1.0",
+        description:
+          "Field-service management API for NNACT Pro. Multi-tenant, role-based access. " +
+          "All endpoints require organization context via JWT or API token.",
+        contact: { name: "NNACT", url: "https://nnact.com" },
+        license: { name: "Proprietary" },
+      },
+      servers: [{ url: "/api", description: "API base path (relative)" }],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+            description: "JWT access token from `/api/auth/login` or `/api/customer-auth/login`",
+          },
+          apiToken: {
+            type: "apiKey",
+            in: "header",
+            name: "X-API-Token",
+            description: "Plugin API token (org-scoped, HMAC-signed)",
+          },
+        },
+        schemas: {
+          ErrorResponse: {
+            type: "object",
+            properties: { error: { type: "string" } },
+            required: ["error"],
+          },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+      tags: [
+        { name: "Auth", description: "Staff authentication (login, register, me)" },
+        { name: "Customer Auth", description: "Customer portal authentication" },
+        { name: "Public", description: "Unauthenticated endpoints (booking config, submit, tracking)" },
+        { name: "Customers", description: "Customer CRUD" },
+        { name: "Jobs", description: "Work orders (jobs) lifecycle" },
+        { name: "Appointments", description: "Scheduling & technician dispatch" },
+        { name: "Line Items", description: "Job line items (labor, parts, materials)" },
+        { name: "Invoices", description: "Invoicing & payments" },
+        { name: "Estimates", description: "Customer estimates & approval flow" },
+        { name: "Portal", description: "Customer portal links & sessions" },
+        { name: "Messages", description: "Email/SMS message logs & templates" },
+        { name: "Documents", description: "File uploads & generated PDFs" },
+        { name: "Activities", description: "Audit/activity log" },
+        { name: "Sync", description: "Mobile offline sync endpoints" },
+        { name: "Users", description: "Team members & roles" },
+        { name: "Equipment", description: "Customer equipment registry" },
+        { name: "Diagnostics", description: "Diagnostic sessions & outputs" },
+        { name: "Voice Notes", description: "Audio notes on jobs" },
+        { name: "Repair Brain", description: "AI-assisted troubleshooting" },
+        { name: "Notifications", description: "In-app + push notifications" },
+        { name: "Walkthroughs", description: "Guided onboarding walkthroughs" },
+        { name: "Search", description: "Global search" },
+        { name: "Plugins", description: "Plugin marketplace & webhooks" },
+        { name: "Service Plans", description: "Recurring maintenance plans" },
+        { name: "Org Settings", description: "Organization configuration" },
+        { name: "Operations", description: "Platform operations (backup, maintenance)" },
+      ],
+    },
+  });
+
+  app.register(swaggerUi, {
+    routePrefix: "/docs",
+    uiConfig: { docExpansion: "list", deepLinking: true },
+    staticCSP: true,
+    transformSpecification: (swaggerObject) => swaggerObject,
   });
   app.addHook("onRequest", unifiedSessionCookieAuthenticationHook);
   app.addHook("onSend", async (_request, reply, payload) => {
