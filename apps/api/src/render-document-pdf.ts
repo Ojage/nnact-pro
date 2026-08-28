@@ -43,7 +43,7 @@ export async function renderFieldDocumentPdfFromHtml(html: string): Promise<Buff
   }
   const page = await browser.newPage();
   try {
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30_000 });
+    await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
     await page.emulateMediaType("print");
     const pdf = await page.pdf({
       format: "letter",

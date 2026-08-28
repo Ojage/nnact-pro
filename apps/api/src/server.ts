@@ -333,9 +333,10 @@ export function buildServer(
 const isMain = import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const port = Number(process.env.API_PORT ?? 3001);
-  buildServer()
-    .listen({ port, host: "0.0.0.0" })
-    .then((app) => {
+  void (async () => {
+    try {
+      const app = await buildServer();
+      await app.listen({ port, host: "0.0.0.0" });
       const shutdown = async () => {
         await closeDocumentPdfBrowser().catch(() => {});
         await app.close();
@@ -343,9 +344,9 @@ if (isMain) {
       };
       process.on("SIGINT", () => void shutdown());
       process.on("SIGTERM", () => void shutdown());
-    })
-    .catch((err) => {
+    } catch (err) {
       console.error(err);
       process.exit(1);
-    });
+    }
+  })();
 }
