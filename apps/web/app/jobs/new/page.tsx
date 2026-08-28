@@ -1,57 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CustomerDTO, JobDTO, UserDTO } from "@nnact/shared";
-import { api } from "@/lib/api";
+import type { CustomerDTO, UserDTO } from "@nnact/shared";
+import {
+  useCreateAppointmentMutation,
+  useCreateCustomerMutation,
+  useCreateJobMutation,
+  useCustomersQuery,
+  useUsersQuery,
+} from "@/lib/redux/api";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormSelect } from "@/components/ui/form-select";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Label } from "@/components/ui/label";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-
 function localInputValue(date: Date) {
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-async function createJob(body: {
-  customerId: string;
-  title: string;
-  description?: string;
-  status: "lead";
-}) {
-  const token = localStorage.getItem("NNPtoken");
-  const response = await fetch(`${BASE}/api/jobs`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const message = await response.text().catch(() => "Unable to create job");
-    throw new Error(message || "Unable to create job");
-  }
-
-  return response.json() as Promise<JobDTO>;
-}
-
 export default function NewJobPage() {
   const router = useRouter();
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [technicians, setTechnicians] = useState<UserDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const { data: customers = [], isLoading: loading } = useCustomersQuery();
+  const { data: users = [] } = useUsersQuery();
+  const [createCustomer] = useCreateCustomerMutation();
+  const [createJob, { isLoading: saving }] = useCreateJobMutation();
+  const [createAppointment] = useCreateAppointmentMutation();
   const [error, setError] = useState<string | null>(null);
 
   const [customerMode, setCustomerMode] = useState<"existing" | "new">("existing");
@@ -67,6 +49,11 @@ export default function NewJobPage() {
   const [durationMinutes, setDurationMinutes] = useState("90");
   const [technicianId, setTechnicianId] = useState("");
 
+  const technicians = useMemo(
+    () => users.filter((user) => user.active && ["technician", "owner"].includes(user.role)),
+    [users],
+  );
+
   useEffect(() => {
     const date = new Date();
     date.setMinutes(0, 0, 0);
@@ -75,24 +62,8 @@ export default function NewJobPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([api.customers(), api.users()])
-      .then(([customerRows, userRows]) => {
-        if (cancelled) return;
-        setCustomers(customerRows);
-        setTechnicians(userRows.filter((user) => user.active && ["technician", "owner"].includes(user.role)));
-        setCustomerId(customerRows[0]?.id ?? "");
-      })
-      .catch((caught) => {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : String(caught));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (customers.length > 0 && !customerId) setCustomerId(customers[0].id);
+  }, [customers, customerId]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -115,15 +86,14 @@ export default function NewJobPage() {
       return;
     }
 
-    setSaving(true);
     try {
       let resolvedCustomerId = customerId;
       if (customerMode === "new") {
-        const customer = await api.createCustomer({
+        const customer = await createCustomer({
           name: customerName.trim(),
           email: customerEmail.trim() || undefined,
           phone: customerPhone.trim() || undefined,
-        });
+        }).unwrap();
         resolvedCustomerId = customer.id;
       }
 
@@ -134,25 +104,23 @@ export default function NewJobPage() {
         customerId: resolvedCustomerId,
         title: title.trim(),
         description: description.trim() || undefined,
-        status: "lead",
-      });
+      }).unwrap();
       emitWalkthroughDone(ADVANCE_TAG.jobCreated);
 
       if (scheduleNow) {
         const scheduledAt = new Date(startsAt).toISOString();
         const end = new Date(new Date(scheduledAt).getTime() + Number(durationMinutes) * 60_000);
-        await api.createAppointment({
+        await createAppointment({
           jobId: job.id,
           technicianId: technicianId || undefined,
           startsAt: scheduledAt,
           endsAt: end.toISOString(),
-        });
+        }).unwrap();
       }
 
       router.push(`/jobs/${job.id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
-      setSaving(false);
     }
   }
 
@@ -296,6 +264,10 @@ export default function NewJobPage() {
                           { value: "180", label: "3 hours" },
                         ]}
                       />
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-fg-muted">
+                        <InfoTip label="About visit length">How long the technician is booked out for. Used to detect scheduling conflicts with other jobs.</InfoTip>
+                        Blocks the technician for this long so the dispatcher can spot overlaps.
+                      </p>
                     </div>
                     <div>
                       <Label htmlFor="technician" className="mb-1.5 block text-xs font-semibold text-fg-muted">Technician</Label>
@@ -311,6 +283,10 @@ export default function NewJobPage() {
                           label: technician.name,
                         }))}
                       />
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-fg-muted">
+                        <InfoTip label="About assigning a technician">Leaving this unassigned keeps the job unassigned; you can pick a technician later from the dispatch board.</InfoTip>
+                        Optional — pick now or assign later from the dispatch board.
+                      </p>
                     </div>
                   </div>
                 </>
@@ -328,8 +304,8 @@ export default function NewJobPage() {
               <p className="text-xs leading-5 text-fg-muted">
                 NNACT Pro creates the customer when needed, creates the work order, adds the appointment when scheduled, and opens the job detail for estimates, notes, photos, invoices, and payment.
               </p>
-              <Button type="submit" className="w-full" data-tour="job-form-submit" disabled={saving || loading}>
-                {saving ? "Creating job…" : scheduleNow ? "Create and schedule job" : "Create unscheduled job"}
+              <Button type="submit" className="w-full" data-tour="job-form-submit" loading={saving} disabled={!title.trim()}>
+                {scheduleNow ? "Create and schedule job" : "Create unscheduled job"}
               </Button>
               <Button type="button" variant="secondary" className="w-full" onClick={() => router.back()} disabled={saving}>
                 Cancel

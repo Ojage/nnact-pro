@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
+import { useAppointmentsQuery, useJobsQuery, type AppointmentDTO } from "@/lib/redux/api";
 import type { JobDTO } from "@nnact/shared";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -12,14 +12,6 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-interface Appointment {
-  id: string;
-  jobId: string;
-  technicianId: string | null;
-  startsAt: string;
-  endsAt: string;
-}
 
 type ViewMode = "day" | "week" | "month";
 
@@ -40,12 +32,8 @@ export default function SchedulePage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [jobs, setJobs] = useState<JobDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [jobDataWarning, setJobDataWarning] = useState(false);
-  const [reloadVersion, setReloadVersion] = useState(0);
+  const { data: appointments = [], isLoading: loading, isError: apptFailed, refetch: refetchAppointments } = useAppointmentsQuery();
+  const { data: jobs = [], isError: jobFailed, refetch: refetchJobs } = useJobsQuery();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [view, setView] = useState<ViewMode>(() => {
     const value = searchParams.get("view");
@@ -60,36 +48,6 @@ export default function SchedulePage() {
     if (search.trim()) params.set("q", search.trim());
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [focusDate, pathname, router, search, view]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      setJobDataWarning(false);
-      const [appointmentResult, jobResult] = await Promise.allSettled([
-        api.appointments(),
-        api.jobs(),
-      ]);
-      if (cancelled) return;
-      if (appointmentResult.status === "rejected") {
-        setAppointments([]);
-        setJobs([]);
-        setError("Schedule could not be loaded. Check the connection and try again.");
-      } else {
-        setAppointments(appointmentResult.value);
-        if (jobResult.status === "fulfilled") {
-          setJobs(jobResult.value);
-        } else {
-          setJobs([]);
-          setJobDataWarning(true);
-        }
-      }
-      setLoading(false);
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [reloadVersion]);
 
   const jobMap = useMemo(() => {
     const m = new Map<string, JobDTO>();
@@ -118,7 +76,7 @@ export default function SchedulePage() {
 
   // ── Appointments by date string for month view ──
   const apptsByDateString = useMemo(() => {
-    const map = new Map<string, Appointment[]>();
+    const map = new Map<string, AppointmentDTO[]>();
     for (const a of filtered) {
       const d = new Date(a.startsAt);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -138,7 +96,7 @@ export default function SchedulePage() {
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 7);
 
-    const cols: { date: Date; label: string; isToday: boolean; appts: Appointment[] }[] = [];
+    const cols: { date: Date; label: string; isToday: boolean; appts: AppointmentDTO[] }[] = [];
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(startOfWeek);
@@ -161,7 +119,7 @@ export default function SchedulePage() {
 
   // ── Month view: 42-cell grid ──
   const monthCells = useMemo(() => {
-    const cells: { date: Date; isCurrentMonth: boolean; isToday: boolean; appts: Appointment[] }[] = [];
+    const cells: { date: Date; isCurrentMonth: boolean; isToday: boolean; appts: AppointmentDTO[] }[] = [];
     const firstOfMonth = new Date(focusDate);
     firstOfMonth.setDate(1);
     const start = new Date(firstOfMonth);
@@ -238,27 +196,27 @@ export default function SchedulePage() {
       />
 
       {/* ── Error ── */}
-      {error && (
+      {apptFailed && (
         <Card className="mb-6 border-red/30 bg-red/5" role="alert">
-          <p className="text-sm font-semibold text-red">{error}</p>
-          <Button className="mt-3" variant="secondary" size="sm" onClick={() => setReloadVersion((value) => value + 1)}>
+          <p className="text-sm font-semibold text-red">Schedule could not be loaded. Check the connection and try again.</p>
+          <Button className="mt-3" variant="secondary" size="sm" onClick={() => void refetchAppointments()}>
             Retry schedule
           </Button>
         </Card>
       )}
 
-      {jobDataWarning && !error && (
+      {jobFailed && !apptFailed && (
         <Card className="mb-6 border-yellow/30 bg-yellow/5" role="status">
           <p className="text-sm font-semibold text-yellow">Job details are temporarily unavailable.</p>
           <p className="mt-1 text-xs text-fg-muted">Visit times are still shown. Retry to restore job titles.</p>
-          <Button className="mt-3" variant="secondary" size="sm" onClick={() => setReloadVersion((value) => value + 1)}>
+          <Button className="mt-3" variant="secondary" size="sm" onClick={() => void refetchJobs()}>
             Retry job details
           </Button>
         </Card>
       )}
 
       {/* ── Empty state ── */}
-      {appointments.length === 0 && !error ? (
+      {appointments.length === 0 && !apptFailed ? (
         <Card>
           <EmptyState
             title="No visits scheduled"
@@ -566,7 +524,7 @@ function AppointmentRow({
   jobTitle: title,
   compact,
 }: {
-  appt: Appointment;
+  appt: AppointmentDTO;
   jobTitle: string;
   compact?: boolean;
 }) {

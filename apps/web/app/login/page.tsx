@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle } from "lucide-react";
 import { login } from "@/lib/api";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { BrandMark } from "@/components/brand-mark";
 import { NNACT_COMPANY } from "@nnact/shared";
@@ -25,7 +29,22 @@ export default function LoginPage() {
       router.replace("/");
       router.refresh();
     } catch (err) {
-      setError((err as Error).message);
+      const message = err instanceof Error ? err.message : "Sign-in failed";
+      if (message.includes("401") || message.toLowerCase().includes("invalid credentials")) {
+        setError(
+          "Invalid email or password. If this is a fresh setup, run: pnpm infra:up && pnpm db:push && pnpm seed:nnact",
+        );
+      } else if (
+        message.toLowerCase().includes("failed to fetch") ||
+        message.toLowerCase().includes("network") ||
+        message.includes("ECONNREFUSED")
+      ) {
+        setError(
+          `Cannot reach the API (${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}). Start it with: pnpm dev:api`,
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -43,8 +62,10 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="login-email" className="mb-1.5 block text-xs text-fg-muted">Email</label>
+            <div className="space-y-2">
+              <Label htmlFor="login-email" className="text-xs text-fg-muted">
+                Email
+              </Label>
               <Input
                 id="login-email"
                 type="email"
@@ -55,11 +76,12 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <div>
-              <label htmlFor="login-password" className="mb-1.5 block text-xs text-fg-muted">Password</label>
-              <Input
+            <div className="space-y-2">
+              <Label htmlFor="login-password" className="text-xs text-fg-muted">
+                Password
+              </Label>
+              <PasswordInput
                 id="login-password"
-                type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -67,13 +89,16 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Signing in…" : "Sign in"}
+            <Button type="submit" className="w-full" loading={submitting}>
+              Sign in
             </Button>
             {error && (
-              <p role="alert" className="rounded-lg border border-red/25 bg-red/5 px-3 py-2 text-sm text-red">
-                Sign-in failed. Verify your email and password, then try again.
-              </p>
+              <Alert variant="destructive">
+                <AlertCircle />
+                <AlertDescription>
+                  Sign-in failed. Verify your email and password, then try again.
+                </AlertDescription>
+              </Alert>
             )}
           </form>
         </CardContent>

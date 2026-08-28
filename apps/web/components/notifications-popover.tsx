@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import type { NotificationDTO } from "@nnact/shared";
 import { api } from "@/lib/api";
+import { connectNotificationStream } from "@/lib/notifications-live";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function formatTimeAgo(iso: string): string {
@@ -18,29 +20,41 @@ function formatTimeAgo(iso: string): string {
 export function NotificationsPopover() {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
-  const [notifs, setNotifs] = useState<Awaited<ReturnType<typeof api.notifications>>>([]);
+  const [notifs, setNotifs] = useState<NotificationDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Fetch unread count every 30s
-  useEffect(() => {
-    let cancelled = false;
-    const fetch = () =>
-      api.unreadNotificationCount().then((r) => {
-        if (!cancelled) setUnread(r.count);
-      }).catch(() => {});
-    fetch();
-    const iv = setInterval(fetch, 30000);
-    return () => { cancelled = true; clearInterval(iv); };
+  const refreshUnread = useCallback(() => {
+    void api.unreadNotificationCount()
+      .then((r) => setUnread(r.count))
+      .catch(() => {});
   }, []);
 
-  // Load full list on open
+  useEffect(() => {
+    refreshUnread();
+    const token = localStorage.getItem("NNPtoken");
+    if (!token) return;
+
+    const teardown = connectNotificationStream(token, {
+      onUnreadCount: setUnread,
+      onNotification: (notification) => {
+        setNotifs((prev) => [notification, ...prev.filter((n) => n.id !== notification.id)]);
+        setUnread((u) => u + 1);
+      },
+      onFieldRefresh: () => refreshUnread(),
+    });
+
+    return teardown;
+  }, [refreshUnread]);
+
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
       const list = await api.notifications();
       setNotifs(list);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
     setLoading(false);
   }, []);
 
@@ -49,7 +63,6 @@ export function NotificationsPopover() {
     if (!open) loadNotifications();
   };
 
-  // Close on click outside
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -59,12 +72,15 @@ export function NotificationsPopover() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const handleMarkRead = async (n: typeof notifs[number]) => {
+  const handleMarkRead = async (n: NotificationDTO) => {
     if (!n.read) {
       try {
         await api.markNotificationRead(n.id);
         setUnread((u) => Math.max(0, u - 1));
-      } catch { /* silent */ }
+        setNotifs((prev) => prev.map((item) => (item.id === n.id ? { ...item, read: true } : item)));
+      } catch {
+        /* silent */
+      }
     }
     if (n.link) window.location.href = n.link;
   };
@@ -74,7 +90,9 @@ export function NotificationsPopover() {
       await api.markAllNotificationsRead();
       setUnread(0);
       setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   };
 
   return (

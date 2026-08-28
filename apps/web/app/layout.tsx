@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import "@fontsource-variable/source-sans-3";
 import "./globals.css";
+import { ReduxProvider } from "@/components/redux-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/app-shell";
 import { SiteJsonLd } from "@/components/json-ld";
@@ -13,9 +14,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en-CM" data-theme="light" suppressHydrationWarning>
       <body>
         <SiteJsonLd />
-        <ThemeProvider>
-          <AppShell>{children}</AppShell>
-        </ThemeProvider>
+        <ReduxProvider>
+          <ThemeProvider>
+            <AppShell>{children}</AppShell>
+          </ThemeProvider>
+        </ReduxProvider>
       </body>
     </html>
   );

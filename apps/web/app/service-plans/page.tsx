@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InfoTip } from "@/components/ui/info-tip";
 import { EmptyState } from "@/components/empty-state";
 import { formatMoney, type ServicePlanDTO } from "@nnact/shared";
 
@@ -93,7 +94,7 @@ export default function ServicePlansPage() {
       />
 
       {showForm && (
-        <Card className="mb-5 border-accent/30">
+        <Card className="mb-5 border-accent/30 p-6">
           <div className="grid gap-4">
             <div>
               <h3 className="text-base font-semibold text-fg">Create service plan</h3>
@@ -102,18 +103,52 @@ export default function ServicePlansPage() {
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Plan name" />
-              <Input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} type="number" min="0" step="0.01" placeholder="Price" />
-              <Input value={form.includedVisitsPerTerm} onChange={(e) => setForm((f) => ({ ...f, includedVisitsPerTerm: e.target.value }))} type="number" min="0" placeholder="Included visits" />
-              <Input value={form.termMonths} onChange={(e) => setForm((f) => ({ ...f, termMonths: e.target.value }))} type="number" min="1" placeholder="Term months" />
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
+                  Plan name
+                </span>
+                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Plan name" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
+                  Price
+                  <InfoTip label="Price per term">Billed once per term when the membership renews. Enter the dollar amount, e.g. 199 for $199.</InfoTip>
+                </span>
+                <Input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} type="number" min="0" step="0.01" placeholder="Price" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
+                  Included visits
+                  <InfoTip label="Included visits">The number of visits each member gets during one term at no extra charge. Extra visits can be billed separately later.</InfoTip>
+                </span>
+                <Input value={form.includedVisitsPerTerm} onChange={(e) => setForm((f) => ({ ...f, includedVisitsPerTerm: e.target.value }))} type="number" min="0" placeholder="Included visits" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
+                  Term length
+                  <InfoTip label="Term length">How long one plan period lasts (months). Members are renewed at the end unless the plan is cancelled.</InfoTip>
+                </span>
+                <Input value={form.termMonths} onChange={(e) => setForm((f) => ({ ...f, termMonths: e.target.value }))} type="number" min="1" placeholder="Term months" />
+              </label>
             </div>
-            <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" />
-            <textarea
-              value={form.benefits}
-              onChange={(e) => setForm((f) => ({ ...f, benefits: e.target.value }))}
-              className="min-h-24 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-              placeholder="One benefit per line"
-            />
+            <label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
+                Description
+              </span>
+              <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
+                Benefits
+                <InfoTip label="Benefits" side="bottom">Perks shown to customers on the plan listing. One item per line, for example “Priority scheduling” or “Included seasonal tune-ups”.</InfoTip>
+              </span>
+              <textarea
+                value={form.benefits}
+                onChange={(e) => setForm((f) => ({ ...f, benefits: e.target.value }))}
+                className="min-h-24 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                placeholder="One benefit per line"
+              />
+            </label>
             <label className="flex items-center gap-2 text-sm text-fg-muted">
               <input
                 type="checkbox"
@@ -121,6 +156,7 @@ export default function ServicePlansPage() {
                 onChange={(e) => setForm((f) => ({ ...f, priorityScheduling: e.target.checked }))}
               />
               Priority scheduling benefit
+              <InfoTip label="Priority scheduling">When enabled, members are moved ahead of non-members when booking a visit.</InfoTip>
             </label>
             <div className="flex gap-2">
               <Button onClick={createPlan} disabled={!form.name.trim()}>

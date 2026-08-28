@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { useActivitiesQuery, useCreateCustomerMutation, useCustomersQuery } from "@/lib/redux/api";
 import { formatRelativeTime } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/pagination";
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { InfoTip } from "@/components/ui/info-tip";
 import type { ActivityDTO, CustomerDTO } from "@nnact/shared";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
@@ -21,10 +22,9 @@ type SortField = "name" | "createdAt" | "lastActivity";
 type SortDir = "asc" | "desc";
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [activities, setActivities] = useState<ActivityDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: customers = [], isLoading, isError, error: queryError } = useCustomersQuery();
+  const { data: activities = [] } = useActivitiesQuery();
+  const [createCustomer, { isLoading: creating }] = useCreateCustomerMutation();
   const [skip, setSkip] = useState(0);
   const take = 50;
 
@@ -34,7 +34,6 @@ export default function CustomersPage() {
   const [createEmail, setCreateEmail] = useState("");
   const [createPhone, setCreatePhone] = useState("");
   const [createNotes, setCreateNotes] = useState("");
-  const [creating, setCreating] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("name");
@@ -42,28 +41,6 @@ export default function CustomersPage() {
 
   // Reset pagination when search changes
   useEffect(() => { setSkip(0); }, [search]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [cr, ar] = await Promise.all([
-          api.customers().catch(() => [] as CustomerDTO[]),
-          api.activities().catch(() => [] as ActivityDTO[]),
-        ]);
-        if (!cancelled) {
-          setCustomers(cr);
-          setActivities(ar);
-        }
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
 
   // ── Last activity per customer ──
   const lastActivityMap = useMemo(() => {
@@ -134,17 +111,15 @@ export default function CustomersPage() {
   // ── Create customer handler ──
   const handleCreateCustomer = async () => {
     if (!createName.trim()) return;
-    setCreating(true);
     setCreateErr(null);
     try {
-      const created = await api.createCustomer({
+      await createCustomer({
         name: createName.trim(),
         email: createEmail.trim() || undefined,
         phone: createPhone.trim() || undefined,
         notes: createNotes.trim() || undefined,
-      });
+      }).unwrap();
       emitWalkthroughDone(ADVANCE_TAG.customerCreated);
-      setCustomers((prev) => [created, ...prev]);
       setShowCreate(false);
       setCreateName("");
       setCreateEmail("");
@@ -152,8 +127,6 @@ export default function CustomersPage() {
       setCreateNotes("");
     } catch {
       setCreateErr("Failed to create customer");
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -183,7 +156,7 @@ export default function CustomersPage() {
   };
 
   // ── Loading ──
-  if (loading) {
+  if (isLoading) {
     return (
       <div>
         <div className="flex items-end justify-between mb-8">
@@ -254,9 +227,9 @@ export default function CustomersPage() {
       )}
 
       {/* ── Error ── */}
-      {error && (
+      {isError && (
         <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">API unreachable ({error}).</p>
+          <p className="text-red text-sm">API unreachable ({queryError ? String(queryError) : "unknown error"}).</p>
         </Card>
       )}
 
@@ -274,7 +247,7 @@ export default function CustomersPage() {
       )}
 
       {/* ── Empty state ── */}
-      {customers.length === 0 && !error ? (
+      {customers.length === 0 && !isError ? (
         <Card>
           <EmptyState
             title="No customers yet"
@@ -494,7 +467,10 @@ export default function CustomersPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-fg-muted">Notes</label>
+              <label className="inline-flex items-center gap-1.5 text-xs font-medium text-fg-muted">
+                Notes
+                <InfoTip label="About customer notes">Visible only to your team — customers never see these notes.</InfoTip>
+              </label>
               <textarea
                 className="min-h-[80px] px-3 py-2 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
                 value={createNotes}
@@ -509,8 +485,8 @@ export default function CustomersPage() {
               <Button type="button" variant="ghost" size="sm" disabled={creating} onClick={() => setShowCreate(false)}>
                 Cancel
               </Button>
-              <Button type="submit" size="sm" data-tour="customer-create-submit" disabled={!createName.trim() || creating}>
-                {creating ? "Creating..." : "Create"}
+              <Button type="submit" size="sm" data-tour="customer-create-submit" loading={creating} disabled={!createName.trim()}>
+                Create
               </Button>
             </DialogFooter>
           </form>

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { and, eq, sql } from "drizzle-orm";
-import { db, orgs, customers, customerAccounts, customerAccountLinks } from "@nnact/db";
+import { and, eq, ilike, or, sql } from "drizzle-orm";
+import { db, orgs, customers, customerAccounts, customerAccountLinks, jobs, estimates, invoices } from "@nnact/db";
 import { validatePasswordStrength } from "@nnact/shared";
 import { hashPassword, verifyPassword, isCustomerClaims, type CustomerJwtClaims } from "../auth.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
@@ -299,5 +299,57 @@ export async function customerAuthRoutes(app: FastifyInstance) {
     const result = await portalDeclineEstimateForActiveLink(active, estimateId, reply);
     if (!result) return;
     return result;
+  });
+
+  app.get("/orgs/:orgId/search", async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const claims = await verifyCustomerRequest(req, reply);
+    if (!claims) return;
+    const { orgId } = req.params as { orgId: string };
+    const { q } = req.query as { q?: string };
+
+    const [link] = await db
+      .select({ customerId: customerAccountLinks.customerId })
+      .from(customerAccountLinks)
+      .where(and(eq(customerAccountLinks.accountId, claims.accountId), eq(customerAccountLinks.orgId, orgId)))
+      .limit(1);
+    if (!link) return reply.code(404).send({ error: "not linked to this business" });
+
+    if (!q || q.trim().length < 2) {
+      return { jobs: [], estimates: [], invoices: [] };
+    }
+
+    const term = `%${q.trim()}%`;
+    const customerId = link.customerId;
+
+    const [jobResults, estimateResults, invoiceResults] = await Promise.all([
+      db
+        .select({ id: jobs.id, title: jobs.title, status: jobs.status })
+        .from(jobs)
+        .where(and(eq(jobs.orgId, orgId), eq(jobs.customerId, customerId), ilike(jobs.title, term)))
+        .limit(6),
+      db
+        .select({ id: estimates.id, number: estimates.number, status: estimates.status })
+        .from(estimates)
+        .innerJoin(jobs, eq(estimates.jobId, jobs.id))
+        .where(
+          and(
+            eq(estimates.orgId, orgId),
+            eq(jobs.customerId, customerId),
+            or(ilike(estimates.number, term), ilike(jobs.title, term)),
+          ),
+        )
+        .limit(6),
+      db
+        .select({ id: invoices.id, number: invoices.number, status: invoices.status })
+        .from(invoices)
+        .innerJoin(jobs, eq(invoices.jobId, jobs.id))
+        .where(
+          and(eq(invoices.orgId, orgId), eq(jobs.customerId, customerId), ilike(invoices.number, term)),
+        )
+        .limit(6),
+    ]);
+
+    return { jobs: jobResults, estimates: estimateResults, invoices: invoiceResults };
   });
 }

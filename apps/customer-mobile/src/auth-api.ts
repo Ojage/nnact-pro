@@ -1,11 +1,13 @@
-import type { CustomerAuthResponseDTO, PortalSessionDTO } from "@nnact/shared";
+import type { CustomerAuthResponseDTO, CustomerSearchResponseDTO, PortalSessionDTO } from "@nnact/shared";
 import type { StoredCustomerSession } from "./auth-storage";
+import { getApiUrl, getDefaultOrgId } from "./env";
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
-const DEFAULT_ORG_ID = process.env.EXPO_PUBLIC_DEFAULT_ORG_ID ?? "";
+function apiBase() {
+  return getApiUrl();
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -24,7 +26,7 @@ function authHeaders(accessToken: string) {
 }
 
 export function toStoredSession(payload: CustomerAuthResponseDTO): StoredCustomerSession {
-  const activeOrgId = payload.orgs[0]?.orgId ?? (DEFAULT_ORG_ID || null);
+  const activeOrgId = payload.orgs[0]?.orgId ?? (getDefaultOrgId() || null);
   return {
     accessToken: payload.accessToken,
     refreshToken: payload.refreshToken,
@@ -44,7 +46,7 @@ export async function customerRegister(body: {
   return toStoredSession(
     await request<CustomerAuthResponseDTO>("/api/customer-auth/register", {
       method: "POST",
-      body: JSON.stringify({ ...body, orgId: body.orgId || DEFAULT_ORG_ID || undefined }),
+      body: JSON.stringify({ ...body, orgId: body.orgId || getDefaultOrgId() || undefined }),
     }),
   );
 }
@@ -64,10 +66,19 @@ export async function customerRefresh(refreshToken: string): Promise<StoredCusto
 }
 
 export async function customerLogout(refreshToken: string) {
-  await request("/api/customer-auth/logout", {
-    method: "POST",
-    body: JSON.stringify({ refreshToken }),
-  }).catch(() => undefined);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  try {
+    await request("/api/customer-auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+      signal: controller.signal,
+    });
+  } catch {
+    // Best-effort revoke — local session is already cleared.
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function customerAuthedRequest<T>(
@@ -75,7 +86,7 @@ export async function customerAuthedRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -119,4 +130,12 @@ export async function customerDeclineEstimate(session: StoredCustomerSession, or
     method: "POST",
     body: JSON.stringify({}),
   });
+}
+
+export async function customerSearch(session: StoredCustomerSession, orgId: string, query: string) {
+  const params = new URLSearchParams({ q: query });
+  return customerAuthedRequest<CustomerSearchResponseDTO>(
+    session,
+    `/api/customer-auth/orgs/${orgId}/search?${params}`,
+  );
 }

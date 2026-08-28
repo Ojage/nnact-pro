@@ -23,7 +23,7 @@ function BrandContent({ size = "md", showSubtitle = true }: Pick<BrandMarkProps,
     <>
       <span
         className={cn(
-          "relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-accent shadow-sm",
+          "relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-100",
           sizes.logo,
         )}
       >
@@ -32,7 +32,7 @@ function BrandContent({ size = "md", showSubtitle = true }: Pick<BrandMarkProps,
           alt={`${SITE_CONFIG.productName} logo`}
           fill
           sizes={size === "lg" ? "40px" : "32px"}
-          className="object-cover"
+          className="object-contain p-0.5"
           priority={size === "lg"}
         />
       </span>

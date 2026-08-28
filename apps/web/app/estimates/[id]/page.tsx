@@ -1,14 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { formatMoney } from "@nnact/shared";
 import { api, type BusinessSettingsDTO, type EstimateOption } from "@/lib/api";
+import {
+  useAddEstimateOptionLineMutation,
+  useCopyApprovedEstimateToJobMutation,
+  useDeleteEstimateOptionLineMutation,
+  useEstimateQuery,
+  useMarkEstimateSentMutation,
+  useOrgQuery,
+  usePatchEstimateOptionLineMutation,
+  useSetEstimateOptionDiscountMutation,
+} from "@/lib/redux/api";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,44 +27,30 @@ import { MessageSendDialog } from "@/components/message-send-dialog";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 import { ADVANCE_TAG } from "@nnact/shared";
 
-type EstimateDetail = Awaited<ReturnType<typeof api.estimate>>;
-
 export default function EstimateDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [estimate, setEstimate] = useState<EstimateDetail | null>(null);
+  const { data: estimate, isLoading: loading, refetch } = useEstimateQuery(id, { skip: !id });
+  const { data: org } = useOrgQuery();
+
   const [activeId, setActiveId] = useState("");
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("");
-  const [discounts, setDiscounts] = useState<BusinessSettingsDTO["taxes"]["discounts"]>([]);
-  const [discountsEnabled, setDiscountsEnabled] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const value = await api.estimate(id);
-      setEstimate(value);
-      setActiveId((current) => current || value.options[0]?.id || "");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load estimate");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const [markEstimateSent, markSentState] = useMarkEstimateSentMutation();
+  const [copyApproved, copyState] = useCopyApprovedEstimateToJobMutation();
+  const [addLine, addState] = useAddEstimateOptionLineMutation();
+  const busy = markSentState.isLoading || copyState.isLoading || addState.isLoading;
+
+  const discounts = org?.businessSettings?.taxes?.discounts ?? [];
+  const discountsEnabled = org?.businessSettings?.taxes?.discountsEnabled ?? true;
 
   useEffect(() => {
-    void load();
-    void api.org().then((org) => {
-      setDiscounts(org?.businessSettings?.taxes?.discounts ?? []);
-      setDiscountsEnabled(org?.businessSettings?.taxes?.discountsEnabled ?? true);
-    }).catch(() => {});
-  }, [load]);
+    if (!activeId && estimate?.options[0]?.id) setActiveId(estimate.options[0].id);
+  }, [activeId, estimate]);
 
   const active = estimate?.options.find((option) => option.id === activeId) ?? estimate?.options[0];
   const editable = estimate?.status === "draft" || estimate?.status === "sent";
@@ -78,21 +75,8 @@ export default function EstimateDetailPage() {
     }
   }
 
-  async function refreshAfter(action: () => Promise<unknown>) {
-    setBusy(true);
-    setError(null);
-    try {
-      await action();
-      await load();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The estimate could not be updated");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (loading) return <div className="grid gap-4"><Skeleton className="h-12 w-72" /><Skeleton className="h-96 rounded-xl" /></div>;
-  if (!estimate) return <Card><div className="grid justify-items-center gap-3 py-10"><p className="text-sm text-red">{error ?? "Estimate not found"}</p><Button onClick={() => void load()}>Retry</Button></div></Card>;
+  if (!estimate) return <Card><div className="grid justify-items-center gap-3 py-10"><p className="text-sm text-red">{error ?? "Estimate not found"}</p><Button onClick={() => void refetch()}>Retry</Button></div></Card>;
 
   return (
     <div>
@@ -101,12 +85,19 @@ export default function EstimateDetailPage() {
         description={`${estimate.status} · ${estimate.options.length} options`}
         actions={<div className="flex flex-wrap gap-2">
           <Link href={`/estimates/${id}/preview`}><Button size="sm" variant="secondary">Preview</Button></Link>
-          <Button size="sm" variant="secondary" disabled={downloadingPdf} onClick={() => void downloadPdf()}>{downloadingPdf ? "Preparing…" : "Download PDF"}</Button>
+          <Button size="sm" variant="secondary" loading={downloadingPdf} onClick={() => void downloadPdf()}>Download PDF</Button>
           <Button size="sm" variant="secondary" onClick={() => setEmailOpen(true)}>Email estimate</Button>
-          {estimate.status === "draft" ? <Button size="sm" variant="secondary" disabled={busy} data-tour="estimates-send" onClick={() => {
-            void refreshAfter(() => api.markEstimateSent(id)).then(() => emitWalkthroughDone(ADVANCE_TAG.estimateSent));
+          {estimate.status === "draft" ? <Button size="sm" variant="secondary" loading={markSentState.isLoading} data-tour="estimates-send" onClick={() => {
+            void markEstimateSent(id)
+              .unwrap()
+              .then(() => emitWalkthroughDone(ADVANCE_TAG.estimateSent))
+              .catch(() => setError("The estimate could not be marked sent"));
           }}>Mark sent</Button> : null}
-          {estimate.status === "approved" ? <Button size="sm" disabled={busy || Boolean(estimate.copiedToJobAt)} onClick={() => refreshAfter(() => api.copyApprovedEstimateToJob(id))}>{estimate.copiedToJobAt ? "Copied to job" : "Copy approved work to job"}</Button> : null}
+          {estimate.status === "approved" ? <Button size="sm" loading={copyState.isLoading} disabled={Boolean(estimate.copiedToJobAt)} onClick={() => {
+            void copyApproved(id)
+              .unwrap()
+              .catch(() => setError("The estimate could not be copied to the job"));
+          }}>{estimate.copiedToJobAt ? "Copied to job" : "Copy approved work to job"}</Button> : null}
         </div>}
       />
       {error ? <Card className="mb-4 border-red/30 bg-red/5"><p className="text-sm text-red">{error}</p></Card> : null}
@@ -147,18 +138,21 @@ export default function EstimateDetailPage() {
           </Button>
         ))}
       </div>
-      {active ? <OptionEditor estimateId={id} option={active} editable={editable} busy={busy} onChange={refreshAfter} discounts={discounts} discountsEnabled={discountsEnabled} /> : <Card><p className="py-10 text-center text-sm text-fg-muted">This estimate has no options.</p></Card>}
+      {active ? <OptionEditor estimateId={id} option={active} editable={editable} discounts={discounts} discountsEnabled={discountsEnabled} onError={setError} /> : <Card><p className="py-10 text-center text-sm text-fg-muted">This estimate has no options.</p></Card>}
       {active && editable ? (
         <Card className="mt-4">
           <form className="grid gap-3 sm:grid-cols-[1fr_90px_130px_auto] sm:items-end" onSubmit={(event) => {
             event.preventDefault();
             const unitPrice = Math.round(Number(price) * 100);
-            void refreshAfter(() => api.addEstimateOptionLine(id, active.id, { description, quantity: Number(quantity), unitPrice })).then(() => { setDescription(""); setQuantity("1"); setPrice(""); });
+            void addLine({ estimateId: id, optionId: active.id, body: { description, quantity: Number(quantity), unitPrice } })
+              .unwrap()
+              .then(() => { setDescription(""); setQuantity("1"); setPrice(""); })
+              .catch(() => setError("The line item could not be added"));
           }}>
             <label className="text-xs text-fg-muted">Service or material<Input required value={description} onChange={(event) => setDescription(event.target.value)} /></label>
             <label className="text-xs text-fg-muted">Quantity<Input required min="1" type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
             <label className="text-xs text-fg-muted">Unit price<Input required min="0" step="0.01" type="number" value={price} onChange={(event) => setPrice(event.target.value)} /></label>
-            <Button type="submit" disabled={busy}>Add line</Button>
+            <Button type="submit" loading={addState.isLoading}>Add line</Button>
           </form>
         </Card>
       ) : null}
@@ -174,15 +168,23 @@ export default function EstimateDetailPage() {
   );
 }
 
-function OptionEditor({ estimateId, option, editable, busy, onChange, discounts, discountsEnabled }: {
+function OptionEditor({ estimateId, option, editable, discounts, discountsEnabled, onError }: {
   estimateId: string;
   option: EstimateOption;
   editable: boolean;
-  busy: boolean;
-  onChange: (action: () => Promise<unknown>) => Promise<void>;
   discounts: BusinessSettingsDTO["taxes"]["discounts"];
   discountsEnabled: boolean;
+  onError: (message: string | null) => void;
 }) {
+  const [setDiscount, discountState] = useSetEstimateOptionDiscountMutation();
+  const [patchLine, patchState] = usePatchEstimateOptionLineMutation();
+  const [deleteLine, deleteState] = useDeleteEstimateOptionLineMutation();
+  const busy = discountState.isLoading || patchState.isLoading || deleteState.isLoading;
+
+  function fail(cause: unknown) {
+    onError(cause instanceof Error ? cause.message : "The option could not be updated");
+  }
+
   const pricing = option.pricing;
   return <Card>
     <div className="mb-4 flex items-center justify-between"><h2 className="text-base font-semibold text-fg">{option.label}</h2><strong>{formatMoney(option.total)}</strong></div>
@@ -190,15 +192,17 @@ function OptionEditor({ estimateId, option, editable, busy, onChange, discounts,
       <div key={line.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg bg-surface-200 p-3">
         <div><p className="text-sm text-fg">{line.description}</p><p className="text-xs text-fg-muted">{line.quantity} × {formatMoney(line.unitPrice)} = {formatMoney(line.quantity * line.unitPrice)}</p></div>
         {editable ? <div className="flex gap-2">
-          <Button size="sm" variant="secondary" disabled={busy} onClick={() => {
+          <Button size="sm" variant="secondary" loading={busy} onClick={() => {
             const description = window.prompt("Service or material", line.description)?.trim();
             if (!description) return;
             const quantity = Number(window.prompt("Quantity", String(line.quantity)));
             const unitPrice = Math.round(Number(window.prompt("Unit price in dollars", String(line.unitPrice / 100))) * 100);
             if (!Number.isInteger(quantity) || quantity <= 0 || !Number.isInteger(unitPrice) || unitPrice < 0) return;
-            void onChange(() => api.patchEstimateOptionLine(estimateId, option.id, line.id, { description, quantity, unitPrice }));
+            void patchLine({ estimateId, optionId: option.id, lineId: line.id, body: { description, quantity, unitPrice } }).unwrap().catch(fail);
           }}>Edit</Button>
-          <Button size="sm" variant="danger" disabled={busy} onClick={() => onChange(() => api.deleteEstimateOptionLine(estimateId, option.id, line.id))}>Remove</Button>
+          <Button size="sm" variant="danger" loading={busy} onClick={() => {
+            void deleteLine({ estimateId, optionId: option.id, lineId: line.id }).unwrap().catch(fail);
+          }}>Remove</Button>
         </div> : null}
       </div>
     ))}</div>}
@@ -206,10 +210,13 @@ function OptionEditor({ estimateId, option, editable, busy, onChange, discounts,
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {editable && discountsEnabled && discounts.length > 0 ? (
           <div className="grid gap-1.5">
-            <Label className="text-sm text-fg-muted">Discount</Label>
+            <Label className="text-sm text-fg-muted">
+              Discount
+              <InfoTip label="About discounts" side="top">Applies a saved discount profile to this option. Discounts are subtracted before tax.</InfoTip>
+            </Label>
             <FormSelect
               value={pricing?.discountId ?? ""}
-              onChange={(value) => onChange(() => api.setEstimateOptionDiscount(estimateId, option.id, value || null))}
+              onChange={(value) => { void setDiscount({ estimateId, optionId: option.id, discountId: value || null }).unwrap().catch(fail); }}
               allowEmpty
               placeholder="No discount"
               emptyLabel="No discount"

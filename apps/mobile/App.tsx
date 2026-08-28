@@ -1,460 +1,427 @@
-// NNACT Pro technician app — next-action field dashboard with a durable
-// diagnostic-package fallback for low-signal service locations.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// NNACT Pro technician app — Coursera-inspired field operations dashboard.
+import { useCallback, useEffect, useState } from "react";
+import { Linking, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import type { JobDTO } from "@nnact/shared";
-import { SyncService, type FieldPackage } from "./src/sync";
-import { useTheme, fonts, type Palette } from "./src/theme";
-import { staffFetch, staffLogout, staffRefresh } from "./src/auth-api";
-import {
-  clearStaffSession,
-  loadStaffSession,
-  saveStaffSession,
-  type StoredStaffSession,
-} from "./src/auth-storage";
+import { AppSearchModal, defaultStaffSuggestions, staffSearchToItems, AnimatedScreen, TabTransition } from "@nnact/mobile-ui";
+import type { MobileSearchResultItem } from "@nnact/shared";
+import { useTheme } from "./src/theme";
+import { clearStaffSession, loadStaffSession, saveStaffSession, type StoredStaffSession } from "./src/auth-storage";
+import { staffLogout, staffSearch, staffMe } from "./src/auth-api";
+import { BottomTabBar, type TabId } from "./src/components/BottomTabBar";
+import { LoadingOverlay } from "./src/components/ui";
+import { useFieldData } from "./src/hooks/useFieldData";
 import { AuthBootScreen, LoginScreen } from "./src/screens/LoginScreen";
+import { ChangePasswordScreen } from "./src/screens/ChangePasswordScreen";
+import { WelcomeScreen } from "./src/screens/WelcomeScreen";
+import { TodayScreen } from "./src/screens/TodayScreen";
+import { JobsScreen } from "./src/screens/JobsScreen";
+import { DiagnosticsScreen } from "./src/screens/DiagnosticsScreen";
+import { AccountScreen } from "./src/screens/AccountScreen";
+import { JobDetailScreen } from "./src/screens/JobDetailScreen";
+import { DiagnosticSessionScreen } from "./src/screens/DiagnosticSessionScreen";
+import { StartDiagnosticScreen } from "./src/screens/StartDiagnosticScreen";
+import { NotificationsScreen } from "./src/screens/NotificationsScreen";
+import { addPushRefreshListener, registerFieldPush } from "./src/push-notifications";
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
-
-interface Appointment {
-  id: string;
-  jobId: string;
-  technicianId: string | null;
-  startsAt: string;
-  endsAt: string;
-}
-
-interface DiagnosticListItem {
-  session: {
-    id: string;
-    jobId: string;
-    status: string;
-    customerComplaint?: string | null;
-    updatedAt: string;
-  };
-  equipment: {
-    id: string;
-    type: string;
-    make?: string | null;
-    model?: string | null;
-    serialNumber?: string | null;
-  };
-  workflow: {
-    id: string;
-    name: string;
-    supportStatus: string;
-  } | null;
-}
-
-async function fetchJson<T>(
-  session: StoredStaffSession,
-  path: string,
-  onSession?: (next: StoredStaffSession) => void,
-): Promise<T> {
-  try {
-    return await staffFetch<T>(session, path);
-  } catch (error) {
-    if (error instanceof Error && error.message === "session_expired") {
-      const refreshed = await staffRefresh(session.refreshToken);
-      await saveStaffSession(refreshed);
-      onSession?.(refreshed);
-      return staffFetch<T>(refreshed, path);
-    }
-    throw error;
-  }
-}
-
-function humanize(value: string) {
-  return value.replaceAll("_", " ");
-}
-
-function statusColor(status: string, colors: Palette) {
-  if (["blocked", "escalated", "suspended"].includes(status)) return colors.danger;
-  if (["diagnosed", "completed"].includes(status)) return colors.success;
-  if (["testing", "workflow_ready"].includes(status)) return colors.focus;
-  return colors.warning;
-}
-
-function packageToDiagnostic(fieldPackage: FieldPackage): DiagnosticListItem | null {
-  if (!fieldPackage.session || !fieldPackage.equipment) return null;
-  return {
-    session: fieldPackage.session as unknown as DiagnosticListItem["session"],
-    equipment: fieldPackage.equipment as unknown as DiagnosticListItem["equipment"],
-    workflow: fieldPackage.workflow
-      ? (fieldPackage.workflow as unknown as DiagnosticListItem["workflow"])
-      : null,
-  };
-}
-
-function packageToAppointment(fieldPackage: FieldPackage): Appointment | null {
-  const job = fieldPackage.job as Partial<JobDTO> & { scheduledAt?: string | null };
-  if (!job.id || !job.scheduledAt) return null;
-  const start = new Date(job.scheduledAt);
-  if (Number.isNaN(start.getTime())) return null;
-  return {
-    id: `cached-${job.id}`,
-    jobId: job.id,
-    technicianId: null,
-    startsAt: start.toISOString(),
-    endsAt: new Date(start.getTime() + 90 * 60 * 1000).toISOString(),
-  };
-}
-
-function FieldDashboard({
+function FieldApp({
   session,
   onSession,
   onSignOut,
+  signingOut,
+  searchOpen,
+  onSearchOpenChange,
+  searchPlaceholder,
+  searchFonts,
 }: {
   session: StoredStaffSession;
   onSession: (next: StoredStaffSession) => void;
   onSignOut: () => void;
+  signingOut: boolean;
+  searchOpen: boolean;
+  onSearchOpenChange: (open: boolean) => void;
+  searchPlaceholder: string;
+  searchFonts: { regular: string; medium: string; semibold: string; bold: string };
 }) {
-  const [jobs, setJobs] = useState<JobDTO[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [diagnostics, setDiagnostics] = useState<DiagnosticListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [offline, setOffline] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastSync, setLastSync] = useState<string | null>(null);
-  const [queuedWrites, setQueuedWrites] = useState(0);
-  const syncRef = useRef<SyncService | null>(null);
   const { colors, scheme } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [tab, setTab] = useState<TabId>("today");
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [startDiagnostic, setStartDiagnostic] = useState<{
+    jobId: string;
+    customerId: string;
+    title: string;
+    description?: string | null;
+  } | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [jobVisible, setJobVisible] = useState(false);
+  const [sessionVisible, setSessionVisible] = useState(false);
+  const [startDiagnosticVisible, setStartDiagnosticVisible] = useState(false);
+  const field = useFieldData(session, onSession);
 
-  const loadCached = useCallback(async (): Promise<boolean> => {
-    const packages = await syncRef.current?.listCachedPackages();
-    if (!packages?.length) return false;
-
-    setJobs(packages.map((item) => item.job as unknown as JobDTO));
-    setAppointments(
-      packages.flatMap((item) => {
-        const appointment = packageToAppointment(item);
-        return appointment ? [appointment] : [];
-      }),
-    );
-    setDiagnostics(
-      packages.flatMap((item) => {
-        const diagnostic = packageToDiagnostic(item);
-        return diagnostic ? [diagnostic] : [];
-      }),
-    );
-    setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
-    setOffline(true);
-    return true;
-  }, []);
-
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      const [jobRows, appointmentRows, diagnosticRows] = await Promise.all([
-        fetchJson<JobDTO[]>(session, "/api/jobs", onSession),
-        fetchJson<Appointment[]>(session, "/api/appointments", onSession),
-        fetchJson<DiagnosticListItem[]>(session, "/api/diagnostics/sessions", onSession).catch(() => []),
-      ]);
-      setJobs(jobRows);
-      setAppointments(appointmentRows);
-      setDiagnostics(diagnosticRows);
-      setOffline(false);
-      setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
-    } catch (caught) {
-      const restored = await loadCached();
-      setError(
-        restored
-          ? "Offline mode — showing downloaded field packages. New readings remain queued until synchronization succeeds."
-          : caught instanceof Error
-            ? caught.message
-            : String(caught),
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [loadCached, onSession, session]);
+  const overlayActive = Boolean(
+    showNotifications || selectedSessionId || startDiagnostic || selectedJobId,
+  );
 
   useEffect(() => {
-    const service = new SyncService({ apiUrl: API, orgId: session.orgId, token: session.accessToken });
-    syncRef.current = service;
-    void load();
+    void registerFieldPush(session);
+    return addPushRefreshListener(() => field.refresh());
+  }, [session.accessToken, field.refresh]);
 
-    const synchronize = async () => {
-      try {
-        const result = await service.pull();
-        setLastSync(new Date().toLocaleTimeString());
-        setQueuedWrites(Math.max(0, result.queuedBeforeFlush - result.flushed));
-        await load();
-      } catch {
-        await loadCached();
-      }
-    };
-
-    void synchronize();
-    const interval = setInterval(() => void synchronize(), 30_000);
-    return () => clearInterval(interval);
-  }, [load, loadCached, session.accessToken, session.orgId]);
-
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-
-  const todayAppointments = useMemo(
-    () =>
-      appointments
-        .filter((appointment) => {
-          const starts = new Date(appointment.startsAt);
-          return starts >= todayStart && starts < tomorrowStart;
-        })
-        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
-    [appointments, todayStart.getTime(), tomorrowStart.getTime()],
-  );
-
-  const activeDiagnostics = useMemo(
-    () =>
-      diagnostics.filter((item) =>
-        ["identification_required", "workflow_ready", "testing", "blocked", "escalated"].includes(
-          item.session.status,
-        ),
-      ),
-    [diagnostics],
-  );
-
-  const nextAppointment = todayAppointments.find(
-    (appointment) => new Date(appointment.endsAt) > now,
-  );
-  const nextJob = nextAppointment ? jobs.find((job) => job.id === nextAppointment.jobId) : null;
-  const nextDiagnostic = nextAppointment
-    ? diagnostics.find((item) => item.session.jobId === nextAppointment.jobId)
-    : null;
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading today’s field work…</Text>
-        </View>
-        <StatusBar style={scheme === "light" ? "dark" : "light"} />
-      </View>
-    );
+  function openJob(jobId: string) {
+    setSelectedSessionId(null);
+    setStartDiagnostic(null);
+    setStartDiagnosticVisible(false);
+    setSessionVisible(false);
+    setSelectedJobId(jobId);
+    setJobVisible(true);
   }
 
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load();
-            }}
-            tintColor={colors.primary}
-          />
+  function closeJob() {
+    setJobVisible(false);
+  }
+
+  function openSession(sessionId: string) {
+    setSelectedJobId(null);
+    setJobVisible(false);
+    setStartDiagnostic(null);
+    setStartDiagnosticVisible(false);
+    setSelectedSessionId(sessionId);
+    setSessionVisible(true);
+  }
+
+  function closeSession() {
+    setSessionVisible(false);
+  }
+
+  function beginStartDiagnostic(payload: {
+    jobId: string;
+    customerId: string;
+    title: string;
+    description?: string | null;
+  }) {
+    setSelectedJobId(null);
+    setJobVisible(false);
+    setSelectedSessionId(null);
+    setSessionVisible(false);
+    setStartDiagnostic(payload);
+    setStartDiagnosticVisible(true);
+  }
+
+  function closeStartDiagnostic() {
+    setStartDiagnosticVisible(false);
+  }
+
+  function openNotifications() {
+    setShowNotifications(true);
+    setNotificationsVisible(true);
+  }
+
+  function closeNotifications() {
+    setNotificationsVisible(false);
+  }
+
+  const runStaffSearch = useCallback(
+    async (query: string) => {
+      const data = await staffSearch(session, query);
+      return staffSearchToItems(data);
+    },
+    [session],
+  );
+
+  function handleSearchSelect(item: MobileSearchResultItem) {
+    switch (item.category) {
+      case "appointment":
+      case "help":
+        if (item.payload?.action === "today") setTab("today");
+        else if (item.payload?.action === "jobs") setTab("jobs");
+        else if (item.payload?.action === "diagnostics") setTab("diagnostics");
+        else if (item.payload?.action === "call" && item.payload?.phone) {
+          void Linking.openURL(`tel:${item.payload.phone.replace(/\s/g, "")}`);
+        } else setTab("today");
+        break;
+      case "job":
+        if (item.payload?.jobId) {
+          openJob(String(item.payload.jobId));
+          onSearchOpenChange(false);
+        } else {
+          setTab("jobs");
         }
-      >
-        <View style={styles.header}>
-          <View style={styles.headerStatusRow}>
-            <Text style={styles.eyebrow}>NNACT FIELD</Text>
-            <View style={styles.headerActions}>
-              <Text style={[styles.connectivity, { color: offline ? colors.warning : colors.success }]}>
-                {offline ? "OFFLINE" : "ONLINE"}
-              </Text>
-              <TouchableOpacity onPress={onSignOut}>
-                <Text style={styles.signOut}>Sign out</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <Text style={styles.headerTitle}>Today</Text>
-          <Text style={styles.headerSub}>
-            {session.user.name} · {todayAppointments.length} visit{todayAppointments.length === 1 ? "" : "s"} · {activeDiagnostics.length} active diagnostic{activeDiagnostics.length === 1 ? "" : "s"}
-            {queuedWrites ? ` · ${queuedWrites} queued` : ""}
-            {lastSync ? ` · synced ${lastSync}` : ""}
-          </Text>
-        </View>
+        break;
+      case "customer":
+      case "invoice":
+      case "estimate":
+        setTab("jobs");
+        break;
+      case "equipment":
+      case "repair_model":
+      case "repair_fault":
+      case "repair_part":
+      case "repair_procedure":
+        setTab("diagnostics");
+        break;
+      default:
+        break;
+    }
+  }
 
-        {error && (
-          <View style={[styles.errorBanner, offline && styles.offlineBanner]}>
-            <Text style={[styles.errorTitle, offline && styles.offlineTitle]}>
-              {offline ? "Working from downloaded field packages" : "Field data needs attention"}
-            </Text>
-            <Text style={styles.errorMessage}>{error}</Text>
-          </View>
-        )}
+  const searchProps = {
+    onOpenSearch: () => onSearchOpenChange(true),
+    searchPlaceholder,
+    searchFonts,
+  };
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Next action</Text>
-          {nextAppointment ? (
-            <View style={styles.primaryCard}>
-              <View style={styles.rowBetween}>
-                <View style={styles.timeBlock}>
-                  <Text style={styles.timeText}>
-                    {new Date(nextAppointment.startsAt).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                  <Text style={styles.timeLabel}>arrival</Text>
-                </View>
-                <View style={styles.flexOne}>
-                  <Text style={styles.cardTitle}>{nextJob?.title ?? "Assigned service job"}</Text>
-                  <Text style={styles.cardMeta}>
-                    {nextJob?.status ? humanize(nextJob.status) : "scheduled"}
-                  </Text>
-                </View>
-              </View>
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <TabTransition activeKey={tab}>
+        {!overlayActive && tab === "today" ? (
+          <TodayScreen
+            colors={colors}
+            session={session}
+            loading={field.loading}
+            refreshing={field.refreshing}
+            offline={field.offline}
+            error={field.error}
+            lastSync={field.lastSync}
+            queuedWrites={field.queuedWrites}
+            todayAppointments={field.todayAppointments}
+            activeDiagnostics={field.activeDiagnostics}
+            nextAppointment={field.nextAppointment}
+            nextJob={field.nextJob ?? undefined}
+            nextDiagnostic={field.nextDiagnostic ?? undefined}
+            jobs={field.jobs}
+            unreadNotifications={field.unreadNotifications}
+            onRefresh={field.refresh}
+            onOpenDiagnostics={() => setTab("diagnostics")}
+            onOpenJobs={() => setTab("jobs")}
+            onOpenJob={openJob}
+            {...searchProps}
+          />
+        ) : null}
 
-              {nextDiagnostic ? (
-                <View style={styles.appliancePanel}>
-                  <View style={styles.rowBetween}>
-                    <View style={styles.flexOne}>
-                      <Text style={styles.applianceTitle}>
-                        {[nextDiagnostic.equipment.make, nextDiagnostic.equipment.model]
-                          .filter(Boolean)
-                          .join(" ") || nextDiagnostic.equipment.type}
-                      </Text>
-                      <Text style={styles.cardMeta}>
-                        {nextDiagnostic.workflow?.name ?? "Coverage required"}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusPill,
-                        { borderColor: statusColor(nextDiagnostic.session.status, colors) },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          { color: statusColor(nextDiagnostic.session.status, colors) },
-                        ]}
-                      >
-                        {humanize(nextDiagnostic.session.status)}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.complaintText}>
-                    {nextDiagnostic.session.customerComplaint || "Customer complaint not recorded"}
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.warningPanel}>
-                  <Text style={styles.warningTitle}>Diagnostic not started</Text>
-                  <Text style={styles.cardMeta}>
-                    Confirm the exact model and serial, then select the applicable validated workflow.
-                  </Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No remaining appointments today</Text>
-              <Text style={styles.emptyText}>
-                Check Jobs for unscheduled work, parts returns, and incomplete diagnostic sessions.
-              </Text>
-            </View>
-          )}
-        </View>
+        {!overlayActive && tab === "jobs" ? (
+          <JobsScreen colors={colors} jobs={field.jobs} loading={field.loading} onOpenJob={openJob} {...searchProps} />
+        ) : null}
 
-        <View style={styles.section}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.sectionTitle}>Diagnostic attention</Text>
-            <Text style={styles.sectionCount}>{activeDiagnostics.length}</Text>
-          </View>
-          {activeDiagnostics.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No active diagnostic sessions</Text>
-              <Text style={styles.emptyText}>
-                New sessions appear after the work order is linked to the exact appliance.
-              </Text>
-            </View>
-          ) : (
-            activeDiagnostics.slice(0, 8).map((item) => (
-              <View key={item.session.id} style={styles.listCard}>
-                <View style={styles.rowBetween}>
-                  <View style={styles.flexOne}>
-                    <Text style={styles.listTitle}>
-                      {[item.equipment.make, item.equipment.model].filter(Boolean).join(" ") ||
-                        item.equipment.type}
-                    </Text>
-                    <Text style={styles.cardMeta}>
-                      {item.workflow?.name ?? "Unsupported / unresolved"}
-                    </Text>
-                  </View>
-                  <Text style={[styles.smallStatus, { color: statusColor(item.session.status, colors) }]}>
-                    {humanize(item.session.status)}
-                  </Text>
-                </View>
-                <Text style={styles.complaintText} numberOfLines={2}>
-                  {item.session.customerComplaint || "Complaint not recorded"}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
+        {!overlayActive && tab === "diagnostics" ? (
+          <DiagnosticsScreen
+            colors={colors}
+            diagnostics={field.diagnostics}
+            loading={field.loading}
+            onOpenSession={openSession}
+            {...searchProps}
+          />
+        ) : null}
 
-        <View style={styles.section}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.sectionTitle}>Today’s route</Text>
-            <Text style={styles.sectionCount}>{todayAppointments.length}</Text>
-          </View>
-          {todayAppointments.map((appointment) => {
-            const job = jobs.find((item) => item.id === appointment.jobId);
-            const session = diagnostics.find((item) => item.session.jobId === appointment.jobId);
-            return (
-              <View key={appointment.id} style={styles.routeCard}>
-                <Text style={styles.routeTime}>
-                  {new Date(appointment.startsAt).toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </Text>
-                <View style={styles.flexOne}>
-                  <Text style={styles.listTitle}>{job?.title ?? "Service job"}</Text>
-                  <Text style={styles.cardMeta}>
-                    {session ? humanize(session.session.status) : "diagnostic not started"}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-        <View style={{ height: 48 }} />
-      </ScrollView>
+        {!overlayActive && tab === "account" ? (
+          <AccountScreen
+            colors={colors}
+            session={session}
+            offline={field.offline}
+            lastSync={field.lastSync}
+            queuedWrites={field.queuedWrites}
+            onSignOut={onSignOut}
+            signingOut={signingOut}
+            onOpenNotifications={openNotifications}
+            {...searchProps}
+          />
+        ) : null}
+      </TabTransition>
+
+      {showNotifications ? (
+        <AnimatedScreen
+          visible={notificationsVisible}
+          onExited={() => {
+            setShowNotifications(false);
+            if (pendingJobId) {
+              openJob(pendingJobId);
+              setPendingJobId(null);
+            }
+          }}
+        >
+          <NotificationsScreen
+            colors={colors}
+            session={session}
+            onBack={closeNotifications}
+            onOpenJob={(jobId) => {
+              setPendingJobId(jobId);
+              closeNotifications();
+            }}
+            {...searchProps}
+          />
+        </AnimatedScreen>
+      ) : null}
+
+      {selectedSessionId ? (
+        <AnimatedScreen visible={sessionVisible} onExited={() => setSelectedSessionId(null)}>
+          <DiagnosticSessionScreen
+            colors={colors}
+            sessionId={selectedSessionId}
+            staffSession={session}
+            offline={field.offline}
+            syncService={field.getSyncService()}
+            onBack={closeSession}
+            onCompleted={() => void field.refresh()}
+          />
+        </AnimatedScreen>
+      ) : null}
+
+      {startDiagnostic ? (
+        <AnimatedScreen visible={startDiagnosticVisible} onExited={() => {
+          setStartDiagnostic(null);
+          if (pendingSessionId) {
+            openSession(pendingSessionId);
+            setPendingSessionId(null);
+          }
+        }}>
+          <StartDiagnosticScreen
+            colors={colors}
+            staffSession={session}
+            jobId={startDiagnostic.jobId}
+            jobTitle={startDiagnostic.title}
+            customerId={startDiagnostic.customerId}
+            defaultComplaint={startDiagnostic.description}
+            onBack={closeStartDiagnostic}
+            onStarted={(sessionId) => {
+              setPendingSessionId(sessionId);
+              closeStartDiagnostic();
+            }}
+          />
+        </AnimatedScreen>
+      ) : null}
+
+      {selectedJobId ? (
+        <AnimatedScreen visible={jobVisible} onExited={() => setSelectedJobId(null)}>
+          <JobDetailScreen
+            colors={colors}
+            jobId={selectedJobId}
+            session={session}
+            onSession={onSession}
+            onBack={closeJob}
+            onOpenDiagnosticSession={openSession}
+            onStartDiagnostic={(payload) => {
+              const job = field.jobs.find((row) => row.id === selectedJobId);
+              beginStartDiagnostic({
+                jobId: selectedJobId,
+                customerId: payload.customerId || job?.customerId || "",
+                title: job?.title ?? "Service job",
+                description: payload.description ?? job?.description,
+              });
+            }}
+            initialJob={field.jobs.find((job) => job.id === selectedJobId)}
+            cachedAppointments={field.appointments}
+            cachedDiagnostics={field.diagnostics}
+            onJobUpdated={() => void field.refresh()}
+          />
+        </AnimatedScreen>
+      ) : null}
+
+      <AppSearchModal
+        visible={searchOpen}
+        colors={colors}
+        fonts={searchFonts}
+        placeholder={searchPlaceholder}
+        suggestions={defaultStaffSuggestions()}
+        onClose={() => onSearchOpenChange(false)}
+        onSearch={runStaffSearch}
+        onSelect={handleSearchSelect}
+      />
+
+      {!overlayActive ? (
+        <BottomTabBar
+          colors={colors}
+          active={tab}
+          onChange={setTab}
+          diagnosticsBadge={field.activeDiagnostics.length}
+          notificationBadge={field.unreadNotifications}
+        />
+      ) : null}
+      {signingOut ? <LoadingOverlay colors={colors} message="Signing out…" /> : null}
       <StatusBar style={scheme === "light" ? "dark" : "light"} />
     </View>
   );
 }
 
 export default function App() {
-  const { colors, scheme } = useTheme();
+  const { colors, scheme, fonts } = useTheme();
   const [session, setSession] = useState<StoredStaffSession | null>(null);
   const [booting, setBooting] = useState(true);
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginVisible, setLoginVisible] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const searchFonts = {
+    regular: fonts.regular,
+    medium: fonts.medium,
+    semibold: fonts.semibold,
+    bold: fonts.bold,
+  };
+
+  const searchPlaceholder = session ? "Search jobs & diagnostics" : "Search field tools";
 
   useEffect(() => {
-    void loadStaffSession().then((stored) => {
-      setSession(stored);
+    void loadStaffSession().then(async (stored) => {
+      if (!stored) {
+        setBooting(false);
+        return;
+      }
+      try {
+        const me = await staffMe(stored.accessToken);
+        setSession({
+          ...stored,
+          user: { ...stored.user, ...me, mustChangePassword: Boolean(me.mustChangePassword) },
+        });
+      } catch {
+        setSession(stored);
+      }
       setBooting(false);
     });
   }, []);
 
-  async function handleSignOut(current: StoredStaffSession) {
-    await staffLogout(current.refreshToken);
-    await clearStaffSession();
+  function signOut() {
+    if (signingOut || !session) return;
+    setSigningOut(true);
+    const refreshToken = session.refreshToken;
+
     setSession(null);
+    setShowLogin(false);
+    setLoginVisible(false);
+
+    void (async () => {
+      try {
+        await clearStaffSession();
+      } finally {
+        setSigningOut(false);
+      }
+      void staffLogout(refreshToken);
+    })();
   }
+
+  const runGuestSearch = useCallback(async (query: string) => {
+    const q = query.trim().toLowerCase();
+    return defaultStaffSuggestions().filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) || (item.subtitle?.toLowerCase().includes(q) ?? false),
+    );
+  }, []);
+
+  function handleGuestSearchSelect(item: MobileSearchResultItem) {
+    if (item.payload?.action === "call" && item.payload?.phone) {
+      void Linking.openURL(`tel:${item.payload.phone.replace(/\s/g, "")}`);
+    } else {
+      setShowLogin(true);
+      setLoginVisible(true);
+    }
+  }
+
+  const guestSearchProps = {
+    onOpenSearch: () => setSearchOpen(true),
+    searchPlaceholder,
+    searchFonts,
+  };
 
   if (booting) {
     return (
@@ -465,12 +432,52 @@ export default function App() {
     );
   }
 
+  if (showLogin && !session) {
+    return (
+      <>
+        <AnimatedScreen visible={loginVisible} onExited={() => setShowLogin(false)}>
+          <LoginScreen
+            colors={colors}
+            onBack={() => setLoginVisible(false)}
+            onSignedIn={async (next) => {
+              await saveStaffSession(next);
+              setSession(next);
+              setLoginVisible(false);
+            }}
+          />
+        </AnimatedScreen>
+        <StatusBar style={scheme === "light" ? "dark" : "light"} />
+      </>
+    );
+  }
+
   if (!session) {
     return (
       <>
-        <LoginScreen
+        <WelcomeScreen colors={colors} onSignIn={() => { setShowLogin(true); setLoginVisible(true); }} {...guestSearchProps} />
+        <AppSearchModal
+          visible={searchOpen}
           colors={colors}
-          onSignedIn={async (next) => {
+          fonts={searchFonts}
+          placeholder={searchPlaceholder}
+          suggestions={defaultStaffSuggestions()}
+          onClose={() => setSearchOpen(false)}
+          onSearch={runGuestSearch}
+          onSelect={handleGuestSearchSelect}
+        />
+        {signingOut ? <LoadingOverlay colors={colors} message="Signing out…" /> : null}
+        <StatusBar style={scheme === "light" ? "dark" : "light"} />
+      </>
+    );
+  }
+
+  if (session.user.mustChangePassword) {
+    return (
+      <>
+        <ChangePasswordScreen
+          colors={colors}
+          session={session}
+          onComplete={async (next) => {
             await saveStaffSession(next);
             setSession(next);
           }}
@@ -481,60 +488,15 @@ export default function App() {
   }
 
   return (
-    <FieldDashboard
+    <FieldApp
       session={session}
-      onSession={(next) => {
-        void saveStaffSession(next).then(() => setSession(next));
-      }}
-      onSignOut={() => void handleSignOut(session)}
+      onSession={(next) => void saveStaffSession(next).then(() => setSession(next))}
+      onSignOut={signOut}
+      signingOut={signingOut}
+      searchOpen={searchOpen}
+      onSearchOpenChange={setSearchOpen}
+      searchPlaceholder={searchPlaceholder}
+      searchFonts={searchFonts}
     />
   );
 }
-
-const createStyles = (colors: Palette) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-  scroll: { flex: 1 },
-  scrollContent: { paddingTop: 58, paddingBottom: 24 },
-  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { color: colors.mutedForeground, fontSize: 14, fontFamily: fonts.regular },
-  header: { paddingHorizontal: 20, marginBottom: 22 },
-  headerStatusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 12 },
-  signOut: { color: colors.mutedForeground, fontSize: 11, fontFamily: fonts.bold },
-  eyebrow: { color: colors.primary, fontSize: 10, fontFamily: fonts.extraBold, letterSpacing: 2 },
-  connectivity: { fontSize: 9, fontFamily: fonts.black, letterSpacing: 1.4 },
-  headerTitle: { color: colors.foreground, fontSize: 32, fontFamily: fonts.extraBold, letterSpacing: -0.8, marginTop: 4 },
-  headerSub: { color: colors.mutedForeground, fontSize: 12, marginTop: 5, fontFamily: fonts.regular },
-  errorBanner: { marginHorizontal: 20, marginBottom: 18, borderRadius: 12, borderWidth: 1, borderColor: colors.dangerAlpha, backgroundColor: colors.dangerAlpha, padding: 14 },
-  offlineBanner: { borderColor: colors.warningAlpha, backgroundColor: colors.warningAlpha },
-  errorTitle: { color: colors.danger, fontSize: 13, fontFamily: fonts.bold },
-  offlineTitle: { color: colors.warning },
-  errorMessage: { color: colors.mutedForeground, fontSize: 11, marginTop: 4, fontFamily: fonts.regular },
-  section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionTitle: { color: colors.foreground, fontSize: 16, fontFamily: fonts.bold, marginBottom: 11 },
-  sectionCount: { color: colors.dimForeground, fontSize: 12, fontFamily: fonts.bold, marginBottom: 11 },
-  primaryCard: { borderRadius: 18, borderWidth: 1, borderColor: colors.focus, backgroundColor: colors.card, padding: 16 },
-  rowBetween: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  flexOne: { flex: 1, minWidth: 0 },
-  timeBlock: { width: 72, borderRadius: 12, backgroundColor: colors.cardMuted, paddingVertical: 9, alignItems: "center" },
-  timeText: { color: colors.foreground, fontSize: 16, fontFamily: fonts.extraBold },
-  timeLabel: { color: colors.dimForeground, fontSize: 9, marginTop: 2, textTransform: "uppercase" },
-  cardTitle: { color: colors.foreground, fontSize: 17, fontFamily: fonts.bold },
-  cardMeta: { color: colors.mutedForeground, fontSize: 11, marginTop: 3, fontFamily: fonts.regular },
-  appliancePanel: { marginTop: 14, borderRadius: 13, backgroundColor: colors.cardMuted, padding: 13 },
-  applianceTitle: { color: colors.foreground, fontSize: 14, fontFamily: fonts.bold },
-  statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
-  statusText: { fontSize: 9, fontFamily: fonts.extraBold, textTransform: "uppercase" },
-  complaintText: { color: colors.mutedForeground, fontSize: 12, lineHeight: 17, marginTop: 10, fontFamily: fonts.regular },
-  warningPanel: { marginTop: 14, borderRadius: 13, backgroundColor: colors.warningAlpha, padding: 13 },
-  warningTitle: { color: colors.warning, fontSize: 13, fontFamily: fonts.bold },
-  emptyCard: { borderRadius: 14, backgroundColor: colors.card, paddingVertical: 28, paddingHorizontal: 18, alignItems: "center" },
-  emptyTitle: { color: colors.mutedForeground, fontSize: 14, fontFamily: fonts.bold, textAlign: "center" },
-  emptyText: { color: colors.dimForeground, fontSize: 11, lineHeight: 16, marginTop: 5, textAlign: "center", fontFamily: fonts.regular },
-  listCard: { borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 9 },
-  listTitle: { color: colors.foreground, fontSize: 13, fontFamily: fonts.bold },
-  smallStatus: { fontSize: 9, fontFamily: fonts.extraBold, textTransform: "uppercase" },
-  routeCard: { flexDirection: "row", alignItems: "center", gap: 13, borderRadius: 13, backgroundColor: colors.card, padding: 13, marginBottom: 8 },
-  routeTime: { width: 70, color: colors.focus, fontSize: 13, fontFamily: fonts.extraBold },
-});

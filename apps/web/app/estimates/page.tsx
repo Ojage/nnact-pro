@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { useCreateEstimateMutation, useCustomersQuery, useEstimatesQuery, useJobsQuery } from "@/lib/redux/api";
 import { formatMoney } from "@nnact/shared";
 import type { JobDTO, CustomerDTO } from "@nnact/shared";
 import { Card } from "@/components/ui/card";
@@ -14,20 +14,6 @@ import { FormSelect } from "@/components/ui/form-select";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/empty-state";
 import { Table, TableHeader, TableHead, TableBody, TableRow } from "@/components/ui/table";
-
-interface Estimate {
-  id: string;
-  orgId: string;
-  jobId: string;
-  number: string;
-  total: number;
-  accepted: boolean;
-  expiresAt?: string | null;
-  acceptedAt?: string | null;
-  acceptedByName?: string | null;
-  status: "draft" | "sent" | "approved" | "declined" | "expired";
-  createdAt: string;
-}
 
 type StatusFilter = "all" | "pending" | "accepted";
 type SortField = "job" | "total" | "status" | "date";
@@ -70,11 +56,10 @@ function SortHead({
 }
 
 export default function EstimatesPage() {
-  const [estimates, setEstimates] = useState<Estimate[]>([]);
-  const [jobs, setJobs] = useState<JobDTO[]>([]);
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: estimates = [], isLoading, isError, error: queryError } = useEstimatesQuery();
+  const { data: jobs = [] } = useJobsQuery();
+  const { data: customers = [] } = useCustomersQuery();
+  const [createEstimate, { isLoading: createSubmitting }] = useCreateEstimateMutation();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortField>("date");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
@@ -83,7 +68,6 @@ export default function EstimatesPage() {
   // ── Create estimate modal ──
   const [showCreate, setShowCreate] = useState(false);
   const [createJobId, setCreateJobId] = useState("");
-  const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   // Jobs that don't already have an estimate
@@ -95,17 +79,13 @@ export default function EstimatesPage() {
 
   const handleCreateEstimate = async () => {
     if (!createJobId) return;
-    setCreateSubmitting(true);
     setCreateError(null);
     try {
-      const est = await api.createEstimate({ jobId: createJobId });
-      setEstimates((prev) => [est, ...prev]);
+      await createEstimate({ jobId: createJobId }).unwrap();
       setShowCreate(false);
       setCreateJobId("");
     } catch (e) {
       setCreateError(String(e));
-    } finally {
-      setCreateSubmitting(false);
     }
   };
 
@@ -124,30 +104,6 @@ export default function EstimatesPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [showCreate]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [est, jb, cust] = await Promise.all([
-          api.estimates(),
-          api.jobs(),
-          api.customers(),
-        ]);
-        if (!cancelled) {
-          setEstimates(est);
-          setJobs(jb);
-          setCustomers(cust);
-        }
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
 
   const jobMap = useMemo(() => {
     const m = new Map<string, JobDTO>();
@@ -210,7 +166,7 @@ export default function EstimatesPage() {
     return list;
   }, [estimates, search, sort, dir, statusFilter, jobMap, customerMap]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div>
         <div className="flex items-end justify-between mb-8">
@@ -309,8 +265,8 @@ export default function EstimatesPage() {
                 </div>
 
                 <div className="flex gap-2 mt-6">
-                  <Button type="submit" disabled={!createJobId || createSubmitting}>
-                    {createSubmitting ? "Creating..." : "Create Estimate"}
+                  <Button type="submit" loading={createSubmitting} disabled={!createJobId}>
+                    Create Estimate
                   </Button>
                   <Button type="button" variant="secondary" onClick={() => setShowCreate(false)}>
                     Cancel
@@ -322,13 +278,13 @@ export default function EstimatesPage() {
         </>
       )}
 
-      {error && (
+      {isError && (
         <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">API unreachable ({error}).</p>
+          <p className="text-red text-sm">API unreachable ({queryError ? String(queryError) : "unknown error"}).</p>
         </Card>
       )}
 
-      {estimates.length === 0 && !error ? (
+      {estimates.length === 0 && !isError ? (
         <Card>
           <EmptyState
             title="No estimates yet"

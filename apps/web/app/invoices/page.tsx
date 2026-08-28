@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { api, type BusinessSettingsDTO } from "@/lib/api";
 import { formatMoney } from "@nnact/shared";
 import type { JobDTO, CustomerDTO } from "@nnact/shared";
+import { useCreateInvoiceMutation, useCustomersQuery, useInvoicesQuery, useJobsQuery, useOrgQuery } from "@/lib/redux/api";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,20 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
 import { Label } from "@/components/ui/label";
+import { InfoTip } from "@/components/ui/info-tip";
 import { InvoiceStatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination } from "@/components/pagination";
-
-interface Invoice {
-  id: string;
-  jobId: string;
-  number: string;
-  status: "draft" | "sent" | "paid" | "void";
-  total: number;
-  dueAt?: string | null;
-  createdAt?: string;
-}
 
 type SortField = "number" | "status" | "total";
 type SortDir = "asc" | "desc";
@@ -40,11 +31,11 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
 ];
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [jobs, setJobs] = useState<JobDTO[]>([]);
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: invoices = [], isLoading: loading, isError, error: queryError } = useInvoicesQuery();
+  const { data: jobs = [] } = useJobsQuery();
+  const { data: customers = [] } = useCustomersQuery();
+  const { data: org } = useOrgQuery();
+  const [createInvoice, { isLoading: createSubmitting }] = useCreateInvoiceMutation();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("number");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -52,18 +43,14 @@ export default function InvoicesPage() {
   const [skip, setSkip] = useState(0);
   const take = 50;
 
-  // Reset pagination when filters change
-  useEffect(() => { setSkip(0); }, [search, statusFilter]);
-
   // ── Create invoice modal ──
   const [showCreate, setShowCreate] = useState(false);
   const [createJobId, setCreateJobId] = useState("");
   const [createDueAt, setCreateDueAt] = useState("");
   const [createDiscountId, setCreateDiscountId] = useState("");
-  const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [discounts, setDiscounts] = useState<BusinessSettingsDTO["taxes"]["discounts"]>([]);
-  const [discountsEnabled, setDiscountsEnabled] = useState(true);
+  const discounts = org?.businessSettings?.taxes?.discounts ?? [];
+  const discountsEnabled = org?.businessSettings?.taxes?.discountsEnabled ?? true;
 
   // Jobs that don't already have an invoice
   const invoicedJobIds = useMemo(() => new Set(invoices.map((i) => i.jobId)), [invoices]);
@@ -74,23 +61,19 @@ export default function InvoicesPage() {
 
   const handleCreateInvoice = async () => {
     if (!createJobId) return;
-    setCreateSubmitting(true);
     setCreateError(null);
     try {
-      const inv = await api.createInvoice({
+      await createInvoice({
         jobId: createJobId,
         ...(createDueAt ? { dueAt: new Date(createDueAt).toISOString() } : {}),
         ...(createDiscountId ? { discountId: createDiscountId } : {}),
-      });
-      setInvoices((prev) => [inv, ...prev]);
+      }).unwrap();
       setShowCreate(false);
       setCreateJobId("");
       setCreateDueAt("");
       setCreateDiscountId("");
     } catch (e) {
       setCreateError(String(e));
-    } finally {
-      setCreateSubmitting(false);
     }
   };
 
@@ -102,32 +85,8 @@ export default function InvoicesPage() {
     setShowCreate(true);
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [iv, jb, cu] = await Promise.all([
-          api.invoices().catch(() => [] as Invoice[]),
-          api.jobs().catch(() => [] as JobDTO[]),
-          api.customers().catch(() => [] as CustomerDTO[]),
-        ]);
-        const orgSettings = await api.org().catch(() => null);
-        if (!cancelled) {
-          setInvoices(iv);
-          setJobs(jb);
-          setCustomers(cu);
-          setDiscounts(orgSettings?.businessSettings?.taxes?.discounts ?? []);
-          setDiscountsEnabled(orgSettings?.businessSettings?.taxes?.discountsEnabled ?? true);
-        }
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
+  // Reset pagination when filters change
+  useEffect(() => { setSkip(0); }, [search, statusFilter]);
 
   // ── Lookups ──
   const jobMap = useMemo(() => {
@@ -265,9 +224,9 @@ export default function InvoicesPage() {
       />
 
       {/* ── Error ── */}
-      {error && (
+      {isError && (
         <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">API unreachable ({error}).</p>
+          <p className="text-red text-sm">API unreachable ({queryError ? String(queryError) : "unknown error"}).</p>
         </Card>
       )}
 
@@ -327,7 +286,10 @@ export default function InvoicesPage() {
 
                   {discountsEnabled && discounts.length > 0 && (
                     <div>
-                      <Label className="mb-1.5 block text-xs font-semibold text-fg-muted">Discount</Label>
+                      <Label className="mb-1.5 block text-xs font-semibold text-fg-muted">
+                        Discount
+                        <InfoTip label="About discount" side="top">Applies a saved discount profile to the whole invoice. Discounts are subtracted before tax.</InfoTip>
+                      </Label>
                       <FormSelect
                         value={createDiscountId}
                         onChange={setCreateDiscountId}
@@ -357,9 +319,10 @@ export default function InvoicesPage() {
                 <div className="flex gap-2 mt-6">
                   <Button
                     type="submit"
-                    disabled={!createJobId || createSubmitting}
+                    loading={createSubmitting}
+                    disabled={!createJobId}
                   >
-                    {createSubmitting ? "Creating..." : "Create Invoice"}
+                    Create Invoice
                   </Button>
                   <Button
                     type="button"
@@ -395,7 +358,7 @@ export default function InvoicesPage() {
       )}
 
       {/* ── Content ── */}
-      {invoices.length === 0 && !error ? (
+      {invoices.length === 0 && !isError ? (
         <Card>
           <EmptyState
             title="No invoices yet"

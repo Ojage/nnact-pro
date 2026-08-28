@@ -31,6 +31,11 @@ const loginBody = z.object({
   password: z.string().min(1).max(128),
 });
 
+const changePasswordBody = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(12).max(128),
+});
+
 const refreshBody = z.object({
   refreshToken: z.string().trim().min(10).max(512),
 });
@@ -56,7 +61,14 @@ const WEB_STAFF_SESSION_SECONDS = 12 * 60 * 60;
 
 function signStaffAccessToken(
   app: FastifyInstance,
-  user: { id: string; orgId: string; role: string; name: string; email: string },
+  user: {
+    id: string;
+    orgId: string;
+    role: string;
+    name: string;
+    email: string;
+    mustChangePassword?: boolean;
+  },
   expiresInSeconds: number = ACCESS_TOKEN_TTL_SECONDS,
 ) {
   return app.jwt.sign(
@@ -67,19 +79,41 @@ function signStaffAccessToken(
       role: user.role,
       name: user.name,
       email: user.email,
+      mustChangePassword: Boolean(user.mustChangePassword),
     } satisfies StaffJwtClaims,
     { expiresIn: expiresInSeconds },
   );
 }
 
-function publicUser(user: { id: string; name: string; email: string; role: string; orgId: string }) {
-  return { id: user.id, name: user.name, email: user.email, role: user.role, orgId: user.orgId };
+function publicUser(user: {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  orgId: string;
+  mustChangePassword?: boolean;
+}) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    orgId: user.orgId,
+    mustChangePassword: Boolean(user.mustChangePassword),
+  };
 }
 
 async function staffAuthResponse(
   app: FastifyInstance,
   reply: FastifyReply,
-  user: { id: string; orgId: string; role: string; name: string; email: string },
+  user: {
+    id: string;
+    orgId: string;
+    role: string;
+    name: string;
+    email: string;
+    mustChangePassword?: boolean;
+  },
   req: FastifyRequest,
   setCookie: boolean,
 ) {
@@ -99,6 +133,7 @@ async function staffAuthResponse(
     expiresIn: sessionSeconds,
     user: publicUser(user),
     orgId: user.orgId,
+    mustChangePassword: Boolean(user.mustChangePassword),
   };
 }
 
@@ -135,6 +170,7 @@ export async function authRoutes(app: FastifyInstance) {
           name,
           role: "owner",
           passwordHash: await hashPassword(password),
+          mustChangePassword: false,
         })
         .returning();
       return { conflict: false as const, org, user };
@@ -142,7 +178,10 @@ export async function authRoutes(app: FastifyInstance) {
 
     if (result.conflict) return reply.code(409).send({ error: "an account with this email already exists" });
 
-    const payload = await staffAuthResponse(app, reply, result.user, req, true);
+    const payload = await staffAuthResponse(app, reply, {
+      ...result.user,
+      mustChangePassword: result.user.mustChangePassword,
+    }, req, true);
     return reply.code(201).send(payload);
   });
 
@@ -157,7 +196,60 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: "invalid credentials" });
     }
 
-    return staffAuthResponse(app, reply, user, req, true);
+    return staffAuthResponse(app, reply, {
+      id: user.id,
+      orgId: user.orgId,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      mustChangePassword: user.mustChangePassword,
+    }, req, true);
+  });
+
+  app.post("/change-password", async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      await req.jwtVerify();
+    } catch {
+      return reply.code(401).send({ error: "authentication required" });
+    }
+    if (!isStaffClaims(req.user)) {
+      return reply.code(401).send({ error: "staff session required" });
+    }
+    const claims = req.user;
+
+    const parsed = changePasswordBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const passwordError = validatePasswordStrength(parsed.data.newPassword);
+    if (passwordError) return reply.code(400).send({ error: passwordError });
+
+    const [user] = await db.select().from(users).where(eq(users.id, claims.userId)).limit(1);
+    if (!user?.active || !user.passwordHash) return reply.code(401).send({ error: "account inactive" });
+    if (!(await verifyPassword(parsed.data.currentPassword, user.passwordHash))) {
+      return reply.code(401).send({ error: "current password is incorrect" });
+    }
+    if (await verifyPassword(parsed.data.newPassword, user.passwordHash)) {
+      return reply.code(400).send({ error: "choose a password different from your current one" });
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({
+        passwordHash: await hashPassword(parsed.data.newPassword),
+        mustChangePassword: false,
+      })
+      .where(eq(users.id, user.id))
+      .returning();
+
+    return staffAuthResponse(app, reply, {
+      id: updated.id,
+      orgId: updated.orgId,
+      role: updated.role,
+      name: updated.name,
+      email: updated.email,
+      mustChangePassword: false,
+    }, req, true);
   });
 
   app.post("/refresh", async (req, reply) => {
@@ -177,15 +269,30 @@ export async function authRoutes(app: FastifyInstance) {
     const [user] = await db.select().from(users).where(eq(users.id, rotated.subjectId)).limit(1);
     if (!user?.active || !user.passwordHash) return reply.code(401).send({ error: "account inactive" });
 
-    const accessToken = signStaffAccessToken(app, user, WEB_STAFF_SESSION_SECONDS);
+    const accessToken = signStaffAccessToken(app, {
+      id: user.id,
+      orgId: user.orgId,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      mustChangePassword: user.mustChangePassword,
+    }, WEB_STAFF_SESSION_SECONDS);
     setSessionCookie(reply, accessToken);
     return {
       token: accessToken,
       accessToken,
       refreshToken: rotated.refreshToken,
       expiresIn: WEB_STAFF_SESSION_SECONDS,
-      user: publicUser(user),
+      user: publicUser({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        orgId: user.orgId,
+        mustChangePassword: user.mustChangePassword,
+      }),
       orgId: user.orgId,
+      mustChangePassword: Boolean(user.mustChangePassword),
     };
   });
 
@@ -208,12 +315,19 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: "staff session required" });
     }
     const claims = req.user;
-    return publicUser({
-      id: claims.userId,
-      name: claims.name ?? "Team member",
-      email: claims.email ?? "",
-      role: claims.role,
-      orgId: claims.orgId,
-    });
+    const [row] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        orgId: users.orgId,
+        mustChangePassword: users.mustChangePassword,
+      })
+      .from(users)
+      .where(eq(users.id, claims.userId))
+      .limit(1);
+    if (!row) return reply.code(401).send({ error: "unauthorized" });
+    return publicUser(row);
   });
 }

@@ -11,12 +11,16 @@ export const customerSiteMetadata: Metadata = {
   },
   description: `Request service, review estimates, pay invoices, and track maintenance with ${NNACT_COMPANY.shortName} — HVAC, refrigeration, electrical, and solar services in ${NNACT_COMPANY.location.addressLocality}.`,
   applicationName: `${NNACT_COMPANY.shortName} Customer`,
+  icons: {
+    icon: "/nnact-logo.png",
+    apple: "/nnact-logo.png",
+  },
   openGraph: {
     type: "website",
     locale: "en_CM",
     siteName: `${NNACT_COMPANY.shortName} Customer`,
     title: `${NNACT_COMPANY.shortName} — ${NNACT_COMPANY.tagline}`,
     description: NNACT_COMPANY.customerPromise,
-    images: [{ url: "/nnact-logo.jpeg", width: 1200, height: 630, alt: NNACT_COMPANY.shortName }],
+    images: [{ url: "/nnact-logo.png", width: 500, height: 500, alt: NNACT_COMPANY.shortName }],
   },
 };

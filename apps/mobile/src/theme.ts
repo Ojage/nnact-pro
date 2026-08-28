@@ -1,78 +1,104 @@
-// NNACT Pro mobile theme — mirrors the web design system (Banking palette) so
-// web and mobile share the same visual language and type ramp. Both light and
-// dark token sets are provided and follow the device system setting.
+// Coursera-inspired NNACT customer theme — clean learning-platform aesthetics
+// adapted for home-service customers: deep blue hero, gold accents, card discovery.
 
 import { useColorScheme } from "react-native";
 
 const light = {
-  // canvas
-  background: "#ffffff",
-  surface: "#ffffff",
+  background: "#f3f7fc",
+  surface: "#fafcfe",
+  surfaceMuted: "#e8f1fa",
+  surfaceElevated: "#ffffff",
   card: "#ffffff",
-  cardMuted: "#f6f8fa",
-  border: "#d1d9e0",
-  borderLight: "#eaeef2",
-  shadow: "#d1d9e0",
+  cardMuted: "#eef3fa",
+  border: "#dce4ef",
+  borderLight: "#e4ebf4",
+  shadow: "rgba(0, 0, 0, 0.04)",
 
-  // text
-  foreground: "#1f2328",
-  mutedForeground: "#59636e",
-  dimForeground: "#6e7781",
+  foreground: "#1f1f1f",
+  mutedForeground: "#636363",
+  dimForeground: "#8a8a8a",
   onEmphasis: "#ffffff",
 
-  // action / status
-  primary: "#1d4ed8",
-  primaryHover: "#1e40af",
-  primaryMuted: "#dbeafe",
-  focus: "#2563eb",
+  // Coursera blue + gold accent
+  primary: "#0056d2",
+  primaryDark: "#00255d",
+  primaryHover: "#004bb8",
+  primaryMuted: "#e8f1fc",
+  accent: "#f2b705",
+  accentMuted: "#fef8e7",
+  focus: "#0056d2",
+
   success: "#1a7f37",
   warning: "#9a6700",
-  danger: "#cf222e",
+  danger: "#d4111e",
 
-  // translucent helpers
-  borderAlpha: "rgba(110,119,129,0.14)",
-  primaryAlpha: "rgba(29,78,216,0.12)",
-  successAlpha: "rgba(26,127,55,0.12)",
-  warningAlpha: "rgba(154,103,0,0.12)",
-  dangerAlpha: "rgba(207,34,46,0.10)",
+  heroGradientStart: "#0056d2",
+  heroGradientEnd: "#00255d",
+
+  borderAlpha: "rgba(0, 0, 0, 0.08)",
+  primaryAlpha: "rgba(0, 86, 210, 0.10)",
+  successAlpha: "rgba(26, 127, 55, 0.12)",
+  warningAlpha: "rgba(154, 103, 0, 0.12)",
+  dangerAlpha: "rgba(212, 17, 30, 0.10)",
 };
 
 export type Palette = typeof light;
 
 const dark: Palette = {
-  // canvas
-  background: "#0f172a",
-  surface: "#0f172a",
-  card: "#1e293b",
-  cardMuted: "#0f172a",
-  border: "#334155",
-  borderLight: "#475569",
-  shadow: "#020617",
+  background: "#0d1117",
+  surface: "#161b22",
+  surfaceMuted: "#21262d",
+  surfaceElevated: "#1c2128",
+  card: "#161b22",
+  cardMuted: "#21262d",
+  border: "#30363d",
+  borderLight: "#484f58",
+  shadow: "rgba(0, 0, 0, 0.4)",
 
-  // text
-  foreground: "#e2e8f0",
-  mutedForeground: "#94a3b8",
-  dimForeground: "#64748b",
+  foreground: "#f0f6fc",
+  mutedForeground: "#8b949e",
+  dimForeground: "#6e7681",
   onEmphasis: "#ffffff",
 
-  // action / status
-  primary: "#3b82f6",
-  primaryHover: "#2563eb",
-  primaryMuted: "#1e3a5f",
-  focus: "#60a5fa",
-  success: "#22c55e",
-  warning: "#fbbf24",
-  danger: "#f87171",
+  primary: "#4c9aff",
+  primaryDark: "#00255d",
+  primaryHover: "#388bfd",
+  primaryMuted: "#1a2332",
+  accent: "#f2b705",
+  accentMuted: "#2d2608",
+  focus: "#4c9aff",
 
-  // translucent helpers
-  borderAlpha: "rgba(148,163,184,0.15)",
-  primaryAlpha: "rgba(59,130,246,0.18)",
-  successAlpha: "rgba(34,197,94,0.12)",
-  warningAlpha: "rgba(251,191,36,0.12)",
-  dangerAlpha: "rgba(248,113,113,0.12)",
+  success: "#3fb950",
+  warning: "#d29922",
+  danger: "#f85149",
+
+  heroGradientStart: "#0d419d",
+  heroGradientEnd: "#051c44",
+
+  borderAlpha: "rgba(240, 246, 252, 0.08)",
+  primaryAlpha: "rgba(76, 154, 255, 0.15)",
+  successAlpha: "rgba(63, 185, 80, 0.12)",
+  warningAlpha: "rgba(210, 153, 34, 0.12)",
+  dangerAlpha: "rgba(248, 81, 73, 0.12)",
 };
 
-// Source Sans 3 (the open continuation of Source Sans Pro).
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+} as const;
+
+export const radius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  pill: 999,
+} as const;
+
 export const fonts = {
   regular: "SourceSans3_400Regular",
   medium: "SourceSans3_500Medium",
@@ -87,6 +113,8 @@ export function useTheme() {
   return {
     colors: scheme === "light" ? light : dark,
     fonts,
+    spacing,
+    radius,
     scheme: scheme === "light" ? "light" : "dark",
   };
 }

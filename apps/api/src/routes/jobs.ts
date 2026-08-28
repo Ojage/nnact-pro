@@ -6,6 +6,7 @@ import { JOB_STATUS } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";
+import { safeNotifyUser } from "../notify-user.js";
 import { technicianJobPatchAllowed, verifiedClaims } from "../operational-authorization.js";
 
 const createBody = z.object({
@@ -91,6 +92,13 @@ export async function jobRoutes(app: FastifyInstance) {
     const parsed = jobPatchBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
+    const [before] = await db
+      .select({ assignedTo: jobs.assignedTo, title: jobs.title })
+      .from(jobs)
+      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, id)))
+      .limit(1);
+    if (!before) return reply.code(404).send({ error: "not found" });
+
     if (claims.role === "technician") {
       if (!technicianJobPatchAllowed(parsed.data as Record<string, unknown>)) {
         return reply.code(403).send({
@@ -138,6 +146,33 @@ export async function jobRoutes(app: FastifyInstance) {
         id: row.id,
         customerId: row.customerId,
         status: row.status,
+      });
+      if (row.assignedTo) {
+        void safeNotifyUser(orgId, row.assignedTo, {
+          type: "job.status_changed",
+          title: `Job ${label}`,
+          body: row.title,
+          link: `/jobs/${row.id}`,
+          jobId: row.id,
+        });
+      }
+    }
+
+    if (
+      parsed.data.assignedTo !== undefined &&
+      parsed.data.assignedTo &&
+      parsed.data.assignedTo !== before.assignedTo
+    ) {
+      void safeNotifyUser(orgId, parsed.data.assignedTo, {
+        type: "job.assigned",
+        title: "Job assigned to you",
+        body: row.title,
+        link: `/jobs/${row.id}`,
+        jobId: row.id,
+      });
+      void safeEmitEvent(orgId, "job.assigned", {
+        id: row.id,
+        technicianId: parsed.data.assignedTo,
       });
     }
 

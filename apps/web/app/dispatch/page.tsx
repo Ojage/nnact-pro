@@ -8,11 +8,18 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
 import { Label } from "@/components/ui/label";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
-import { dispatchApi, type DispatchAppointment } from "@/lib/dispatch-api";
+import {
+  useAppointmentsQuery,
+  useAssignAppointmentMutation,
+  useJobsQuery,
+  useUsersQuery,
+  type AppointmentDTO,
+} from "@/lib/redux/api";
 import {
   buildConflictMap,
   conflictsForAppointment,
@@ -24,7 +31,7 @@ interface DispatchColumn {
   technicianId: string | null;
   title: string;
   subtitle: string;
-  appointments: DispatchAppointment[];
+  appointments: AppointmentDTO[];
 }
 
 function dateKey(date: Date) {
@@ -69,12 +76,12 @@ function DispatchCard({
   onAssign,
   onDragStart,
 }: {
-  appointment: DispatchAppointment;
+  appointment: AppointmentDTO;
   job?: JobDTO;
   technicians: UserDTO[];
   saving: boolean;
   conflictTitles: string[];
-  onAssign: (appointment: DispatchAppointment, technicianId: string | null) => void;
+  onAssign: (appointment: AppointmentDTO, technicianId: string | null) => void;
   onDragStart: (event: DragEvent<HTMLElement>, appointmentId: string) => void;
 }) {
   const title = job?.title ?? `Job ${appointment.jobId.slice(0, 8)}`;
@@ -164,7 +171,7 @@ function DispatchLane({
   savingIds: Set<string>;
   conflictMap: Map<string, Set<string>>;
   dragOver: boolean;
-  onAssign: (appointment: DispatchAppointment, technicianId: string | null) => void;
+  onAssign: (appointment: AppointmentDTO, technicianId: string | null) => void;
   onDragStart: (event: DragEvent<HTMLElement>, appointmentId: string) => void;
   onDragEnter: () => void;
   onDragLeave: () => void;
@@ -237,39 +244,38 @@ function DispatchLane({
 }
 
 export default function DispatchPage() {
-  const [appointments, setAppointments] = useState<DispatchAppointment[]>([]);
-  const [jobs, setJobs] = useState<JobDTO[]>([]);
-  const [users, setUsers] = useState<UserDTO[]>([]);
+  const { data: appointmentRows = [], isLoading: loading, isError: loadFailed, refetch } = useAppointmentsQuery();
+  const { data: jobRows = [], refetch: refetchJobs } = useJobsQuery();
+  const { data: userRows = [] } = useUsersQuery();
+  const [runAssignAppointment] = useAssignAppointmentMutation();
+
+  const [appointments, setAppointments] = useState<AppointmentDTO[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [savingIds, setSavingIds] = useState<Set<string>>(() => new Set());
   const [dragLaneId, setDragLaneId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [appointmentRows, jobRows, userRows] = await Promise.all([
-        dispatchApi.appointments(),
-        dispatchApi.jobs(),
-        dispatchApi.users(),
-      ]);
-      setAppointments(appointmentRows);
-      setJobs(jobRows);
-      setUsers(userRows);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const jobs = useMemo(() => jobRows, [jobRows]);
+  const users = useMemo(() => userRows, [userRows]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setAppointments(appointmentRows);
+  }, [appointmentRows]);
+
+  useEffect(() => {
+    if (loadFailed) setError("Could not load dispatch data.");
+  }, [loadFailed]);
+
+  useEffect(() => {
+    const handler = () => {
+      void refetch();
+      void refetchJobs();
+    };
+    window.addEventListener("nnact:field-refresh", handler);
+    return () => window.removeEventListener("nnact:field-refresh", handler);
+  }, [refetch, refetchJobs]);
 
   const technicians = useMemo(
     () => users.filter((user) => user.active && user.role === "technician").toSorted((a, b) => a.name.localeCompare(b.name)),
@@ -331,7 +337,7 @@ export default function DispatchPage() {
     [columns],
   );
 
-  const assignAppointment = useCallback(async (appointment: DispatchAppointment, technicianId: string | null) => {
+  const assignAppointment = useCallback(async (appointment: AppointmentDTO, technicianId: string | null) => {
     if (appointment.technicianId === technicianId) return;
 
     const technician = technicians.find((item) => item.id === technicianId);
@@ -357,7 +363,7 @@ export default function DispatchPage() {
     );
 
     try {
-      const saved = await dispatchApi.assignAppointment(appointment.id, technicianId);
+      const saved = await runAssignAppointment({ id: appointment.id, technicianId }).unwrap();
       setAppointments((current) => current.map((item) => (item.id === saved.id ? saved : item)));
       setAnnouncement(`${title} assigned to ${technician?.name ?? "Unassigned"}.`);
       if (technicianId) emitWalkthroughDone(ADVANCE_TAG.technicianAssigned);
@@ -375,7 +381,7 @@ export default function DispatchPage() {
         return next;
       });
     }
-  }, [appointments, jobsById, technicians]);
+  }, [appointments, jobsById, runAssignAppointment, technicians]);
 
   const handleDragStart = useCallback((event: DragEvent<HTMLElement>, appointmentId: string) => {
     event.dataTransfer.effectAllowed = "move";
@@ -418,7 +424,7 @@ export default function DispatchPage() {
             <Link href="/schedule" className="no-underline">
               <Button variant="secondary" size="sm">Calendar</Button>
             </Link>
-            <Button variant="secondary" size="sm" onClick={() => void load()}>Refresh</Button>
+            <Button variant="secondary" size="sm" onClick={() => void refetch()}>Refresh</Button>
           </div>
         }
       />
@@ -453,7 +459,10 @@ export default function DispatchPage() {
           <p className="mt-1 text-xs text-fg-muted">Needs dispatcher action</p>
         </Card>
         <Card className={`p-4 ${conflictPairCount > 0 ? "border-red/35 bg-red/5" : ""}`}>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">Schedule conflicts</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">
+          Schedule conflicts
+          <InfoTip label="About schedule conflicts" side="top">Two visits that overlap for the same technician. Conflicting assignments are blocked at dispatch time so each tech only has one job at a time.</InfoTip>
+        </p>
           <p className={`mt-2 text-2xl font-black ${conflictPairCount > 0 ? "text-red" : "text-green"}`}>
             {conflictPairCount}
           </p>

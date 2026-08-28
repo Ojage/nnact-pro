@@ -6,6 +6,7 @@ import { sumLines, jobCost, jobMargin } from "../totals.js";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { verifiedClaims } from "../operational-authorization.js";
+import { canAccessJob } from "../job-access.js";
 
 const createBody = z.object({
   description: z.string().min(1),
@@ -31,13 +32,6 @@ async function recomputeJobTotals(orgId: string, jobId: string) {
 
   await db.update(jobs).set({ total }).where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
   return { total, cost, margin };
-}
-
-async function canAccessJob(orgId: string, jobId: string, role: string, userId: string) {
-  const conditions = [eq(jobs.orgId, orgId), eq(jobs.id, jobId)];
-  if (role === "technician") conditions.push(eq(jobs.assignedTo, userId));
-  const [job] = await db.select({ id: jobs.id }).from(jobs).where(and(...conditions));
-  return Boolean(job);
 }
 
 export async function lineItemRoutes(app: FastifyInstance) {

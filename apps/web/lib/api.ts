@@ -1,3 +1,5 @@
+import { loadingStore } from "@/lib/loadingStore";
+
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 class ApiError extends Error {
@@ -17,43 +19,61 @@ export interface DownloadedDocument {
 
 /** Fetches a PDF as a blob and keeps the server-provided download filename. */
 async function downloadDocument(path: string): Promise<DownloadedDocument> {
-  const res = await fetch(`${BASE}${path}`, { credentials: "include" });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new ApiError(res.status, body);
+  loadingStore.begin();
+  try {
+    const res = await fetch(`${BASE}${path}`, { credentials: "include" });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new ApiError(res.status, body);
+    }
+    const disposition = res.headers.get("content-disposition") ?? "";
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    return { blob: await res.blob(), filename: match?.[1] ?? "document.pdf" };
+  } finally {
+    loadingStore.end();
   }
-  const disposition = res.headers.get("content-disposition") ?? "";
-  const match = disposition.match(/filename="?([^";]+)"?/);
-  return { blob: await res.blob(), filename: match?.[1] ?? "document.pdf" };
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = {
-    ...(init?.headers as Record<string, string>),
-  };
+  loadingStore.begin();
+  try {
+    const headers: Record<string, string> = {
+      ...(init?.headers as Record<string, string>),
+    };
 
-  if (
-    init?.body
-    && !(typeof FormData !== "undefined" && init.body instanceof FormData)
-  ) {
-    headers["content-type"] = "application/json";
+    if (
+      init?.body
+      && !(typeof FormData !== "undefined" && init.body instanceof FormData)
+    ) {
+      headers["content-type"] = "application/json";
+    }
+    const res = await fetch(`${BASE}${path}`, {
+      ...init,
+      credentials: init?.credentials ?? "include",
+      headers,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new ApiError(res.status, body);
+    }
+    const text = await res.text();
+    return text ? (JSON.parse(text) as T) : (undefined as T);
+  } finally {
+    loadingStore.end();
   }
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    credentials: init?.credentials ?? "include",
-    headers,
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new ApiError(res.status, body);
-  }
-  const text = await res.text();
-  return text ? (JSON.parse(text) as T) : (undefined as T);
 }
 
 export interface LoginResult {
   token: string;
-  user: { id: string; name: string; email: string; role: string; orgId: string };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    orgId: string;
+    mustChangePassword?: boolean;
+  };
+  mustChangePassword?: boolean;
 }
 
 export function parseSessionUser(value: unknown): LoginResult["user"] {
@@ -78,7 +98,15 @@ export function parseSessionUser(value: unknown): LoginResult["user"] {
     email: user.email as string,
     role: user.role as string,
     orgId: typeof user.orgId === "string" ? (user.orgId as string) : "",
+    mustChangePassword: Boolean(user.mustChangePassword),
   };
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<LoginResult> {
+  return request<LoginResult>("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
 }
 
 export async function login(email: string, password: string): Promise<LoginResult> {
@@ -145,7 +173,7 @@ interface Appointment {
   endsAt: string;
 }
 
-interface Invoice {
+export interface Invoice {
   id: string;
   jobId: string;
   number: string;
@@ -206,7 +234,7 @@ interface LineItem {
   createdAt: string;
 }
 
-interface EstimateDetail extends Estimate {
+export interface EstimateDetail extends Estimate {
   lineItems: LineItem[];
   options: EstimateOption[];
   deposit?: {
@@ -345,7 +373,6 @@ interface PluginEvent {
 }
 
 export type PortalLinkScope = import("@nnact/shared").PortalLinkScope;
-export type PublicBookingConfigDTO = import("@nnact/shared").PublicBookingConfigDTO;
 
 export interface PortalLinkDTO {
   id: string;
@@ -429,11 +456,6 @@ export interface PortalSessionDTO {
 
 export const api = {
   health: () => request<{ ok: boolean }>("/api/health"),
-
-  // ── Public (no auth) ──
-  publicOrg: () => request<PublicBookingConfigDTO>("/api/public/default"),
-  publicBook: (orgId: string, body: { name: string; email?: string; phone?: string; title?: string; description?: string }) =>
-    request<{ ok: boolean }>(`/api/public/${orgId}/book`, { method: "POST", body: JSON.stringify(body) }),
 
   // ── Organization settings ──
   org: () => request<OrgSettingsDTO>("/api/org/me"),
@@ -564,16 +586,21 @@ export const api = {
   uploadJobPhoto: async (jobId: string, file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch(`${BASE}/api/photos/upload/${jobId}`, {
-      method: "POST",
-      credentials: "include",
-      body: fd,
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new ApiError(res.status, body);
+    loadingStore.begin();
+    try {
+      const res = await fetch(`${BASE}/api/photos/upload/${jobId}`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new ApiError(res.status, body);
+      }
+      return res.json() as Promise<PhotoRecord>;
+    } finally {
+      loadingStore.end();
     }
-    return res.json() as Promise<PhotoRecord>;
   },
 
   lineItems: (jobId: string) => request<LineItem[]>(`/api/jobs/${jobId}/line-items`),
@@ -581,7 +608,12 @@ export const api = {
   users: () => request<UserDTO[]>("/api/users"),
   recurring: () => request<RecurringJobDTO[]>("/api/recurring"),
 
-  me: () => request<{ id: string; name: string; email: string; role: string; orgId: string }>("/api/auth/me"),
+  me: () => request<LoginResult["user"]>("/api/auth/me"),
+  createTeamMember: (body: { name: string; email: string; role: "dispatcher" | "technician" }) =>
+    request<import("@nnact/shared").CreateTeamMemberResponseDTO>("/api/users", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   patchUser: (id: string, body: { role?: string; active?: boolean }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteUser: (id: string) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
 

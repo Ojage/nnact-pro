@@ -1,20 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { api } from "@/lib/api";
+import { useState } from "react";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
-
-interface EquipmentDTO {
-  id: string; orgId: string; customerId: string; type: string;
-  make?: string | null; model?: string | null; serialNumber?: string | null;
-  installDate?: string | null; warrantyExpiry?: string | null;
-  notes?: string | null; createdAt: string;
-}
+import { useCreateEquipmentMutation, useDeleteEquipmentMutation, useEquipmentQuery, type EquipmentDTO } from "@/lib/redux/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -50,33 +44,18 @@ const initForm: EquipmentForm = {
 };
 
 export function CustomerEquipment({ customerId }: { customerId: string }) {
-  const [equipment, setEquipment] = useState<EquipmentDTO[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: equipment = [], isLoading: loading } = useEquipmentQuery({ customerId }, { skip: !customerId });
+  const [createEquipment, { isLoading: submitting }] = useCreateEquipmentMutation();
+  const [deleteEquipment, { isLoading: deleting }] = useDeleteEquipmentMutation();
   const [addOpen, setAddOpen] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form, setForm] = useState<EquipmentForm>(initForm);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const list = await api.equipment({ customerId });
-      setEquipment(list);
-    } catch {
-      setError("Failed to load equipment");
-    }
-    setLoading(false);
-  }, [customerId]);
-
-  useEffect(() => { load(); }, [load]);
-
   const handleAdd = async () => {
-    setSubmitting(true);
     setError(null);
     try {
-      await api.createEquipment({
+      await createEquipment({
         customerId,
         type: form.type,
         make: form.make || undefined,
@@ -85,23 +64,20 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
         installDate: form.installDate || undefined,
         warrantyExpiry: form.warrantyExpiry || undefined,
         notes: form.notes || undefined,
-      });
+      }).unwrap();
       emitWalkthroughDone(ADVANCE_TAG.equipmentCreated);
       setAddOpen(false);
       setForm(initForm);
-      await load();
     } catch {
       setError("Failed to add equipment");
     }
-    setSubmitting(false);
   };
 
   const handleDelete = async (id: string) => {
     try {
-      await api.deleteEquipment(id);
-      setEquipment((prev) => prev.filter((e) => e.id !== id));
+      await deleteEquipment(id).unwrap();
     } catch { /* silent */ }
-    setDeleting(null);
+    setDeletingId(null);
   };
 
   return (
@@ -155,10 +131,10 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
                     )}
                   </div>
                 </div>
-                {deleting === e.id ? (
+                {deletingId === e.id ? (
                   <div className="flex gap-1 shrink-0">
-                    <Button type="button" size="sm" variant="danger" className="h-auto px-0 text-xs" onClick={() => handleDelete(e.id)}>Confirm</Button>
-                    <Button type="button" size="sm" variant="ghost" className="h-auto px-0 text-xs" onClick={() => setDeleting(null)}>Cancel</Button>
+                    <Button type="button" size="sm" variant="danger" className="h-auto px-0 text-xs" loading={deleting} onClick={() => handleDelete(e.id)}>Confirm</Button>
+                    <Button type="button" size="sm" variant="ghost" className="h-auto px-0 text-xs" onClick={() => setDeletingId(null)}>Cancel</Button>
                   </div>
                 ) : (
                   <Button
@@ -166,7 +142,7 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
                     size="sm"
                     variant="ghost"
                     className="h-auto shrink-0 px-0 text-xs text-fg-muted hover:text-destructive"
-                    onClick={() => setDeleting(e.id)}
+                    onClick={() => setDeletingId(e.id)}
                   >
                     Delete
                   </Button>
@@ -203,7 +179,10 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-fg-muted mb-1.5">Serial Number</label>
+                <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                  Serial Number
+                  <InfoTip label="About serial number">Stored on the work order so service history stays tied to the exact unit when filing warranty claims.</InfoTip>
+                </label>
                 <Input placeholder="SN-12345" value={form.serialNumber} onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -212,7 +191,10 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
                   <Input type="date" value={form.installDate} onChange={(e) => setForm((f) => ({ ...f, installDate: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">Warranty Expiry</label>
+                  <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                    Warranty Expiry
+                    <InfoTip label="About warranty expiry">Used to tell customers whether a repair is still under warranty before you quote it.</InfoTip>
+                  </label>
                   <Input type="date" value={form.warrantyExpiry} onChange={(e) => setForm((f) => ({ ...f, warrantyExpiry: e.target.value }))} />
                 </div>
               </div>
@@ -229,8 +211,8 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
               {error && <p className="text-xs text-red">{error}</p>}
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="ghost" onClick={() => { setAddOpen(false); setForm(initForm); }} disabled={submitting}>Cancel</Button>
-                <Button onClick={handleAdd} data-tour="equipment-form" disabled={submitting}>
-                  {submitting ? "Saving..." : "Save"}
+                <Button onClick={handleAdd} data-tour="equipment-form" loading={submitting}>
+                  Save
                 </Button>
               </div>
             </div>

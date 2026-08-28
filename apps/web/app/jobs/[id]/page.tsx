@@ -1,14 +1,27 @@
+"use client";
+
 import Link from "next/link";
-import { serverApi } from "@/lib/server-api";
+import { useParams } from "next/navigation";
+import {
+  useActivitiesQuery,
+  useAppointmentsQuery,
+  useCustomersQuery,
+  useDiagnosticSessionsQuery,
+  useInvoicesQuery,
+  useJobLineItemsQuery,
+  useJobQuery,
+} from "@/lib/redux/api";
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import { formatMoney } from "@nnact/shared";
-import type { ActivityDTO, CustomerDTO, JobDTO } from "@nnact/shared";
+import type { ActivityDTO, CustomerDTO, JobDTO, JobSource } from "@nnact/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { JobStatusBadge, InvoiceStatusBadge } from "@/components/status-badge";
 import { JobRepairBrainWorkflow } from "@/components/job-repair-brain-workflow";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { JobVoiceNotesPanel } from "@/components/job-voice-notes";
 
 interface Appointment {
   id: string;
@@ -36,42 +49,45 @@ interface LineItem {
   createdAt: string;
 }
 
-export default async function JobDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id: jobId } = await params;
+export default function JobDetailPage() {
+  const params = useParams<{ id: string }>();
+  const jobId = params.id;
 
-  let job: JobDTO | null = null;
-  let jobLoadFailed = false;
-  try {
-    job = await serverApi.job(jobId);
-  } catch {
-    jobLoadFailed = true;
-  }
-
-  const [activities, appointments, invoices, customers, lineItems, diagnosticRows] =
-    await Promise.all([
-      serverApi.activities({ jobId }).catch(() => [] as ActivityDTO[]),
-      serverApi.appointments().catch(() => [] as Appointment[]),
-      serverApi.invoices().catch(() => [] as Invoice[]),
-      serverApi.customers().catch(() => [] as CustomerDTO[]),
-      serverApi.lineItems(jobId).catch(() => [] as LineItem[]),
-      serverApi.diagnosticSessions({ jobId }).catch(() => [] as DiagnosticSessionListItem[]),
-    ]);
+  const { data: job, isLoading } = useJobQuery(jobId, { skip: !jobId });
+  const { data: activities = [] } = useActivitiesQuery({ jobId }, { skip: !jobId });
+  const { data: appointments = [] } = useAppointmentsQuery();
+  const { data: invoices = [] } = useInvoicesQuery();
+  const { data: customers = [] } = useCustomersQuery();
+  const { data: lineItems = [] } = useJobLineItemsQuery(jobId, { skip: !jobId });
+  const { data: diagnosticRows = [] } = useDiagnosticSessionsQuery({ jobId }, { skip: !jobId });
 
   const customer = job ? customers.find((item) => item.id === job.customerId) : null;
   const jobAppointments = appointments.filter((item) => item.jobId === jobId);
   const jobInvoices = invoices.filter((item) => item.jobId === jobId);
-  const diagnostic = diagnosticRows[0] ?? null;
+  const diagnostic: DiagnosticSessionListItem | null = diagnosticRows[0] ?? null;
+
+  if (isLoading) {
+    return (
+      <div>
+        <Skeleton className="mb-2 h-8 w-64" />
+        <Skeleton className="mb-8 h-4 w-96" />
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_.85fr]">
+          <Skeleton className="h-96 rounded-xl" />
+          <Skeleton className="h-96 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      {jobLoadFailed ? (
-        <PageHeader title="Couldn’t load job" description="The work order is unavailable or this session is not authorized to view it." />
-      ) : !job ? (
-        <PageHeader title="Job not found" description={`No job with id ${jobId} in this organization.`} />
+      {!job ? (
+        <>
+          <PageHeader title="Job not found" description={`No job with id ${jobId} in this organization.`} />
+          <Card>
+            <EmptyState title="No job data" description="Verify the work-order ID, authentication session, or API connection." />
+          </Card>
+        </>
       ) : (
         <PageHeader
           title={job.title}
@@ -126,11 +142,7 @@ export default async function JobDetailPage({
         />
       )}
 
-      {!job ? (
-        <Card>
-          <EmptyState title="No job data" description="Verify the work-order ID, authentication session, or API connection." />
-        </Card>
-      ) : (
+      {!job ? null : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_.85fr]">
           <div className="space-y-6">
             <Card>
@@ -152,6 +164,36 @@ export default async function JobDetailPage({
                   <p className="text-xs text-fg-muted">Scheduled</p>
                   <p className="mt-2 text-sm text-fg">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Not scheduled"}</p>
                 </div>
+                {job.source && job.source !== "staff" && (
+                  <div className="rounded-xl bg-surface-200 p-4">
+                    <p className="text-xs text-fg-muted">Source</p>
+                    <p className="mt-2 text-sm text-fg capitalize">{job.source.replace("_", " ")}</p>
+                  </div>
+                )}
+                {job.serviceCategory && (
+                  <div className="rounded-xl bg-surface-200 p-4">
+                    <p className="text-xs text-fg-muted">Service category</p>
+                    <p className="mt-2 text-sm text-fg">{job.serviceCategory}</p>
+                  </div>
+                )}
+                {job.serviceAddress && (
+                  <div className="rounded-xl bg-surface-200 p-4">
+                    <p className="text-xs text-fg-muted">Service address</p>
+                    <p className="mt-2 text-sm text-fg">{job.serviceAddress}</p>
+                  </div>
+                )}
+                {job.preferredDate && (
+                  <div className="rounded-xl bg-surface-200 p-4">
+                    <p className="text-xs text-fg-muted">Preferred date</p>
+                    <p className="mt-2 text-sm text-fg">{job.preferredDate}</p>
+                  </div>
+                )}
+                {job.preferredTime && (
+                  <div className="rounded-xl bg-surface-200 p-4">
+                    <p className="text-xs text-fg-muted">Preferred time</p>
+                    <p className="mt-2 text-sm text-fg capitalize">{job.preferredTime}</p>
+                  </div>
+                )}
                 {job.description && (
                   <div className="rounded-xl bg-surface-200 p-4 sm:col-span-2">
                     <p className="text-xs text-fg-muted">Customer complaint and access notes</p>
@@ -205,6 +247,8 @@ export default async function JobDetailPage({
                 </CardContent>
               </Card>
             )}
+
+            <JobVoiceNotesPanel jobId={jobId} />
 
             <Card>
               <CardHeader>

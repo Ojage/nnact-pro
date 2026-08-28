@@ -18,7 +18,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         src: SITE_CONFIG.logoPath,
         sizes: "512x512",
-        type: "image/jpeg",
+        type: "image/png",
         purpose: "any",
       },
     ],

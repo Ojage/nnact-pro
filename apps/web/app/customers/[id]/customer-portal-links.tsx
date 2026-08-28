@@ -1,12 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api, type PortalLinkDTO, type PortalLinkScope } from "@/lib/api";
+import { useState } from "react";
+import type { PortalLinkDTO, PortalLinkScope } from "@/lib/api";
+import {
+  useCreatePortalLinkMutation,
+  usePortalLinksQuery,
+  useRevokePortalLinkMutation,
+  useSendPortalLinkMutation,
+} from "@/lib/redux/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+const SCOPE_HELP: Record<PortalLinkScope, string> = {
+  balance: "Lets the customer see what they owe for each invoice.",
+  checkout: "Opens the payment flow so the customer can settle their balance.",
+  receipts: "Lists paid invoices and lets the customer download or view receipts.",
+  service_plans: "Shows subscribed service plans and upcoming visits.",
+  estimates: "Opens the estimate for review and approval from the link.",
+  service_history: "Shows past jobs and equipment on file for this customer.",
+};
 
 const SCOPE_LABELS: Record<PortalLinkScope, string> = {
   balance: "Invoice balance",
@@ -32,9 +48,10 @@ function linkState(link: PortalLinkDTO): { label: string; className: string } {
 }
 
 export function CustomerPortalLinks({ customerId }: { customerId: string }) {
-  const [links, setLinks] = useState<PortalLinkDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: links = [], isFetching: loading } = usePortalLinksQuery({ customerId }, { skip: !customerId });
+  const [createPortalLink, { isLoading: creating }] = useCreatePortalLinkMutation();
+  const [revokePortalLink, { isLoading: revoking }] = useRevokePortalLinkMutation();
+  const [sendPortalLink, { isLoading: sending }] = useSendPortalLinkMutation();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedScopes, setSelectedScopes] = useState<PortalLinkScope[]>([
@@ -46,30 +63,13 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
     "service_history",
   ]);
   const [ttl, setTtl] = useState("30");
-  const [creating, setCreating] = useState(false);
 
   const [newToken, setNewToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      setLinks(await api.portalLinks(customerId));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load portal links");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId]);
+  const [error, setError] = useState<string | null>(null);
 
   function toggleScope(scope: PortalLinkScope) {
     setSelectedScopes((current) =>
@@ -79,20 +79,16 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
 
   async function createLink() {
     if (selectedScopes.length === 0) return;
-    setCreating(true);
     setError(null);
     try {
-      const result = await api.createPortalLink({
+      const result = await createPortalLink({
         customerId,
         scopes: selectedScopes,
         expiresInDays: ttl === "null" ? null : Number(ttl),
-      });
+      }).unwrap();
       setNewToken(result.token);
-      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create portal link");
-    } finally {
-      setCreating(false);
     }
   }
 
@@ -107,9 +103,9 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
 
   async function revoke(id: string) {
     setRevokingId(id);
+    setError(null);
     try {
-      await api.revokePortalLink(id);
-      await load();
+      await revokePortalLink(id).unwrap();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to revoke portal link");
     } finally {
@@ -122,9 +118,8 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
     setSendNotice(null);
     setError(null);
     try {
-      const result = await api.sendPortalLink(id);
+      const result = await sendPortalLink(id).unwrap();
       setSendNotice(`Emailed the portal link to ${result.to}.`);
-      await load();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to email the portal link";
       setError(message.replace(/^\d+:\s*/, ""));
@@ -180,13 +175,13 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
                     <div className="flex items-center gap-2">
                       {active ? (
                         <>
-                          <Button size="sm" variant="secondary" disabled={sendingId === link.id} onClick={() => void send(link.id)}>
-                            {sendingId === link.id ? "Sending…" : "Send email"}
+                          <Button size="sm" variant="secondary" loading={sendingId === link.id} onClick={() => void send(link.id)}>
+                            Send email
                           </Button>
                           {revokingId === link.id ? (
                             <>
                               <Button size="sm" variant="ghost" onClick={() => setRevokingId(null)}>Keep</Button>
-                              <Button size="sm" variant="danger" onClick={() => void revoke(link.id)}>Confirm revoke</Button>
+                              <Button size="sm" variant="danger" loading={revoking} onClick={() => void revoke(link.id)}>Confirm revoke</Button>
                             </>
                           ) : (
                             <Button size="sm" variant="ghost" onClick={() => setRevokingId(link.id)}>Revoke</Button>
@@ -229,7 +224,10 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
                   onChange={() => toggleScope(scope as PortalLinkScope)}
                   className="h-4 w-4 accent-accent"
                 />
-                {label}
+                <span>{label}</span>
+                <InfoTip label={`About ${label}`} className="ml-auto">
+                  {SCOPE_HELP[scope as PortalLinkScope]}
+                </InfoTip>
               </label>
             ))}
             {selectedScopes.length === 0 ? (
@@ -266,8 +264,8 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
         <DialogFooter>
           <Button variant="ghost" onClick={() => setDialogOpen(false)}>Close</Button>
           {newToken ? null : (
-            <Button onClick={() => void createLink()} disabled={selectedScopes.length === 0 || creating}>
-              {creating ? "Creating…" : "Create link"}
+            <Button onClick={() => void createLink()} loading={creating} disabled={selectedScopes.length === 0}>
+              Create link
             </Button>
           )}
         </DialogFooter>

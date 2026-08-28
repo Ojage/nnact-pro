@@ -1,4 +1,5 @@
 export * from "./auth.js";
+export * from "./team-credentials.js";
 export * from "./portal.js";
 export * from "./brand.js";
 export * from "./sponsors.js";
@@ -6,8 +7,10 @@ export * from "./documents.js";
 export * from "./business-settings.js";
 export * from "./operations.js";
 export * from "./message-templates.js";
+export * from "./notifications.js";
 export * from "./currency.js";
 export * from "./repair-brain.js";
+export * from "./mobile-search.js";
 export * from "./walkthroughs.js";
 
 // Shared domain enums + DTO types used by api, web, and mobile.
@@ -20,6 +23,9 @@ export const JOB_STATUS = [
   "canceled",
 ] as const;
 export type JobStatus = (typeof JOB_STATUS)[number];
+
+export const JOB_SOURCE = ["staff", "customer_request"] as const;
+export type JobSource = (typeof JOB_SOURCE)[number];
 
 export const INVOICE_STATUS = ["draft", "sent", "paid", "void"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUS)[number];
@@ -40,6 +46,7 @@ export interface CustomerDTO {
   name: string;
   email?: string | null;
   phone?: string | null;
+  primaryAddress?: string | null;
   createdAt: string;
 }
 
@@ -49,6 +56,11 @@ export interface JobDTO {
   title: string;
   description?: string | null;
   status: JobStatus;
+  source?: JobSource | null;
+  serviceCategory?: string | null;
+  serviceAddress?: string | null;
+  preferredDate?: string | null;
+  preferredTime?: string | null;
   scheduledAt?: string | null;
   assignedTo?: string | null;
   total: Money;
@@ -76,6 +88,11 @@ export interface UserDTO {
   role: "owner" | "dispatcher" | "technician";
   active: boolean;
   createdAt: string;
+}
+
+export interface CreateTeamMemberResponseDTO {
+  user: UserDTO;
+  temporaryPassword: string;
 }
 
 export interface ServicePlanDTO {

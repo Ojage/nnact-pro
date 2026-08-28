@@ -10,6 +10,7 @@ export interface SessionUser {
   email: string;
   role: string;
   orgId: string;
+  mustChangePassword?: boolean;
 }
 
 export function useSessionUser() {
@@ -17,6 +18,12 @@ export function useSessionUser() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+
+  const refreshUser = useCallback(() => {
+    return currentUser()
+      .then((nextUser) => setUser(nextUser))
+      .catch(() => setUser(null));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -47,5 +54,5 @@ export function useSessionUser() {
     }
   }, [router]);
 
-  return { user, loading, signingOut, signOut };
+  return { user, loading, signingOut, signOut, setUser, refreshUser };
 }

@@ -37,6 +37,18 @@ export type TeamGuardResult =
   | { ok: true }
   | { ok: false; code: 403 | 409; error: string; hint?: string };
 
+export function guardTeamCreate(actor: TeamActor): TeamGuardResult {
+  if (actor.role !== "owner") {
+    return {
+      ok: false,
+      code: 403,
+      error: "Only owners can add team members.",
+      hint: "Ask an owner to invite them.",
+    };
+  }
+  return { ok: true };
+}
+
 export function guardTeamChange(snapshot: TeamSnapshot, change: TeamChange): TeamGuardResult {
   // Rule 1 — team management is an owner capability.
   if (snapshot.actor.role !== "owner") {

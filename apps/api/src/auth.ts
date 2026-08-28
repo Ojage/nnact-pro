@@ -29,6 +29,7 @@ export interface StaffJwtClaims {
   role: string;
   name?: string;
   email?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface CustomerJwtClaims {

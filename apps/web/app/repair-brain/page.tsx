@@ -1,12 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { repairBrainApi, type RepairBrainSearchResults } from "@/lib/repair-brain-api";
+import {
+  useCreateProposalMutation,
+  useLazyRepairBrainSearchQuery,
+  useRepairBrainProposalsQuery,
+  useVerifyProposalMutation,
+  type ProposalRow,
+} from "@/lib/redux/api";
+import type { RepairBrainSearchResults } from "@/lib/repair-brain-api";
 import { useSessionUser } from "@/lib/use-session-user";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 import { ADVANCE_TAG, KNOWLEDGE_PROPOSAL_TYPE } from "@nnact/shared";
@@ -31,78 +39,52 @@ const PROPOSAL_TYPE_LABELS: Record<string, string> = {
   document: "Reference document",
 };
 
-interface ProposalRow {
-  id: string;
-  title: string;
-  proposalType: string;
-  status: string;
-  createdAt: string;
-}
-
 export default function RepairBrainPage() {
   const session = useSessionUser();
   const canReview = session.user?.role === "owner" || session.user?.role === "dispatcher";
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<RepairBrainSearchResults>(EMPTY);
-  const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  const [triggerSearch, searchQuery] = useLazyRepairBrainSearchQuery();
+  const results = searchQuery.data ?? EMPTY;
+  const searching = searchQuery.isFetching;
 
   // ── Contribute knowledge ──
   const [contributeOpen, setContributeOpen] = useState(false);
   const [proposalType, setProposalType] = useState<string>("fault");
   const [proposalTitle, setProposalTitle] = useState("");
   const [proposalNotes, setProposalNotes] = useState("");
-  const [proposalSubmitting, setProposalSubmitting] = useState(false);
   const [proposalError, setProposalError] = useState<string | null>(null);
+  const [createProposal, { isLoading: proposalSubmitting }] = useCreateProposalMutation();
 
   // ── Pending knowledge review ──
-  const [proposals, setProposals] = useState<ProposalRow[]>([]);
-  const [proposalsLoading, setProposalsLoading] = useState(false);
+  const proposalsQuery = useRepairBrainProposalsQuery("proposed", { skip: !canReview });
+  const proposals = (proposalsQuery.data ?? []) as unknown as ProposalRow[];
   const [verifyId, setVerifyId] = useState<string | null>(null);
-
-  const loadProposals = useCallback(async () => {
-    if (!canReview) return;
-    setProposalsLoading(true);
-    try {
-      const rows = (await repairBrainApi.listProposals("proposed")) as unknown as ProposalRow[];
-      setProposals(rows);
-    } catch {
-      setProposals([]);
-    } finally {
-      setProposalsLoading(false);
-    }
-  }, [canReview]);
-
-  useEffect(() => {
-    void loadProposals();
-  }, [loadProposals]);
+  const [verifyProposal] = useVerifyProposalMutation();
 
   const handleContribute = async () => {
     if (!proposalTitle.trim()) return;
-    setProposalSubmitting(true);
     setProposalError(null);
     try {
-      await repairBrainApi.createProposal({
+      await createProposal({
         proposalType,
         title: proposalTitle.trim(),
         payload: proposalNotes.trim() ? { notes: proposalNotes.trim() } : {},
-      });
+      }).unwrap();
       setProposalTitle("");
       setProposalNotes("");
       setContributeOpen(false);
       emitWalkthroughDone(ADVANCE_TAG.knowledgeContributed);
-    } catch (e) {
-      setProposalError(String(e));
-    } finally {
-      setProposalSubmitting(false);
+    } catch {
+      setProposalError("Failed to submit proposal");
     }
   };
 
   const handleVerify = async (id: string) => {
     setVerifyId(id);
     try {
-      await repairBrainApi.verifyProposal(id);
-      await loadProposals();
+      await verifyProposal(id).unwrap();
       emitWalkthroughDone(ADVANCE_TAG.knowledgeReviewed);
     } catch {
       // keep the row listed
@@ -111,19 +93,11 @@ export default function RepairBrainPage() {
     }
   };
 
-  const search = useCallback(async () => {
+  const search = () => {
     if (query.trim().length < 2) return;
-    setLoading(true);
-    try {
-      const data = await repairBrainApi.search(query.trim());
-      setResults(data);
-      setSearched(true);
-    } catch {
-      setResults(EMPTY);
-    } finally {
-      setLoading(false);
-    }
-  }, [query]);
+    setSearched(true);
+    void triggerSearch(query.trim());
+  };
 
   const total =
     results.models.length +
@@ -151,8 +125,8 @@ export default function RepairBrainPage() {
               className="flex-1"
               data-tour="rb-search"
             />
-            <Button onClick={search} disabled={loading || query.trim().length < 2}>
-              {loading ? "Searching…" : "Search"}
+            <Button onClick={search} loading={searching} disabled={query.trim().length < 2}>
+              Search
             </Button>
           </div>
           {searched && (
@@ -268,6 +242,7 @@ export default function RepairBrainPage() {
                   <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
                     <label className="grid gap-1 text-xs text-fg-muted">
                       Type
+                      <InfoTip label="About type" side="top">Categorizes what you learned so reviewers and future searches can find it. A procedure is a step-by-step fix; a measurement is a real-world reading from the field.</InfoTip>
                       <select
                         value={proposalType}
                         onChange={(e) => setProposalType(e.target.value)}
@@ -301,10 +276,11 @@ export default function RepairBrainPage() {
                   <Button
                     size="sm"
                     className="mt-3"
-                    disabled={proposalSubmitting || !proposalTitle.trim()}
+                    loading={proposalSubmitting}
+                    disabled={!proposalTitle.trim()}
                     onClick={() => void handleContribute()}
                   >
-                    {proposalSubmitting ? "Submitting…" : "Submit proposal"}
+                    Submit proposal
                   </Button>
                 </div>
               )}
@@ -319,8 +295,8 @@ export default function RepairBrainPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2" data-tour="rb-proposals">
-                {proposalsLoading ? <p className="text-sm text-fg-muted">Loading…</p> : null}
-                {!proposalsLoading && proposals.length === 0 ? (
+                {proposalsQuery.isFetching ? <p className="text-sm text-fg-muted">Loading…</p> : null}
+                {!proposalsQuery.isFetching && proposals.length === 0 ? (
                   <p className="text-sm text-fg-muted">No proposals waiting for review.</p>
                 ) : null}
                 {proposals.map((p) => (
@@ -329,8 +305,8 @@ export default function RepairBrainPage() {
                       <div className="truncate text-sm font-medium text-fg">{p.title}</div>
                       <div className="text-xs text-fg-muted capitalize">{PROPOSAL_TYPE_LABELS[p.proposalType] ?? p.proposalType}</div>
                     </div>
-                    <Button size="sm" variant="secondary" disabled={verifyId === p.id} onClick={() => void handleVerify(p.id)}>
-                      {verifyId === p.id ? "Verifying…" : "Verify"}
+                    <Button size="sm" variant="secondary" loading={verifyId === p.id} onClick={() => void handleVerify(p.id)}>
+                      Verify
                     </Button>
                   </div>
                 ))}

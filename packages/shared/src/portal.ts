@@ -1,4 +1,4 @@
-import type { PortalLinkScope } from "./index.js";
+import type { JobStatus, PortalLinkScope } from "./index.js";
 
 export interface PortalEstimateOptionDTO {
   id: string;
@@ -80,4 +80,30 @@ export interface PublicBookingConfigDTO {
     endTime: string;
   };
   emergencyPhone?: string | null;
+}
+
+export interface PublicBookingResultDTO {
+  ok: true;
+  /** A "customer request" job row. */
+  requestId: string;
+  /** One-time link payload; only the hash is stored server-side. */
+  trackingToken: string;
+  trackingUrl?: string | null;
+  /** True when a confirmation email was attempted (SMTP may still fail-closed). */
+  emailSent?: boolean;
+}
+
+export interface PublicRequestStatusDTO {
+  ok: true;
+  requestId: string;
+  status: JobStatus;
+  title: string;
+  customerName: string;
+  serviceCategory?: string | null;
+  serviceAddress?: string | null;
+  preferredDate?: string | null;
+  preferredTime?: string | null;
+  createdAt: string;
+  scheduledAt?: string | null;
+  updatedAt: string;
 }

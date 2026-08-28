@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { useCustomersQuery, useJobsQuery } from "@/lib/redux/api";
 import { formatMoney } from "@nnact/shared";
-import type { JobDTO, CustomerDTO } from "@nnact/shared";
+import type { JobSource } from "@nnact/shared";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { JobStatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
@@ -19,6 +20,7 @@ import { Pagination } from "@/components/pagination";
 type SortField = "title" | "status" | "total" | "customer";
 type SortDir = "asc" | "desc";
 type StatusFilter = "all" | "lead" | "scheduled" | "in_progress" | "completed" | "canceled";
+type SourceFilter = "all" | JobSource;
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All statuses" },
@@ -27,6 +29,12 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "in_progress", label: "In Progress" },
   { value: "completed", label: "Completed" },
   { value: "canceled", label: "Canceled" },
+];
+
+const SOURCE_OPTIONS: { value: SourceFilter; label: string }[] = [
+  { value: "all", label: "All sources" },
+  { value: "staff", label: "Staff" },
+  { value: "customer_request", label: "Customer request" },
 ];
 
 type SortHeadProps = {
@@ -57,41 +65,18 @@ function SortHead({ field, label, active, direction, align = "left", onSort }: S
 }
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<JobDTO[]>([]);
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: jobs = [], isLoading, isError, error: queryError } = useJobsQuery();
+  const { data: customers = [] } = useCustomersQuery();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [skip, setSkip] = useState(0);
   const take = 50;
 
   // Reset pagination when filters change
-  useEffect(() => { setSkip(0); }, [search, statusFilter]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [jb, cu] = await Promise.all([
-          api.jobs().catch(() => [] as JobDTO[]),
-          api.customers().catch(() => [] as CustomerDTO[]),
-        ]);
-        if (!cancelled) {
-          setJobs(jb);
-          setCustomers(cu);
-        }
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
+  useEffect(() => { setSkip(0); }, [search, statusFilter, sourceFilter]);
 
   // ── Customer map for O(1) lookups ──
   const customerMap = useMemo(() => {
@@ -109,6 +94,11 @@ export default function JobsPage() {
       list = list.filter((j) => j.status === statusFilter);
     }
 
+    // Source filter
+    if (sourceFilter !== "all") {
+      list = list.filter((j) => (j.source ?? "staff") === sourceFilter);
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((j) => {
@@ -116,7 +106,8 @@ export default function JobsPage() {
         return (
           j.title.toLowerCase().includes(q) ||
           (cust?.toLowerCase().includes(q) ?? false) ||
-          j.status.replace("_", " ").includes(q)
+          j.status.replace("_", " ").includes(q) ||
+          (j.serviceCategory?.toLowerCase().includes(q) ?? false)
         );
       });
     }
@@ -144,7 +135,7 @@ export default function JobsPage() {
     });
 
     return list;
-  }, [jobs, search, sortField, sortDir, customerMap, statusFilter]);
+  }, [jobs, search, sortField, sortDir, customerMap, statusFilter, sourceFilter]);
 
   // ── Sort helpers ──
   const handleSort = (field: SortField) => {
@@ -164,7 +155,7 @@ export default function JobsPage() {
     (statusFilter !== "all" && filteredSorted.length === 0);
 
   // ── Loading ──
-  if (loading) {
+  if (isLoading) {
     return (
       <div>
         <div className="flex items-end justify-between mb-8">
@@ -209,9 +200,9 @@ export default function JobsPage() {
       />
 
       {/* ── Error ── */}
-      {error && (
+      {isError && (
         <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">API unreachable ({error}).</p>
+          <p className="text-red text-sm">API unreachable ({queryError ? String(queryError) : "unknown error"}).</p>
         </Card>
       )}
 
@@ -231,11 +222,17 @@ export default function JobsPage() {
             options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
             className="sm:w-48"
           />
+          <FormSelect
+            value={sourceFilter}
+            onChange={(value) => setSourceFilter(value as SourceFilter)}
+            options={SOURCE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+            className="sm:w-48"
+          />
         </div>
       )}
 
       {/* ── Empty state ── */}
-      {jobs.length === 0 && !error ? (
+      {jobs.length === 0 && !isError ? (
         <Card>
           <EmptyState
             title="No jobs yet"
@@ -293,7 +290,7 @@ export default function JobsPage() {
                         variant="link"
                         size="sm"
                         className="mt-1 h-auto p-0 text-xs"
-                        onClick={() => { setSearch(""); setStatusFilter("all"); }}
+                        onClick={() => { setSearch(""); setStatusFilter("all"); setSourceFilter("all"); }}
                       >
                         Clear search
                       </Button>
@@ -303,7 +300,14 @@ export default function JobsPage() {
                   paginated.map((j) => (
                     <TableRow key={j.id}>
                       <TableCell className="font-medium text-fg">
-                        {j.title}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {j.title}
+                          {j.source && j.source !== "staff" && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {j.source.replace("_", " ")}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <JobStatusBadge status={j.status} />
@@ -359,27 +363,34 @@ export default function JobsPage() {
                     data-tour="jobs-link"
                     className="block no-underline hover:no-underline"
                   >
-                    <Card className="p-4 hover:bg-surface-400 transition-colors cursor-pointer">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1 min-w-0 mr-3">
-                          <p className="text-sm font-semibold text-fg truncate">
-                            {j.title}
-                          </p>
-                          {cust && (
-                            <p className="text-xs text-fg-muted mt-0.5">
-                              {cust}
+<Card className="p-4 hover:bg-surface-400 transition-colors cursor-pointer">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1 min-w-0 mr-3">
+                            <p className="text-sm font-semibold text-fg truncate">
+                              <span className="flex items-center gap-1">
+                                {j.title}
+                                {j.source && j.source !== "staff" && (
+                                  <Badge variant="secondary" className="text-[9px]">
+                                    {j.source.replace("_", " ")}
+                                  </Badge>
+                                )}
+                              </span>
                             </p>
-                          )}
+                            {cust && (
+                              <p className="text-xs text-fg-muted mt-0.5">
+                                {cust}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-base font-bold text-fg tabular-nums shrink-0">
+                            {formatMoney(j.total)}
+                          </span>
                         </div>
-                        <span className="text-base font-bold text-fg tabular-nums shrink-0">
-                          {formatMoney(j.total)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-border">
-                        <JobStatusBadge status={j.status} />
-                        <span className="text-fg-dim text-sm">→</span>
-                      </div>
-                    </Card>
+                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                          <JobStatusBadge status={j.status} />
+                          <span className="text-fg-dim text-sm">→</span>
+                        </div>
+                      </Card>
                   </Link>
                 );
               })

@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
@@ -170,6 +171,10 @@ export default function NewDiagnosticPage() {
                       label: `${workflow.name} · ${workflow.supportStatus} · v${workflow.versionNumber}`,
                     }))}
                   />
+                  <span className="mt-1 flex items-center gap-1.5 text-xs text-fg-dim">
+                    <InfoTip label="About workflow status" side="top">"Published" workflows are fully validated. "Pilot" and "experimental" workflows are usable but must stay visibly labeled during field use.</InfoTip>
+                    Published, pilot, and experimental workflows appear here.
+                  </span>
                 </div>
 
                 <label className="block">

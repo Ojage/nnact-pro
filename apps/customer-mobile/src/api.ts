@@ -1,9 +1,8 @@
-import type { PortalSessionDTO, PublicBookingConfigDTO } from "@nnact/shared";
-
-const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
+import type { PortalSessionDTO, PublicBookingConfigDTO, PublicBookingResultDTO } from "@nnact/shared";
+import { getApiUrl } from "./env";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
+  const response = await fetch(`${getApiUrl()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -34,7 +33,7 @@ export const customerApi = {
       preferredDate?: string;
       preferredTime?: string;
     },
-  ) => request<{ ok: boolean; requestId: string }>(`/api/public/${orgId}/book`, { method: "POST", body: JSON.stringify(body) }),
+  ) => request<PublicBookingResultDTO>(`/api/public/${orgId}/book`, { method: "POST", body: JSON.stringify(body) }),
 
   portalSession: (token: string) => request<PortalSessionDTO>(`/api/portal/${token}`),
 

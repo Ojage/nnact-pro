@@ -1,50 +1,50 @@
+"use client";
+
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { useParams } from "next/navigation";
 import { formatMoney } from "@nnact/shared";
+import { useActivitiesQuery, useCustomerQuery, useJobsQuery } from "@/lib/redux/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { JobStatusBadge } from "@/components/status-badge";
 import { EditCustomerDialog } from "./edit-dialog";
 import { CustomerEquipment } from "./customer-equipment";
 import { CustomerServicePlans } from "./customer-service-plans";
 import { CustomerPortalLinks } from "./customer-portal-links";
 
-export default async function CustomerDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id: customerId } = await params;
+export default function CustomerDetailPage() {
+  const params = useParams<{ id: string }>();
+  const customerId = params.id;
 
-  let customer: Awaited<ReturnType<typeof api.customer>> | null = null;
-  let customerLoadFailed = false;
-  try {
-    customer = await api.customer(customerId);
-  } catch {
-    customerLoadFailed = true;
-  }
-
-  const [allJobs, timeline] = await Promise.all([
-    api.jobs().catch(() => []),
-    api.activities({ customerId }).catch(() => []),
-  ]);
+  const { data: customer, isLoading } = useCustomerQuery(customerId, { skip: !customerId });
+  const { data: allJobs = [] } = useJobsQuery();
+  const { data: timeline = [] } = useActivitiesQuery({ customerId }, { skip: !customerId });
   const customerJobs = allJobs.filter((j) => j.customerId === customerId);
+
+  if (isLoading) {
+    return (
+      <div>
+        <Skeleton className="mb-2 h-8 w-52" />
+        <Skeleton className="mb-8 h-4 w-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      {customerLoadFailed ? (
-        <PageHeader
-          title="Customer (couldn't load)"
-          description={`ID: ${customerId}`}
-        />
-      ) : customer ? (
+      {!customer ? (
+        <PageHeader title="Customer not found" description={`No customer with id ${customerId} in this org.`} />
+      ) : (
         <PageHeader
           title={customer.name}
           description={`${customer.email ?? "—"} · ${customer.phone ?? "—"} · added ${new Date(customer.createdAt).toLocaleDateString()}`}
           actions={<EditCustomerDialog customer={customer} />}
         />
-      ) : (
-        <PageHeader title="Customer not found" description={`No customer with id ${customerId} in this org.`} />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

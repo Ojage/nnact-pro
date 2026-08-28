@@ -3,31 +3,33 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, type InvoiceDetail, type InvoiceLineItem, type OrgSettingsDTO } from "@/lib/api";
+import { api, type InvoiceLineItem } from "@/lib/api";
 import { formatMoney } from "@nnact/shared";
 import type { JobDTO, CustomerDTO } from "@nnact/shared";
+import {
+  useAddInvoiceLineMutation,
+  useCustomersQuery,
+  useDeleteInvoiceLineMutation,
+  useInvoiceQuery,
+  useJobsQuery,
+  useOrgQuery,
+  useRecordPaymentMutation,
+  useUpdateInvoiceLineMutation,
+  useUpdateInvoiceStatusMutation,
+} from "@/lib/redux/api";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { InvoiceStatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageSendDialog } from "@/components/message-send-dialog";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 import { ADVANCE_TAG } from "@nnact/shared";
-
-interface Payment {
-  id: string;
-  orgId: string;
-  invoiceId: string;
-  amount: number;
-  method: string;
-  reference?: string | null;
-  paidAt: string;
-}
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   manual: "Manual",
@@ -40,16 +42,19 @@ export default function InvoiceDetailPage() {
   const params = useParams();
   const invoiceId = params.id as string;
 
-  const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
-  const [jobs, setJobs] = useState<JobDTO[]>([]);
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [orgSettings, setOrgSettings] = useState<OrgSettingsDTO | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const { data: invoice, isLoading: loading, isError: loadFailed } = useInvoiceQuery(invoiceId);
+  const { data: jobs = [] } = useJobsQuery();
+  const { data: customers = [] } = useCustomersQuery();
+  const { data: orgSettings } = useOrgQuery();
+
+  const [updateInvoiceStatus, statusState] = useUpdateInvoiceStatusMutation();
+  const [recordPayment, payState] = useRecordPaymentMutation();
+  const [addLine, addLineState] = useAddInvoiceLineMutation();
+  const [updateLine, updateLineState] = useUpdateInvoiceLineMutation();
+  const [deleteLine, deleteLineState] = useDeleteInvoiceLineMutation();
 
   // ── Action states ──
   const [actionError, setActionError] = useState<string | null>(null);
-  const [submittingStatus, setSubmittingStatus] = useState<string | null>(null);
 
   // ── Confirm dialog ──
   const [confirmAction, setConfirmAction] = useState<"sent" | "paid" | "void" | null>(null);
@@ -62,7 +67,6 @@ export default function InvoiceDetailPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("manual");
-  const [paySubmitting, setPaySubmitting] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
 
   // ── Line item editor (draft only) ──
@@ -70,7 +74,6 @@ export default function InvoiceDetailPage() {
   const [lineDescription, setLineDescription] = useState("");
   const [lineQuantity, setLineQuantity] = useState("1");
   const [linePrice, setLinePrice] = useState("");
-  const [lineSubmitting, setLineSubmitting] = useState(false);
   const [lineError, setLineError] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -89,32 +92,6 @@ export default function InvoiceDetailPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [confirmAction, showPayment, lineModal, emailOpen]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [inv, jb, cust, org] = await Promise.all([
-          api.invoice(invoiceId),
-          api.jobs().catch(() => [] as JobDTO[]),
-          api.customers().catch(() => [] as CustomerDTO[]),
-          api.org().catch(() => null as OrgSettingsDTO | null),
-        ]);
-        if (!cancelled) {
-          setInvoice(inv);
-          setJobs(jb);
-          setCustomers(cust);
-          setOrgSettings(org);
-        }
-      } catch {
-        if (!cancelled) setLoadFailed(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [invoiceId]);
 
   const job = useMemo(
     () => (invoice ? jobs.find((j) => j.id === invoice.jobId) : null),
@@ -163,37 +140,25 @@ export default function InvoiceDetailPage() {
 
   const handleStatusChange = async (status: "sent" | "void") => {
     if (!invoice) return;
-    setSubmittingStatus(status);
     setActionError(null);
     try {
-      const result = await api.updateInvoiceStatus(invoice.id, status);
-      setInvoice((prev) => prev ? { ...prev, status: result.status as InvoiceDetail["status"] } : prev);
+      await updateInvoiceStatus({ id: invoice.id, status }).unwrap();
       setConfirmAction(null);
       if (status === "sent") emitWalkthroughDone(ADVANCE_TAG.invoiceSent);
     } catch (e) {
       setActionError(String(e));
-    } finally {
-      setSubmittingStatus(null);
     }
   };
 
   const handleMarkPaid = async () => {
     if (!invoice || remaining <= 0) return;
-    setSubmittingStatus("paid");
     setActionError(null);
     try {
-      await api.recordPayment(invoice.id, {
-        amount: remaining,
-        method: "manual",
-      });
-      const refreshed = await api.invoice(invoiceId);
-      setInvoice(refreshed);
+      await recordPayment({ id: invoice.id, amount: remaining, method: "manual" }).unwrap();
       setConfirmAction(null);
       emitWalkthroughDone(ADVANCE_TAG.paymentRecorded);
     } catch (e) {
       setActionError(String(e));
-    } finally {
-      setSubmittingStatus(null);
     }
   };
 
@@ -213,23 +178,14 @@ export default function InvoiceDetailPage() {
       setPayError(`Amount cannot exceed the remaining balance of ${formatMoney(remaining)}.`);
       return;
     }
-    setPaySubmitting(true);
     setPayError(null);
     try {
-      await api.recordPayment(invoice.id, {
-        amount: cents,
-        method: payMethod,
-      });
-      // Refresh full invoice to get updated payments list
-      const refreshed = await api.invoice(invoiceId);
-      setInvoice(refreshed);
+      await recordPayment({ id: invoice.id, amount: cents, method: payMethod }).unwrap();
       setShowPayment(false);
       setPayAmount("");
       emitWalkthroughDone(ADVANCE_TAG.paymentRecorded);
     } catch (e) {
       setPayError(String(e));
-    } finally {
-      setPaySubmitting(false);
     }
   };
 
@@ -267,21 +223,16 @@ export default function InvoiceDetailPage() {
       setLineError("Unit price must be zero or more.");
       return;
     }
-    setLineSubmitting(true);
     setLineError(null);
     try {
       if (lineModal.mode === "edit") {
-        await api.updateInvoiceLine(invoice.id, lineModal.lineId, { description, quantity, unitPrice: cents });
+        await updateLine({ id: invoice.id, lineId: lineModal.lineId, body: { description, quantity, unitPrice: cents } }).unwrap();
       } else {
-        await api.addInvoiceLine(invoice.id, { description, quantity, unitPrice: cents });
+        await addLine({ id: invoice.id, body: { description, quantity, unitPrice: cents } }).unwrap();
       }
-      const refreshed = await api.invoice(invoiceId);
-      setInvoice(refreshed);
       setLineModal(null);
     } catch (e) {
       setLineError(String(e));
-    } finally {
-      setLineSubmitting(false);
     }
   };
 
@@ -289,15 +240,16 @@ export default function InvoiceDetailPage() {
     if (!invoice) return;
     setDeleteError(null);
     try {
-      await api.deleteInvoiceLine(invoice.id, lineId);
+      await deleteLine({ id: invoice.id, lineId }).unwrap();
       setConfirmingDeleteId(null);
-      const refreshed = await api.invoice(invoiceId);
-      setInvoice(refreshed);
     } catch (e) {
       setDeleteError(String(e));
       setConfirmingDeleteId(null);
     }
   };
+
+  const lineSubmitting = lineModal ? (lineModal.mode === "edit" ? updateLineState.isLoading : addLineState.isLoading) : false;
+  const statusSubmitting = confirmAction === "paid" ? payState.isLoading : statusState.isLoading;
 
   // ── Loading ──
   if (loading) {
@@ -351,12 +303,10 @@ export default function InvoiceDetailPage() {
                 <div className="flex gap-2">
                   <Button
                     onClick={() => confirmAction === "paid" ? handleMarkPaid() : handleStatusChange(confirmAction as "sent" | "void")}
-                    disabled={submittingStatus !== null}
+                    loading={statusSubmitting}
                     variant={confirmAction === "void" ? "danger" : "default"}
                   >
-                    {submittingStatus === confirmAction
-                      ? (confirmAction === "void" ? "Voiding..." : confirmAction === "paid" ? "Paying..." : "Sending...")
-                      : (confirmAction === "void" ? "Yes, void it" : confirmAction === "paid" ? "Yes, record payment" : "Yes, mark as sent")}
+                    {confirmAction === "void" ? "Yes, void it" : confirmAction === "paid" ? "Yes, record payment" : "Yes, mark as sent"}
                   </Button>
                   <Button variant="secondary" onClick={() => setConfirmAction(null)}>
                     Cancel
@@ -426,7 +376,10 @@ export default function InvoiceDetailPage() {
                     )}
                   </div>
                   <div>
-                    <Label className="mb-1.5 block text-xs font-semibold text-fg-muted">Method</Label>
+                    <Label className="mb-1.5 block text-xs font-semibold text-fg-muted">
+                      Method
+                      <InfoTip label="About payment method" side="top">Records how the payment was collected. "Manual" is used when money was taken outside the portal.</InfoTip>
+                    </Label>
                     <FormSelect
                       value={payMethod}
                       onChange={setPayMethod}
@@ -439,8 +392,8 @@ export default function InvoiceDetailPage() {
                 </div>
 
                 <div className="flex gap-2 mt-6">
-                  <Button type="submit" disabled={paySubmitting || !payAmount}>
-                    {paySubmitting ? "Recording..." : "Record Payment"}
+                  <Button type="submit" loading={payState.isLoading} disabled={!payAmount}>
+                    Record Payment
                   </Button>
                   <Button type="button" variant="secondary" onClick={() => setShowPayment(false)}>
                     Cancel
@@ -534,8 +487,8 @@ export default function InvoiceDetailPage() {
                 </div>
 
                 <div className="flex gap-2 mt-6">
-                  <Button type="submit" disabled={lineSubmitting || !lineDescription.trim() || !linePrice}>
-                    {lineSubmitting ? "Saving..." : lineModal.mode === "edit" ? "Save changes" : "Add line"}
+                  <Button type="submit" loading={lineSubmitting} disabled={!lineDescription.trim() || !linePrice}>
+                    {lineModal.mode === "edit" ? "Save changes" : "Add line"}
                   </Button>
                   <Button type="button" variant="secondary" onClick={() => setLineModal(null)}>
                     Cancel
@@ -585,8 +538,8 @@ export default function InvoiceDetailPage() {
           actions={
             <div className="flex gap-2 flex-wrap">
               {(invoice.status === "draft" || invoice.status === "sent" || invoice.status === "paid") && (
-                <Button size="sm" variant="secondary" disabled={downloadingPdf} onClick={() => void downloadPdf()}>
-                  {downloadingPdf ? "Preparing…" : "Download PDF"}
+                <Button size="sm" variant="secondary" loading={downloadingPdf} onClick={() => void downloadPdf()}>
+                  Download PDF
                 </Button>
               )}
               {(invoice.status === "draft" || invoice.status === "sent" || invoice.status === "paid") && (
@@ -826,7 +779,7 @@ export default function InvoiceDetailPage() {
                             <span className="flex items-center gap-1 ml-3 shrink-0">
                               {confirmingDeleteId === item.id ? (
                                 <>
-                                  <Button size="sm" variant="danger" onClick={() => handleDeleteLine(item.id)}>
+                                  <Button size="sm" variant="danger" loading={deleteLineState.isLoading} onClick={() => handleDeleteLine(item.id)}>
                                     Delete
                                   </Button>
                                   <Button size="sm" variant="secondary" onClick={() => setConfirmingDeleteId(null)}>

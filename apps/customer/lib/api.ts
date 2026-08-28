@@ -1,4 +1,4 @@
-import type { PortalSessionDTO, PublicBookingConfigDTO } from "@nnact/shared";
+import type { PortalSessionDTO, PublicBookingConfigDTO, PublicBookingResultDTO, PublicRequestStatusDTO } from "@nnact/shared";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -18,7 +18,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export type { PortalSessionDTO, PublicBookingConfigDTO };
+export type { PortalSessionDTO, PublicBookingConfigDTO, PublicBookingResultDTO, PublicRequestStatusDTO };
 
 export const api = {
   bookingConfig: (orgId?: string) =>
@@ -37,7 +37,10 @@ export const api = {
       preferredDate?: string;
       preferredTime?: string;
     },
-  ) => request<{ ok: boolean; requestId: string }>(`/api/public/${orgId}/book`, { method: "POST", body: JSON.stringify(body) }),
+  ) => request<PublicBookingResultDTO>(`/api/public/${orgId}/book`, { method: "POST", body: JSON.stringify(body) }),
+
+  requestStatus: (token: string) =>
+    request<PublicRequestStatusDTO>(`/api/public/requests/${encodeURIComponent(token)}`),
 
   portalSession: (token: string) => request<PortalSessionDTO>(`/api/portal/${token}`),
 

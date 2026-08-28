@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
-import { db, customers } from "@nnact/db";
+import { db, customers, properties } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 
 const createBody = z.object({
@@ -41,7 +41,14 @@ export async function customerRoutes(app: FastifyInstance) {
       .from(customers)
       .where(and(eq(customers.orgId, orgId), eq(customers.id, id)));
     if (!row) return reply.code(404).send({ error: "not found" });
-    return row;
+
+    const [site] = await db
+      .select({ address: properties.address })
+      .from(properties)
+      .where(and(eq(properties.orgId, orgId), eq(properties.customerId, id)))
+      .limit(1);
+
+    return { ...row, primaryAddress: site?.address ?? null };
   });
 
   app.post("/", async (req, reply) => {

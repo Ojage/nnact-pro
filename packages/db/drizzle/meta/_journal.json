@@ -143,10 +143,31 @@
       "breakpoints": true
     },
     {
-      "idx": 21,
+      "idx": 22,
       "version": "7",
-      "when": 1787868754664,
-      "tag": "0021_walkthrough_progress",
+      "when": 1788000000000,
+      "tag": "0022_device_push_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788400000000,
+      "tag": "0023_customer_service_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788500000000,
+      "tag": "0024_job_voice_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788600000000,
+      "tag": "0025_users_must_change_password",
       "breakpoints": true
     }
   ]

@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { getPasswordStrength, PasswordInput, BrandLogo, BackButton } from "@nnact/mobile-ui";
 import { PASSWORD_MIN_LENGTH } from "@nnact/shared";
 import { customerRegister } from "../auth-api";
 import type { StoredCustomerSession } from "../auth-storage";
-import { Card, PrimaryButton, ScreenHeader } from "../components/ui";
-import { fonts, type Palette } from "../theme";
+import { Card, HeroBanner, PrimaryButton, TextField } from "../components/ui";
+import { formatNetworkError, getApiUrl } from "../env";
+import { fonts, spacing, type Palette } from "../theme";
 
 export function SignupScreen({
   colors,
@@ -21,9 +23,15 @@ export function SignupScreen({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const styles = createStyles(colors);
+  const styles = createStyles();
 
   async function submit() {
+    const strength = getPasswordStrength(password);
+    if (!strength.isValid) {
+      setError(`Use at least ${PASSWORD_MIN_LENGTH} characters with letters and numbers.`);
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -36,62 +44,68 @@ export function SignupScreen({
         }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message.replace(/^\d+:\s*/, "") : "Registration failed");
+      setError(formatNetworkError(err, getApiUrl()));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <ScreenHeader
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <View style={styles.logoRow}>
+        <BrandLogo size={56} />
+      </View>
+      <HeroBanner
         colors={colors}
-        eyebrow="NEW CUSTOMER"
-        title="Create account"
+        eyebrow="JOIN NNACT"
+        title="Create your account"
         subtitle={`Choose a strong password (at least ${PASSWORD_MIN_LENGTH} characters with letters and numbers).`}
-        onBack={onBack}
       />
       <View style={styles.form}>
-        <Card colors={colors}>
-          <Text style={styles.label}>Full name</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor={colors.dimForeground} style={styles.input} />
-          <Text style={styles.label}>Email</Text>
-          <TextInput
+        <Card colors={colors} elevated>
+          <TextField colors={colors} label="Full name" value={name} onChangeText={setName} placeholder="Your name" />
+          <TextField
+            colors={colors}
+            label="Email address"
             value={email}
             onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
             placeholder="you@example.com"
-            placeholderTextColor={colors.dimForeground}
-            style={styles.input}
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
-          <Text style={styles.label}>Phone (optional)</Text>
-          <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+237 …" placeholderTextColor={colors.dimForeground} style={styles.input} />
-          <Text style={styles.label}>Password</Text>
-          <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="Password" placeholderTextColor={colors.dimForeground} style={styles.input} />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <TextField
+            colors={colors}
+            label="Phone (optional)"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="+237 …"
+            keyboardType="phone-pad"
+          />
+          <PasswordInput
+            colors={colors}
+            fonts={{ medium: fonts.medium, semibold: fonts.semibold, bold: fonts.bold }}
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Create a password"
+            autoComplete="new-password"
+            showStrength
+            error={error ?? undefined}
+            returnKeyType="go"
+            onSubmitEditing={() => void submit()}
+          />
         </Card>
-        <PrimaryButton colors={colors} label={submitting ? "Creating account…" : "Create account"} onPress={() => void submit()} disabled={submitting} />
+        <PrimaryButton colors={colors} label="Create account" onPress={() => void submit()} disabled={submitting} loading={submitting} />
+        <BackButton colors={colors} onPress={onBack} variant="surface" label="Back to sign in" />
       </View>
     </ScrollView>
   );
 }
 
-const createStyles = (colors: Palette) =>
+const createStyles = () =>
   StyleSheet.create({
-    scroll: { flex: 1, backgroundColor: colors.background },
-    content: { paddingTop: 58, paddingBottom: 24 },
-    form: { paddingHorizontal: 20, gap: 12 },
-    label: { color: colors.mutedForeground, fontSize: 11, fontFamily: fonts.bold, marginBottom: 8, marginTop: 8, textTransform: "uppercase" },
-    input: {
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.cardMuted,
-      padding: 12,
-      color: colors.foreground,
-      fontSize: 14,
-      fontFamily: fonts.regular,
-    },
-    error: { color: colors.danger, fontSize: 12, marginTop: 10, fontFamily: fonts.regular },
+    scroll: { flex: 1 },
+    content: { paddingBottom: spacing.xl },
+    logoRow: { alignItems: "center", paddingTop: spacing.xl, paddingBottom: spacing.sm },
+    form: { paddingHorizontal: spacing.lg, marginTop: spacing.lg, gap: spacing.sm },
   });

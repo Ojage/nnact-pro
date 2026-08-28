@@ -5,6 +5,9 @@ import { db, appointments, jobs, users } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { resolveAppointmentWindow } from "./appointment-validation.js";
+import { verifiedClaims } from "../operational-authorization.js";
+import { safeNotifyUser } from "../notify-user.js";
+import { safeEmitEvent } from "../plugins/bus.js";
 
 const createBody = z.object({
   jobId: z.string().uuid(),
@@ -88,12 +91,24 @@ function conflictResponse(conflict: {
 
 export async function appointmentRoutes(app: FastifyInstance) {
   // List, optionally within [from, to] for a calendar view.
-  app.get("/", async (req) => {
+  app.get("/", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const { from, to } = req.query as { from?: string; to?: string };
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+
+    const { from, to, technicianId } = req.query as {
+      from?: string;
+      to?: string;
+      technicianId?: string;
+    };
     const conds = [eq(appointments.orgId, orgId)];
     if (from) conds.push(gte(appointments.startsAt, new Date(from)));
     if (to) conds.push(lte(appointments.startsAt, new Date(to)));
+    if (claims.role === "technician") {
+      conds.push(eq(appointments.technicianId, claims.userId));
+    } else if (technicianId) {
+      conds.push(eq(appointments.technicianId, technicianId));
+    }
     return db
       .select()
       .from(appointments)
@@ -161,6 +176,28 @@ export async function appointmentRoutes(app: FastifyInstance) {
       `Scheduled appointment for ${window.startsAt.toLocaleString()}`,
       { jobId: rest.jobId },
     );
+
+    if (rest.technicianId) {
+      const [jobRow] = await db
+        .select({ title: jobs.title })
+        .from(jobs)
+        .where(and(eq(jobs.orgId, orgId), eq(jobs.id, rest.jobId)))
+        .limit(1);
+      void safeNotifyUser(orgId, rest.technicianId, {
+        type: "appointment.assigned",
+        title: "New visit assigned",
+        body: `${jobRow?.title ?? "Service job"} · ${window.startsAt.toLocaleString()}`,
+        link: `/jobs/${rest.jobId}`,
+        jobId: rest.jobId,
+      });
+      void safeEmitEvent(orgId, "appointment.assigned", {
+        jobId: rest.jobId,
+        technicianId: rest.technicianId,
+        appointmentId: row.id,
+        startsAt: window.startsAt.toISOString(),
+      });
+    }
+
     return reply.code(201).send(row);
   });
 
@@ -235,6 +272,40 @@ export async function appointmentRoutes(app: FastifyInstance) {
           : `Appointment rescheduled for ${window.startsAt.toLocaleString()}`,
         { jobId: current.jobId },
       );
+
+      if (assignmentChanged && technicianId) {
+        const [jobRow] = await db
+          .select({ title: jobs.title })
+          .from(jobs)
+          .where(and(eq(jobs.orgId, orgId), eq(jobs.id, current.jobId)))
+          .limit(1);
+        void safeNotifyUser(orgId, technicianId, {
+          type: "appointment.assigned",
+          title: "New visit assigned",
+          body: `${jobRow?.title ?? "Service job"} · ${window.startsAt.toLocaleString()}`,
+          link: `/jobs/${current.jobId}`,
+          jobId: current.jobId,
+        });
+        void safeEmitEvent(orgId, "appointment.assigned", {
+          jobId: current.jobId,
+          technicianId,
+          appointmentId: id,
+          startsAt: window.startsAt.toISOString(),
+        });
+      } else if (scheduleChanged && targetTechnicianId) {
+        const [jobRow] = await db
+          .select({ title: jobs.title })
+          .from(jobs)
+          .where(and(eq(jobs.orgId, orgId), eq(jobs.id, current.jobId)))
+          .limit(1);
+        void safeNotifyUser(orgId, targetTechnicianId, {
+          type: "appointment.rescheduled",
+          title: "Visit rescheduled",
+          body: `${jobRow?.title ?? "Service job"} · ${window.startsAt.toLocaleString()}`,
+          link: `/jobs/${current.jobId}`,
+          jobId: current.jobId,
+        });
+      }
     }
 
     return row;

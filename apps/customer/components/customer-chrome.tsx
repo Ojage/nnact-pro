@@ -9,7 +9,7 @@ export function CustomerHeader({ compact = false }: { compact?: boolean }) {
       <div className="mx-auto flex h-16 w-[min(1080px,calc(100%-32px))] items-center justify-between gap-4">
         <Link href="/" className="flex min-w-0 items-center gap-3 no-underline">
           <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-accent shadow-sm">
-            <Image src="/nnact-logo.jpeg" alt={`${NNACT_COMPANY.shortName} logo`} fill sizes="40px" className="object-cover" priority />
+            <Image src="/nnact-logo.png" alt={`${NNACT_COMPANY.shortName} logo`} fill sizes="40px" className="object-contain p-0.5" priority />
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-black tracking-tight text-fg">{NNACT_COMPANY.shortName}</p>

@@ -1,11 +1,24 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
-import { db, orgs, customers, jobs } from "@nnact/db";
-import { mergeBusinessSettings, NNACT_COMPANY, type PublicBookingConfigDTO } from "@nnact/shared";
+import { and, eq, inArray, or } from "drizzle-orm";
+import { db, orgs, customers, properties, jobs, users } from "@nnact/db";
+import {
+  NNACT_COMPANY,
+  mergeBusinessSettings,
+  type PublicBookingConfigDTO,
+  type PublicBookingResultDTO,
+  type PublicRequestStatusDTO,
+  type JobStatus,
+} from "@nnact/shared";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 import { getOrgLogo } from "../uploads.js";
 import { resolveDefaultOrgId } from "../runtime-security.js";
+import { hashPortalToken } from "../portal-links.js";
+import { safeEmitActivity } from "../activities.js";
+import { safeEmitEvent } from "../plugins/bus.js";
+import { safeNotifyUser } from "../notify-user.js";
+import { sendEmail } from "../mailer.js";
 
 const bookBody = z.object({
   name: z.string().trim().min(1).max(200),
@@ -27,6 +40,76 @@ const bookingRateLimit = createFixedWindowRateLimit({
     return `${requestIpKey(request)}:${orgId}`;
   },
 });
+
+function customerAppUrl(path = ""): string {
+  const base = process.env.CUSTOMER_APP_URL?.replace(/\/$/, "") ?? "http://localhost:3002";
+  return path ? `${base}${path.startsWith("/") ? path : `/${path}`}` : base;
+}
+
+function notifyStaffOfServiceRequest(orgId: string, job: typeof jobs.$inferSelect): void {
+  void (async () => {
+    try {
+      const staff = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            eq(users.orgId, orgId),
+            eq(users.active, true),
+            inArray(users.role, ["owner", "dispatcher"]),
+          ),
+        );
+      await Promise.all(
+        staff.map((member) =>
+          safeNotifyUser(orgId, member.id, {
+            type: "customer.request_received",
+            title: "New service request",
+            body: `${job.title}`,
+            link: `/jobs/${job.id}`,
+            jobId: job.id,
+          }),
+        ),
+      );
+    } catch (err) {
+      console.error("[public] staff notification failed:", err);
+    }
+  })();
+}
+
+function sendBookingConfirmationEmail(input: {
+  orgName: string;
+  to: string;
+  customerName: string;
+  service: string;
+  requestId: string;
+  trackingUrl: string;
+}): void {
+  void (async () => {
+    try {
+      await sendEmail({
+        to: input.to,
+        subject: `We received your ${input.orgName} service request`,
+        text: [
+          `Hi ${input.customerName},`,
+          "",
+          `We've received your request for: ${input.service}`,
+          `Request reference: ${input.requestId}`,
+          "",
+          `You can check the status of your request anytime here:`,
+          input.trackingUrl,
+          "",
+          "Our dispatch team will reach out to confirm a time — usually within 24 hours.",
+          "",
+          `Thanks,`,
+          input.orgName,
+        ].join("\n"),
+      });
+    } catch (err) {
+      // Best-effort delivery: a flaky SMTP relay must not surface to the booker.
+      console.error("[public] booking confirmation email failed:", err);
+    }
+  })();
+}
 
 function bookingConfigForOrg(org: typeof orgs.$inferSelect): PublicBookingConfigDTO {
   const settings = mergeBusinessSettings(org.businessSettings);
@@ -50,12 +133,72 @@ function bookingConfigForOrg(org: typeof orgs.$inferSelect): PublicBookingConfig
 }
 
 export async function publicRoutes(app: FastifyInstance) {
+  app.get("/firebase-config", async () => ({
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
+    authDomain:
+      process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ??
+      (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        ? `${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`
+        : ""),
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "",
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "",
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
+  }));
+
   app.get("/default", async (_req, reply) => {
     const orgId = resolveDefaultOrgId();
     if (!orgId) return reply.code(404).send({ error: "default organization is not configured" });
     const [org] = await db.select().from(orgs).where(eq(orgs.id, orgId));
     if (!org) return reply.code(404).send({ error: "business not found" });
     return bookingConfigForOrg(org);
+  });
+
+  /** Resolve a tracking token that may arrive as a bare token or a pasted URL. */
+  function resolveTrackingToken(input: string): string | null {
+    const trimmed = input.trim();
+    if (trimmed.startsWith("trk_")) return trimmed;
+    try {
+      const url = new URL(trimmed);
+      const last = url.pathname.split("/").filter(Boolean).pop();
+      return last?.startsWith("trk_") ? last : null;
+    } catch {
+      return null;
+    }
+  }
+
+  app.get("/requests/:token", async (req, reply) => {
+    const { token } = req.params as { token: string };
+    const raw = resolveTrackingToken(token);
+    if (!raw) return reply.code(404).send({ error: "request not found" });
+
+    const [job] = await db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.trackingTokenHash, hashPortalToken(raw)))
+      .limit(1);
+    if (!job) return reply.code(404).send({ error: "request not found" });
+
+    const [customer] = await db
+      .select({ name: customers.name })
+      .from(customers)
+      .where(eq(customers.id, job.customerId))
+      .limit(1);
+
+    const status: JobStatus = job.status as JobStatus;
+    return {
+      ok: true,
+      requestId: job.id,
+      status,
+      title: job.title,
+      customerName: customer?.name ?? "",
+      serviceCategory: job.serviceCategory,
+      serviceAddress: job.serviceAddress,
+      preferredDate: job.preferredDate,
+      preferredTime: job.preferredTime,
+      createdAt: job.createdAt.toISOString(),
+      scheduledAt: job.scheduledAt ? job.scheduledAt.toISOString() : null,
+      updatedAt: job.updatedAt.toISOString(),
+    } satisfies PublicRequestStatusDTO;
   });
 
   app.get("/:orgId/logo", async (req, reply) => {
@@ -85,34 +228,127 @@ export async function publicRoutes(app: FastifyInstance) {
     const parsed = bookBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-    const [org] = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId));
+    const [org] = await db.select({ id: orgs.id, name: orgs.name, publicEmail: orgs.publicEmail }).from(orgs).where(eq(orgs.id, orgId));
     if (!org) return reply.code(404).send({ error: "business not found" });
 
-    const { name, phone, title, description, serviceCategory, address, preferredDate, preferredTime } = parsed.data;
-    const email = parsed.data.email?.toLowerCase();
-    const details = [
-      serviceCategory ? `Category: ${serviceCategory}` : null,
-      address ? `Address: ${address}` : null,
-      preferredDate ? `Preferred date: ${preferredDate}` : null,
-      preferredTime ? `Preferred time: ${preferredTime}` : null,
-      description ?? null,
-    ].filter(Boolean).join("\n");
+    const { name, title, description, serviceCategory, address, preferredDate, preferredTime } = parsed.data;
+    const email = parsed.data.email?.trim().toLowerCase() || null;
+    const phone = parsed.data.phone?.trim() || null;
 
-    const job = await db.transaction(async (tx) => {
-      const [customer] = await tx.insert(customers).values({ orgId, name, email, phone }).returning();
+    // Public booking token: returned raw once, stored only as a SHA-256 hash so
+    // a database leak cannot be used to look up or guess tracking links.
+    const trackingToken = `trk_${randomBytes(24).toString("base64url")}`;
+    const trackingTokenHash = hashPortalToken(trackingToken);
+
+    const { job } = await db.transaction(async (tx) => {
+      // Dedupe the customer by email OR phone so repeat requesters reuse a row
+      // (and accumulate activity/timeline history) instead of spawning clones.
+      const contactClauses = [];
+      if (email) contactClauses.push(eq(customers.email, email));
+      if (phone) contactClauses.push(eq(customers.phone, phone));
+
+      let customer;
+      if (contactClauses.length > 0) {
+        [customer] = await tx
+          .select()
+          .from(customers)
+          .where(and(eq(customers.orgId, orgId), or(...contactClauses)))
+          .limit(1);
+      }
+      if (!customer) {
+        [customer] = await tx
+          .insert(customers)
+          .values({ orgId, name, email, phone })
+          .returning();
+      } else {
+        // Refresh contact details on a returning customer (keep whatever they
+        // supplied; never clear fields they just left blank).
+        [customer] = await tx
+          .update(customers)
+          .set({
+            name: name || customer.name,
+            email: email || customer.email,
+            phone: phone || customer.phone,
+          })
+          .where(eq(customers.id, customer.id))
+          .returning();
+      }
+
+      // Attach (or re-use) a property row when the customer gave an address.
+      let propertyId: string | null = null;
+      if (address) {
+        const [existing] = await tx
+          .select({ id: properties.id })
+          .from(properties)
+          .where(and(eq(properties.orgId, orgId), eq(properties.customerId, customer.id), eq(properties.address, address)))
+          .limit(1);
+        if (existing) {
+          propertyId = existing.id;
+        } else {
+          const [property] = await tx
+            .insert(properties)
+            .values({ orgId, customerId: customer.id, address })
+            .returning();
+          propertyId = property.id;
+        }
+      }
+
       const [createdJob] = await tx
         .insert(jobs)
         .values({
           orgId,
           customerId: customer.id,
+          propertyId,
           title,
-          description: details || undefined,
+          description: description ?? null,
           status: "lead",
+          source: "customer_request",
+          serviceCategory: serviceCategory ?? null,
+          serviceAddress: address ?? null,
+          preferredDate: preferredDate ?? null,
+          preferredTime: preferredTime ?? null,
+          trackingTokenHash,
         })
         .returning();
-      return createdJob;
+
+      return { job: createdJob };
     });
 
-    return reply.code(201).send({ ok: true, requestId: job.id });
+    // Activity + plugin event + staff notifications: all best-effort.
+    safeEmitActivity(orgId, "customer.request_received", `Service request received: ${job.title}`, {
+      customerId: job.customerId,
+      jobId: job.id,
+    });
+    void safeEmitEvent(orgId, "job.created", {
+      id: job.id,
+      title: job.title,
+      customerId: job.customerId,
+      status: job.status,
+      source: "customer_request",
+    });
+    notifyStaffOfServiceRequest(orgId, job);
+
+    // Confirmation email to the customer (best-effort; fail-closed when SMTP is
+    // not configured). Fire-and-forget so a slow relay never blocks the submit.
+    let emailSent = false;
+    if (email) {
+      emailSent = true;
+      void sendBookingConfirmationEmail({
+        orgName: org.name,
+        to: email,
+        customerName: name,
+        service: title,
+        requestId: job.id,
+        trackingUrl: customerAppUrl(`/track/${trackingToken}`),
+      });
+    }
+
+    return reply.code(201).send({
+      ok: true,
+      requestId: job.id,
+      trackingToken,
+      trackingUrl: customerAppUrl(`/track/${trackingToken}`),
+      emailSent,
+    } satisfies PublicBookingResultDTO);
   });
 }

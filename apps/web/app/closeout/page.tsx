@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { CustomerDTO, JobDTO } from "@nnact/shared";
 import { formatMoney } from "@nnact/shared";
-import { api } from "@/lib/api";
+import {
+  useCreateInvoiceMutation,
+  useCustomersQuery,
+  useInvoicesQuery,
+  useJobsQuery,
+  usePatchJobMutation,
+} from "@/lib/redux/api";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,14 +19,6 @@ import { JobStatusBadge, InvoiceStatusBadge } from "@/components/status-badge";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 
-interface InvoiceRow {
-  id: string;
-  jobId: string;
-  number: string;
-  status: "draft" | "sent" | "paid" | "void";
-  total: number;
-}
-
 type BusyAction = { jobId: string; action: "start" | "complete" | "invoice" } | null;
 
 function customerName(job: JobDTO, customers: Map<string, CustomerDTO>) {
@@ -28,32 +26,19 @@ function customerName(job: JobDTO, customers: Map<string, CustomerDTO>) {
 }
 
 export default function CloseoutPage() {
-  const [jobs, setJobs] = useState<JobDTO[]>([]);
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const jobsQuery = useJobsQuery();
+  const customersQuery = useCustomersQuery();
+  const invoicesQuery = useInvoicesQuery();
+  const jobs = jobsQuery.data ?? [];
+  const customers = customersQuery.data ?? [];
+  const invoices = invoicesQuery.data ?? [];
+  const [patchJob] = usePatchJobMutation();
+  const [createInvoice] = useCreateInvoiceMutation();
+
+  const loading = jobsQuery.isLoading || customersQuery.isLoading || invoicesQuery.isLoading;
+  const queryFailed = jobsQuery.isError || customersQuery.isError || invoicesQuery.isError;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<BusyAction>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([api.jobs(), api.customers(), api.invoices()])
-      .then(([jobRows, customerRows, invoiceRows]) => {
-        if (cancelled) return;
-        setJobs(jobRows);
-        setCustomers(customerRows);
-        setInvoices(invoiceRows);
-      })
-      .catch((caught) => {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : String(caught));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const customerMap = useMemo(
     () => new Map(customers.map((customer) => [customer.id, customer])),
@@ -89,10 +74,9 @@ export default function CloseoutPage() {
     setError(null);
     setBusy({ jobId: job.id, action: status === "in_progress" ? "start" : "complete" });
     try {
-      const updated = await api.patchJob(job.id, { status });
+      await patchJob({ id: job.id, data: { status } }).unwrap();
       if (status === "in_progress") emitWalkthroughDone(ADVANCE_TAG.visitStarted);
       if (status === "completed") emitWalkthroughDone(ADVANCE_TAG.visitCompleted);
-      setJobs((rows) => rows.map((row) => (row.id === job.id ? updated : row)));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -100,7 +84,7 @@ export default function CloseoutPage() {
     }
   }
 
-  async function createInvoice(job: JobDTO) {
+  async function createInvoiceFrom(job: JobDTO) {
     if (job.total <= 0) {
       setError("Add billable line items before creating an invoice.");
       return;
@@ -108,8 +92,7 @@ export default function CloseoutPage() {
     setError(null);
     setBusy({ jobId: job.id, action: "invoice" });
     try {
-      const invoice = await api.createInvoice({ jobId: job.id });
-      setInvoices((rows) => [invoice, ...rows]);
+      await createInvoice({ jobId: job.id }).unwrap();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -145,9 +128,9 @@ export default function CloseoutPage() {
         }
       />
 
-      {error && (
+      {(error || queryFailed) && (
         <div role="alert" className="mb-5 rounded-xl border border-red/30 bg-red/5 p-4 text-sm text-red">
-          {error}
+          {error ?? "Closeout data could not be loaded."}
         </div>
       )}
 
@@ -175,10 +158,10 @@ export default function CloseoutPage() {
               <Button
                 size="sm"
                 onClick={() => updateStatus(job, "in_progress")}
-                disabled={busy?.jobId === job.id}
+                loading={busy?.jobId === job.id}
                 aria-label={`Start ${job.title}`}
               >
-                {busy?.jobId === job.id ? "Starting…" : "Start job"}
+                Start job
               </Button>
             </JobCard>
           ))}
@@ -190,10 +173,10 @@ export default function CloseoutPage() {
               <Button
                 size="sm"
                 onClick={() => updateStatus(job, "completed")}
-                disabled={busy?.jobId === job.id}
+                loading={busy?.jobId === job.id}
                 aria-label={`Complete ${job.title}`}
               >
-                {busy?.jobId === job.id ? "Completing…" : "Mark complete"}
+                Mark complete
               </Button>
             </JobCard>
           ))}
@@ -204,11 +187,11 @@ export default function CloseoutPage() {
             <JobCard key={job.id} job={job} customer={customerName(job, customerMap)}>
               <Button
                 size="sm"
-                onClick={() => createInvoice(job)}
-                disabled={busy?.jobId === job.id}
+                onClick={() => createInvoiceFrom(job)}
+                loading={busy?.jobId === job.id}
                 aria-label={`Create invoice for ${job.title}`}
               >
-                {busy?.jobId === job.id ? "Creating…" : "Create invoice"}
+                Create invoice
               </Button>
             </JobCard>
           ))}

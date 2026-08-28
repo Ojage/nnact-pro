@@ -11,6 +11,7 @@ export interface StaffSessionUser {
   email: string;
   role: string;
   orgId: string;
+  mustChangePassword?: boolean;
 }
 
 export interface CustomerSessionUser {
@@ -34,6 +35,7 @@ export interface AuthTokenPairDTO {
 
 export interface StaffAuthResponseDTO extends AuthTokenPairDTO {
   user: StaffSessionUser;
+  mustChangePassword?: boolean;
 }
 
 export interface CustomerAuthResponseDTO extends AuthTokenPairDTO {

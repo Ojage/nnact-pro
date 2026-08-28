@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { NNACT_COMPANY } from "@nnact/shared";
-import { api, type PublicBookingConfigDTO } from "@/lib/api";
+import { api, type PublicBookingConfigDTO, type PublicBookingResultDTO } from "@/lib/api";
 import { CustomerFooter, CustomerHeader } from "@/components/customer-chrome";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 const DEFAULT_ORG_ID = process.env.NEXT_PUBLIC_DEFAULT_ORG_ID;
 
@@ -15,6 +16,7 @@ export default function BookPage() {
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState<PublicBookingResultDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -55,7 +57,7 @@ export default function BookPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.bookService(config.org.id, {
+      const res = await api.bookService(config.org.id, {
         name,
         email: email || undefined,
         phone: phone || undefined,
@@ -66,6 +68,7 @@ export default function BookPage() {
         preferredTime: preferredTime || undefined,
         description: notes || undefined,
       });
+      setResult(res);
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message.replace(/^\d+:\s*/, "") : "Unable to submit your request.");
@@ -89,7 +92,7 @@ export default function BookPage() {
           </p>
         </div>
 
-        {submitted ? (
+        {submitted && result ? (
           <Card>
             <CardContent className="p-8 text-center">
               <p className="text-4xl">✓</p>
@@ -98,6 +101,23 @@ export default function BookPage() {
                 Thanks, {name}. We&apos;ll reach out shortly about <strong>{service}</strong>
                 {address ? ` at ${address}` : ""}.
               </p>
+              <div className="mt-6 space-y-3 text-left text-sm">
+                <p className="text-fg-dim">Your reference number:</p>
+                <p className="font-mono text-fg break-all">{result.requestId}</p>
+                {result.trackingUrl && (
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-fg-dim mb-1">Track status:</p>
+                    <Link
+                      href={result.trackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-fg-link hover:underline text-sm break-all"
+                    >
+                      {result.trackingUrl}
+                    </Link>
+                  </div>
+                )}
+              </div>
               <Button className="mt-6" onClick={() => setSubmitted(false)} variant="secondary">
                 Submit another request
               </Button>

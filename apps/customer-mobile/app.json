@@ -7,7 +7,12 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "nnactcustomer",
-    "splash": { "backgroundColor": "#0f172a" },
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nnact.customer"

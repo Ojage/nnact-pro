@@ -27,6 +27,8 @@ export {
 
 export { Input } from './input';
 
+export { PasswordInput } from './password-input';
+
 export { Button, buttonVariants } from './button';
 
 export { FormSelect, type FormSelectOption, type FormSelectProps } from './form-select';
@@ -82,5 +84,7 @@ export {
 export { PaginationList } from './pagination-list';
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './tooltip';
+
+export { InfoTip } from './info-tip';
 
 export { LoadingSpinner as Spinner } from './LoadingSpinner';

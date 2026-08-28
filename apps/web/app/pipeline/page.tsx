@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const COLUMNS = [
   { status: "lead", label: "Lead", color: "border-t-purple" },
@@ -172,7 +173,14 @@ export default function PipelinePage() {
                               className="block p-3 rounded-lg bg-surface-300 hover:bg-surface-400 transition-colors no-underline border-l-2 border-accent"
                             >
                               <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">
-                                {j.title}
+                                <span className="flex items-center gap-1">
+                                  {j.title}
+                                  {j.source && j.source !== "staff" && (
+                                    <Badge variant="secondary" className="text-[9px]">
+                                      {j.source.replace("_", " ")}
+                                    </Badge>
+                                  )}
+                                </span>
                               </p>
                               {cust && (
                                 <p className="text-[10px] text-fg-muted mt-1 truncate">

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "572995030283",
+    "project_id": "nnact-technician",
+    "storage_bucket": "nnact-technician.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:572995030283:android:dbf7401e1cab72384fa60e",
+        "android_client_info": {
+          "package_name": "com.nnact.nnact_technician"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBYUnVreYtsdzahFtGDucoiYRYiJ2JoIJI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

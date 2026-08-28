@@ -1,37 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { CustomerDTO } from "@nnact/shared";
-import { api } from "@/lib/api";
+import { usePatchCustomerMutation } from "@/lib/redux/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export function EditCustomerDialog({ customer }: { customer: CustomerDTO }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(customer.name);
   const [email, setEmail] = useState(customer.email ?? "");
   const [phone, setPhone] = useState(customer.phone ?? "");
+  const [patchCustomer, { isLoading: saving }] = usePatchCustomerMutation();
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    setSaving(true);
     setError(null);
     try {
-      await api.patchCustomer(customer.id, {
-        name: name.trim(),
-        email: email.trim() || null,
-        phone: phone.trim() || null,
-      });
+      await patchCustomer({
+        id: customer.id,
+        body: {
+          name: name.trim(),
+          email: email.trim() || null,
+          phone: phone.trim() || null,
+        },
+      }).unwrap();
       setOpen(false);
-      router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -74,7 +71,7 @@ export function EditCustomerDialog({ customer }: { customer: CustomerDTO }) {
               {error && <p className="rounded-lg border border-red/30 bg-red/5 p-3 text-sm text-red">{error}</p>}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving || !name.trim()}>{saving ? "Saving…" : "Save"}</Button>
+                <Button type="submit" loading={saving} disabled={!name.trim()}>Save</Button>
               </div>
             </form>
           </div>

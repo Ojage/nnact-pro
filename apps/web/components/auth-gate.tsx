@@ -5,11 +5,12 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isPublicPath } from "@/lib/public-routes";
 import { useSessionUser } from "@/lib/use-session-user";
+import { RequiredPasswordChange } from "@/components/required-password-change";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading } = useSessionUser();
+  const { user, loading, setUser } = useSessionUser();
   const [mounted, setMounted] = useState(false);
 
   const isPublicSurface = isPublicPath(pathname);
@@ -30,6 +31,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <div className="flex min-h-screen items-center justify-center bg-surface-100 text-sm text-fg-muted">
         Verifying session…
       </div>
+    );
+  }
+
+  if (user.mustChangePassword) {
+    return (
+      <RequiredPasswordChange
+        user={user}
+        onComplete={(next) => setUser(next)}
+      />
     );
   }
 

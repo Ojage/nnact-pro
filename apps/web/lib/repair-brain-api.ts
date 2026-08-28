@@ -1,25 +1,32 @@
+import { loadingStore } from "@/lib/loadingStore";
+
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 async function rbRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = {
-    ...(init?.headers as Record<string, string> | undefined),
-  };
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("NNPtoken");
-    if (token) headers.authorization = `Bearer ${token}`;
-  }
+  loadingStore.begin();
+  try {
+    const headers: Record<string, string> = {
+      ...(init?.headers as Record<string, string> | undefined),
+    };
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("NNPtoken");
+      if (token) headers.authorization = `Bearer ${token}`;
+    }
 
-  const response = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { "content-type": "application/json", ...headers },
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body || response.statusText}`);
+    const response = await fetch(`${BASE}${path}`, {
+      ...init,
+      headers: { "content-type": "application/json", ...headers },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`${response.status}: ${body || response.statusText}`);
+    }
+    const text = await response.text();
+    return text ? (JSON.parse(text) as T) : (undefined as T);
+  } finally {
+    loadingStore.end();
   }
-  const text = await response.text();
-  return text ? (JSON.parse(text) as T) : (undefined as T);
 }
 
 export interface EquipmentModel {

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { InfoTip } from "@/components/ui/info-tip";
 import { EmptyState } from "@/components/empty-state";
 import { formatMoney } from "@nnact/shared";
 
@@ -173,32 +174,50 @@ export default function PriceBookPage() {
               {editing ? "Edit Service" : "New Service"}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-              <Input
-                placeholder="Service name"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                autoFocus
-              />
-              <Input
-                placeholder="Price ($)"
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.price}
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-              />
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">Service name</span>
+                <Input
+                  placeholder="Service name"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  autoFocus
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
+                  Price
+                  <InfoTip label="Price">The rate billed to the customer for this service, in dollars. Stored in whole cents behind the scenes.</InfoTip>
+                </span>
+                <Input
+                  placeholder="Price ($)"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.price}
+                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                />
+              </label>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-              <Input
-                placeholder="Description (optional)"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
-              <FormSelect
-                value={form.category}
-                onChange={(category) => setForm((f) => ({ ...f, category }))}
-                options={CATEGORIES.map((c) => ({ value: c, label: c }))}
-              />
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">Description</span>
+                <Input
+                  placeholder="Description (optional)"
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
+                  Category
+                  <InfoTip label="Category">Used to group services in reports and to filter the price book. Pick the trade this work belongs to.</InfoTip>
+                </span>
+                <FormSelect
+                  value={form.category}
+                  onChange={(category) => setForm((f) => ({ ...f, category }))}
+                  options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+                />
+              </label>
             </div>
             <div className="flex gap-2">
               <Button onClick={handleSave} disabled={!form.name.trim() || !form.price}>

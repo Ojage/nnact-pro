@@ -54,6 +54,35 @@ export const NNACT_COMPANY = {
   ] as const,
 } as const;
 
+/** Opens Google Maps at the NNACT workshop. */
+export function buildGoogleMapsUrl(
+  location: (typeof NNACT_COMPANY)["location"] = NNACT_COMPANY.location,
+): string {
+  const { latitude, longitude } = location.geo;
+  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+}
+
+/** Directions deep link — preferred for mobile "Get directions" CTAs. */
+export function buildGoogleMapsDirectionsUrl(
+  location: (typeof NNACT_COMPANY)["location"] = NNACT_COMPANY.location,
+): string {
+  const { latitude, longitude } = location.geo;
+  return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+}
+
+/** WhatsApp deep link for customer messaging (wa.me). */
+export function buildWhatsAppUrl(phone: string, message?: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const base = `https://wa.me/${digits}`;
+  if (!message?.trim()) return base;
+  return `${base}?text=${encodeURIComponent(message.trim())}`;
+}
+
+/** Google Maps directions to a street address string. */
+export function buildGoogleMapsDirectionsToAddress(address: string): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address.trim())}`;
+}
+
 export const NNACT_PRODUCT = {
   name: "NNACT Pro",
   slug: "nnact-pro",

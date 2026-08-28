@@ -89,6 +89,7 @@ export const users = pgTable(
     role: userRole("role").default("technician").notNull(),
     passwordHash: text("password_hash"),
     active: boolean("active").default(true).notNull(),
+    mustChangePassword: boolean("must_change_password").default(false).notNull(),
     /** Per-user guided-walkthrough progress, keyed by walkthrough id. */
     walkthroughProgress: jsonb("walkthrough_progress")
       .$type<WalkthroughProgressMap>()
@@ -144,6 +145,14 @@ export const jobs = pgTable(
     title: text("title").notNull(),
     description: text("description"),
     status: jobStatus("status").default("lead").notNull(),
+    /** How the job entered the system — "staff" (in-house) or "customer_request" (public booking form). */
+    source: text("source").default("staff").notNull(),
+    serviceCategory: text("service_category"),
+    serviceAddress: text("service_address"),
+    preferredDate: text("preferred_date"),
+    preferredTime: text("preferred_time"),
+    /** SHA-256 of the customer-facing tracking token. Never stored in plain text. */
+    trackingTokenHash: text("tracking_token_hash"),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     total: integer("total").default(0).notNull(),
     laborCostCents: integer("labor_cost_cents").default(0).notNull(),
@@ -154,6 +163,7 @@ export const jobs = pgTable(
   (t) => ({
     orgStatus: index("jobs_org_status_idx").on(t.orgId, t.status),
     sched: index("jobs_scheduled_idx").on(t.scheduledAt),
+    tracking: uniqueIndex("jobs_tracking_hash_idx").on(t.trackingTokenHash),
   }),
 );
 
@@ -387,6 +397,30 @@ export const photos = pgTable(
   (t) => ({ job: index("photos_job_idx").on(t.orgId, t.jobId) }),
 );
 
+export const jobVoiceNotes = pgTable(
+  "job_voice_notes",
+  {
+    id: id(),
+    orgId: orgId(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    authorUserId: uuid("author_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    objectKey: text("object_key").notNull(),
+    contentType: text("content_type").notNull(),
+    fileName: text("file_name"),
+    fileSize: integer("file_size"),
+    durationMs: integer("duration_ms").notNull().default(0),
+    createdAt: ts(),
+  },
+  (t) => ({
+    job: index("job_voice_notes_job_idx").on(t.orgId, t.jobId),
+    author: index("job_voice_notes_author_idx").on(t.orgId, t.authorUserId),
+  }),
+);
+
 export const equipment = pgTable(
   "equipment",
   {
@@ -434,6 +468,26 @@ export const notifications = pgTable(
     createdAt: ts(),
   },
   (t) => ({ userUnread: index("notifications_user_unread_idx").on(t.userId, t.read, t.createdAt) }),
+);
+
+export const devicePushTokens = pgTable(
+  "device_push_tokens",
+  {
+    id: id(),
+    orgId: orgId(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    provider: text("provider").notNull().default("fcm"),
+    token: text("token").notNull(),
+    updatedAt: updatedAt(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    tokenUnique: uniqueIndex("device_push_tokens_token_idx").on(t.token),
+    userIdx: index("device_push_tokens_user_idx").on(t.orgId, t.userId),
+  }),
 );
 
 export const catalogCategories = pgTable(

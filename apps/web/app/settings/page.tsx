@@ -15,8 +15,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormSelect, type FormSelectOption } from "@/components/ui/form-select";
-import { Label } from "@/components/ui/label";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { TeamMemberCreatedDialog } from "@/components/team-member-created-dialog";
+import { buildTeamMemberDefaultPassword } from "@nnact/shared";
+import type { CreateTeamMemberResponseDTO } from "@nnact/shared";
 
 type Tab = "company" | "hours" | "areas" | "invoice" | "estimate" | "payments" | "taxes" | "messages" | "numbering" | "portal" | "currency" | "team";
 
@@ -482,12 +485,12 @@ function InvoiceSection({ settings, updateSettings }: SettingsProps) {
         <option value="work_completion">Due on completion</option>
         <option value="net_days">Net days</option>
       </SelectField>
-      <NumberField label="Net days" value={settings.invoice.netDays} onChange={(value) => updateSettings({ ...settings, invoice: { ...settings.invoice, netDays: value } })} />
-      <SelectField label="Customer view format" value={settings.invoice.format} onChange={(value) => updateSettings({ ...settings, invoice: { ...settings.invoice, format: value as BusinessSettingsDTO["invoice"]["format"] } })}>
+      <NumberField label="Net days" info={'How many days the customer has to pay after the invoice is sent. Only used when the due term is set to "Net days".'} value={settings.invoice.netDays} onChange={(value) => updateSettings({ ...settings, invoice: { ...settings.invoice, netDays: value } })} />
+      <SelectField label="Customer view format" info={'\"Email optimized\" reads best on phones and in email clients. \"Envelope\" is tuned for printing and mailing.'} value={settings.invoice.format} onChange={(value) => updateSettings({ ...settings, invoice: { ...settings.invoice, format: value as BusinessSettingsDTO["invoice"]["format"] } })}>
         <option value="email">Email optimized</option>
         <option value="envelope">Envelope / print optimized</option>
       </SelectField>
-      <TextField label="Reminder days" value={settings.invoice.reminderDays.join(", ")} onChange={(value) => updateSettings({ ...settings, invoice: { ...settings.invoice, reminderDays: splitCsv(value).map((item) => Number(item)).filter(Number.isFinite) } })} />
+      <TextField label="Reminder days" info="Comma-separated list of days after the due date at which the customer gets a reminder email. Example: 3, 7, 14." value={settings.invoice.reminderDays.join(", ")} onChange={(value) => updateSettings({ ...settings, invoice: { ...settings.invoice, reminderDays: splitCsv(value).map((item) => Number(item)).filter(Number.isFinite) } })} />
       <TextArea label="Default invoice message" value={settings.invoice.defaultMessage} onChange={(value) => updateSettings({ ...settings, invoice: { ...settings.invoice, defaultMessage: value } })} />
       <TextArea label="Payment instructions" value={settings.invoice.paymentInstructions} onChange={(value) => updateSettings({ ...settings, invoice: { ...settings.invoice, paymentInstructions: value } })} />
       <VisibilityGroup
@@ -512,18 +515,18 @@ function EstimateSection({ settings, updateSettings }: SettingsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <p className="rounded-lg border border-border bg-surface-200 px-3 py-2 text-xs text-fg-muted md:col-span-2">Your company logo and name are always included. Change the logo under Company settings.</p>
-      <NumberField label="Default expiration days" value={settings.estimate.expirationDays} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, expirationDays: value } })} />
-      <SelectField label="Approval mode" value={settings.estimate.approvalMode} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, approvalMode: value as BusinessSettingsDTO["estimate"]["approvalMode"] } })}>
+      <NumberField label="Default expiration days" info="How long an estimate stays valid. Once expired, customers can no longer approve it from the portal." value={settings.estimate.expirationDays} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, expirationDays: value } })} />
+      <SelectField label="Approval mode" info={'\"Single option\" lets the customer approve one total. \"Multiple options\" presents Good / Better / Best tiers so they can pick a level of service.'} value={settings.estimate.approvalMode} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, approvalMode: value as BusinessSettingsDTO["estimate"]["approvalMode"] } })}>
         <option value="single_option">Single option approval</option>
         <option value="multiple_options">Multiple option approval</option>
       </SelectField>
-      <SelectField label="Deposit mode" value={settings.estimate.depositMode} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, depositMode: value as BusinessSettingsDTO["estimate"]["depositMode"] } })}>
+      <SelectField label="Deposit mode" info="An optional upfront payment collected when the estimate is approved. Fixed charges a flat amount; Percent charges a share of the total." value={settings.estimate.depositMode} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, depositMode: value as BusinessSettingsDTO["estimate"]["depositMode"] } })}>
         <option value="none">No deposit</option>
         <option value="fixed">Fixed amount</option>
         <option value="percent">Percent</option>
       </SelectField>
-      <NumberField label="Deposit value" value={settings.estimate.depositValue} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, depositValue: value } })} />
-      <TextField label="Option labels" value={settings.estimate.optionLabels.join(", ")} onChange={(value) => {
+      <NumberField label="Deposit value" info={'Amount or percentage collected upfront. Only used when a deposit mode other than "No deposit" is selected.'} value={settings.estimate.depositValue} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, depositValue: value } })} />
+      <TextField label="Option labels" info="The names shown on the Good / Better / Best tiers when approval mode is set to multiple options." value={settings.estimate.optionLabels.join(", ")} onChange={(value) => {
         const labels = splitCsv(value);
         updateSettings({ ...settings, estimate: { ...settings.estimate, optionLabels: [labels[0] || "Good", labels[1] || "Better", labels[2] || "Best"] } });
       }} />
@@ -534,6 +537,7 @@ function EstimateSection({ settings, updateSettings }: SettingsProps) {
           onChange={(event) => updateSettings({ ...settings, estimate: { ...settings.estimate, signatureRequired: event.target.checked } })}
         />
         Require customer signature
+        <InfoTip label="About customer signature">Collects an e-signature before the estimate can be approved.</InfoTip>
       </label>
       <TextArea label="Default estimate message" value={settings.estimate.defaultMessage} onChange={(value) => updateSettings({ ...settings, estimate: { ...settings.estimate, defaultMessage: value } })} />
       <VisibilityGroup
@@ -654,10 +658,12 @@ function TaxesSection({ settings, updateSettings }: SettingsProps) {
         <label className="flex items-center gap-2 text-sm text-fg-muted">
           <input checked={taxes.taxEnabled} onChange={(event) => setTaxes({ ...taxes, taxEnabled: event.target.checked })} type="checkbox" />
           Enable taxes
+          <InfoTip label="About taxes">Turns tax collection on for new estimates and invoices. Existing paperwork keeps its original amounts.</InfoTip>
         </label>
         <label className="flex items-center gap-2 text-sm text-fg-muted">
           <input checked={taxes.discountsEnabled} onChange={(event) => setTaxes({ ...taxes, discountsEnabled: event.target.checked })} type="checkbox" />
           Enable discounts
+          <InfoTip label="About discounts">Lets you offer fixed or percentage discounts when building estimates and invoices.</InfoTip>
         </label>
       </div>
 
@@ -692,8 +698,8 @@ function TaxesSection({ settings, updateSettings }: SettingsProps) {
           </div>
         )}
         <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <TextField label="Fallback tax label" value={taxes.taxLabel} onChange={(value) => setTaxes({ ...taxes, taxLabel: value })} />
-          <NumberField label="Fallback rate (basis points)" value={taxes.defaultTaxRateBps} onChange={(value) => setTaxes({ ...taxes, defaultTaxRateBps: Math.max(0, Math.min(10_000, Math.round(value))) })} />
+          <TextField label="Fallback tax label" info={'Name shown on invoices when no named tax profile applies, e.g. "Sales tax".'} value={taxes.taxLabel} onChange={(value) => setTaxes({ ...taxes, taxLabel: value })} />
+          <NumberField label="Fallback rate (basis points)" info="One basis point is 0.01%, so 725 = 7.25%. Used when no named profile applies." value={taxes.defaultTaxRateBps} onChange={(value) => setTaxes({ ...taxes, defaultTaxRateBps: Math.max(0, Math.min(10_000, Math.round(value))) })} />
         </div>
       </section>
 
@@ -735,9 +741,9 @@ function NumberingSection({ settings, updateSettings }: SettingsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <TextField label="Invoice prefix" value={settings.numbering.invoicePrefix} onChange={(value) => updateSettings({ ...settings, numbering: { ...settings.numbering, invoicePrefix: value } })} />
-      <NumberField label="Next invoice number" value={settings.numbering.invoiceNextNumber} onChange={(value) => updateSettings({ ...settings, numbering: { ...settings.numbering, invoiceNextNumber: value } })} />
+      <NumberField label="Next invoice number" info="The number the next invoice will get. Raise it to skip ahead or fix duplicate numbering." value={settings.numbering.invoiceNextNumber} onChange={(value) => updateSettings({ ...settings, numbering: { ...settings.numbering, invoiceNextNumber: value } })} />
       <TextField label="Estimate prefix" value={settings.numbering.estimatePrefix} onChange={(value) => updateSettings({ ...settings, numbering: { ...settings.numbering, estimatePrefix: value } })} />
-      <NumberField label="Next estimate number" value={settings.numbering.estimateNextNumber} onChange={(value) => updateSettings({ ...settings, numbering: { ...settings.numbering, estimateNextNumber: value } })} />
+      <NumberField label="Next estimate number" info="The number the next estimate will get. Raise it to skip ahead or fix duplicate numbering." value={settings.numbering.estimateNextNumber} onChange={(value) => updateSettings({ ...settings, numbering: { ...settings.numbering, estimateNextNumber: value } })} />
     </div>
   );
 }
@@ -826,6 +832,13 @@ function TeamTab() {
   const [notice, setNotice] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"dispatcher" | "technician">("technician");
+  const [inviting, setInviting] = useState(false);
+  const [createdMember, setCreatedMember] = useState<CreateTeamMemberResponseDTO | null>(null);
+  const [showCreatedDialog, setShowCreatedDialog] = useState(false);
+  const passwordPreview = inviteName.trim() ? buildTeamMemberDefaultPassword(inviteName) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -881,11 +894,83 @@ function TeamTab() {
     }
   };
 
+  const handleInvite = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setInviting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await api.createTeamMember({
+        name: inviteName.trim(),
+        email: inviteEmail.trim(),
+        role: inviteRole,
+      });
+      setUsers((prev) => [...prev, result.user]);
+      setCreatedMember(result);
+      setShowCreatedDialog(true);
+      setInviteName("");
+      setInviteEmail("");
+      setInviteRole("technician");
+    } catch (err) {
+      setError(teamErrorMessage(err));
+    } finally {
+      setInviting(false);
+    }
+  };
+
   if (loading) return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>;
   if (error && users.length === 0) return <Card className="border-red/30 bg-red/5"><CardContent className="p-4"><p className="text-sm text-red">{error}</p></CardContent></Card>;
 
   return (
     <div className="grid gap-6">
+      <TeamMemberCreatedDialog
+        open={showCreatedDialog}
+        result={createdMember}
+        onClose={() => {
+          setShowCreatedDialog(false);
+          setCreatedMember(null);
+        }}
+      />
+
+      {isOwner ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Add team member</CardTitle>
+            <p className="text-sm text-fg-muted">
+              Creates a dispatcher or technician account with a temporary password ({`firstname@${new Date().getFullYear()}`}).
+              They must set a new password when they first sign in.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4 md:grid-cols-2" onSubmit={(event) => void handleInvite(event)}>
+              <TextField label="Full name" name="memberName" value={inviteName} onChange={setInviteName} placeholder="Grace Nkweta" />
+              <TextField label="Email" name="memberEmail" type="email" autoComplete="email" value={inviteEmail} onChange={setInviteEmail} placeholder="grace@company.com" />
+              <div className="md:col-span-2">
+                <SelectField
+                  label="Role"
+                  value={inviteRole}
+                  onChange={(value) => setInviteRole(value as "dispatcher" | "technician")}
+                  options={[
+                    { value: "technician", label: "Technician — field app & assigned jobs" },
+                    { value: "dispatcher", label: "Dispatcher — schedule, dispatch, customers" },
+                  ]}
+                />
+              </div>
+              {passwordPreview ? (
+                <p className="md:col-span-2 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg-muted">
+                  Temporary password will be <span className="font-mono font-semibold text-fg">{passwordPreview}</span> — copy and share after adding.
+                </p>
+              ) : null}
+              <div className="md:col-span-2">
+                <Button type="submit" disabled={inviting || !inviteName.trim() || !inviteEmail.trim()}>
+                  {inviting ? "Adding…" : "Add team member"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Roles & permissions</CardTitle>
@@ -1084,33 +1169,43 @@ function SettingsPreview({ form, tab }: { form: OrgSettingsDTO; tab: Exclude<Tab
   );
 }
 
-function TextField({ label, value, onChange, placeholder, ...inputProps }: {
+function FieldLabel({ label, info }: { label: React.ReactNode; info?: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label}
+      {info ? <InfoTip label={`About ${label}`}>{info}</InfoTip> : null}
+    </span>
+  );
+}
+
+function TextField({ label, value, onChange, placeholder, info, ...inputProps }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  info?: React.ReactNode;
 } & Pick<React.InputHTMLAttributes<HTMLInputElement>, "name" | "type" | "autoComplete">) {
   return (
     <label className="grid gap-1.5 text-sm text-fg-muted">
-      {label}
+      <FieldLabel label={label} info={info} />
       <Input {...inputProps} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
     </label>
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function NumberField({ label, value, onChange, info }: { label: string; value: number; onChange: (value: number) => void; info?: React.ReactNode }) {
   return (
     <label className="grid gap-1.5 text-sm text-fg-muted">
-      {label}
+      <FieldLabel label={label} info={info} />
       <Input type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} />
     </label>
   );
 }
 
-function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function TextArea({ label, value, onChange, info }: { label: string; value: string; onChange: (value: string) => void; info?: React.ReactNode }) {
   return (
     <label className="grid gap-1.5 text-sm text-fg-muted md:col-span-2">
-      {label}
+      <FieldLabel label={label} info={info} />
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -1141,12 +1236,14 @@ function SelectField({
   onChange,
   children,
   options,
+  info,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   children?: React.ReactNode;
   options?: FormSelectOption[];
+  info?: React.ReactNode;
 }) {
   const id = React.useId();
   const resolved = options ?? optionsFromChildren(children);
@@ -1154,7 +1251,7 @@ function SelectField({
 
   return (
     <div className="grid gap-1.5 text-sm text-fg-muted">
-      <Label htmlFor={id}>{label}</Label>
+      <FieldLabel label={<label htmlFor={id}>{label}</label>} info={info} />
       <FormSelect
         id={id}
         value={value}
