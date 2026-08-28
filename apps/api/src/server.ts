@@ -46,7 +46,7 @@ import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
 import { repairBrainAuthorizationGuard } from "./repair-brain-authorization.js";
 import { operationalAuthorizationGuard } from "./operational-authorization.js";
 import { resolveCorsOrigin, resolveJwtSecret } from "./runtime-security.js";
-import { applyApiSecurityHeaders } from "./security-headers.js";
+import { applyApiSecurityHeaders, applyDocsSecurityHeaders } from "./security-headers.js";
 import { unifiedSessionCookieAuthenticationHook } from "./customer-session-cookie.js";
 import type { HealthProbes } from "./health.js";
 import {
@@ -184,8 +184,12 @@ export function buildServer(
     transformSpecification: (swaggerObject) => swaggerObject,
   });
   app.addHook("onRequest", unifiedSessionCookieAuthenticationHook);
-  app.addHook("onSend", async (_request, reply, payload) => {
-    applyApiSecurityHeaders(reply);
+  app.addHook("onSend", async (request, reply, payload) => {
+    if (request.url.startsWith("/docs")) {
+      applyDocsSecurityHeaders(reply);
+    } else {
+      applyApiSecurityHeaders(reply);
+    }
     return payload;
   });
   const maintenance = options.maintenanceReader ?? maintenanceReaderFromEnvironment();
