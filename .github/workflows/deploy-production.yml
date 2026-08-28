@@ -28,6 +28,33 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Checkout marketing site
+        uses: actions/checkout@v4
+        with:
+          repository: Ojage/nnact-webapp
+          ssh-key: ${{ secrets.MARKETING_REPO_DEPLOY_KEY }}
+          path: marketing-src
+
+      - name: Build marketing site
+        working-directory: marketing-src
+        run: |
+          npm ci
+          npm run build
+
+      - name: Sync marketing dist to VPS
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "mkdir -p '${DEPLOY_PATH}/data/marketing/dist'"
+          rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes" \
+            marketing-src/dist/ \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/data/marketing/dist/"
+
       - name: Write production environment
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -49,4 +76,4 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "cd '${DEPLOY_PATH}' && bash scripts/ci-deploy.sh"
+            "cd '${DEPLOY_PATH}' && MARKETING_SKIP_BUILD=true bash scripts/ci-deploy.sh"

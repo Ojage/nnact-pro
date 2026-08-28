@@ -1,14 +1,14 @@
 # Builds the public marketing site (nnact-webapp) for export to a host directory.
-# Usage (on the VPS):
+# Source is supplied as an additional build context (no git clone — repo is private).
+#
+# Usage:
 #   docker buildx build -f infra/marketing/Dockerfile \
-#     --output "type=local,dest=${NNPMARKETING_ROOT:-/srv/nnact-webapp/dist}" .
+#     --build-context marketing=/path/to/nnact-webapp \
+#     --output "type=local,dest=${NNPMARKETING_ROOT}" .
 
 FROM node:22-alpine AS build
 WORKDIR /src
-RUN apk add --no-cache git
-ARG MARKETING_REPO=https://github.com/Ojage/nnact-webapp.git
-ARG MARKETING_GIT_REF=main
-RUN git clone --depth 1 --branch "${MARKETING_GIT_REF}" "${MARKETING_REPO}" .
+COPY --from=marketing . .
 RUN npm ci
 RUN npm run build
 RUN if [ -f google9f7ee614cc6527c5.html ]; then cp google9f7ee614cc6527c5.html dist/; fi

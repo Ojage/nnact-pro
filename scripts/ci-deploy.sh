@@ -74,7 +74,15 @@ if [ "$healthy" != true ]; then
 fi
 
 echo "Building marketing site..."
-bash scripts/deploy-marketing.sh
+if [ "${MARKETING_SKIP_BUILD:-false}" = "true" ]; then
+  if [ ! -f "${NNPMARKETING_ROOT:-data/marketing/dist}/index.html" ]; then
+    echo "MARKETING_SKIP_BUILD=true but marketing dist is missing." >&2
+    exit 1
+  fi
+  echo "Marketing dist already synced; skipping build."
+else
+  bash scripts/deploy-marketing.sh
+fi
 
 echo "Deploy complete."
 echo "Staff app:  https://${NNPSITE_ADDRESS:-unknown}"

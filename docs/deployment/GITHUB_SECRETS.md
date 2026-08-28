@@ -19,6 +19,7 @@ Set these on **both** repositories:
 | Secret | Purpose |
 |--------|---------|
 | `NNACT_PRO_ENV` | Full contents of production `.env` — copy from `infra/production.env.example` and fill secrets |
+| `MARKETING_REPO_DEPLOY_KEY` | Read-only deploy key for private `Ojage/nnact-webapp` (used to build marketing in CI) |
 
 Minimum `NNACT_PRO_ENV` domain lines:
 
