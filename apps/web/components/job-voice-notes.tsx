@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JobVoiceNoteDTO } from "@nnact/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useJobVoiceNotesQuery } from "@/lib/redux/api";
 
@@ -101,7 +102,12 @@ export function JobVoiceNotesPanel({ jobId }: { jobId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Field voice notes</CardTitle>
+        <CardTitle className="inline-flex items-center gap-1.5">
+          Field voice notes
+          <InfoTip label="About field voice notes" side="right">
+            Hold-to-record messages from technicians in the field. Play them back here as they arrive in real time.
+          </InfoTip>
+        </CardTitle>
         <p className="text-sm text-fg-muted">Technician recordings arrive here in real time.</p>
       </CardHeader>
       <CardContent className="space-y-3">

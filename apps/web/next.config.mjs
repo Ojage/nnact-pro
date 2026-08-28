@@ -20,7 +20,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "img-src 'self' data: blob: https:",
+  `img-src 'self' data: blob: https: ${apiOrigin}`,
   "object-src 'none'",
   `script-src 'self' 'unsafe-inline'${developmentEval}`,
   "style-src 'self' 'unsafe-inline'",

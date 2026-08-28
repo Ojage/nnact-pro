@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
+import { NavLinkItem } from "@/components/nav-link-item";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
@@ -90,22 +91,16 @@ export function MobileNav() {
                 {section.links.map(({ href, label, icon, tour }) => {
                   const active = currentNavHref === href;
                   return (
-                    <Link
+                    <NavLinkItem
                       key={href}
                       href={href}
-                      data-tour={tour}
-                      onClick={() => setOpen(false)}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-3 text-sm no-underline transition-all duration-150",
-                        active
-                          ? "bg-accent font-medium text-white"
-                          : "text-fg-muted hover:bg-surface-300 hover:text-fg",
-                      )}
-                    >
-                      <span aria-hidden="true" className="w-5 text-center text-base">{icon}</span>
-                      {label}
-                    </Link>
+                      label={label}
+                      icon={icon}
+                      tour={tour}
+                      active={active}
+                      onNavigate={() => setOpen(false)}
+                      className="py-3"
+                    />
                   );
                 })}
               </div>

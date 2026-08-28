@@ -252,7 +252,7 @@ export default function InvoiceDetailPage() {
   const statusSubmitting = confirmAction === "paid" ? payState.isLoading : statusState.isLoading;
 
   // ── Loading ──
-  if (loading) {
+  if (!invoice && loading) {
     return (
       <div>
         <div className="flex items-end justify-between mb-8">

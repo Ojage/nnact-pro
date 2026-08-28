@@ -1,8 +1,14 @@
+import Link from "next/link";
 import { renderFieldDocumentHtml } from "@nnact/shared";
+import { api } from "@/lib/api";
 import { PageHeader } from "@/components/page-header";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { DocumentPreviewWorkbench } from "@/components/document-preview-workbench";
 
-export default function DocumentPreviewPage() {
+export default async function DocumentPreviewPage() {
+  const org = await api.org().catch(() => null);
+
   const html = renderFieldDocumentHtml({
     kind: "invoice",
     number: "INV-DEMO-1001",
@@ -13,37 +19,53 @@ export default function DocumentPreviewPage() {
     customerEmail: "customer@example.com",
     customerPhone: "(555) 010-1234",
     jobTitle: "Seasonal HVAC tune-up",
-    notes: "Thank you for choosing this service business. This is a preview template and not a final PDF renderer yet.",
+    notes: "Thank you for choosing our team. This sample uses your organization branding when settings are available.",
     lineItems: [
-      { description: "Diagnostic and tune-up", quantity: 1, unitPriceCents: 12900 },
-      { description: "Filter replacement", quantity: 2, unitPriceCents: 2400 },
-      { description: "Service plan discount", quantity: 1, unitPriceCents: -1500 },
+      { description: "Diagnostic and tune-up", quantity: 1, unitPriceCents: 129000 },
+      { description: "Filter replacement", quantity: 2, unitPriceCents: 24000 },
     ],
     paymentsCents: 0,
     branding: {
-      companyName: "NNACT",
-      brandColor: "#22C55E",
-      footerText: "Field service command center document preview",
-      removeOpenFieldProAttribution: false,
+      companyName: org?.name ?? "NNACT",
+      logoUrl: org?.logoUrl ?? undefined,
+      brandColor: org?.brandColor ?? "#22C55E",
+      footerText: org?.documentFooter ?? "Field service command center document preview",
+      publicEmail: org?.publicEmail,
+      publicPhone: org?.publicPhone,
+      publicAddress: org?.publicAddress,
+      removeOpenFieldProAttribution: org?.removeOpenFieldProAttribution ?? false,
     },
+    currency: org?.businessSettings?.currency,
   });
 
   return (
     <div>
       <PageHeader
-        title="Document Preview"
-        description="Brandable invoice, estimate, receipt, work-order, and service-plan document rendering foundation."
+        title="Document template preview"
+        description="Standalone sample of the shared customer document renderer."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link href="/documents">
+              <Button size="sm" variant="secondary">Back to documents</Button>
+            </Link>
+            <Link href="/settings">
+              <Button size="sm" variant="secondary">Edit branding</Button>
+            </Link>
+          </div>
+        }
       />
-      <Card className="mb-5 border-accent/30 bg-accent/5">
-        <p className="text-sm text-fg-muted">
-          This is the HTML rendering foundation. The next step is wiring real invoice/estimate data into this renderer and exporting to PDF/email.
-        </p>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Renderer sample</CardTitle>
+          <CardDescription>
+            Uses the same HTML renderer as invoice and estimate previews. Download or print from the workbench controls.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DocumentPreviewWorkbench documents={[{ id: "invoice", label: "Invoice sample", html }]} fileName="document-sample.html" />
+        </CardContent>
       </Card>
-      <iframe
-        title="NNACT Pro document preview"
-        srcDoc={html}
-        className="h-[900px] w-full rounded-2xl border border-border bg-white"
-      />
     </div>
   );
 }

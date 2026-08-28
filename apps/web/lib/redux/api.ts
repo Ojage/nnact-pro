@@ -16,7 +16,7 @@ import type {
   RepairBrainSearchResults,
 } from "@/lib/repair-brain-api";
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
-import type { PortalLinkDTO, PortalLinkScope } from "@/lib/api";
+import type { PortalLinkDTO, PortalLinkScope, DocumentHubEntryDTO } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -87,6 +87,9 @@ export const apiSlice = createApi({
     credentials: "include",
     headers: { "content-type": "application/json" },
   }),
+  keepUnusedDataFor: 300,
+  refetchOnMountOrArgChange: 60,
+  refetchOnFocus: false,
   tagTypes: [
     "Job",
     "Customer",
@@ -99,6 +102,7 @@ export const apiSlice = createApi({
     "Org",
     "User",
     "Photo",
+    "Document",
   ],
   endpoints: (builder) => ({
     // ── Jobs ──
@@ -422,6 +426,11 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/api/repair-brain/proposals/${id}/verify`, method: "POST" }),
       invalidatesTags: ["Activity"],
     }),
+
+    documentsHub: builder.query<DocumentHubEntryDTO[], void>({
+      query: () => "/api/documents",
+      providesTags: ["Document"],
+    }),
   }),
 });
 
@@ -483,5 +492,6 @@ export const {
   useRepairBrainProposalsQuery,
   useCreateProposalMutation,
   useVerifyProposalMutation,
+  useDocumentsHubQuery,
   useLazyGlobalSearchQuery,
 } = apiSlice;

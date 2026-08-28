@@ -36,10 +36,10 @@ export async function healthRoutes(app: FastifyInstance, options: HealthRouteOpt
     return reply.code(report.ok ? 200 : 503).send({ ok: report.ok, service: "ofp-api", components: report.components, ts: Date.now() });
   };
 
-  app.get("/api/health/live", async () => ({ ok: true, service: "ofp-api", ts: Date.now() }));
-  app.get("/api/health/ready", async (_request, reply) => sendReadiness(reply));
-  app.get("/api/health", async (_request, reply) => sendReadiness(reply));
-  app.get("/api/health/details", async (request, reply) => {
+  app.get("/health/live", async () => ({ ok: true, service: "ofp-api", ts: Date.now() }));
+  app.get("/health/ready", async (_request, reply) => sendReadiness(reply));
+  app.get("/health", async (_request, reply) => sendReadiness(reply));
+  app.get("/health/details", async (request, reply) => {
     const claims = await verifiedClaims(request, reply);
     if (!claims || reply.sent) return;
     if (claims.role !== "owner") return reply.code(403).send({ error: "owner access required" });

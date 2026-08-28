@@ -12,6 +12,7 @@ import {
   type ProposalDraft,
 } from "@/lib/repair-brain-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
 import { Label } from "@/components/ui/label";
@@ -311,7 +312,12 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
     <Card className="border-accent/30 overflow-hidden">
       <CardHeader className="pb-2 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base">Repair Brain — Field Workflow</CardTitle>
+          <CardTitle className="inline-flex items-center gap-1.5 text-base">
+            Repair Brain — Field Workflow
+            <InfoTip label="About Repair Brain workflow" side="right">
+              Guided field diagnosis from equipment through outcome. Capture measurements, suggested faults, and learnings for future jobs.
+            </InfoTip>
+          </CardTitle>
           {model && (
             <Link href={`/repair-brain/models/${model.id}`} className="text-xs text-green shrink-0">
               Model →

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
+import { usePrefetchListDetails } from "@/hooks/use-prefetch-list-details";
 import { useCreateEstimateMutation, useCustomersQuery, useEstimatesQuery, useJobsQuery } from "@/lib/redux/api";
 import { formatMoney } from "@nnact/shared";
 import type { JobDTO, CustomerDTO } from "@nnact/shared";
@@ -165,6 +166,11 @@ export default function EstimatesPage() {
 
     return list;
   }, [estimates, search, sort, dir, statusFilter, jobMap, customerMap]);
+
+  usePrefetchListDetails(
+    "estimates",
+    useMemo(() => filteredSorted.slice(0, 40).map((e) => e.id), [filteredSorted]),
+  );
 
   if (isLoading) {
     return (

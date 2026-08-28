@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
+import { usePrefetchListDetails } from "@/hooks/use-prefetch-list-details";
 import { useActivitiesQuery, useCreateCustomerMutation, useCustomersQuery } from "@/lib/redux/api";
 import { formatRelativeTime } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -97,6 +98,11 @@ export default function CustomersPage() {
   }, [customers, search, sortField, sortDir, lastActivityMap]);
 
   const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
+
+  usePrefetchListDetails(
+    "customers",
+    useMemo(() => filteredSorted.slice(0, 40).map((c) => c.id), [filteredSorted]),
+  );
 
   // ── Sort header helper ──
   const handleSort = (field: SortField) => {

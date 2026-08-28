@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAppointmentsQuery, useJobsQuery, type AppointmentDTO } from "@/lib/redux/api";
 import type { JobDTO } from "@nnact/shared";

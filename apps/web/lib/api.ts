@@ -387,6 +387,34 @@ export interface PortalLinkDTO {
   createdAt: string;
 }
 
+export interface StoredDocumentDTO {
+  id: string;
+  kind: "invoice" | "estimate";
+  documentId: string;
+  filename: string;
+  mime: string;
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+}
+
+export interface DocumentHubEntryDTO {
+  kind: "invoice" | "estimate";
+  documentId: string;
+  number: string;
+  status: string;
+  total: number;
+  customerName: string | null;
+  customerId: string | null;
+  jobId: string;
+  jobTitle: string | null;
+  createdAt: string;
+  stored: StoredDocumentDTO | null;
+  emailsSent: number;
+  lastEmailAt: string | null;
+  lastEmailStatus: "pending" | "sent" | "failed" | null;
+}
+
 export interface MessageLogDTO {
   id: string;
   kind: "invoice" | "estimate";
@@ -528,8 +556,13 @@ export const api = {
     request<{ log: MessageLogDTO; draft: EmailPreviewDTO; attachment: EmailAttachmentInfo }>(`/api/estimates/${id}/email`, { method: "POST" }),
 
   // ── Durable documents (PDF) ──
+  documentsHub: () => request<DocumentHubEntryDTO[]>("/api/documents"),
   invoicePdf: (id: string) => downloadDocument(`/api/invoices/${id}/document`),
   estimatePdf: (id: string) => downloadDocument(`/api/estimates/${id}/document`),
+  regenerateInvoiceDocument: (id: string) =>
+    request<{ document: StoredDocumentDTO }>(`/api/invoices/${id}/document/regenerate`, { method: "POST" }),
+  regenerateEstimateDocument: (id: string) =>
+    request<{ document: StoredDocumentDTO }>(`/api/estimates/${id}/document/regenerate`, { method: "POST" }),
   messageLogs: (query: { kind?: "invoice" | "estimate"; documentId?: string }) => {
     const params = new URLSearchParams();
     if (query.kind) params.set("kind", query.kind);

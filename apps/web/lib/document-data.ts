@@ -1,6 +1,5 @@
 // Web preview layer for durable field documents. The document *data*
-// assembly lives in @nnact/shared so the API generates byte-identical PDFs for
-// email attachments; this module only renders the branded HTML preview.
+// assembly lives in @nnact/shared; the API renders the same HTML to PDF via Puppeteer.
 import {
   estimateDocumentData,
   invoiceDocumentData,

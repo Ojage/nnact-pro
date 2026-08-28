@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
+import { CacheWarmer } from "@/components/cache-warmer";
+import { NavigationPending } from "@/components/navigation-pending";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { CommandPalette } from "@/components/command-palette";
@@ -20,6 +22,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <AuthGate>
       <WalkthroughProvider>
+        <CacheWarmer />
+        <NavigationPending />
         <LiveNotificationsBridge
           onFieldRefresh={(reason) => {
             window.dispatchEvent(new CustomEvent("nnact:field-refresh", { detail: { reason } }));

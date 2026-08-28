@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { formatMoney } from "@nnact/shared";
 import type { JobDTO, CustomerDTO } from "@nnact/shared";
+import { usePrefetchListDetails } from "@/hooks/use-prefetch-list-details";
 import { useCreateInvoiceMutation, useCustomersQuery, useInvoicesQuery, useJobsQuery, useOrgQuery } from "@/lib/redux/api";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -152,6 +153,11 @@ export default function InvoicesPage() {
   }, [invoices, search, sortField, sortDir, jobMap, customers, statusFilter]);
 
   const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
+
+  usePrefetchListDetails(
+    "invoices",
+    useMemo(() => filteredSorted.slice(0, 40).map((inv) => inv.id), [filteredSorted]),
+  );
 
   // ── Sort helpers ──
   const handleSort = (field: SortField) => {

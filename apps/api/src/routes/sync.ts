@@ -37,7 +37,7 @@ const REQUEST_Z = z.object({
 });
 
 export async function syncRoutes(app: FastifyInstance) {
-  app.post("/api/sync", async (req, reply) => {
+  app.post("/sync", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;

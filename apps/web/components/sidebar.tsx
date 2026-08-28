@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
+import { NavLinkItem } from "@/components/nav-link-item";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
@@ -34,21 +34,14 @@ export function Sidebar() {
               {section.links.map(({ href, label, icon, tour }) => {
                 const active = currentNavHref === href;
                 return (
-                  <Link
+                  <NavLinkItem
                     key={href}
                     href={href}
-                    data-tour={tour}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm no-underline transition-all duration-150",
-                      active
-                        ? "bg-accent font-medium text-white"
-                        : "text-fg-muted hover:bg-surface-300 hover:text-fg",
-                    )}
-                  >
-                    <span aria-hidden="true" className="w-5 text-center text-base">{icon}</span>
-                    <span>{label}</span>
-                  </Link>
+                    label={label}
+                    icon={icon}
+                    tour={tour}
+                    active={active}
+                  />
                 );
               })}
             </div>

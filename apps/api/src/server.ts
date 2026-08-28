@@ -224,7 +224,7 @@ export function buildServer(
   app.addHook("preHandler", repairBrainAuthorizationGuard);
 
   // Register versioned API routes (v1)
-  app.register(healthRoutes, { prefix: withVersion("/health"), probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
+  app.register(healthRoutes, { prefix: withVersion(""), probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
   app.get(withVersion("/internal/drain"), async () => apiDrain.status());
   app.register(authRoutes, { prefix: withVersion("/auth") });
   app.register(customerAuthRoutes, { prefix: withVersion("/customer-auth") });
@@ -245,7 +245,7 @@ export function buildServer(
   app.register(messageRoutes, { prefix: withVersion("") });
   app.register(documentRoutes, { prefix: withVersion("") });
   app.register(activityRoutes, { prefix: withVersion("/activities") });
-  app.register(syncRoutes, { prefix: withVersion("/sync") });
+  app.register(syncRoutes, { prefix: withVersion("") });
   app.register(userRoutes, { prefix: withVersion("/users") });
   app.register(equipmentRoutes, { prefix: withVersion("/equipment") });
   app.register(diagnosticRoutes, { prefix: withVersion("/diagnostics") });
@@ -276,7 +276,7 @@ export function buildServer(
 
   // Legacy (unversioned) routes — deprecated, redirect with headers
   addDeprecationHeader(LEGACY_API_BASE);
-  app.register(healthRoutes, { prefix: withLegacy("/health"), probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
+  app.register(healthRoutes, { prefix: withLegacy(""), probes: options.healthProbes, timeoutMs: options.healthProbeTimeoutMs });
   app.get(withLegacy("/internal/drain"), async () => apiDrain.status());
   app.register(authRoutes, { prefix: withLegacy("/auth") });
   app.register(customerAuthRoutes, { prefix: withLegacy("/customer-auth") });
@@ -297,7 +297,7 @@ export function buildServer(
   app.register(messageRoutes, { prefix: withLegacy("") });
   app.register(documentRoutes, { prefix: withLegacy("") });
   app.register(activityRoutes, { prefix: withLegacy("/activities") });
-  app.register(syncRoutes, { prefix: withLegacy("/sync") });
+  app.register(syncRoutes, { prefix: withLegacy("") });
   app.register(userRoutes, { prefix: withLegacy("/users") });
   app.register(equipmentRoutes, { prefix: withLegacy("/equipment") });
   app.register(diagnosticRoutes, { prefix: withLegacy("/diagnostics") });

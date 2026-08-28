@@ -6,6 +6,7 @@ import {
   documentView,
   ensureEstimateDocument,
   ensureInvoiceDocument,
+  listDocumentHub,
   regenerateDocument,
   type StoredDocument,
 } from "../documents.js";
@@ -21,6 +22,11 @@ function sendPdf(reply: FastifyReply, buffer: Buffer, filename: string) {
 }
 
 export async function documentRoutes(app: FastifyInstance) {
+  app.get("/documents", async (req) => {
+    const orgId = await resolveOrgId(req);
+    return listDocumentHub(orgId);
+  });
+
   app.get("/invoices/:id/document", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const { id } = req.params as { id: string };

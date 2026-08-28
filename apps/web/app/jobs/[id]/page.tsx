@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { useParams } from "next/navigation";
 import {
   useActivitiesQuery,
@@ -15,6 +15,7 @@ import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import { formatMoney } from "@nnact/shared";
 import type { ActivityDTO, CustomerDTO, JobDTO, JobSource } from "@nnact/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { InfoTip } from "@/components/ui/info-tip";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { JobStatusBadge, InvoiceStatusBadge } from "@/components/status-badge";
@@ -66,7 +67,7 @@ export default function JobDetailPage() {
   const jobInvoices = invoices.filter((item) => item.jobId === jobId);
   const diagnostic: DiagnosticSessionListItem | null = diagnosticRows[0] ?? null;
 
-  if (isLoading) {
+  if (!job && isLoading) {
     return (
       <div>
         <Skeleton className="mb-2 h-8 w-64" />
@@ -146,57 +147,94 @@ export default function JobDetailPage() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_.85fr]">
           <div className="space-y-6">
             <Card>
-              <CardHeader><CardTitle>Job details</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="inline-flex items-center gap-1.5">
+                  Job details
+                  <InfoTip label="About job details" side="right">
+                    Overview of this work order — status, pricing, scheduling, and intake details from when the job was created or booked.
+                  </InfoTip>
+                </CardTitle>
+              </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl bg-surface-200 p-4" data-tour="job-detail-status">
-                  <p className="text-xs text-fg-muted">Status</p>
+                  <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                    Status
+                    <InfoTip label="About status" side="top">Where this job sits in your workflow. Dispatch, field work, and billing actions depend on the current status.</InfoTip>
+                  </p>
                   <div className="mt-2"><JobStatusBadge status={job.status} /></div>
                 </div>
                 <div className="rounded-xl bg-surface-200 p-4">
-                  <p className="text-xs text-fg-muted">Current total</p>
+                  <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                    Current total
+                    <InfoTip label="About current total" side="top">Running total from all line items on this job. Updates as parts and labor are added before invoicing.</InfoTip>
+                  </p>
                   <p className="mt-2 text-xl font-bold text-fg">{formatMoney(job.total)}</p>
                 </div>
                 <div className="rounded-xl bg-surface-200 p-4">
-                  <p className="text-xs text-fg-muted">Created</p>
+                  <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                    Created
+                    <InfoTip label="About created date" side="top">When this work order was first opened in the system.</InfoTip>
+                  </p>
                   <p className="mt-2 text-sm text-fg">{new Date(job.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div className="rounded-xl bg-surface-200 p-4">
-                  <p className="text-xs text-fg-muted">Scheduled</p>
+                  <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                    Scheduled
+                    <InfoTip label="About scheduled time" side="top">The confirmed visit time on the calendar. May differ from the customer&apos;s preferred window.</InfoTip>
+                  </p>
                   <p className="mt-2 text-sm text-fg">{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Not scheduled"}</p>
                 </div>
                 {job.source && job.source !== "staff" && (
                   <div className="rounded-xl bg-surface-200 p-4">
-                    <p className="text-xs text-fg-muted">Source</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                      Source
+                      <InfoTip label="About job source" side="top">How this job entered the system — staff-created, online booking, or a customer portal request.</InfoTip>
+                    </p>
                     <p className="mt-2 text-sm text-fg capitalize">{job.source.replace("_", " ")}</p>
                   </div>
                 )}
                 {job.serviceCategory && (
                   <div className="rounded-xl bg-surface-200 p-4">
-                    <p className="text-xs text-fg-muted">Service category</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                      Service category
+                      <InfoTip label="About service category" side="top">Trade or service type (HVAC, electrical, etc.) used for routing, reporting, and technician matching.</InfoTip>
+                    </p>
                     <p className="mt-2 text-sm text-fg">{job.serviceCategory}</p>
                   </div>
                 )}
                 {job.serviceAddress && (
                   <div className="rounded-xl bg-surface-200 p-4">
-                    <p className="text-xs text-fg-muted">Service address</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                      Service address
+                      <InfoTip label="About service address" side="top">Where the technician should go. May differ from the customer&apos;s billing address on file.</InfoTip>
+                    </p>
                     <p className="mt-2 text-sm text-fg">{job.serviceAddress}</p>
                   </div>
                 )}
                 {job.preferredDate && (
                   <div className="rounded-xl bg-surface-200 p-4">
-                    <p className="text-xs text-fg-muted">Preferred date</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                      Preferred date
+                      <InfoTip label="About preferred date" side="top">The date the customer requested during booking, before dispatch confirms a calendar slot.</InfoTip>
+                    </p>
                     <p className="mt-2 text-sm text-fg">{job.preferredDate}</p>
                   </div>
                 )}
                 {job.preferredTime && (
                   <div className="rounded-xl bg-surface-200 p-4">
-                    <p className="text-xs text-fg-muted">Preferred time</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                      Preferred time
+                      <InfoTip label="About preferred time" side="top">The time window the customer asked for during intake. Use it when scheduling the visit.</InfoTip>
+                    </p>
                     <p className="mt-2 text-sm text-fg capitalize">{job.preferredTime}</p>
                   </div>
                 )}
                 {job.description && (
                   <div className="rounded-xl bg-surface-200 p-4 sm:col-span-2">
-                    <p className="text-xs text-fg-muted">Customer complaint and access notes</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+                      Customer complaint and access notes
+                      <InfoTip label="About complaint and access notes" side="top">What the customer reported and any gate codes, parking, or site instructions for the technician.</InfoTip>
+                    </p>
                     <p className="mt-2 whitespace-pre-wrap text-sm text-fg">{job.description}</p>
                   </div>
                 )}
@@ -214,7 +252,12 @@ export default function JobDetailPage() {
 
             <Card>
               <CardHeader className="flex-row items-center justify-between">
-                <CardTitle>Activity</CardTitle>
+                <CardTitle className="inline-flex items-center gap-1.5">
+                  Activity
+                  <InfoTip label="About activity" side="right">
+                    Audit trail of status changes, notes, and system events recorded on this job.
+                  </InfoTip>
+                </CardTitle>
                 <span className="text-xs text-fg-dim">{activities.length}</span>
               </CardHeader>
               <CardContent>
@@ -238,7 +281,14 @@ export default function JobDetailPage() {
           <div className="space-y-6">
             {customer && (
               <Card>
-                <CardHeader><CardTitle>Customer</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="inline-flex items-center gap-1.5">
+                    Customer
+                    <InfoTip label="About customer" side="right">
+                      Contact and account context for the person or site tied to this work order.
+                    </InfoTip>
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-3">
                   <Link href={`/customers/${customer.id}`} className="font-semibold text-fg-link">{customer.name}</Link>
                   {customer.email && <p className="text-xs text-fg-muted">{customer.email}</p>}
@@ -252,7 +302,12 @@ export default function JobDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Appointments</CardTitle>
+                <CardTitle className="inline-flex items-center gap-1.5">
+                  Appointments
+                  <InfoTip label="About appointments" side="right">
+                    Calendar blocks that assign a technician and time window for this visit.
+                  </InfoTip>
+                </CardTitle>
                 <CardDescription>{jobAppointments.length ? `${jobAppointments.length} appointment${jobAppointments.length === 1 ? "" : "s"}` : "Not yet scheduled"}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -273,7 +328,12 @@ export default function JobDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Invoices</CardTitle>
+                <CardTitle className="inline-flex items-center gap-1.5">
+                  Invoices
+                  <InfoTip label="About invoices" side="right">
+                    Billing documents generated from this job&apos;s line items. Create from Job Closeout when pricing is final.
+                  </InfoTip>
+                </CardTitle>
                 <CardDescription>{jobInvoices.length ? `${jobInvoices.length} invoice${jobInvoices.length === 1 ? "" : "s"}` : "No invoices yet"}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -297,7 +357,12 @@ export default function JobDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Line items</CardTitle>
+                <CardTitle className="inline-flex items-center gap-1.5">
+                  Line items
+                  <InfoTip label="About line items" side="right">
+                    Parts, labor, and fees that roll up into the job total and future invoice.
+                  </InfoTip>
+                </CardTitle>
                 <CardDescription>{lineItems.length ? `${lineItems.length} item${lineItems.length === 1 ? "" : "s"}` : "No items yet"}</CardDescription>
               </CardHeader>
               <CardContent>

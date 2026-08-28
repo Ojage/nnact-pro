@@ -17,6 +17,7 @@ import {
   jobs,
   customers,
   orgs,
+  messageLogs,
 } from "@nnact/db";
 import { formatDocumentCents, invoiceDocumentData, estimateDocumentData, fieldDocumentTitle } from "@nnact/shared";
 import { mergeBusinessSettings } from "@nnact/shared";
@@ -254,6 +255,23 @@ export interface StoredDocument {
   createdAt: string;
 }
 
+export interface DocumentHubEntry {
+  kind: DocumentKind;
+  documentId: string;
+  number: string;
+  status: string;
+  total: number;
+  customerName: string | null;
+  customerId: string | null;
+  jobId: string;
+  jobTitle: string | null;
+  createdAt: string;
+  stored: StoredDocument | null;
+  emailsSent: number;
+  lastEmailAt: string | null;
+  lastEmailStatus: "pending" | "sent" | "failed" | null;
+}
+
 export function documentView(row: typeof documents.$inferSelect): StoredDocument {
   return {
     id: row.id,
@@ -426,4 +444,87 @@ export async function regenerateDocument(orgId: string, kind: DocumentKind, docu
       : await ensureEstimateDocument(orgId, documentId);
   if ("error" in regenerated) return regenerated;
   return { row: regenerated.row, buffer: regenerated.buffer };
+}
+
+/** Lists invoices and estimates with stored PDF metadata and email delivery stats. */
+export async function listDocumentHub(orgId: string): Promise<DocumentHubEntry[]> {
+  const [invoiceRows, estimateRows, storedRows, messageRows, jobRows, customerRows] = await Promise.all([
+    db.select().from(invoices).where(eq(invoices.orgId, orgId)),
+    db.select().from(estimates).where(eq(estimates.orgId, orgId)),
+    db.select().from(documents).where(eq(documents.orgId, orgId)),
+    db.select().from(messageLogs).where(and(eq(messageLogs.orgId, orgId), inArray(messageLogs.kind, ["invoice", "estimate"]))),
+    db.select({ id: jobs.id, title: jobs.title, customerId: jobs.customerId }).from(jobs).where(eq(jobs.orgId, orgId)),
+    db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.orgId, orgId)),
+  ]);
+
+  const jobMap = new Map(jobRows.map((row) => [row.id, row]));
+  const customerMap = new Map(customerRows.map((row) => [row.id, row.name]));
+  const storedMap = new Map(storedRows.map((row) => [`${row.kind}:${row.documentId}`, documentView(row)]));
+
+  const messageStats = new Map<
+    string,
+    { emailsSent: number; lastEmailAt: string | null; lastEmailStatus: "pending" | "sent" | "failed" | null }
+  >();
+
+  for (const log of messageRows) {
+    const key = `${log.kind}:${log.documentId}`;
+    const current = messageStats.get(key) ?? { emailsSent: 0, lastEmailAt: null, lastEmailStatus: null };
+    if (log.status === "sent") current.emailsSent += 1;
+    const attemptAt = log.sentAt ?? log.lastAttemptAt ?? log.createdAt;
+    const attemptIso = attemptAt.toISOString();
+    if (!current.lastEmailAt || new Date(attemptIso) > new Date(current.lastEmailAt)) {
+      current.lastEmailAt = attemptIso;
+      current.lastEmailStatus = log.status as DocumentHubEntry["lastEmailStatus"];
+    }
+    messageStats.set(key, current);
+  }
+
+  const entries: DocumentHubEntry[] = [];
+
+  for (const invoice of invoiceRows) {
+    const job = jobMap.get(invoice.jobId);
+    const key = `invoice:${invoice.id}`;
+    const stats = messageStats.get(key);
+    entries.push({
+      kind: "invoice",
+      documentId: invoice.id,
+      number: invoice.number,
+      status: invoice.status,
+      total: invoice.total,
+      customerName: job ? customerMap.get(job.customerId) ?? null : null,
+      customerId: job?.customerId ?? null,
+      jobId: invoice.jobId,
+      jobTitle: job?.title ?? null,
+      createdAt: invoice.createdAt.toISOString(),
+      stored: storedMap.get(key) ?? null,
+      emailsSent: stats?.emailsSent ?? 0,
+      lastEmailAt: stats?.lastEmailAt ?? null,
+      lastEmailStatus: stats?.lastEmailStatus ?? null,
+    });
+  }
+
+  for (const estimate of estimateRows) {
+    const job = jobMap.get(estimate.jobId);
+    const key = `estimate:${estimate.id}`;
+    const stats = messageStats.get(key);
+    entries.push({
+      kind: "estimate",
+      documentId: estimate.id,
+      number: estimate.number,
+      status: estimate.status,
+      total: estimate.total,
+      customerName: job ? customerMap.get(job.customerId) ?? null : null,
+      customerId: job?.customerId ?? null,
+      jobId: estimate.jobId,
+      jobTitle: job?.title ?? null,
+      createdAt: estimate.createdAt.toISOString(),
+      stored: storedMap.get(key) ?? null,
+      emailsSent: stats?.emailsSent ?? 0,
+      lastEmailAt: stats?.lastEmailAt ?? null,
+      lastEmailStatus: stats?.lastEmailStatus ?? null,
+    });
+  }
+
+  entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return entries;
 }

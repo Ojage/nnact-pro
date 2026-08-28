@@ -22,7 +22,7 @@ export default function CustomerDetailPage() {
   const { data: timeline = [] } = useActivitiesQuery({ customerId }, { skip: !customerId });
   const customerJobs = allJobs.filter((j) => j.customerId === customerId);
 
-  if (isLoading) {
+  if (!customer && isLoading) {
     return (
       <div>
         <Skeleton className="mb-2 h-8 w-52" />

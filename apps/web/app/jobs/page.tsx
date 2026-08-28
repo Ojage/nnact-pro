@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
+import { usePrefetchListDetails } from "@/hooks/use-prefetch-list-details";
 import { useCustomersQuery, useJobsQuery } from "@/lib/redux/api";
 import { formatMoney } from "@nnact/shared";
 import type { JobSource } from "@nnact/shared";
@@ -149,6 +150,11 @@ export default function JobsPage() {
 
   // ── Pagination (must be before any early return: rules of hooks) ──
   const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
+
+  usePrefetchListDetails(
+    "jobs",
+    useMemo(() => filteredSorted.slice(0, 40).map((j) => j.id), [filteredSorted]),
+  );
 
   const noResults =
     (jobs.length > 0 && search.trim() && filteredSorted.length === 0) ||

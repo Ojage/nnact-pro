@@ -157,6 +157,7 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
 <meta charset="utf-8" />
 <title>${escapeHtml(title)} ${escapeHtml(data.number)}</title>
 <style>
+  @page{size:letter;margin:0}
   *{box-sizing:border-box}body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#eef1ed;color:#17201b;line-height:1.45}
   .page{max-width:820px;min-height:980px;margin:32px auto;background:#fff;border:1px solid #d9dfda;border-radius:18px;padding:44px;box-shadow:0 18px 50px rgba(23,32,27,.1)}
   .page.format-envelope .top{padding-top:76px}.top{display:flex;justify-content:space-between;gap:28px;border-bottom:3px solid ${color};padding-bottom:26px;margin-bottom:28px}
