@@ -75,6 +75,11 @@ if [ ! -d "$MARKETING_DIR/.git" ]; then
   chown -R "$APP_USER:$APP_USER" "$MARKETING_DIR"
 fi
 
+if systemctl is-active --quiet nginx 2>/dev/null; then
+  systemctl stop nginx
+  systemctl disable nginx
+fi
+
 if command -v ufw >/dev/null 2>&1; then
   ufw allow OpenSSH
   ufw allow 80/tcp

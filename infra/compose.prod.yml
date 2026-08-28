@@ -138,6 +138,9 @@ services:
       NNPAPI_ADDRESS: ${NNPAPI_ADDRESS:?Set the API domain, e.g. api.pro.nnact.com}
       NNPMARKETING_ADDRESS: ${NNPMARKETING_ADDRESS:?Set the marketing apex domain, e.g. nnact.com}
       NNPMARKETING_WWW: ${NNPMARKETING_WWW:-www.nnact.com}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     ports:
       - "80:80"
       - "443:443"

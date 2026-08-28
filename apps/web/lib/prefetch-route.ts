@@ -4,6 +4,13 @@ import { apiSlice } from "@/lib/redux/api";
 const DETAIL_ROUTE =
   /^\/(jobs|customers|invoices|estimates|equipment|diagnostics|repair-brain\/models)\/([^/?#]+)/;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** True when a path segment is a real record id (skips create routes like `/jobs/new`). */
+export function isRecordId(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 function warmSharedLists(dispatch: AppDispatch) {
   void dispatch(apiSlice.util.prefetch("jobs", undefined, { force: false }));
   void dispatch(apiSlice.util.prefetch("customers", undefined, { force: false }));
@@ -19,6 +26,8 @@ export function prefetchRoute(dispatch: AppDispatch, href: string) {
   if (!match) return;
 
   const [, kind, id] = match;
+  if (!isRecordId(id)) return;
+
   warmSharedLists(dispatch);
 
   switch (kind) {
