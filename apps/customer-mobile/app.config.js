@@ -7,11 +7,10 @@ if (fs.existsSync(repoEnv)) {
   process.loadEnvFile(repoEnv);
 }
 
-const apiPort = process.env.API_PORT ?? "3001";
-const apiUrl =
-  process.env.EXPO_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  `http://localhost:${apiPort}`;
+const { NNACT_PRODUCTION_API_URL } = require("../../packages/shared/mobile-api-origin.cjs");
+
+/** Mobile uses EXPO_PUBLIC_API_URL only — not NEXT_PUBLIC_API_URL (web dev localhost). */
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? NNACT_PRODUCTION_API_URL;
 
 process.env.EXPO_PUBLIC_API_URL = apiUrl;
 
@@ -32,6 +31,9 @@ module.exports = {
       ...appJson.expo.extra,
       apiUrl,
       defaultOrgId,
+      eas: {
+        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "45eeecf8-bd00-454b-a8de-fca82ad8defa",
+      },
     },
   },
 };
