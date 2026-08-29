@@ -197,12 +197,14 @@ export async function fetchUnreadNotificationCount(session: StoredStaffSession) 
   return staffFetch<{ count: number }>(session, "/api/notifications/unread-count");
 }
 
-export function jobPhotoFileUrl(photoId: string) {
-  return `${getApiUrl()}/api/photos/${photoId}/file`;
+export function jobPhotoFileUrl(photoId: string, accessToken?: string | null) {
+  const base = `${getApiUrl()}/api/photos/${photoId}/file`;
+  return accessToken ? `${base}?token=${encodeURIComponent(accessToken)}` : base;
 }
 
-export function voiceNoteFileUrl(noteId: string) {
-  return `${getApiUrl()}/api/voice-notes/${noteId}/file`;
+export function voiceNoteFileUrl(noteId: string, accessToken?: string | null) {
+  const base = `${getApiUrl()}/api/voice-notes/${noteId}/file`;
+  return accessToken ? `${base}?token=${encodeURIComponent(accessToken)}` : base;
 }
 
 export async function listJobVoiceNotes(session: StoredStaffSession, jobId: string) {

@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JobVoiceNoteDTO } from "@nnact/shared";
+import { Check, CheckCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useJobVoiceNotesQuery } from "@/lib/redux/api";
+import {
+  useJobVoiceNotesQuery,
+  useMarkJobVoiceNotesDeliveredMutation,
+  useMarkVoiceNoteReadMutation,
+} from "@/lib/redux/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -26,8 +31,39 @@ function formatTimeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function VoiceNotePlayer({ note, autoPlay }: { note: JobVoiceNoteDTO; autoPlay?: boolean }) {
+function StatusTicks({ note }: { note: JobVoiceNoteDTO }) {
+  if (note.readAt) {
+    return (
+      <span title="Read" className="inline-flex items-center gap-0.5 text-accent">
+        <CheckCheck className="h-3.5 w-3.5" />
+      </span>
+    );
+  }
+  if (note.deliveredAt) {
+    return (
+      <span title="Delivered" className="inline-flex items-center gap-0.5 text-fg-muted">
+        <CheckCheck className="h-3.5 w-3.5" />
+      </span>
+    );
+  }
+  return (
+    <span title="Sent" className="inline-flex items-center text-fg-muted">
+      <Check className="h-3.5 w-3.5" />
+    </span>
+  );
+}
+
+function VoiceNotePlayer({
+  note,
+  autoPlay,
+  onPlayed,
+}: {
+  note: JobVoiceNoteDTO;
+  autoPlay?: boolean;
+  onPlayed?: () => void;
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playedRef = useRef(false);
   const [src, setSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,6 +91,13 @@ function VoiceNotePlayer({ note, autoPlay }: { note: JobVoiceNoteDTO; autoPlay?:
     }
   }, [autoPlay, src]);
 
+  const handlePlay = useCallback(() => {
+    if (!playedRef.current) {
+      playedRef.current = true;
+      onPlayed?.();
+    }
+  }, [onPlayed]);
+
   return (
     <div className="rounded-xl border border-border bg-surface-200 p-3">
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -64,12 +107,15 @@ function VoiceNotePlayer({ note, autoPlay }: { note: JobVoiceNoteDTO; autoPlay?:
             {formatDuration(note.durationMs)} · {formatTimeAgo(note.createdAt)}
           </p>
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-wide text-accent">Voice</span>
+        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+          Voice
+          <StatusTicks note={note} />
+        </span>
       </div>
       {loading ? (
         <Skeleton className="h-10 w-full rounded-lg" />
       ) : src ? (
-        <audio ref={audioRef} controls preload="metadata" src={src} className="w-full h-10" />
+        <audio ref={audioRef} controls preload="metadata" src={src} className="w-full h-10" onPlay={handlePlay} />
       ) : (
         <p className="text-xs text-fg-muted">Could not load audio</p>
       )}
@@ -79,7 +125,28 @@ function VoiceNotePlayer({ note, autoPlay }: { note: JobVoiceNoteDTO; autoPlay?:
 
 export function JobVoiceNotesPanel({ jobId }: { jobId: string }) {
   const { data: notes = [], isLoading, refetch } = useJobVoiceNotesQuery(jobId, { skip: !jobId });
+  const [markDelivered] = useMarkJobVoiceNotesDeliveredMutation();
+  const [markRead] = useMarkVoiceNoteReadMutation();
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const markingRef = useRef(false);
+
+  useEffect(() => {
+    if (isLoading || notes.length === 0 || markingRef.current) return;
+    if (notes.some((note) => !note.deliveredAt)) {
+      markingRef.current = true;
+      void markDelivered({ jobId }).finally(() => {
+        markingRef.current = false;
+      });
+    }
+  }, [notes, isLoading, markDelivered, jobId]);
+
+  const handlePlayerPlayed = useCallback(
+    (note: JobVoiceNoteDTO) => {
+      if (note.readAt) return;
+      void markRead({ noteId: note.id, jobId });
+    },
+    [jobId, markRead],
+  );
 
   const onLiveVoiceNote = useCallback(
     (event: Event) => {
@@ -124,7 +191,11 @@ export function JobVoiceNotesPanel({ jobId }: { jobId: string }) {
               key={note.id}
               className={highlightId === note.id ? "ring-2 ring-accent rounded-xl" : undefined}
             >
-              <VoiceNotePlayer note={note} autoPlay={highlightId === note.id} />
+              <VoiceNotePlayer
+                note={note}
+                autoPlay={highlightId === note.id}
+                onPlayed={() => handlePlayerPlayed(note)}
+              />
             </div>
           ))
         )}

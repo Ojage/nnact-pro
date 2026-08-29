@@ -29,4 +29,8 @@ export interface JobVoiceNoteDTO {
   fileSize?: number | null;
   fileName?: string | null;
   createdAt: string;
+  /** Set when the office/dispatch has fetched the note (single-grey → double-grey). */
+  deliveredAt?: string | null;
+  /** Set when the office has played the note (double-grey → double-blue). */
+  readAt?: string | null;
 }

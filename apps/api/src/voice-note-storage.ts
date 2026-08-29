@@ -4,7 +4,7 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { Transform, type Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull, ne } from "drizzle-orm";
 import { fileTypeFromBuffer } from "file-type";
 import { db, jobs, jobVoiceNotes, users } from "@nnact/db";
 import type { JobVoiceNoteDTO } from "@nnact/shared";
@@ -182,6 +182,8 @@ export async function listJobVoiceNotes(jobId: string, orgId: string): Promise<J
     fileSize: row.note.fileSize,
     fileName: row.note.fileName,
     createdAt: row.note.createdAt.toISOString(),
+    deliveredAt: row.note.deliveredAt ? row.note.deliveredAt.toISOString() : null,
+    readAt: row.note.readAt ? row.note.readAt.toISOString() : null,
   }));
 }
 
@@ -208,5 +210,47 @@ export async function getVoiceNoteDto(noteId: string, orgId: string): Promise<Jo
     fileSize: row.note.fileSize,
     fileName: row.note.fileName,
     createdAt: row.note.createdAt.toISOString(),
+    deliveredAt: row.note.deliveredAt ? row.note.deliveredAt.toISOString() : null,
+    readAt: row.note.readAt ? row.note.readAt.toISOString() : null,
   };
+}
+
+/** Office has received the note -> deliver (double grey tick). Never marks the author's own fetch. */
+export async function markJobVoiceNotesDelivered(
+  jobId: string,
+  orgId: string,
+  requesterUserId: string,
+): Promise<number> {
+  const result = await db
+    .update(jobVoiceNotes)
+    .set({ deliveredAt: new Date() })
+    .where(
+      and(
+        eq(jobVoiceNotes.orgId, orgId),
+        eq(jobVoiceNotes.jobId, jobId),
+        isNull(jobVoiceNotes.deliveredAt),
+        ne(jobVoiceNotes.authorUserId, requesterUserId),
+      ),
+    );
+  return Number((result as { rowCount?: number }).rowCount ?? 0);
+}
+
+/** Office has played the note -> read (blue tick). */
+export async function markVoiceNoteRead(
+  noteId: string,
+  orgId: string,
+  requesterUserId: string,
+): Promise<boolean> {
+  const result = await db
+    .update(jobVoiceNotes)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(jobVoiceNotes.id, noteId),
+        eq(jobVoiceNotes.orgId, orgId),
+        isNull(jobVoiceNotes.readAt),
+        ne(jobVoiceNotes.authorUserId, requesterUserId),
+      ),
+    );
+  return Number((result as { rowCount?: number }).rowCount ?? 0) > 0;
 }

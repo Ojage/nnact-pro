@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import multipart from "@fastify/multipart";
 import { resolveOrgId } from "./org.js";
 import { savePhoto, getPhotoFile, listJobPhotos } from "../uploads.js";
+import { resolveOrgIdWithQueryToken, verifiedClaimsForQueryToken } from "../query-token.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 
 interface PhotoParams {
@@ -72,7 +73,10 @@ export async function photoRoutes(app: FastifyInstance) {
   app.get<{ Params: PhotoIdParams }>(
     "/:photoId/file",
     async (req, reply) => {
-      const orgId = await resolveOrgId(req);
+      const orgId = await resolveOrgIdWithQueryToken(app, req);
+      const claims = await verifiedClaimsForQueryToken(app, req, reply);
+      if (!claims || reply.sent) return;
+
       const { photoId } = req.params;
 
       try {

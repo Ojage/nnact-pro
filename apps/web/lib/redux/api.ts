@@ -132,6 +132,20 @@ export const apiSlice = createApi({
       query: (jobId) => `/api/jobs/${jobId}/voice-notes`,
       providesTags: (_result, _error, jobId) => [{ type: "Job", id: jobId }],
     }),
+    markJobVoiceNotesDelivered: builder.mutation<{ ok: boolean }, { jobId: string }>({
+      query: ({ jobId }) => ({
+        url: `/api/jobs/${jobId}/voice-notes/mark-delivered`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Job", id: arg.jobId }],
+    }),
+    markVoiceNoteRead: builder.mutation<{ ok: boolean }, { noteId: string; jobId: string }>({
+      query: ({ noteId }) => ({
+        url: `/api/voice-notes/${noteId}/read`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Job", id: arg.jobId }],
+    }),
     uploadJobPhoto: builder.mutation<PhotoRecordDTO, { jobId: string; file: File }>({
       query: ({ jobId, file }) => {
         const body = new FormData();
@@ -442,6 +456,8 @@ export const {
   useJobLineItemsQuery,
   useJobPhotosQuery,
   useJobVoiceNotesQuery,
+  useMarkJobVoiceNotesDeliveredMutation,
+  useMarkVoiceNoteReadMutation,
   useUploadJobPhotoMutation,
   useCustomersQuery,
   useCustomerQuery,

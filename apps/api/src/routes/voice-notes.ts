@@ -8,10 +8,13 @@ import {
   listJobVoiceNotes,
   saveVoiceNote,
   getVoiceNoteDto,
+  markJobVoiceNotesDelivered,
+  markVoiceNoteRead,
 } from "../voice-note-storage.js";
 import { notifyVoiceNoteReceived } from "../notify-office.js";
+import { resolveOrgIdWithQueryToken, verifiedClaimsForQueryToken } from "../query-token.js";
 import { safeEmitActivity } from "../activities.js";
-import { db, jobs, users } from "@nnact/db";
+import { db, jobs, users, jobVoiceNotes } from "@nnact/db";
 import { eq, and } from "drizzle-orm";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 
@@ -111,12 +114,65 @@ export async function voiceNoteRoutes(app: FastifyInstance) {
     },
   );
 
+  app.post<{ Params: { jobId: string } }>(
+    "/jobs/:jobId/voice-notes/mark-delivered",
+    async (req, reply) => {
+      const orgId = await resolveOrgId(req);
+      const claims = await verifiedClaims(req, reply);
+      if (!claims || reply.sent) return;
+
+      const { jobId } = req.params;
+      if (!(await canAccessJob(orgId, jobId, claims.role, claims.userId))) {
+        return reply.code(404).send({ error: "job not found" });
+      }
+      if (claims.role !== "owner" && claims.role !== "dispatcher") {
+        return reply.code(403).send({ error: "only office users can confirm delivery" });
+      }
+
+      await markJobVoiceNotesDelivered(jobId, orgId, claims.userId);
+      return { ok: true };
+    },
+  );
+
+  app.post<{ Params: { noteId: string } }>(
+    "/voice-notes/:noteId/read",
+    async (req, reply) => {
+      const orgId = await resolveOrgId(req);
+      const claims = await verifiedClaims(req, reply);
+      if (!claims || reply.sent) return;
+
+      const { noteId } = req.params;
+      const [note] = await db
+        .select({ jobId: jobVoiceNotes.jobId, authorUserId: jobVoiceNotes.authorUserId })
+        .from(jobVoiceNotes)
+        .where(and(eq(jobVoiceNotes.id, noteId), eq(jobVoiceNotes.orgId, orgId)))
+        .limit(1);
+      if (!note) return reply.code(404).send({ error: "voice note not found" });
+      if (!(await canAccessJob(orgId, note.jobId, claims.role, claims.userId))) {
+        return reply.code(404).send({ error: "job not found" });
+      }
+
+      await markVoiceNoteRead(noteId, orgId, claims.userId);
+      return { ok: true };
+    },
+  );
+
   app.get<{ Params: { noteId: string } }>("/voice-notes/:noteId/file", async (req, reply) => {
-    const orgId = await resolveOrgId(req);
-    const claims = await verifiedClaims(req, reply);
+    const orgId = await resolveOrgIdWithQueryToken(app, req);
+    const claims = await verifiedClaimsForQueryToken(app, req, reply);
     if (!claims || reply.sent) return;
 
     const { noteId } = req.params;
+    const [note] = await db
+      .select({ jobId: jobVoiceNotes.jobId })
+      .from(jobVoiceNotes)
+      .where(and(eq(jobVoiceNotes.id, noteId), eq(jobVoiceNotes.orgId, orgId)))
+      .limit(1);
+    if (!note) return reply.code(404).send({ error: "voice note not found" });
+    if (!(await canAccessJob(orgId, note.jobId, claims.role, claims.userId))) {
+      return reply.code(404).send({ error: "job not found" });
+    }
+
     const result = await getVoiceNoteFile(noteId, orgId);
     if (!result) return reply.code(404).send({ error: "voice note not found" });
 

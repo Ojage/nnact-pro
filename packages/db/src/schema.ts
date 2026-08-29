@@ -420,6 +420,8 @@ export const jobVoiceNotes = pgTable(
     fileName: text("file_name"),
     fileSize: integer("file_size"),
     durationMs: integer("duration_ms").notNull().default(0),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
     createdAt: ts(),
   },
   (t) => ({

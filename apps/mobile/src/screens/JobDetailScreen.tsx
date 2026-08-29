@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Image,
   Linking,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,9 +27,10 @@ import {
 } from "../components/ui";
 import type { Appointment, DiagnosticListItem } from "../hooks/useFieldData";
 import { humanize, statusColor } from "../hooks/useFieldData";
-import { listJobPhotos, listJobVoiceNotes, uploadJobPhoto, type JobPhoto } from "../field-api";
+import { listJobPhotos, listJobVoiceNotes, uploadJobPhoto, jobPhotoFileUrl, type JobPhoto } from "../field-api";
 import type { JobVoiceNoteDTO } from "@nnact/shared";
 import { VoiceNoteRecorder } from "../components/VoiceNoteRecorder";
+import { VoiceNoteList } from "../components/VoiceNoteList";
 import { fonts, spacing, type Palette } from "../theme";
 import * as ImagePicker from "expo-image-picker";
 
@@ -94,6 +97,7 @@ export function JobDetailScreen({
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [voiceNotes, setVoiceNotes] = useState<JobVoiceNoteDTO[]>([]);
+  const [viewerPhoto, setViewerPhoto] = useState<JobPhoto | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const jobAppointments = useMemo(() => {
@@ -157,6 +161,15 @@ export function JobDetailScreen({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void listJobVoiceNotes(session, jobId)
+        .then((rows) => setVoiceNotes(rows))
+        .catch(() => {});
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [jobId, session]);
 
   function openDiagnostic() {
     if (primaryDiagnostic) {
@@ -361,6 +374,15 @@ export function JobDetailScreen({
             size="sm"
             fullWidth={false}
           />
+          <PrimaryButton
+            colors={colors}
+            label="Upload from library"
+            onPress={() => void pickPhoto()}
+            loading={photoUploading}
+            variant="ghost"
+            size="sm"
+            fullWidth={false}
+          />
         </View>
 
         <SectionHeader colors={colors} title="Overview" />
@@ -535,32 +557,30 @@ export function JobDetailScreen({
             jobId={jobId}
             onUploaded={() => void load(true)}
           />
-          {voiceNotes.length > 0 ? (
-            <Text style={styles.mutedText}>
-              {voiceNotes.length} note{voiceNotes.length === 1 ? "" : "s"} sent · office notified instantly
-            </Text>
-          ) : null}
+          <VoiceNoteList colors={colors} accessToken={session.accessToken} notes={voiceNotes} />
         </View>
 
         <SectionHeader colors={colors} title="Field photos" action="Gallery" onAction={() => void pickPhoto()} />
         <View style={styles.section}>
           {photos.length === 0 ? (
-            <Text style={styles.mutedText}>No photos yet. Capture evidence from the job site.</Text>
+            <Text style={styles.mutedText}>No photos yet. Capture evidence or upload from your library.</Text>
           ) : (
-            photos.map((photo) => (
-              <View key={photo.id} style={styles.photoRow}>
-                <Ionicons name="image-outline" size={18} color={colors.primary} />
-                <Text style={styles.cardTitle}>{photo.filename}</Text>
-                <Text style={styles.dimText}>
-                  {new Date(photo.createdAt).toLocaleString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </Text>
-              </View>
-            ))
+            <View style={styles.photoGrid}>
+              {photos.map((photo) => (
+                <TouchableOpacity
+                  key={photo.id}
+                  activeOpacity={0.85}
+                  onPress={() => setViewerPhoto(photo)}
+                  style={styles.photoCell}
+                >
+                  <Image
+                    source={{ uri: jobPhotoFileUrl(photo.id, session.accessToken) }}
+                    style={styles.photoThumb}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
         </View>
 
@@ -615,6 +635,34 @@ export function JobDetailScreen({
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      <Modal
+        visible={viewerPhoto !== null}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={() => setViewerPhoto(null)}
+      >
+        <View style={styles.viewerRoot}>
+          <View style={styles.viewerTopbar}>
+            <View style={styles.viewerBack}>
+              <BackButton colors={colors} onPress={() => setViewerPhoto(null)} variant="surface" />
+            </View>
+            <Text style={styles.viewerTitle} numberOfLines={1}>
+              {viewerPhoto?.filename}
+            </Text>
+            <View style={styles.viewerBack} />
+          </View>
+          <View style={styles.viewerBody}>
+            {viewerPhoto ? (
+              <Image
+                source={{ uri: jobPhotoFileUrl(viewerPhoto.id, session.accessToken) }}
+                style={styles.viewerImage}
+                resizeMode="contain"
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -682,17 +730,39 @@ const createStyles = (colors: Palette) =>
     phoneRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm },
     contactRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
     phoneText: { color: colors.primary, fontSize: 14, fontFamily: fonts.semibold },
-    photoRow: {
+    photoGrid: {
       flexDirection: "row",
-      alignItems: "center",
+      flexWrap: "wrap",
       gap: spacing.sm,
-      backgroundColor: colors.card,
+    },
+    photoCell: {
+      width: "31%",
+      aspectRatio: 1,
       borderRadius: 12,
+      overflow: "hidden",
+      backgroundColor: colors.surfaceMuted,
       borderWidth: 1,
       borderColor: colors.borderLight,
-      padding: spacing.md,
-      marginBottom: spacing.sm,
     },
+    photoThumb: { width: "100%", height: "100%" },
+    viewerRoot: { flex: 1, backgroundColor: colors.background },
+    viewerTopbar: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      gap: spacing.sm,
+    },
+    viewerBack: { width: 40 },
+    viewerTitle: {
+      flex: 1,
+      textAlign: "center",
+      color: colors.foreground,
+      fontSize: 14,
+      fontFamily: fonts.semibold,
+    },
+    viewerBody: { flex: 1, backgroundColor: colors.background },
+    viewerImage: { width: "100%", height: "100%" },
     scheduleRow: {
       flexDirection: "row",
       gap: spacing.md,
