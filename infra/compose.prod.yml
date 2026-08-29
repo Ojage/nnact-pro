@@ -72,6 +72,12 @@ services:
       NNPHEALTH_PROBE_TIMEOUT_MS: ${NNPHEALTH_PROBE_TIMEOUT_MS:-2000}
       NNPMAINTENANCE_FILE: /var/lib/nnactpro-ops/state/maintenance.json
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - ../data/uploads:/uploads
       - operations_state:/var/lib/nnactpro-ops/state:ro
