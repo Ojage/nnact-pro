@@ -35,6 +35,10 @@ set -a
 source .env
 set +a
 
+# shellcheck source=scripts/reconcile-cors.sh
+source scripts/reconcile-cors.sh
+reconcile_cors
+
 export ALLOW_SCHEMA_PUSH=true
 
 "${COMPOSE[@]}" -f infra/compose.prod.yml config >/dev/null
@@ -95,6 +99,9 @@ if [ "${MARKETING_SKIP_BUILD:-false}" = "true" ]; then
 else
   bash scripts/deploy-marketing.sh
 fi
+
+echo "Verifying production CORS origins..."
+verify_cors
 
 echo "Deploy complete."
 echo "Staff app:  https://${NNPSITE_ADDRESS:-unknown}"

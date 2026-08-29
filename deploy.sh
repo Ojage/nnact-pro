@@ -43,6 +43,10 @@ set -a
 source .env
 set +a
 
+# shellcheck source=scripts/reconcile-cors.sh
+source scripts/reconcile-cors.sh
+reconcile_cors
+
 required=(POSTGRES_PASSWORD JWT_SECRET CORS_ORIGIN PUBLIC_WEB_URL PUBLIC_API_URL NNPSITE_ADDRESS NNPAPI_ADDRESS NNPMARKETING_ADDRESS)
 for name in "${required[@]}"; do
   if [ -z "${!name:-}" ]; then
@@ -114,6 +118,8 @@ if [ "$healthy" != true ]; then
   "${COMPOSE[@]}" -f infra/compose.prod.yml ps >&2
   exit 1
 fi
+
+verify_cors
 
 cat <<EOF
 NNACT Pro deployment started.

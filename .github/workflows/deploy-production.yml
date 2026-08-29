@@ -37,6 +37,9 @@ jobs:
 
       - name: Build marketing site
         working-directory: marketing-src
+        env:
+          VITE_API_URL: ${{ vars.MARKETING_API_URL }}
+          VITE_SITE_URL: ${{ vars.MARKETING_SITE_URL }}
         run: |
           npm ci
           npm run build
