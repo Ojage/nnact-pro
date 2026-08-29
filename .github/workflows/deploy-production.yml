@@ -76,21 +76,25 @@ jobs:
           set -euo pipefail
           HOST="${DEPLOY_USER}@${DEPLOY_HOST}"
           OPTS=(-i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=10)
-          # Run the long deploy detached on the VPS so a dropped SSH connection
-          # cannot abort the build; the runner polls for completion instead.
-          ssh "${OPTS[@]}" "$HOST" \
-            "set +e; pkill -f 'ci-deploy.sh' 2>/dev/null; : > /tmp/ci-deploy.log; rm -f /tmp/ci-deploy.exit; nohup bash -lc 'cd \"${DEPLOY_PATH}\" && MARKETING_SKIP_BUILD=true bash scripts/ci-deploy.sh > /tmp/ci-deploy.log 2>&1; echo \$? > /tmp/ci-deploy.exit' >/dev/null 2>&1 & echo \"deploy started pid \$!\""
+          # Start the long deploy detached on the VPS so a dropped SSH
+          # connection cannot abort the build; the runner polls instead.
+          ssh "${OPTS[@]}" "$HOST" "cd '${DEPLOY_PATH}' && git fetch --quiet origin main && git reset --hard --quiet origin/main && bash scripts/start-deploy.sh" || true
           for i in $(seq 1 300); do
             sleep 20
-            if ssh "${OPTS[@]}" "$HOST" "pgrep -f 'ci-deploy.sh' >/dev/null" && ssh "${OPTS[@]}" "$HOST" "test ! -f /tmp/ci-deploy.exit"; then
+            OUT=$(ssh "${OPTS[@]}" "$HOST" "cd '${DEPLOY_PATH}' && bash scripts/deploy-status.sh" 2>/dev/null || true)
+            if [ "$OUT" = "RUNNING" ]; then
               echo "[$(date -u +%H:%M:%S)] deploy running..."
-            else
-              echo "=== deploy log ==="
-              ssh "${OPTS[@]}" "$HOST" "cat /tmp/ci-deploy.log 2>/dev/null || true"
-              CODE=$(ssh "${OPTS[@]}" "$HOST" "cat /tmp/ci-deploy.exit 2>/dev/null || echo 1")
-              echo "=== exit code: $CODE ==="
-              exit "$CODE"
+              continue
             fi
+            break
           done
-          echo "deploy did not finish within the poll window" >&2
-          exit 1
+          echo "=== deploy log ==="
+          printf '%s\n' "$OUT"
+          if [ "$OUT" = "STOPPED_WITHOUT_EXIT" ]; then
+            echo "deploy did not finish within the poll window" >&2
+            exit 1
+          fi
+          CODE=$(printf '%s\n' "$OUT" | sed -n 's/^EXIT_CODE=\([0-9][0-9]*\)$/\1/p' | tail -1)
+          CODE=${CODE:-1}
+          echo "=== exit code: $CODE ==="
+          exit "$CODE"
