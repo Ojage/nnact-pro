@@ -5,6 +5,8 @@ apps/web/artifacts/
 apps/web/playwright-report/
 apps/web/test-results/
 .expo/
+apps/*/android/
+apps/*/ios/
 *.tsbuildinfo
 .env
 .env.local
