@@ -1,13 +1,25 @@
 const path = require("path");
-const { getDefaultConfig } = require("expo/metro-config");
-const { resolve: resolveModule } = require("metro-resolver");
-const exclusionList = require("metro-config/src/defaults/exclusionList");
+const { createRequire } = require("node:module");
 
 /** Workspace packages resolved from source (not prebuilt dist). */
 const WORKSPACE_PACKAGE_DIRS = ["shared", "mobile-ui"];
 
+/**
+ * Require (call) resolve relative to the app directory, where pnpm installs
+ * `expo`, `metro-config`, and `metro-resolver`. The shared config lives
+ * outside the app's node_modules, so plain require() from this file walks up
+ * to the monorepo root and misses packages on EAS runners.
+ */
+function requireFromProject(projectRoot, name) {
+  return createRequire(path.join(projectRoot, "package.json"))(name);
+}
+
 /** Shared Metro config for pnpm monorepo Expo apps. */
 function createExpoMetroConfig(projectRoot) {
+  const { getDefaultConfig } = requireFromProject(projectRoot, "expo/metro-config");
+  const { resolve: resolveModule } = requireFromProject(projectRoot, "metro-resolver");
+  const exclusionList = requireFromProject(projectRoot, "metro-config/src/defaults/exclusionList");
+
   const monorepoRoot = path.resolve(projectRoot, "../..");
   const config = getDefaultConfig(projectRoot);
 
