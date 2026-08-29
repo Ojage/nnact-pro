@@ -36,6 +36,7 @@
     "react-native": "0.76.0"
   },
   "devDependencies": {
+    "@react-native-community/cli": "15.0.1",
     "@types/react": "^18.3.0",
     "eas-cli": "^23.0.0",
     "expo-asset": "11.0.5",
