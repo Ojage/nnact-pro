@@ -39,21 +39,23 @@ export ALLOW_SCHEMA_PUSH=true
 
 "${COMPOSE[@]}" -f infra/compose.prod.yml config >/dev/null
 
-# Provision the ops maintenance state file. api/worker mount the volume
-# read-only, so the file must exist on the host. A missing file is treated as
-# "maintenance active" (fail-closed). Preserve an intentional active:true
-# flag; only recreate the file when it is genuinely absent.
-OPS_STATE="$(docker volume inspect --format '{{.Mountpoint}}' "${NNPOPERATIONS_STATE_VOLUME:-openfieldpro_operations_state}" 2>/dev/null || true)"
-if [ -n "$OPS_STATE" ] && [ ! -f "$OPS_STATE/maintenance.json" ]; then
-  echo "Provisioning maintenance state file at $OPS_STATE/maintenance.json"
-  printf '{"version":1,"active":false}\n' > "$OPS_STATE/maintenance.json"
-fi
-
 echo "Building production images (this may take several minutes)..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml build api web worker migrate
 
 echo "Starting data services..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml up -d postgres redis
+
+# Provision the ops maintenance state file. api/worker mount the volume
+# read-only, so the file must exist on the host; a missing file is treated as
+# "maintenance active" (fail-closed) and 503s every mutating request.
+# Preserve an intentional active:true flag — only recreate the file when it
+# is genuinely absent. postgis image is present at this point.
+OPS_STATE="$(docker volume inspect --format '{{.Mountpoint}}' "${NNPOPERATIONS_STATE_VOLUME:-openfieldpro_operations_state}" 2>/dev/null || true)"
+if [ -n "$OPS_STATE" ] && [ ! -f "$OPS_STATE/maintenance.json" ]; then
+  echo "Provisioning maintenance state file at $OPS_STATE/maintenance.json"
+  docker run --rm -v "${NNPOPERATIONS_STATE_VOLUME:-openfieldpro_operations_state}:/state" \
+    postgis/postgis:16-3.4 sh -c 'printf "%s\n" "{\"version\":1,\"active\":false}" > /state/maintenance.json'
+fi
 
 echo "Applying database migrations..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml --profile tools run --build --rm -e ALLOW_SCHEMA_PUSH=true migrate
