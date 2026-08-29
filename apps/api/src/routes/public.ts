@@ -115,6 +115,50 @@ const marketingProfileResponseSchema = {
         },
       },
     },
+    location: {
+      type: "object",
+      properties: {
+        streetAddress: { type: "string" },
+        city: { type: "string" },
+        region: { type: "string" },
+        country: { type: "string" },
+        fullAddress: { type: "string" },
+        geo: {
+          type: "object",
+          properties: {
+            latitude: { type: "number" },
+            longitude: { type: "number" },
+          },
+        },
+      },
+    },
+    hours: {
+      type: "object",
+      properties: {
+        weekdays: { type: "string" },
+        saturday: { type: ["string", "null"] },
+        sunday: { type: "string" },
+        emergency: { type: "string" },
+        schema: { type: "string" },
+      },
+    },
+    contact: {
+      type: "object",
+      properties: {
+        whatsAppPhone: { type: "string" },
+        whatsAppUrl: { type: "string" },
+        mapsUrl: { type: "string" },
+        mapsDirectionsUrl: { type: "string" },
+      },
+    },
+    social: {
+      type: "object",
+      properties: {
+        facebook: { type: ["string", "null"] },
+        whatsApp: { type: ["string", "null"] },
+        linkedin: { type: ["string", "null"] },
+      },
+    },
   },
 };
 
