@@ -12,10 +12,10 @@ test("session responses require every display and authorization field", () => {
 
 test("a complete session user passes validation", () => {
   const user = { id: "owner-1", name: "Morgan Owner", email: "owner@example.test", role: "owner" };
-  assert.deepEqual(parseSessionUser(user), { ...user, orgId: "" });
+  assert.deepEqual(parseSessionUser(user), { ...user, orgId: "", mustChangePassword: false });
 });
 
 test("parseSessionUser normalizes orgId when present and tolerated when absent", () => {
   const withOrg = { id: "owner-1", name: "Morgan Owner", email: "owner@example.test", role: "owner", orgId: "org-9" };
-  assert.deepEqual(parseSessionUser(withOrg), withOrg);
+  assert.deepEqual(parseSessionUser(withOrg), { ...withOrg, mustChangePassword: false });
 });
