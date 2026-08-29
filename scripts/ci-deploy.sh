@@ -39,6 +39,16 @@ export ALLOW_SCHEMA_PUSH=true
 
 "${COMPOSE[@]}" -f infra/compose.prod.yml config >/dev/null
 
+# Provision the ops maintenance state file. api/worker mount the volume
+# read-only, so the file must exist on the host. A missing file is treated as
+# "maintenance active" (fail-closed). Preserve an intentional active:true
+# flag; only recreate the file when it is genuinely absent.
+OPS_STATE="$("${COMPOSE[@]}" -f infra/compose.prod.yml volume inspect --format '{{.Mountpoint}}' "${NNPOPERATIONS_STATE_VOLUME:-openfieldpro_operations_state}" 2>/dev/null || true)"
+if [ -n "$OPS_STATE" ] && [ ! -f "$OPS_STATE/maintenance.json" ]; then
+  echo "Provisioning maintenance state file at $OPS_STATE/maintenance.json"
+  printf '{"version":1,"active":false}\n' > "$OPS_STATE/maintenance.json"
+fi
+
 echo "Building production images (this may take several minutes)..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml build api web worker migrate
 
