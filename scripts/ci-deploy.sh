@@ -5,6 +5,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Fail loudly before touching anything if the git object store is not writable
+# by the deploy user (e.g. when a manual root-side git command left root-owned
+# objects behind). A missing write permission would otherwise abort the fetch
+# below in a way that the CI poll loop can mistake for a successful deploy.
+if ! ( cd .git/objects && mkdir .nnact-write-probe 2>/dev/null ); then
+  echo "ERROR: .git is not writable by $(id -un). Fix ownership on the VPS (chown -R <deploy-user> .git) and retry." >&2
+  exit 1
+fi
+rmdir .git/objects/.nnact-write-probe
+
 if [ -n "${NNACT_PRO_ENV:-}" ]; then
   umask 077
   printf '%s\n' "$NNACT_PRO_ENV" > .env

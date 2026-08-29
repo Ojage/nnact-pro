@@ -81,7 +81,9 @@ jobs:
           OPTS=(-i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=10)
           # Start the long deploy detached on the VPS so a dropped SSH
           # connection cannot abort the build; the runner polls instead.
-          ssh "${OPTS[@]}" "$HOST" "cd '${DEPLOY_PATH}' && git fetch --quiet origin main && git reset --hard --quiet origin/main && bash scripts/start-deploy.sh" || true
+          # Clear stale deploy state first: deploy-status.sh reads /tmp/ci-deploy.*,
+          # so a failed start must not fall back to a previous run's "success".
+          ssh "${OPTS[@]}" "$HOST" "cd '${DEPLOY_PATH}' && rm -f /tmp/ci-deploy.exit /tmp/ci-deploy.log && git fetch --quiet origin main && git reset --hard --quiet origin/main && bash scripts/start-deploy.sh" || true
           for i in $(seq 1 300); do
             sleep 20
             OUT=$(ssh "${OPTS[@]}" "$HOST" "cd '${DEPLOY_PATH}' && bash scripts/deploy-status.sh" 2>/dev/null || true)
@@ -100,4 +102,16 @@ jobs:
           CODE=$(printf '%s\n' "$OUT" | sed -n 's/^EXIT_CODE=\([0-9][0-9]*\)$/\1/p' | tail -1)
           CODE=${CODE:-1}
           echo "=== exit code: $CODE ==="
+
+          # Ultimate guard against silent failed deploys: the VPS must be at a
+          # HEAD containing the commit that triggered this run. A fetch or
+          # start failure that never surfaced an exit code would otherwise
+          # leave production on an older commit while the run shows green.
+          DEPLOYED_SHA=$(ssh "${OPTS[@]}" "$HOST" "git -C '${DEPLOY_PATH}' rev-parse HEAD")
+          if ! ssh "${OPTS[@]}" "$HOST" "git -C '${DEPLOY_PATH}' merge-base --is-ancestor '${GITHUB_SHA}' HEAD"; then
+            echo "deployed HEAD ${DEPLOYED_SHA} does not contain ${GITHUB_SHA}; deploy did not reach production" >&2
+            exit 1
+          fi
+          echo "deploy verified: ${GITHUB_SHA} is in ${DEPLOYED_SHA}"
+
           exit "$CODE"
