@@ -134,6 +134,9 @@ type RevenueTrendReport = import("@nnact/shared").RevenueTrendReport;
 type TechnicianScorecardsReport = import("@nnact/shared").TechnicianScorecardsReport;
 type UserDTO = import("@nnact/shared").UserDTO;
 type RecurringJobDTO = import("@nnact/shared").RecurringJobDTO;
+type ServicePlanDTO = import("@nnact/shared").ServicePlanDTO;
+type CustomerServicePlanDTO = import("@nnact/shared").CustomerServicePlanDTO;
+type ServicePlanVisitDTO = import("@nnact/shared").ServicePlanVisitDTO;
 export type BusinessSettingsDTO = import("@nnact/shared").BusinessSettings;
 
 export interface OrgSettingsDTO {
@@ -733,6 +736,33 @@ export const api = {
     request<CatalogItemDTO>(`/api/catalog/items/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteCatalogItem: (id: string) =>
     request<void>(`/api/catalog/items/${id}`, { method: "DELETE" }),
+
+  // ── Service plans ──
+  servicePlans: () => request<ServicePlanDTO[]>("/api/service-plans"),
+  createServicePlan: (body: {
+    name: string;
+    description?: string;
+    includedVisitsPerTerm?: number;
+    termMonths?: number;
+    priceCents?: number;
+    priorityScheduling?: boolean;
+    benefits?: string[];
+    active?: boolean;
+  }) => request<ServicePlanDTO>("/api/service-plans", { method: "POST", body: JSON.stringify(body) }),
+  servicePlanEnrollments: (customerId?: string) => {
+    const qs = customerId ? `?customerId=${customerId}` : "";
+    return request<CustomerServicePlanDTO[]>(`/api/service-plans/enrollments${qs}`);
+  },
+  createServicePlanEnrollment: (body: {
+    customerId: string;
+    servicePlanId: string;
+    startsAt: string;
+    renewsAt?: string;
+    renewalReminderAt?: string;
+    visitsIncluded?: number;
+    notes?: string;
+  }) => request<CustomerServicePlanDTO>("/api/service-plans/enrollments", { method: "POST", body: JSON.stringify(body) }),
+  servicePlanVisits: () => request<ServicePlanVisitDTO[]>("/api/service-plans/visits"),
 
   // ── Customer portal links (owner management) ──
   portalLinks: (customerId: string) => request<PortalLinkDTO[]>(`/api/portal/links?customerId=${customerId}`),

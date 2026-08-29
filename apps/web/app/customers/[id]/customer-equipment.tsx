@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 import { useCreateEquipmentMutation, useDeleteEquipmentMutation, useEquipmentQuery, type EquipmentDTO } from "@/lib/redux/api";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardAction, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
@@ -82,9 +82,23 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>Equipment</CardTitle>
-        <Button size="sm" data-tour="equipment-add" onClick={() => setAddOpen(true)}>Add Equipment</Button>
+      <CardHeader>
+        <CardTitle className="inline-flex items-center gap-1.5">
+          Equipment
+          <InfoTip label="About customer equipment" side="right">
+            Units installed at this customer&apos;s properties — serial numbers and warranty dates flow into work orders and service history.
+          </InfoTip>
+        </CardTitle>
+        <CardDescription>
+          {loading
+            ? "Loading equipment…"
+            : equipment.length === 0
+              ? "No equipment tracked yet."
+              : `${equipment.length} unit${equipment.length === 1 ? "" : "s"} on file.`}
+        </CardDescription>
+        <CardAction>
+          <Button size="sm" data-tour="equipment-add" onClick={() => setAddOpen(true)}>Add equipment</Button>
+        </CardAction>
       </CardHeader>
       <CardContent>
         <div data-tour="equipment-section">
@@ -103,7 +117,7 @@ export function CustomerEquipment({ customerId }: { customerId: string }) {
         ) : (
           <div className="flex flex-col gap-2">
             {equipment.map((e) => (
-              <div key={e.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-surface-200">
+              <div key={e.id} className="flex items-center justify-between rounded-lg bg-surface-200 px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted bg-surface-300 px-1.5 py-0.5 rounded">

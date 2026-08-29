@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { formatMoney } from "@nnact/shared";
 import { useActivitiesQuery, useCustomerQuery, useJobsQuery } from "@/lib/redux/api";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { InfoTip } from "@/components/ui/info-tip";
 import { JobStatusBadge } from "@/components/status-badge";
 import { EditCustomerDialog } from "./edit-dialog";
 import { CustomerEquipment } from "./customer-equipment";
@@ -51,7 +52,17 @@ export default function CustomerDetailPage() {
         {/* Jobs */}
         <Card>
           <CardHeader>
-            <CardTitle>Jobs ({customerJobs.length})</CardTitle>
+            <CardTitle className="inline-flex items-center gap-1.5">
+              Jobs ({customerJobs.length})
+              <InfoTip label="About customer jobs" side="right">
+                Work orders linked to this customer — open any job for line items, scheduling, diagnostics, and invoicing.
+              </InfoTip>
+            </CardTitle>
+            <CardDescription>
+              {customerJobs.length === 0
+                ? "No work orders yet for this customer."
+                : `${customerJobs.length} work order${customerJobs.length === 1 ? "" : "s"} on file.`}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {customerJobs.length === 0 ? (
@@ -62,7 +73,7 @@ export default function CustomerDetailPage() {
                   <Link
                     key={j.id}
                     href={`/jobs/${j.id}`}
-                    className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-surface-200 hover:bg-surface-400 transition-colors no-underline hover:no-underline"
+                    className="flex items-center justify-between rounded-lg bg-surface-200 px-4 py-3 transition-colors no-underline hover:bg-surface-400 hover:no-underline"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <JobStatusBadge status={j.status} />
@@ -81,16 +92,24 @@ export default function CustomerDetailPage() {
         {/* Activity timeline */}
         <Card>
           <CardHeader>
-            <CardTitle>Activity</CardTitle>
+            <CardTitle className="inline-flex items-center gap-1.5">
+              Activity
+              <InfoTip label="About customer activity" side="right">
+                Timeline of notes, status changes, payments, and other events tied to this customer across jobs and documents.
+              </InfoTip>
+            </CardTitle>
+            <CardDescription>
+              {timeline.length === 0 ? "No recorded activity yet." : "Most recent events first."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {timeline.length === 0 ? (
               <p className="text-sm text-fg-muted py-6 text-center">No activity yet.</p>
             ) : (
-              <div className="relative pl-4 border-l-2 border-surface-400 space-y-4">
+              <div className="relative space-y-4 border-l-2 border-surface-400 pl-5">
                 {timeline.map((a) => (
                   <div key={a.id} className="relative">
-                    <div className="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-surface-500 border-2 border-surface-300" />
+                    <div className="absolute -left-[26px] top-1 h-3 w-3 rounded-full border-2 border-surface-300 bg-surface-500" />
                     <p className="text-sm text-fg">{a.summary}</p>
                     <p className="text-xs text-fg-dim mt-0.5">
                       {new Date(a.createdAt).toLocaleString()}

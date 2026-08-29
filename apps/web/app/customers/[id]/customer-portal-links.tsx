@@ -8,7 +8,7 @@ import {
   useRevokePortalLinkMutation,
   useSendPortalLinkMutation,
 } from "@/lib/redux/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
 import { InfoTip } from "@/components/ui/info-tip";
@@ -77,6 +77,12 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
     );
   }
 
+  function openDialog() {
+    setNewToken(null);
+    setError(null);
+    setDialogOpen(true);
+  }
+
   async function createLink() {
     if (selectedScopes.length === 0) return;
     setError(null);
@@ -128,104 +134,141 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
     }
   }
 
+  const activeLinks = links.filter((link) => linkState(link).label === "Active").length;
+
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>Customer portal links</CardTitle>
-        <Button size="sm" onClick={() => { setNewToken(null); setDialogOpen(true); }}>
-          New link
-        </Button>
+      <CardHeader>
+        <CardTitle className="inline-flex items-center gap-1.5">
+          Customer portal links
+          <InfoTip label="About customer portal links" side="right">
+            Signed links you share with this customer so they can view balances, pay invoices, see receipts, approve estimates, and review service history — without a full account.
+          </InfoTip>
+        </CardTitle>
+        <CardDescription>
+          {loading
+            ? "Loading portal links…"
+            : links.length === 0
+              ? "Create a secure link to share billing and self-service views with this customer."
+              : `${activeLinks} active · ${links.length} total link${links.length === 1 ? "" : "s"}`}
+        </CardDescription>
+        <CardAction>
+          <Button size="sm" onClick={openDialog}>
+            New link
+          </Button>
+        </CardAction>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         {loading ? (
-          <p className="py-6 text-center text-sm text-fg-muted">Loading portal links…</p>
-        ) : error ? (
-          <div className="rounded-lg border border-red/30 bg-red/5 p-3">
-            <p className="text-sm font-medium text-red">Portal links unavailable</p>
-            <p className="mt-1 text-xs text-fg-muted">{error}</p>
-          </div>
+          <p className="py-8 text-center text-sm text-fg-muted">Loading portal links…</p>
         ) : (
-          <div className="grid gap-3">
+          <>
+            {error ? (
+              <div className="rounded-lg border border-red/30 bg-red/5 px-4 py-3">
+                <p className="text-sm font-medium text-red">Something went wrong</p>
+                <p className="mt-1 text-xs text-fg-muted">{error}</p>
+              </div>
+            ) : null}
             {sendNotice ? (
-              <div role="status" className="rounded-lg border border-green/40 bg-green/10 p-3">
+              <div role="status" className="rounded-lg border border-green/40 bg-green/10 px-4 py-3">
                 <p className="text-sm text-green">{sendNotice}</p>
               </div>
             ) : null}
             {links.length === 0 ? (
-              <div className="rounded-xl border border-border bg-surface-200 p-4">
-                <p className="text-sm font-medium text-fg">No portal link yet.</p>
-                <p className="mt-1 text-xs text-fg-muted">
-                  Create a signed, expiring link to share the customer’s balance, checkout, receipts, and service plans.
-                  You can revoke it at any time.
+              <div className="rounded-xl border border-border bg-surface-200 px-5 py-5">
+                <p className="text-sm font-medium text-fg">No portal link yet</p>
+                <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-fg-muted">
+                  Create a signed, expiring link to share invoice balance, checkout, receipts, service plans, and more.
+                  Revoke access at any time if the link is lost or no longer needed.
                 </p>
+                <Button size="sm" className="mt-4" onClick={openDialog}>
+                  Create first link
+                </Button>
               </div>
             ) : (
-              links.map((link) => {
-                const state = linkState(link);
-                const active = state.label === "Active";
-                return (
-                  <div key={link.id} className="rounded-xl border border-border bg-surface-200 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <code className="rounded bg-surface-300 px-2 py-0.5 text-xs font-semibold text-fg">{link.tokenPrefix}…</code>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${state.className}`}>
-                          {state.label}
-                        </span>
-                      </div>
-                    <div className="flex items-center gap-2">
-                      {active ? (
-                        <>
-                          <Button size="sm" variant="secondary" loading={sendingId === link.id} onClick={() => void send(link.id)}>
-                            Send email
-                          </Button>
-                          {revokingId === link.id ? (
+              <div className="grid gap-3">
+                {links.map((link) => {
+                  const state = linkState(link);
+                  const active = state.label === "Active";
+                  return (
+                    <div key={link.id} className="rounded-xl border border-border bg-surface-200 px-5 py-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <code className="rounded-md bg-surface-300 px-2.5 py-1 text-xs font-semibold text-fg">{link.tokenPrefix}…</code>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${state.className}`}>
+                            {state.label}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {active ? (
                             <>
-                              <Button size="sm" variant="ghost" onClick={() => setRevokingId(null)}>Keep</Button>
-                              <Button size="sm" variant="danger" loading={revoking} onClick={() => void revoke(link.id)}>Confirm revoke</Button>
+                              <Button size="sm" variant="secondary" loading={sendingId === link.id} onClick={() => void send(link.id)}>
+                                Send email
+                              </Button>
+                              {revokingId === link.id ? (
+                                <>
+                                  <Button size="sm" variant="ghost" onClick={() => setRevokingId(null)}>Keep</Button>
+                                  <Button size="sm" variant="danger" loading={revoking} onClick={() => void revoke(link.id)}>Confirm revoke</Button>
+                                </>
+                              ) : (
+                                <Button size="sm" variant="ghost" onClick={() => setRevokingId(link.id)}>Revoke</Button>
+                              )}
                             </>
-                          ) : (
-                            <Button size="sm" variant="ghost" onClick={() => setRevokingId(link.id)}>Revoke</Button>
-                          )}
-                        </>
-                      ) : null}
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {link.scopes.map((scope) => (
+                          <span
+                            key={scope}
+                            className="rounded-full bg-surface-300 px-2.5 py-0.5 text-[11px] font-medium text-fg-muted"
+                          >
+                            {SCOPE_LABELS[scope]}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-xs leading-relaxed text-fg-dim">
+                        {link.expiresAt ? `Expires ${new Date(link.expiresAt).toLocaleDateString()} · ` : "No expiration · "}
+                        {link.lastUsedAt ? `Last used ${new Date(link.lastUsedAt).toLocaleDateString()} · ` : "Never used · "}
+                        {link.sentCount > 0
+                          ? `Emailed ${link.sentCount}×${link.lastSentAt ? ` (${new Date(link.lastSentAt).toLocaleDateString()})` : ""}`
+                          : "Not yet emailed"}
+                      </p>
                     </div>
-                    </div>
-                    <p className="mt-2 text-xs text-fg-muted">
-                      {link.scopes.map((scope) => SCOPE_LABELS[scope]).join(" · ")}
-                    </p>
-                    <p className="mt-1 text-xs text-fg-dim">
-                      {link.expiresAt ? `Expires ${new Date(link.expiresAt).toLocaleDateString()} · ` : "No expiration · "}
-                      {link.lastUsedAt ? `last used ${new Date(link.lastUsedAt).toLocaleDateString()} · ` : "never used · "}
-                      {link.sentCount > 0 ? `emailed ${link.sentCount}×${link.lastSentAt ? ` (${new Date(link.lastSentAt).toLocaleDateString()})` : ""}` : "not yet emailed"}
-                    </p>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
-          </div>
+          </>
         )}
       </CardContent>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!creating) setDialogOpen(open); }}>
-        <DialogHeader>
-          <DialogTitle>New customer portal link</DialogTitle>
-          <DialogDescription>
-            Choose which views this link opens. The link expires automatically and can be revoked at any time.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogContent>
-          <fieldset className="grid gap-2">
-            <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-fg-dim">Views</legend>
+        <DialogContent className="max-w-lg gap-5">
+          <DialogHeader className="text-left">
+            <DialogTitle>New customer portal link</DialogTitle>
+            <DialogDescription>
+              Choose which views this link opens. The link expires automatically and can be revoked at any time.
+            </DialogDescription>
+          </DialogHeader>
+
+          <fieldset className="grid gap-2.5">
+            <legend className="mb-1 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-dim">
+              Views
+              <InfoTip label="About portal views" side="right">
+                Each view controls what the customer sees after opening the link. Select only what they need — fewer scopes keeps the portal focused.
+              </InfoTip>
+            </legend>
             {Object.entries(SCOPE_LABELS).map(([scope, label]) => (
-              <label key={scope} className="flex items-center gap-3 rounded-lg border border-border bg-surface-300 px-3 py-2 text-sm text-fg">
+              <label key={scope} className="flex items-center gap-3 rounded-lg border border-border bg-surface-300 px-4 py-3 text-sm text-fg">
                 <input
                   type="checkbox"
                   checked={selectedScopes.includes(scope as PortalLinkScope)}
                   onChange={() => toggleScope(scope as PortalLinkScope)}
                   className="h-4 w-4 accent-accent"
                 />
-                <span>{label}</span>
-                <InfoTip label={`About ${label}`} className="ml-auto">
+                <span className="min-w-0 flex-1">{label}</span>
+                <InfoTip label={`About ${label}`} side="left">
                   {SCOPE_HELP[scope as PortalLinkScope]}
                 </InfoTip>
               </label>
@@ -235,8 +278,13 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
             ) : null}
           </fieldset>
 
-          <div className="mt-4">
-            <Label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-fg-dim">Expiration</Label>
+          <div>
+            <Label className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-dim">
+              Expiration
+              <InfoTip label="About link expiration" side="right">
+                How long the link stays valid. Shorter windows are safer; use no expiration only for long-term customer accounts you trust.
+              </InfoTip>
+            </Label>
             <FormSelect
               value={ttl}
               onChange={setTtl}
@@ -245,9 +293,9 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
           </div>
 
           {newToken ? (
-            <div className="mt-4 rounded-xl border border-green/40 bg-green/10 p-4">
+            <div className="rounded-xl border border-green/40 bg-green/10 px-4 py-4">
               <p className="text-sm font-semibold text-green">Portal link created</p>
-              <p className="mt-1 text-xs text-fg-muted">
+              <p className="mt-1 text-xs leading-relaxed text-fg-muted">
                 Share this link with the customer. It is shown only once — copy it now.
               </p>
               <div className="mt-3 flex items-center gap-2">
@@ -260,15 +308,16 @@ export function CustomerPortalLinks({ customerId }: { customerId: string }) {
               </div>
             </div>
           ) : null}
+
+          <DialogFooter className="pt-1">
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>Close</Button>
+            {newToken ? null : (
+              <Button onClick={() => void createLink()} loading={creating} disabled={selectedScopes.length === 0}>
+                Create link
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => setDialogOpen(false)}>Close</Button>
-          {newToken ? null : (
-            <Button onClick={() => void createLink()} loading={creating} disabled={selectedScopes.length === 0}>
-              Create link
-            </Button>
-          )}
-        </DialogFooter>
       </Dialog>
     </Card>
   );

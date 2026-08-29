@@ -7,22 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InfoTip } from "@/components/ui/info-tip";
 import { EmptyState } from "@/components/empty-state";
+import { api } from "@/lib/api";
 import { formatMoney, type ServicePlanDTO } from "@nnact/shared";
-
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
-  const token = typeof window !== "undefined" ? localStorage.getItem("NNPtoken") : null;
-  if (token) headers.authorization = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { "content-type": "application/json", ...headers },
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const text = await res.text();
-  return text ? (JSON.parse(text) as T) : (undefined as T);
-}
 
 const defaultBenefits = ["Priority scheduling", "Included seasonal tune-ups", "Renewal reminders"];
 
@@ -45,7 +31,7 @@ export default function ServicePlansPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiRequest<ServicePlanDTO[]>("/api/service-plans");
+      const data = await api.servicePlans();
       setPlans(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load service plans");
@@ -62,20 +48,17 @@ export default function ServicePlansPage() {
 
   async function createPlan() {
     const priceCents = Math.round(Number.parseFloat(form.price || "0") * 100);
-    await apiRequest<ServicePlanDTO>("/api/service-plans", {
-      method: "POST",
-      body: JSON.stringify({
-        name: form.name.trim(),
-        description: form.description.trim() || undefined,
-        includedVisitsPerTerm: Number.parseInt(form.includedVisitsPerTerm || "0", 10),
-        termMonths: Number.parseInt(form.termMonths || "12", 10),
-        priceCents,
-        priorityScheduling: form.priorityScheduling,
-        benefits: form.benefits
-          .split("\n")
-          .map((x) => x.trim())
-          .filter(Boolean),
-      }),
+    await api.createServicePlan({
+      name: form.name.trim(),
+      description: form.description.trim() || undefined,
+      includedVisitsPerTerm: Number.parseInt(form.includedVisitsPerTerm || "0", 10),
+      termMonths: Number.parseInt(form.termMonths || "12", 10),
+      priceCents,
+      priorityScheduling: form.priorityScheduling,
+      benefits: form.benefits
+        .split("\n")
+        .map((x) => x.trim())
+        .filter(Boolean),
     });
     setShowForm(false);
     await load();

@@ -1,25 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { InfoTip } from "@/components/ui/info-tip";
+import { api } from "@/lib/api";
 import { formatMoney, type CustomerServicePlanDTO, type ServicePlanDTO, type ServicePlanVisitDTO } from "@nnact/shared";
-
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("NNPtoken") : null;
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
-    ...(init?.headers as Record<string, string>),
-  };
-  const res = await fetch(`${BASE}${path}`, { ...init, headers });
-  if (!res.ok) throw new Error(await res.text());
-  const text = await res.text();
-  return text ? (JSON.parse(text) as T) : (undefined as T);
-}
 
 export function CustomerServicePlans({ customerId }: { customerId: string }) {
   const [plans, setPlans] = useState<ServicePlanDTO[]>([]);
@@ -35,9 +23,9 @@ export function CustomerServicePlans({ customerId }: { customerId: string }) {
     setError(null);
     try {
       const [planRows, enrollmentRows, visitRows] = await Promise.all([
-        request<ServicePlanDTO[]>("/api/service-plans"),
-        request<CustomerServicePlanDTO[]>(`/api/service-plans/enrollments?customerId=${customerId}`),
-        request<ServicePlanVisitDTO[]>("/api/service-plans/visits"),
+        api.servicePlans(),
+        api.servicePlanEnrollments(customerId),
+        api.servicePlanVisits(),
       ]);
       setPlans(planRows);
       setEnrollments(enrollmentRows);
@@ -76,16 +64,13 @@ export function CustomerServicePlans({ customerId }: { customerId: string }) {
       renewsAt.setMonth(renewsAt.getMonth() + (plan?.termMonths ?? 12));
       const renewalReminderAt = new Date(renewsAt);
       renewalReminderAt.setDate(renewalReminderAt.getDate() - 30);
-      await request<CustomerServicePlanDTO>("/api/service-plans/enrollments", {
-        method: "POST",
-        body: JSON.stringify({
-          customerId,
-          servicePlanId: selectedPlanId,
-          startsAt: startsAt.toISOString(),
-          renewsAt: renewsAt.toISOString(),
-          renewalReminderAt: renewalReminderAt.toISOString(),
-          visitsIncluded: plan?.includedVisitsPerTerm ?? 2,
-        }),
+      await api.createServicePlanEnrollment({
+        customerId,
+        servicePlanId: selectedPlanId,
+        startsAt: startsAt.toISOString(),
+        renewsAt: renewsAt.toISOString(),
+        renewalReminderAt: renewalReminderAt.toISOString(),
+        visitsIncluded: plan?.includedVisitsPerTerm ?? 2,
       });
       await load();
     } finally {
@@ -93,25 +78,46 @@ export function CustomerServicePlans({ customerId }: { customerId: string }) {
     }
   }
 
+  const activeEnrollments = enrollments.filter((row) => row.status === "active").length;
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Service Plans</CardTitle>
+        <CardTitle className="inline-flex items-center gap-1.5">
+          Service plans
+          <InfoTip label="About service plans" side="right">
+            Recurring maintenance memberships for this customer — track included visits, renewal dates, and priority scheduling benefits.
+          </InfoTip>
+        </CardTitle>
+        <CardDescription>
+          {loading
+            ? "Loading memberships…"
+            : activeEnrollments === 0
+              ? "No active membership on this customer."
+              : `${activeEnrollments} active membership${activeEnrollments === 1 ? "" : "s"}.`}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p className="text-sm text-fg-muted py-6 text-center">Loading service plans...</p>
+          <p className="py-8 text-center text-sm text-fg-muted">Loading service plans…</p>
         ) : error ? (
-          <div className="rounded-lg border border-red/30 bg-red/5 p-3">
-            <p className="text-sm text-red font-medium">Service plans unavailable</p>
+          <div className="rounded-lg border border-red/30 bg-red/5 px-4 py-3">
+            <p className="text-sm font-medium text-red">Service plans unavailable</p>
             <p className="mt-1 text-xs text-fg-muted">{error}</p>
           </div>
         ) : (
           <div className="grid gap-4">
             {enrollments.length === 0 ? (
-              <div className="rounded-xl border border-border bg-surface-200 p-4">
-                <p className="text-sm font-medium text-fg">No active membership on this customer.</p>
-                <p className="mt-1 text-xs text-fg-muted">Enroll them in a service plan to track included visits, renewal timing, and priority benefits.</p>
+              <div className="rounded-xl border border-border bg-surface-200 px-5 py-5">
+                <p className="text-sm font-medium text-fg">No active membership on this customer</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+                  Enroll them in a plan to track included visits, renewal timing, and priority benefits.
+                </p>
+                {plans.length === 0 ? (
+                  <Link href="/service-plans" className="mt-3 inline-block text-sm font-medium text-accent hover:underline">
+                    Create a service plan first →
+                  </Link>
+                ) : null}
               </div>
             ) : (
               <div className="grid gap-3">
@@ -120,7 +126,7 @@ export function CustomerServicePlans({ customerId }: { customerId: string }) {
                   const rows = visitsByEnrollment.get(enrollment.id) ?? [];
                   const pct = enrollment.visitsIncluded > 0 ? Math.min(100, (enrollment.visitsCompleted / enrollment.visitsIncluded) * 100) : 0;
                   return (
-                    <div key={enrollment.id} className="rounded-xl border border-border bg-surface-200 p-4">
+                    <div key={enrollment.id} className="rounded-xl border border-border bg-surface-200 px-5 py-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-fg">{plan?.name ?? "Service plan"}</p>
@@ -128,11 +134,16 @@ export function CustomerServicePlans({ customerId }: { customerId: string }) {
                             {plan ? `${formatMoney(plan.priceCents)} · ${plan.termMonths} month term` : "Plan details unavailable"}
                           </p>
                         </div>
-                        <span className="rounded-full bg-green/10 px-2.5 py-1 text-xs font-semibold text-green capitalize">{enrollment.status}</span>
+                        <span className="rounded-full bg-green/10 px-2.5 py-1 text-xs font-semibold capitalize text-green">{enrollment.status}</span>
                       </div>
                       <div className="mt-4">
                         <div className="mb-1 flex justify-between text-xs text-fg-muted">
-                          <span>Included visits</span>
+                          <span className="inline-flex items-center gap-1">
+                            Included visits
+                            <InfoTip label="About included visits" side="top">
+                              Visits covered by this membership during the current term. Extra visits can be billed separately.
+                            </InfoTip>
+                          </span>
                           <span>{enrollment.visitsCompleted} / {enrollment.visitsIncluded}</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-surface-400">
@@ -150,19 +161,27 @@ export function CustomerServicePlans({ customerId }: { customerId: string }) {
               </div>
             )}
 
-            <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-300 p-4 sm:flex-row sm:items-center">
-              <FormSelect
-                value={selectedPlanId}
-                onChange={setSelectedPlanId}
-                className="flex-1"
-                allowEmpty={plans.length === 0}
-                placeholder="Create a plan first"
-                emptyLabel="Create a plan first"
-                options={plans.map((plan) => ({ value: plan.id, label: plan.name }))}
-              />
-              <Button size="sm" disabled={!selectedPlanId || enrolling} onClick={enroll}>
-                {enrolling ? "Enrolling..." : "Enroll customer"}
-              </Button>
+            <div className="rounded-xl border border-border bg-surface-300 px-4 py-4">
+              <p className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-dim">
+                Enroll in a plan
+                <InfoTip label="About enrollment" side="right">
+                  Adds this customer to the selected plan with included visits and renewal dates calculated from the plan term.
+                </InfoTip>
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <FormSelect
+                  value={selectedPlanId}
+                  onChange={setSelectedPlanId}
+                  className="flex-1"
+                  allowEmpty={plans.length === 0}
+                  placeholder="Create a plan first"
+                  emptyLabel="Create a plan first"
+                  options={plans.map((plan) => ({ value: plan.id, label: plan.name }))}
+                />
+                <Button size="sm" disabled={!selectedPlanId || enrolling} onClick={enroll}>
+                  {enrolling ? "Enrolling…" : "Enroll customer"}
+                </Button>
+              </div>
             </div>
           </div>
         )}
