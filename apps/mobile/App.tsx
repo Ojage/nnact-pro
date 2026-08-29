@@ -123,6 +123,17 @@ function FieldApp({
     setNotificationsVisible(false);
   }
 
+  const TAB_ORDER: TabId[] = ["today", "jobs", "diagnostics", "account"];
+
+  function switchTab(direction: -1 | 1) {
+    setTab((current) => {
+      const index = TAB_ORDER.indexOf(current);
+      const next = index + direction;
+      if (next < 0 || next >= TAB_ORDER.length) return current;
+      return TAB_ORDER[next];
+    });
+  }
+
   const runStaffSearch = useCallback(
     async (query: string) => {
       const data = await staffSearch(session, query);
@@ -175,7 +186,11 @@ function FieldApp({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TabTransition activeKey={tab}>
+      <TabTransition
+        activeKey={tab}
+        onNextTab={() => switchTab(1)}
+        onPreviousTab={() => switchTab(-1)}
+      >
         {!overlayActive && tab === "today" ? (
           <TodayScreen
             colors={colors}
@@ -233,6 +248,7 @@ function FieldApp({
       {showNotifications ? (
         <AnimatedScreen
           visible={notificationsVisible}
+          onDismiss={closeNotifications}
           onExited={() => {
             setShowNotifications(false);
             if (pendingJobId) {
@@ -255,7 +271,11 @@ function FieldApp({
       ) : null}
 
       {selectedSessionId ? (
-        <AnimatedScreen visible={sessionVisible} onExited={() => setSelectedSessionId(null)}>
+        <AnimatedScreen
+          visible={sessionVisible}
+          onDismiss={closeSession}
+          onExited={() => setSelectedSessionId(null)}
+        >
           <DiagnosticSessionScreen
             colors={colors}
             sessionId={selectedSessionId}
@@ -269,7 +289,10 @@ function FieldApp({
       ) : null}
 
       {startDiagnostic ? (
-        <AnimatedScreen visible={startDiagnosticVisible} onExited={() => {
+        <AnimatedScreen
+          visible={startDiagnosticVisible}
+          onDismiss={closeStartDiagnostic}
+          onExited={() => {
           setStartDiagnostic(null);
           if (pendingSessionId) {
             openSession(pendingSessionId);
@@ -293,7 +316,11 @@ function FieldApp({
       ) : null}
 
       {selectedJobId ? (
-        <AnimatedScreen visible={jobVisible} onExited={() => setSelectedJobId(null)}>
+        <AnimatedScreen
+          visible={jobVisible}
+          onDismiss={closeJob}
+          onExited={() => setSelectedJobId(null)}
+        >
           <JobDetailScreen
             colors={colors}
             jobId={selectedJobId}
@@ -435,7 +462,11 @@ export default function App() {
   if (showLogin && !session) {
     return (
       <>
-        <AnimatedScreen visible={loginVisible} onExited={() => setShowLogin(false)}>
+        <AnimatedScreen
+          visible={loginVisible}
+          onDismiss={() => setLoginVisible(false)}
+          onExited={() => setShowLogin(false)}
+        >
           <LoginScreen
             colors={colors}
             onBack={() => setLoginVisible(false)}

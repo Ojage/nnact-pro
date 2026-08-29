@@ -7,6 +7,8 @@ export type BackButtonColors = {
   surfaceMuted: string;
   borderLight: string;
   onEmphasis?: string;
+  background: string;
+  primary: string;
 };
 
 export function BackButton({
@@ -19,14 +21,14 @@ export function BackButton({
   colors: BackButtonColors;
   onPress: () => void;
   label?: string;
-  variant?: "surface" | "hero" | "floating";
+  variant?: "surface" | "hero";
   style?: StyleProp<ViewStyle>;
 }) {
   const isHero = variant === "hero";
-  const pillBg = isHero ? "rgba(255, 255, 255, 0.22)" : colors.surfaceMuted;
-  const borderColor = isHero ? "rgba(255, 255, 255, 0.35)" : colors.borderLight;
-  const iconColor = isHero ? colors.onEmphasis ?? "#ffffff" : colors.mutedForeground;
-  const textColor = isHero ? "rgba(255, 255, 255, 0.92)" : colors.mutedForeground;
+  const pillBg = isHero ? colors.background : colors.surfaceMuted;
+  const borderColor = colors.borderLight;
+  const iconColor = isHero ? colors.primary : colors.mutedForeground;
+  const textColor = isHero ? colors.primary : colors.mutedForeground;
 
   return (
     <TouchableOpacity
@@ -34,9 +36,9 @@ export function BackButton({
       activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[styles.hit, variant === "floating" && styles.floating, style]}
+      style={[styles.hit, isHero && styles.floating, style]}
     >
-      <View style={[styles.pill, { backgroundColor: pillBg, borderColor }]}>
+      <View style={[styles.pill, { backgroundColor: pillBg, borderColor }, isHero && styles.heroPill]}>
         <Ionicons name="arrow-back" size={18} color={iconColor} />
         <Text style={[styles.label, { color: textColor }]}>{label}</Text>
       </View>
@@ -50,6 +52,13 @@ const styles = StyleSheet.create({
   },
   floating: {
     zIndex: 20,
+  },
+  heroPill: {
+    shadowColor: "#0b1220",
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
   pill: {
     flexDirection: "row",

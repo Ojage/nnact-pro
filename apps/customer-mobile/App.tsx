@@ -106,6 +106,17 @@ export default function App() {
     setOverlayVisible(false);
   }
 
+  const TAB_ORDER: TabId[] = ["home", "services", "activity", "account"];
+
+  function switchTab(direction: -1 | 1) {
+    setTab((current) => {
+      const index = TAB_ORDER.indexOf(current);
+      const next = index + direction;
+      if (next < 0 || next >= TAB_ORDER.length) return current;
+      return TAB_ORDER[next];
+    });
+  }
+
   const runCustomerSearch = useCallback(
     async (query: string) => {
       const local = searchLocalServices(query);
@@ -160,7 +171,11 @@ export default function App() {
   if (overlay === "login") {
     return (
       <>
-        <AnimatedScreen visible={overlayVisible} onExited={() => setOverlay(null)}>
+        <AnimatedScreen
+          visible={overlayVisible}
+          onDismiss={hideOverlay}
+          onExited={() => setOverlay(null)}
+        >
           <LoginScreen
             colors={colors}
             onBack={hideOverlay}
@@ -176,7 +191,11 @@ export default function App() {
   if (overlay === "signup") {
     return (
       <>
-        <AnimatedScreen visible={overlayVisible} onExited={() => setOverlay(null)}>
+        <AnimatedScreen
+          visible={overlayVisible}
+          onDismiss={hideOverlay}
+          onExited={() => setOverlay(null)}
+        >
           <SignupScreen colors={colors} onBack={() => showOverlay("login")} onSignedIn={(session) => void onSignedIn(session)} />
         </AnimatedScreen>
         <ExpoStatusBar style={scheme === "light" ? "dark" : "light"} />
@@ -189,6 +208,7 @@ export default function App() {
       <>
         <AnimatedScreen
           visible={overlayVisible}
+          onDismiss={hideOverlay}
           onExited={() => {
             setOverlay(null);
             setBookPrefill({});
@@ -234,7 +254,11 @@ export default function App() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TabTransition activeKey={tab}>
+      <TabTransition
+        activeKey={tab}
+        onNextTab={() => switchTab(1)}
+        onPreviousTab={() => switchTab(-1)}
+      >
         {tab === "home" ? (
           <HomeScreen
             colors={colors}
