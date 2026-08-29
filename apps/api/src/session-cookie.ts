@@ -24,12 +24,10 @@ export function sessionTokenFromCookie(header: string | undefined) {
 }
 
 function cookieAttributes(env: NodeJS.ProcessEnv = process.env) {
-  return [
-    "Path=/",
-    "HttpOnly",
-    "SameSite=Lax",
-    ...(env.NODE_ENV === "production" ? ["Secure"] : []),
-  ];
+  const attributes = ["Path=/", "HttpOnly", "SameSite=Lax"];
+  if (env.SESSION_COOKIE_DOMAIN) attributes.push(`Domain=${env.SESSION_COOKIE_DOMAIN}`);
+  if (env.NODE_ENV === "production") attributes.push("Secure");
+  return attributes;
 }
 
 export function sessionCookieHeader(

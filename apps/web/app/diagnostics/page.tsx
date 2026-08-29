@@ -2,11 +2,8 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import {
-  diagnosticsApi,
-  type DiagnosticOverview,
-  type DiagnosticSessionListItem,
-} from "@/lib/diagnostics-api";
+import { serverApi } from "@/lib/server-api";
+import type { DiagnosticOverview, DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 
 const EMPTY_OVERVIEW: DiagnosticOverview = {
   activeSessions: 0,
@@ -37,7 +34,10 @@ export default async function DiagnosticsPage() {
   let apiError: string | null = null;
 
   try {
-    [overview, sessions] = await Promise.all([diagnosticsApi.overview(), diagnosticsApi.sessions()]);
+    [overview, sessions] = await Promise.all([
+      serverApi.diagnosticsOverview(),
+      serverApi.diagnosticsSessions(),
+    ]);
   } catch (error) {
     apiError = error instanceof Error ? error.message : String(error);
   }

@@ -3,6 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import type { ActivityDTO, CustomerDTO, JobDTO } from "@nnact/shared";
 import type {
+  DiagnosticOverview,
   DiagnosticSessionDetail,
   DiagnosticSessionListItem,
 } from "@/lib/diagnostics-api";
@@ -89,4 +90,13 @@ export const serverApi = {
   },
   diagnosticSession: (id: string) =>
     serverRequest<DiagnosticSessionDetail>(`/api/diagnostics/sessions/${id}`),
+  diagnosticsOverview: () => serverRequest<DiagnosticOverview>("/api/diagnostics/overview"),
+  diagnosticsSessions: (query?: { jobId?: string; equipmentId?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    if (query?.jobId) params.set("jobId", query.jobId);
+    if (query?.equipmentId) params.set("equipmentId", query.equipmentId);
+    if (query?.status) params.set("status", query.status);
+    const suffix = params.toString() ? `?${params}` : "";
+    return serverRequest<DiagnosticSessionListItem[]>(`/api/diagnostics/sessions${suffix}`);
+  },
 };
