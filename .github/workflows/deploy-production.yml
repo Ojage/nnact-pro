@@ -74,6 +74,23 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "cd '${DEPLOY_PATH}' && MARKETING_SKIP_BUILD=true bash scripts/ci-deploy.sh"
+          HOST="${DEPLOY_USER}@${DEPLOY_HOST}"
+          OPTS=(-i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=10)
+          # Run the long deploy detached on the VPS so a dropped SSH connection
+          # cannot abort the build; the runner polls for completion instead.
+          ssh "${OPTS[@]}" "$HOST" \
+            "set +e; pkill -f 'ci-deploy.sh' 2>/dev/null; : > /tmp/ci-deploy.log; rm -f /tmp/ci-deploy.exit; nohup bash -lc 'cd \"${DEPLOY_PATH}\" && MARKETING_SKIP_BUILD=true bash scripts/ci-deploy.sh > /tmp/ci-deploy.log 2>&1; echo \$? > /tmp/ci-deploy.exit' >/dev/null 2>&1 & echo \"deploy started pid \$!\""
+          for i in $(seq 1 300); do
+            sleep 20
+            if ssh "${OPTS[@]}" "$HOST" "pgrep -f 'ci-deploy.sh' >/dev/null" && ssh "${OPTS[@]}" "$HOST" "test ! -f /tmp/ci-deploy.exit"; then
+              echo "[$(date -u +%H:%M:%S)] deploy running..."
+            else
+              echo "=== deploy log ==="
+              ssh "${OPTS[@]}" "$HOST" "cat /tmp/ci-deploy.log 2>/dev/null || true"
+              CODE=$(ssh "${OPTS[@]}" "$HOST" "cat /tmp/ci-deploy.exit 2>/dev/null || echo 1")
+              echo "=== exit code: $CODE ==="
+              exit "$CODE"
+            fi
+          done
+          echo "deploy did not finish within the poll window" >&2
+          exit 1
