@@ -82,6 +82,55 @@ export interface PublicBookingConfigDTO {
   emergencyPhone?: string | null;
 }
 
+/** Public marketing + booking profile for nnact.com and other frontends. */
+export interface PublicMarketingProfileDTO extends PublicBookingConfigDTO {
+  company: {
+    legalName: string;
+    shortName: string;
+    tagline: string;
+    motto: string;
+    customerPromise: string;
+  };
+  brandColor: string;
+  logoUrl: string;
+  phones: string[];
+  email: string;
+  website: string;
+  featuredServices: Array<{
+    id: string;
+    title: string;
+    description: string;
+    categoryLabel: string;
+  }>;
+  location: {
+    streetAddress: string;
+    city: string;
+    region: string;
+    country: string;
+    fullAddress: string;
+    geo: { latitude: number; longitude: number };
+  };
+  hours: {
+    weekdays: string;
+    saturday: string | null;
+    sunday: string;
+    emergency: string;
+    /** schema.org openingHours format, e.g. Mo-Sa 07:30-18:00 */
+    schema: string;
+  };
+  contact: {
+    whatsAppPhone: string;
+    whatsAppUrl: string;
+    mapsUrl: string;
+    mapsDirectionsUrl: string;
+  };
+  social: {
+    facebook?: string | null;
+    whatsApp?: string | null;
+    linkedin?: string | null;
+  };
+}
+
 export interface PublicBookingResultDTO {
   ok: true;
   /** A "customer request" job row. */

@@ -36,8 +36,8 @@ const ALLOWED_MIME = new Set([
 const MAX_BYTES_DEFAULT = 25 * 1024 * 1024;
 const MAX_BYTES_CEIL = 100 * 1024 * 1024;
 const SNIFF_HEAD_BYTES = 4096;
-const ORG_LOGO_MAX_BYTES = 2 * 1024 * 1024;
-const ORG_LOGO_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ORG_BRANDING_MAX_BYTES = 2 * 1024 * 1024;
+const ORG_BRANDING_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function maxBytes() {
   const configured = Number(process.env.NNPUPLOAD_MAX_BYTES);
@@ -63,10 +63,16 @@ function safePathSegment(value: string) {
   return value;
 }
 
-export async function saveOrgLogo(orgId: string, input: SavePhotoInput): Promise<{ contentType: string; fileSize: number }> {
+export type OrgBrandingAsset = "logo" | "signature" | "stamp";
+
+async function saveOrgBrandingAsset(
+  orgId: string,
+  asset: OrgBrandingAsset,
+  input: SavePhotoInput,
+): Promise<{ contentType: string; fileSize: number }> {
   const directory = join(uploadDir(), "branding", safePathSegment(orgId));
-  const destination = join(directory, "logo");
-  const temporary = join(directory, `logo-${randomUUID()}.tmp`);
+  const destination = join(directory, asset);
+  const temporary = join(directory, `${asset}-${randomUUID()}.tmp`);
   await mkdir(directory, { recursive: true, mode: 0o750 }).catch(() => {
     throw httpError(500, "internal storage error");
   });
@@ -76,7 +82,7 @@ export async function saveOrgLogo(orgId: string, input: SavePhotoInput): Promise
   const inspector = new Transform({
     transform(chunk: Buffer, _encoding, callback) {
       total += chunk.length;
-      if (total > ORG_LOGO_MAX_BYTES) return callback(httpError(413, "logo exceeds the 2 MB size limit"));
+      if (total > ORG_BRANDING_MAX_BYTES) return callback(httpError(413, `${asset} exceeds the 2 MB size limit`));
       if (head.length < SNIFF_HEAD_BYTES) {
         head = Buffer.concat([head, chunk.subarray(0, SNIFF_HEAD_BYTES - head.length)]);
       }
@@ -88,8 +94,8 @@ export async function saveOrgLogo(orgId: string, input: SavePhotoInput): Promise
     await pipeline(input.stream, inspector, createWriteStream(temporary, { flags: "wx", mode: 0o640 }));
     if (total === 0) throw httpError(400, "empty file");
     const detected = await fileTypeFromBuffer(head);
-    if (!detected || !ORG_LOGO_MIME.has(detected.mime)) {
-      throw httpError(415, "logo must be a PNG, JPEG, or WebP image");
+    if (!detected || !ORG_BRANDING_MIME.has(detected.mime)) {
+      throw httpError(415, `${asset} must be a PNG, JPEG, or WebP image`);
     }
     await rm(destination, { force: true });
     await rename(temporary, destination);
@@ -101,11 +107,11 @@ export async function saveOrgLogo(orgId: string, input: SavePhotoInput): Promise
   }
 }
 
-export async function getOrgLogo(orgId: string): Promise<{ contentType: string; buffer: Buffer } | null> {
+async function getOrgBrandingAsset(orgId: string, asset: OrgBrandingAsset): Promise<{ contentType: string; buffer: Buffer } | null> {
   try {
-    const buffer = await readFile(join(uploadDir(), "branding", safePathSegment(orgId), "logo"));
+    const buffer = await readFile(join(uploadDir(), "branding", safePathSegment(orgId), asset));
     const detected = await fileTypeFromBuffer(buffer.subarray(0, SNIFF_HEAD_BYTES));
-    if (!detected || !ORG_LOGO_MIME.has(detected.mime)) throw httpError(500, "stored logo is invalid");
+    if (!detected || !ORG_BRANDING_MIME.has(detected.mime)) throw httpError(500, `stored ${asset} is invalid`);
     return { contentType: detected.mime, buffer };
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
@@ -114,10 +120,46 @@ export async function getOrgLogo(orgId: string): Promise<{ contentType: string; 
   }
 }
 
-export async function deleteOrgLogo(orgId: string): Promise<void> {
-  await rm(join(uploadDir(), "branding", safePathSegment(orgId), "logo"), { force: true }).catch(() => {
+async function deleteOrgBrandingAsset(orgId: string, asset: OrgBrandingAsset): Promise<void> {
+  await rm(join(uploadDir(), "branding", safePathSegment(orgId), asset), { force: true }).catch(() => {
     throw httpError(500, "internal storage error");
   });
+}
+
+export async function saveOrgLogo(orgId: string, input: SavePhotoInput) {
+  return saveOrgBrandingAsset(orgId, "logo", input);
+}
+
+export async function getOrgLogo(orgId: string) {
+  return getOrgBrandingAsset(orgId, "logo");
+}
+
+export async function deleteOrgLogo(orgId: string) {
+  return deleteOrgBrandingAsset(orgId, "logo");
+}
+
+export async function saveOrgSignature(orgId: string, input: SavePhotoInput) {
+  return saveOrgBrandingAsset(orgId, "signature", input);
+}
+
+export async function getOrgSignature(orgId: string) {
+  return getOrgBrandingAsset(orgId, "signature");
+}
+
+export async function deleteOrgSignature(orgId: string) {
+  return deleteOrgBrandingAsset(orgId, "signature");
+}
+
+export async function saveOrgStamp(orgId: string, input: SavePhotoInput) {
+  return saveOrgBrandingAsset(orgId, "stamp", input);
+}
+
+export async function getOrgStamp(orgId: string) {
+  return getOrgBrandingAsset(orgId, "stamp");
+}
+
+export async function deleteOrgStamp(orgId: string) {
+  return deleteOrgBrandingAsset(orgId, "stamp");
 }
 
 export async function savePhoto(

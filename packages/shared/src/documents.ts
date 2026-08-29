@@ -13,6 +13,8 @@ export interface FieldDocumentBranding {
   publicEmail?: string | null;
   publicPhone?: string | null;
   publicAddress?: string | null;
+  /** e.g. "TPPRR/RC/BUA/2024/B/09" — printed under the logo, above address/contact. */
+  registrationNumber?: string | null;
   removeOpenFieldProAttribution?: boolean;
 }
 
@@ -20,6 +22,8 @@ export interface FieldDocumentLineItem {
   description: string;
   quantity: number;
   unitPriceCents: DocumentMoney;
+  /** e.g. "No.", "LS", "hrs", "m" — printed in the Unit column. */
+  unit?: string | null;
 }
 
 export interface FieldDocumentOption {
@@ -40,6 +44,15 @@ export interface DocumentPricing {
   discountLabel?: string;
 }
 
+/** Fully programmatic sign-off block — never hardcoded per document. */
+export interface DocumentSignatory {
+  name?: string | null;
+  /** Defaults to "Authorized Signatory" */
+  title?: string | null;
+  signatureImageUrl?: string | null;
+  stampImageUrl?: string | null;
+}
+
 export interface FieldDocumentData {
   kind: FieldDocumentKind;
   number: string;
@@ -50,12 +63,17 @@ export interface FieldDocumentData {
   customerEmail?: string | null;
   customerPhone?: string | null;
   jobTitle?: string;
+  /** Bold subtitle under the header, e.g. "HOME APPLIANCE REPAIRS AND MAINTENANCE". */
+  category?: string | null;
   notes?: string | null;
   lineItems: FieldDocumentLineItem[];
   options?: FieldDocumentOption[];
   paymentsCents?: DocumentMoney;
   pricing?: DocumentPricing;
   branding: FieldDocumentBranding;
+  /** Numbered terms & conditions, rendered as an ordered list. */
+  termsAndConditions?: string[] | null;
+  signatory?: DocumentSignatory | null;
   /** Display currency (defaults to XAF). Mirrors the org business setting. */
   currency?: CurrencyCode;
   presentation?: {
@@ -64,6 +82,8 @@ export interface FieldDocumentData {
     showLineItemPrices?: boolean;
     showPayments?: boolean;
     showBalance?: boolean;
+    /** Show the big "TOTAL: <amount>" line + amount-in-words. Skipped automatically for option-based documents. */
+    showAmountInWords?: boolean;
   };
 }
 
@@ -104,8 +124,77 @@ export function documentPricingRows(pricing: DocumentPricing | undefined): Array
   const rows: Array<{ label: string; value: number; strong?: boolean }> = [];
   if (pricing.discountCents > 0) rows.push({ label: pricing.discountLabel || "Discount", value: -pricing.discountCents });
   if (pricing.taxCents > 0 || pricing.taxLabel) rows.push({ label: pricing.taxLabel || "Tax", value: pricing.taxCents });
-  rows.push({ label: "Total", value: pricing.totalCents, strong: true });
+  rows.push({ label: "Grand Total", value: pricing.totalCents, strong: true });
   return rows;
+}
+
+// ── Amount-in-words ──
+// Fully programmatic number → English words converter, used for the
+// "Amount in Words" line under the grand total. No document ever hardcodes
+// this text; it's always derived from the pricing snapshot + currency.
+
+const ONES = [
+  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const SCALE_WORDS = ["", "Thousand", "Million", "Billion", "Trillion"];
+
+function threeDigitsToWords(n: number): string {
+  let out = "";
+  if (n >= 100) {
+    out += `${ONES[Math.floor(n / 100)]} Hundred`;
+    n %= 100;
+    if (n > 0) out += " and ";
+  }
+  if (n >= 20) {
+    out += TENS[Math.floor(n / 10)];
+    if (n % 10 > 0) out += `-${ONES[n % 10]}`;
+  } else if (n > 0) {
+    out += ONES[n];
+  }
+  return out.trim();
+}
+
+/** Converts a non-negative integer into English words, e.g. 3250000 → "Three Million Two Hundred and Fifty Thousand". */
+export function integerToWords(value: number): string {
+  const n = Math.round(Math.abs(value));
+  if (!Number.isFinite(n) || n === 0) return "Zero";
+  const groups: number[] = [];
+  let remaining = n;
+  while (remaining > 0) {
+    groups.push(remaining % 1000);
+    remaining = Math.floor(remaining / 1000);
+  }
+  const parts: string[] = [];
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i] === 0) continue;
+    const words = threeDigitsToWords(groups[i]);
+    parts.push(SCALE_WORDS[i] ? `${words} ${SCALE_WORDS[i]}` : words);
+  }
+  return parts.join(" ");
+}
+
+/** Currency names as spoken on a printed amount line. Falls back to the currency code. */
+const CURRENCY_NAME_WORDS: Partial<Record<CurrencyCode, string>> = {
+  XAF: "Francs CFA",
+  XOF: "Francs CFA",
+  USD: "US Dollars",
+  EUR: "Euros",
+  GBP: "British Pounds",
+  NGN: "Naira",
+  GHS: "Ghana Cedis",
+  KES: "Kenyan Shillings",
+  ZAR: "South African Rand",
+};
+
+/** Builds "Three Million Two Hundred and Fifty Thousand Francs CFA Only" from a cents amount + currency. */
+export function documentAmountInWords(totalCents: number, currency: CurrencyCode = DEFAULT_CURRENCY): string {
+  const decimals = (CURRENCY_CATALOG as Record<string, { decimals?: number }>)[currency]?.decimals ?? 0;
+  const majorUnits = decimals > 0 ? totalCents / Math.pow(10, decimals) : totalCents;
+  const words = integerToWords(majorUnits);
+  const currencyName = CURRENCY_NAME_WORDS[currency] ?? currency;
+  return `${words} ${currencyName} Only`;
 }
 
 export function renderFieldDocumentHtml(data: FieldDocumentData): string {
@@ -113,8 +202,14 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
   const totals = fieldDocumentTotals(data);
   const formatter = (cents: DocumentMoney): string => formatCents(cents, data.currency);
   const color = data.branding.brandColor ?? "#22C55E";
+  const currencyCode = data.currency ?? DEFAULT_CURRENCY;
+  const currencyLabel = (CURRENCY_CATALOG as Record<string, { code?: string }>)[currencyCode]?.code ?? currencyCode;
   const logo = data.branding.logoUrl
     ? `<img class="logo" src="${escapeHtml(data.branding.logoUrl)}" alt="${escapeHtml(data.branding.companyName)} logo" />`
+    : "";
+  const companyBadge = `<div class="brand-badge">${escapeHtml(data.branding.companyName)}</div>`;
+  const logoFallback = data.branding.logoUrl
+    ? ""
     : `<div class="logo-mark">${escapeHtml(data.branding.companyName.slice(0, 2).toUpperCase())}</div>`;
   const attribution = data.branding.removeOpenFieldProAttribution
     ? ""
@@ -124,31 +219,94 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
   const showLineItemPrices = presentation.showLineItemPrices ?? true;
   const showPayments = presentation.showPayments ?? true;
   const showBalance = presentation.showBalance ?? true;
+  const hasOptions = Boolean(data.options?.length);
+  const showAmountInWords = presentation.showAmountInWords ?? !hasOptions;
+
   const rows = data.lineItems
     .map(
-      (item) => `
+      (item, idx) => `
         <tr>
+          <td class="sn">${idx + 1}</td>
           <td>${escapeHtml(item.description)}</td>
+          <td class="center">${item.unit ? escapeHtml(item.unit) : "—"}</td>
           <td class="num">${item.quantity}</td>
           <td class="num">${showLineItemPrices ? formatter(item.unitPriceCents) : "Hidden"}</td>
           <td class="num">${showLineItemPrices ? formatter(item.quantity * item.unitPriceCents) : "Hidden"}</td>
         </tr>`,
     )
     .join("");
-  const optionSections = data.options?.length
-    ? data.options.map((option) => {
+
+  const optionSections = hasOptions
+    ? data.options!.map((option) => {
       const optionTotal = option.pricing?.totalCents ?? option.lineItems.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
-      const optionRows = option.lineItems.map((item) => `
-        <tr><td>${escapeHtml(item.description)}</td><td class="num">${item.quantity}</td><td class="num">${showLineItemPrices ? formatter(item.unitPriceCents) : "Hidden"}</td><td class="num">${showLineItemPrices ? formatter(item.quantity * item.unitPriceCents) : "Hidden"}</td></tr>`).join("");
+      const optionRows = option.lineItems.map((item, idx) => `
+        <tr>
+          <td class="sn">${idx + 1}</td>
+          <td>${escapeHtml(item.description)}</td>
+          <td class="center">${item.unit ? escapeHtml(item.unit) : "—"}</td>
+          <td class="num">${item.quantity}</td>
+          <td class="num">${showLineItemPrices ? formatter(item.unitPriceCents) : "Hidden"}</td>
+          <td class="num">${showLineItemPrices ? formatter(item.quantity * item.unitPriceCents) : "Hidden"}</td>
+        </tr>`).join("");
       const selectedLabel = data.status === "approved" ? "Approved" : "Selected";
-      return `<section class="option${option.selected ? " selected" : ""}"><div class="option-heading"><h2>${escapeHtml(option.label)}</h2>${option.selected ? `<span>${selectedLabel}</span>` : ""}</div><table><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>${optionRows}</tbody></table><p class="option-total">Option total <strong>${formatter(optionTotal)}</strong></p></section>`;
+      return `<section class="option${option.selected ? " selected" : ""}">
+        <div class="option-heading"><h2>${escapeHtml(option.label)}</h2>${option.selected ? `<span>${selectedLabel}</span>` : ""}</div>
+        <table><thead><tr><th class="sn">SN.</th><th>Description</th><th class="center">Unit</th><th class="num">Qty</th><th class="num">Unit Price (${escapeHtml(currencyLabel)})</th><th class="num">Amount (${escapeHtml(currencyLabel)})</th></tr></thead>
+        <tbody>${optionRows}</tbody></table>
+        <p class="option-total">Option total <strong>${formatter(optionTotal)}</strong></p>
+      </section>`;
     }).join("")
     : null;
-  const businessContact = [data.branding.publicPhone, data.branding.publicEmail, data.branding.publicAddress]
+
+  const businessContact = [data.branding.publicPhone, data.branding.publicEmail]
     .filter(Boolean)
     .map((value) => escapeHtml(value!))
-    .join("<br />");
-  const brandBlock = `<div class="brand-block">${logo}<div><div class="brand">${escapeHtml(data.branding.companyName)}</div>${showBusinessInfo && businessContact ? `<p class="muted contact">${businessContact}</p>` : ""}</div></div>`;
+    .join(" / ");
+  const regLine = data.branding.registrationNumber
+    ? `<p class="reg"><strong>Business Registration N°</strong>: ${escapeHtml(data.branding.registrationNumber)}</p>`
+    : "";
+  const locationLine = showBusinessInfo && data.branding.publicAddress
+    ? `<p class="reg"><strong>Location</strong>: ${escapeHtml(data.branding.publicAddress)}</p>`
+    : "";
+  const contactLine = showBusinessInfo && businessContact
+    ? `<p class="reg"><strong>Contact</strong>: ${businessContact}</p>`
+    : "";
+  const brandBlock = `<div class="brand-block">${logo}${logoFallback}${companyBadge}<div class="brand-meta">${regLine}${locationLine}${contactLine}</div></div>`;
+
+  const categoryLine = data.category
+    ? `<p class="category">${escapeHtml(data.category)}</p>`
+    : "";
+
+  const notesSection = data.notes?.trim()
+    ? `<section class="notes"><p class="notes-body">${escapeHtml(data.notes).replace(/\n/g, "<br />")}</p></section>`
+    : "";
+
+  const amountInWordsSection = showAmountInWords
+    ? `
+    <p class="total-line">TOTAL: ${formatter(totals.totalCents)}</p>
+    <p class="words-label">Amount in Words:</p>
+    <p class="words">${escapeHtml(documentAmountInWords(totals.totalCents, data.currency))}</p>`
+    : "";
+
+  const termsSection = data.termsAndConditions?.length
+    ? `<section class="terms">
+        <p class="terms-heading">Terms &amp; Conditions</p>
+        <ol>${data.termsAndConditions.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ol>
+      </section>`
+    : "";
+
+  const signatoryBlock = `
+    <section class="signatory">
+      <p>For <span class="underline">${escapeHtml(data.branding.companyName)}</span></p>
+      <p class="sig-role">${escapeHtml(data.signatory?.title ?? "Authorized Signatory")}</p>
+      <div class="sig-row"><span class="sig-label">Name:</span><span class="sig-value">${data.signatory?.name ? escapeHtml(data.signatory.name) : ""}</span></div>
+      <div class="sig-approval">
+        <div class="sig-row sig-line"><span class="sig-label">Signature:</span><span class="sig-value sig-media">${data.signatory?.signatureImageUrl ? `<img class="sig-img" src="${escapeHtml(data.signatory.signatureImageUrl)}" alt="Signature" />` : ""}</span></div>
+        <div class="sig-row sig-line"><span class="sig-label">Stamp:</span><span class="sig-value sig-media">${data.signatory?.stampImageUrl ? "" : ""}</span></div>
+        ${data.signatory?.stampImageUrl ? `<img class="stamp-overlay" src="${escapeHtml(data.signatory.stampImageUrl)}" alt="Stamp" />` : ""}
+      </div>
+    </section>`;
+
   const formatClass = presentation.format === "envelope" ? " format-envelope" : "";
 
   return `<!doctype html>
@@ -158,37 +316,116 @@ export function renderFieldDocumentHtml(data: FieldDocumentData): string {
 <title>${escapeHtml(title)} ${escapeHtml(data.number)}</title>
 <style>
   @page{size:letter;margin:0}
-  *{box-sizing:border-box}body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#eef1ed;color:#17201b;line-height:1.45}
-  .page{max-width:820px;min-height:980px;margin:32px auto;background:#fff;border:1px solid #d9dfda;border-radius:18px;padding:44px;box-shadow:0 18px 50px rgba(23,32,27,.1)}
-  .page.format-envelope .top{padding-top:76px}.top{display:flex;justify-content:space-between;gap:28px;border-bottom:3px solid ${color};padding-bottom:26px;margin-bottom:28px}
-  .brand-block{display:flex;align-items:flex-start;gap:14px;min-width:0}.logo{width:56px;height:56px;object-fit:contain;border-radius:12px;border:1px solid #e5e9e6}.logo-mark{width:56px;height:56px;display:grid;place-items:center;border-radius:12px;background:${color};color:#fff;font-weight:900;letter-spacing:-.04em}.brand{font-size:23px;font-weight:850;letter-spacing:-.035em}.contact{margin:6px 0 0;font-size:12px;line-height:1.55}.kind{text-align:right;flex:none}.kind h1{margin:8px 0 0;font-size:38px;line-height:1;letter-spacing:-.045em}.kind .number{margin:8px 0 0;font-weight:700}.muted{color:#647168}.pill{display:inline-block;border:1px solid ${color};color:${color};border-radius:999px;padding:5px 9px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.08em}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0}.box{border:1px solid #dfe5e0;border-radius:12px;padding:16px;background:#fafcf9}.box h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#6b776f;margin:0 0 8px}.box p{margin:6px 0 0;font-size:13px}
-  table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}th{text-align:left;color:#69756d;font-size:10px;text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid #ccd5ce;padding:10px 8px}td{border-bottom:1px solid #edf0ed;padding:13px 8px;vertical-align:top}.num{text-align:right;white-space:nowrap}.option{margin-top:18px;border:1px solid #dfe5e0;border-radius:14px;padding:18px;background:#fff}.option.selected{border:2px solid ${color};box-shadow:0 0 0 3px color-mix(in srgb, ${color} 12%, transparent)}.option-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.option-heading h2{margin:0;font-size:19px}.option-heading span{border-radius:999px;background:${color};color:#fff;padding:4px 8px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.08em}.option table{margin-top:8px}.option-total{text-align:right;font-size:15px}.totals{margin-left:auto;margin-top:24px;max-width:320px}.total-row{display:flex;justify-content:space-between;border-top:1px solid #e0e5e1;padding:10px 0}.total-row.strong{font-size:20px;font-weight:900;color:#17201b}.notes{margin-top:28px;border-left:3px solid ${color};padding:4px 0 4px 16px;color:#4f5d54;white-space:pre-line;font-size:13px}.footer{display:flex;justify-content:space-between;gap:16px;margin-top:38px;padding-top:16px;border-top:1px solid #dfe5e0;color:#6b776f;font-size:11px}.attribution{margin:0;font-weight:750;color:#364139}
-  @media(max-width:680px){body{background:#fff}.page{min-height:100vh;margin:0;border:0;border-radius:0;padding:24px 18px;box-shadow:none}.page.format-envelope .top{padding-top:24px}.top{display:grid;gap:20px}.kind{text-align:left}.kind h1{font-size:32px}.grid{grid-template-columns:1fr}table{font-size:12px}th,td{padding:10px 5px}.brand{font-size:20px}.contact{overflow-wrap:anywhere}}
-  @media print{body{background:#fff}.page{max-width:none;min-height:auto;margin:0;border:0;border-radius:0;padding:0;box-shadow:none}.option{break-inside:avoid}.footer{margin-top:24px}}
+  *{box-sizing:border-box}
+  body{font-family:ui-serif,Georgia,"Times New Roman",serif;margin:0;background:#eef1ed;color:#111;line-height:1.5}
+  .page{position:relative;max-width:820px;min-height:980px;margin:32px auto;background:#fff;border:1px solid #d9dfda;border-radius:4px;padding:48px 48px 48px 56px;box-shadow:0 18px 50px rgba(23,32,27,.1);overflow:hidden}
+  .page::before{content:"";position:absolute;left:0;top:0;bottom:0;width:14px;background:${color}}
+  .page.format-envelope .top{padding-top:76px}
+
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:20px}
+  .brand-block{display:grid;grid-template-columns:auto auto 1fr;grid-template-rows:auto auto;align-items:start;gap:8px 12px;min-width:0}
+  .logo{grid-row:1;grid-column:1;width:52px;height:52px;object-fit:contain}
+  .logo-mark{grid-row:1;grid-column:1;width:52px;height:52px;display:grid;place-items:center;border-radius:8px;background:${color};color:#fff;font-weight:900;letter-spacing:-.04em;font-family:ui-sans-serif,system-ui,sans-serif}
+  .brand-badge{grid-row:1;grid-column:2;align-self:center;display:inline-block;background:${color};color:#fff;font-weight:800;padding:6px 14px;border-radius:6px;font-size:15px;letter-spacing:.02em;font-family:ui-sans-serif,system-ui,sans-serif;text-transform:uppercase}
+  .brand-meta{grid-row:2;grid-column:1/-1}
+  .reg{margin:2px 0 0;font-size:11px;line-height:1.5;color:#4b5563}
+  .date{font-style:italic;font-size:14px;white-space:nowrap}
+
+  .category{text-align:center;font-weight:800;font-size:15px;letter-spacing:.01em;margin:8px 0 4px;text-transform:uppercase}
+  .doc-number{text-align:center;margin:0 0 6px;font-size:14px}
+  .doc-title{text-align:center;margin:0 0 22px;font-size:14px}
+  .doc-title strong{text-transform:uppercase}
+
+  .boq-heading{text-align:center;font-weight:800;font-size:14px;letter-spacing:.08em;margin:0 0 10px;text-transform:uppercase}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:4px}
+  th,td{border:1px solid #111;padding:8px 10px;vertical-align:top}
+  th{font-weight:700;background:#f3f4f2;text-align:left}
+  .sn{width:36px;text-align:center}
+  .center{text-align:center}
+  .num{text-align:right;white-space:nowrap}
+  tfoot td{font-weight:800}
+
+  .total-line{font-size:26px;font-weight:900;margin:22px 0 14px;letter-spacing:-.01em}
+  .words-label{font-weight:800;margin:0 0 2px;font-size:13px}
+  .words{font-style:italic;font-weight:700;margin:0 0 18px;font-size:14px}
+
+  .notes{margin:0 0 18px;font-size:13px;line-height:1.6}
+  .notes-body{margin:0;white-space:normal}
+
+  .terms{margin:18px 0}
+  .terms-heading{font-weight:800;margin:0 0 6px;font-size:13px}
+  .terms ol{margin:0;padding-left:20px;font-size:12.5px;line-height:1.7}
+
+  .signatory{margin-top:26px;font-size:13px}
+  .underline{text-decoration:underline}
+  .sig-role{margin:2px 0 14px}
+  .sig-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:14px}
+  .sig-label{min-width:82px}
+  .sig-value{flex:1;border-bottom:1px solid #111;min-height:22px;padding-bottom:2px}
+  .sig-approval{position:relative;min-height:96px;margin-top:4px}
+  .sig-line{margin-bottom:18px}
+  .sig-media{border-bottom:1px solid #111;display:flex;align-items:flex-end;min-height:44px;padding-bottom:2px}
+  .sig-img{max-height:42px;max-width:200px;object-fit:contain}
+  .stamp-overlay{position:absolute;left:120px;top:-8px;max-height:110px;max-width:130px;object-fit:contain;opacity:.95;pointer-events:none}
+
+  .option{margin-top:18px}
+  .option-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+  .option-heading h2{margin:0;font-size:16px}
+  .option-heading span{border-radius:999px;background:${color};color:#fff;padding:4px 8px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.08em;font-family:ui-sans-serif,system-ui,sans-serif}
+  .option.selected table{outline:2px solid ${color}}
+  .option-total{text-align:right;font-size:14px;margin:6px 0 0}
+
+  .footer{display:flex;justify-content:space-between;gap:16px;margin-top:34px;padding-top:14px;border-top:1px solid #dfe5e0;color:#6b776f;font-size:11px;font-family:ui-sans-serif,system-ui,sans-serif}
+  .attribution{margin:0;font-weight:750;color:#364139}
+
+  @media(max-width:680px){
+    body{background:#fff}
+    .page{min-height:100vh;margin:0;border:0;border-radius:0;padding:24px 18px;box-shadow:none}
+    .top{flex-direction:column}
+    table{font-size:11px}
+    th,td{padding:6px}
+  }
+  @media print{
+    body{background:#fff}
+    .page{max-width:none;min-height:auto;margin:0;border:0;border-radius:0;padding:0;box-shadow:none}
+    .option{break-inside:avoid}
+    .signatory{break-inside:avoid}
+  }
 </style>
 </head>
 <body>
   <main class="page${formatClass}">
     <section class="top">
       ${brandBlock}
-      <div class="kind"><span class="pill">${escapeHtml(data.status ?? "draft")}</span><h1>${escapeHtml(title)}</h1><p class="muted number">#${escapeHtml(data.number)}</p></div>
+      <p class="date">${escapeHtml(data.issuedAt ?? new Date().toLocaleDateString())}</p>
     </section>
-    <section class="grid">
-      <div class="box"><h2>Customer</h2><strong>${escapeHtml(data.customerName)}</strong><p class="muted">${escapeHtml([data.customerEmail, data.customerPhone].filter(Boolean).join(" · ") || "No contact details")}</p></div>
-      <div class="box"><h2>Job</h2><strong>${escapeHtml(data.jobTitle ?? title)}</strong><p class="muted">Issued ${escapeHtml(data.issuedAt ?? new Date().toLocaleDateString())}${data.dueAt ? ` · Due ${escapeHtml(data.dueAt)}` : ""}</p></div>
-    </section>
-    ${optionSections ?? `<table>
-      <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`}
-    ${optionSections ? "" : `<section class="totals">
-      <div class="total-row"><span>Subtotal</span><strong>${formatter(totals.subtotalCents)}</strong></div>
-      ${documentPricingRows(data.pricing).map((row) => `<div class="total-row${row.strong ? " strong" : ""}"><span>${escapeHtml(row.label)}</span><strong>${formatter(row.value)}</strong></div>`).join("\n      ")}
-      ${showPayments && !data.pricing ? `<div class="total-row"><span>Paid</span><strong>${formatter(totals.paidCents)}</strong></div>` : ""}
-      ${showBalance ? `<div class="total-row strong"><span>Balance</span><strong>${formatter(totals.balanceCents)}</strong></div>` : ""}
-    </section>`}
-    ${data.notes ? `<section class="notes">${escapeHtml(data.notes)}</section>` : ""}
+
+    ${categoryLine}
+    <p class="doc-number">${escapeHtml(title)} No.: <strong>${escapeHtml(data.number)}</strong></p>
+    <p class="doc-title"><strong>${escapeHtml(data.branding.companyName)} – ${escapeHtml(data.jobTitle ?? title)}</strong></p>
+
+    ${optionSections ?? `
+      <p class="boq-heading">Bill of Quantities</p>
+      <table>
+        <thead><tr><th class="sn">SN.</th><th>Description</th><th class="center">Unit</th><th class="num">Qty</th><th class="num">Unit Price (${escapeHtml(currencyLabel)})</th><th class="num">Amount (${escapeHtml(currencyLabel)})</th></tr></thead>
+        <tbody>${rows}
+          ${documentPricingRows(data.pricing ?? {
+            subtotalCents: totals.subtotalCents,
+            discountCents: 0,
+            taxCents: 0,
+            totalCents: totals.totalCents,
+          }).map((row) => `<tr><td colspan="5" class="num">${escapeHtml(row.label.toUpperCase())}</td><td class="num">${formatter(row.value)}</td></tr>`).join("")}
+        </tbody>
+      </table>
+      ${showPayments && !hasOptions && (data.paymentsCents ?? 0) > 0 ? `<p class="num" style="font-size:13px;margin:6px 0">Paid: <strong>${formatter(totals.paidCents)}</strong>${showBalance ? ` — Balance: <strong>${formatter(totals.balanceCents)}</strong>` : ""}</p>` : ""}
+    `}
+
+    ${notesSection}
+    ${amountInWordsSection}
+    ${termsSection}
+    ${signatoryBlock}
+
     <footer class="footer"><span>${escapeHtml(data.branding.footerText ?? "Field service document")}</span>${attribution}</footer>
   </main>
 </body>
@@ -231,6 +468,7 @@ export interface DocumentLineItemLike {
   description: string;
   quantity: number;
   unitPrice: number;
+  unit?: string | null;
 }
 
 export interface DocumentInvoiceLike {
@@ -265,8 +503,32 @@ export interface DocumentOrgLike {
   publicEmail?: string | null;
   publicPhone?: string | null;
   publicAddress?: string | null;
+  registrationNumber?: string | null;
+  documentCategory?: string | null;
+  signatoryName?: string | null;
+  signatoryTitle?: string | null;
+  signatureUrl?: string | null;
+  stampUrl?: string | null;
+  documentTerms?: string[] | null;
   removeOpenFieldProAttribution?: boolean;
   businessSettings?: BusinessSettings | null;
+}
+
+function orgDocumentSignatory(org?: DocumentOrgLike | null, explicit?: DocumentSignatory | null): DocumentSignatory | undefined {
+  if (explicit) return explicit;
+  if (!org?.signatoryName && !org?.signatureUrl && !org?.stampUrl) return undefined;
+  return {
+    name: org.signatoryName,
+    title: org.signatoryTitle ?? "Authorized Signatory",
+    signatureImageUrl: org.signatureUrl,
+    stampImageUrl: org.stampUrl,
+  };
+}
+
+function orgDocumentTerms(org?: DocumentOrgLike | null, explicit?: string[] | null, fallback?: string[] | null): string[] | undefined {
+  if (explicit?.length) return explicit;
+  if (org?.documentTerms?.length) return org.documentTerms;
+  return fallback?.length ? fallback : undefined;
 }
 
 function documentIssuedDate(value?: string | Date | null) {
@@ -282,6 +544,7 @@ function documentBranding(org?: DocumentOrgLike | null, fallbackFooter = "Field 
     publicEmail: org?.publicEmail,
     publicPhone: org?.publicPhone,
     publicAddress: org?.publicAddress,
+    registrationNumber: org?.registrationNumber,
     removeOpenFieldProAttribution: org?.removeOpenFieldProAttribution ?? false,
   };
 }
@@ -292,6 +555,7 @@ function documentLineItems(lineItems: DocumentLineItemLike[], fallbackTotalCents
       description: item.description,
       quantity: item.quantity,
       unitPriceCents: item.unitPrice,
+      unit: item.unit ?? undefined,
     }));
   }
   return [{ description: "Service work", quantity: 1, unitPriceCents: fallbackTotalCents }];
@@ -317,12 +581,18 @@ export function invoiceDocumentData({
   job,
   lineItems,
   org,
+  signatory,
+  termsAndConditions,
+  category,
 }: {
   invoice: DocumentInvoiceLike & { total: number };
   customer: DocumentCustomerLike | null;
   job: DocumentJobLike | null;
   lineItems: DocumentLineItemLike[];
   org?: DocumentOrgLike | null;
+  signatory?: DocumentSignatory | null;
+  termsAndConditions?: string[] | null;
+  category?: string | null;
 }): FieldDocumentData {
   const paid = invoice.payments?.reduce((sum, payment) => sum + payment.amount, 0) ?? 0;
   const settings = org?.businessSettings;
@@ -337,6 +607,7 @@ export function invoiceDocumentData({
     customerEmail: visibility?.showCustomerInfo === false ? null : customer?.email,
     customerPhone: visibility?.showCustomerInfo === false ? null : customer?.phone,
     jobTitle: visibility?.showJobInfo === false ? "Service work" : job?.title ?? "Service work",
+    category: category ?? org?.documentCategory,
     notes: joinDocumentNotes([job?.description, settings?.invoice.defaultMessage, settings?.invoice.paymentInstructions]),
     lineItems: visibleDocumentLineItems(lineItems, invoice.total, {
       showLineItems: visibility?.showLineItems ?? true,
@@ -344,6 +615,8 @@ export function invoiceDocumentData({
     paymentsCents: paid,
     pricing: documentPricing(invoice.pricing),
     branding: documentBranding(org),
+    termsAndConditions: orgDocumentTerms(org, termsAndConditions),
+    signatory: orgDocumentSignatory(org, signatory),
     currency: settings?.currency ?? DEFAULT_CURRENCY,
     presentation: {
       format: settings?.invoice.format,
@@ -387,12 +660,18 @@ export function estimateDocumentData({
   job,
   lineItems,
   org,
+  signatory,
+  termsAndConditions,
+  category,
 }: {
   estimate: DocumentEstimateLike & { total: number };
   customer: DocumentCustomerLike | null;
   job: DocumentJobLike | null;
   lineItems: DocumentLineItemLike[];
   org?: DocumentOrgLike | null;
+  signatory?: DocumentSignatory | null;
+  termsAndConditions?: string[] | null;
+  category?: string | null;
 }): FieldDocumentData {
   const settings = org?.businessSettings;
   const visibility = settings?.estimate.visibility;
@@ -406,6 +685,7 @@ export function estimateDocumentData({
     customerEmail: visibility?.showCustomerInfo === false ? null : customer?.email,
     customerPhone: visibility?.showCustomerInfo === false ? null : customer?.phone,
     jobTitle: visibility?.showJobInfo === false ? "Service work" : job?.title ?? "Service work",
+    category: category ?? org?.documentCategory,
     notes: joinDocumentNotes([
       job?.description,
       settings?.estimate.defaultMessage ?? "Estimate is valid pending final service conditions and customer approval.",
@@ -428,6 +708,12 @@ export function estimateDocumentData({
     pricing: documentPricing(estimate.pricing),
     paymentsCents: 0,
     branding: documentBranding(org, "Estimate generated from NNACT Pro"),
+    termsAndConditions: orgDocumentTerms(org, termsAndConditions, [
+      "Quotation is valid for 30 days from the date of issue.",
+      "Prices include the supply of the listed equipment, transportation, installation, testing and commissioning as specified.",
+      "Payment terms shall be agreed upon with the client and formalized through a service agreement.",
+    ]),
+    signatory: orgDocumentSignatory(org, signatory),
     currency: settings?.currency ?? DEFAULT_CURRENCY,
     presentation: {
       format: settings?.estimate.format,

@@ -123,6 +123,8 @@ function BusinessSettingsTab({ tab, onDirtyChange }: { tab: Exclude<Tab, "team">
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
+  const [signatureBusy, setSignatureBusy] = useState(false);
+  const [stampBusy, setStampBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<ReturnType<typeof validateBusinessHours>>({});
@@ -210,6 +212,88 @@ function BusinessSettingsTab({ tab, onDirtyChange }: { tab: Exclude<Tab, "team">
     }
   };
 
+  const validateBrandingImage = (file: File, label: string) => {
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError(`Choose a PNG, JPEG, or WebP ${label} image.`);
+      return false;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError(`Choose a ${label} image smaller than 2 MB.`);
+      return false;
+    }
+    return true;
+  };
+
+  const uploadSignature = async (file: File) => {
+    if (!validateBrandingImage(file, "signature")) return false;
+    setSignatureBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const row = await api.uploadOrgSignature(file);
+      setOrg((current) => current ? { ...current, signatureUrl: row.signatureUrl } : row);
+      setForm((current) => current ? { ...current, signatureUrl: row.signatureUrl } : row);
+      setMessage("Signature image uploaded. It will appear on PDF estimates and invoices.");
+      return true;
+    } catch {
+      setError("The signature could not be uploaded. Check the image and try again.");
+      return false;
+    } finally {
+      setSignatureBusy(false);
+    }
+  };
+
+  const removeSignature = async () => {
+    setSignatureBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const row = await api.deleteOrgSignature();
+      setOrg((current) => current ? { ...current, signatureUrl: null } : row);
+      setForm((current) => current ? { ...current, signatureUrl: null } : row);
+      setMessage("Signature image removed from customer documents.");
+    } catch {
+      setError("The signature could not be removed. Please try again.");
+    } finally {
+      setSignatureBusy(false);
+    }
+  };
+
+  const uploadStamp = async (file: File) => {
+    if (!validateBrandingImage(file, "stamp")) return false;
+    setStampBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const row = await api.uploadOrgStamp(file);
+      setOrg((current) => current ? { ...current, stampUrl: row.stampUrl } : row);
+      setForm((current) => current ? { ...current, stampUrl: row.stampUrl } : row);
+      setMessage("Stamp image uploaded. It will appear on PDF estimates and invoices.");
+      return true;
+    } catch {
+      setError("The stamp could not be uploaded. Check the image and try again.");
+      return false;
+    } finally {
+      setStampBusy(false);
+    }
+  };
+
+  const removeStamp = async () => {
+    setStampBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const row = await api.deleteOrgStamp();
+      setOrg((current) => current ? { ...current, stampUrl: null } : row);
+      setForm((current) => current ? { ...current, stampUrl: null } : row);
+      setMessage("Stamp image removed from customer documents.");
+    } catch {
+      setError("The stamp could not be removed. Please try again.");
+    } finally {
+      setStampBusy(false);
+    }
+  };
+
   const save = async () => {
     if (!form) return;
     const nextFieldErrors = validateBusinessHours(form.businessSettings.businessHours);
@@ -231,6 +315,13 @@ function BusinessSettingsTab({ tab, onDirtyChange }: { tab: Exclude<Tab, "team">
         publicEmail: form.publicEmail || null,
         publicPhone: form.publicPhone || null,
         publicAddress: form.publicAddress || null,
+        registrationNumber: form.registrationNumber || null,
+        documentCategory: form.documentCategory || null,
+        signatoryName: form.signatoryName || null,
+        signatoryTitle: form.signatoryTitle || null,
+        signatureUrl: form.signatureUrl || null,
+        stampUrl: form.stampUrl || null,
+        documentTerms: form.documentTerms ?? [],
         removeOpenFieldProAttribution: form.removeOpenFieldProAttribution,
         businessSettings: form.businessSettings,
       });
@@ -270,7 +361,22 @@ function BusinessSettingsTab({ tab, onDirtyChange }: { tab: Exclude<Tab, "team">
           <CardTitle>{TABS.find((item) => item.id === tab)?.label}</CardTitle>
         </CardHeader>
         <CardContent>
-          {tab === "company" && <CompanySection form={form} updateOrg={updateOrg} updateSettings={updateSettings} logoBusy={logoBusy} onUploadLogo={uploadLogo} onRemoveLogo={removeLogo} />}
+          {tab === "company" && (
+            <CompanySection
+              form={form}
+              updateOrg={updateOrg}
+              updateSettings={updateSettings}
+              logoBusy={logoBusy}
+              signatureBusy={signatureBusy}
+              stampBusy={stampBusy}
+              onUploadLogo={uploadLogo}
+              onRemoveLogo={removeLogo}
+              onUploadSignature={uploadSignature}
+              onRemoveSignature={removeSignature}
+              onUploadStamp={uploadStamp}
+              onRemoveStamp={removeStamp}
+            />
+          )}
           {tab === "hours" && <BusinessHoursSection settings={settings} updateSettings={updateSettings} errors={fieldErrors} />}
           {tab === "areas" && <ServiceAreasSection settings={settings} updateSettings={updateSettings} />}
           {tab === "invoice" && <InvoiceSection settings={settings} updateSettings={updateSettings} />}
@@ -296,20 +402,30 @@ function BusinessSettingsTab({ tab, onDirtyChange }: { tab: Exclude<Tab, "team">
   );
 }
 
-function CompanySection({ form, updateOrg, updateSettings, logoBusy, onUploadLogo, onRemoveLogo }: {
+function CompanySection({ form, updateOrg, updateSettings, logoBusy, signatureBusy, stampBusy, onUploadLogo, onRemoveLogo, onUploadSignature, onRemoveSignature, onUploadStamp, onRemoveStamp }: {
   form: OrgSettingsDTO;
   updateOrg: <K extends keyof OrgSettingsDTO>(key: K, value: OrgSettingsDTO[K]) => void;
   updateSettings: (settings: BusinessSettingsDTO) => void;
   logoBusy: boolean;
+  signatureBusy: boolean;
+  stampBusy: boolean;
   onUploadLogo: (file: File) => Promise<boolean>;
   onRemoveLogo: () => Promise<void>;
+  onUploadSignature: (file: File) => Promise<boolean>;
+  onRemoveSignature: () => Promise<void>;
+  onUploadStamp: (file: File) => Promise<boolean>;
+  onRemoveStamp: () => Promise<void>;
 }) {
   const settings = form.businessSettings;
   const [localLogo, setLocalLogo] = useState<string | null>(null);
+  const [localSignature, setLocalSignature] = useState<string | null>(null);
+  const [localStamp, setLocalStamp] = useState<string | null>(null);
 
   useEffect(() => () => {
     if (localLogo) URL.revokeObjectURL(localLogo);
-  }, [localLogo]);
+    if (localSignature) URL.revokeObjectURL(localSignature);
+    if (localStamp) URL.revokeObjectURL(localStamp);
+  }, [localLogo, localSignature, localStamp]);
 
   const chooseLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -319,6 +435,26 @@ function CompanySection({ form, updateOrg, updateSettings, logoBusy, onUploadLog
     setLocalLogo(previewUrl);
     const uploaded = await onUploadLogo(file);
     if (uploaded) setLocalLogo(null);
+  };
+
+  const chooseSignature = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setLocalSignature(previewUrl);
+    const uploaded = await onUploadSignature(file);
+    if (uploaded) setLocalSignature(null);
+  };
+
+  const chooseStamp = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setLocalStamp(previewUrl);
+    const uploaded = await onUploadStamp(file);
+    if (uploaded) setLocalStamp(null);
   };
 
   return (
@@ -385,6 +521,64 @@ function CompanySection({ form, updateOrg, updateSettings, logoBusy, onUploadLog
         />
         Remove NNACT Pro attribution on customer-facing documents
       </label>
+
+      <div className="md:col-span-2 rounded-xl border border-border bg-surface-200 p-4">
+        <p className="text-sm font-semibold text-fg">Document appearance</p>
+        <p className="mt-1 text-xs text-fg-muted">These fields control the printed estimate and invoice layout, including the signatory block at the bottom.</p>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <TextField label="Business registration number" name="registrationNumber" value={form.registrationNumber ?? ""} onChange={(value) => updateOrg("registrationNumber", value || null)} placeholder="TPPRR/RC/BUA/2024/B/09" />
+          <TextField label="Document category line" name="documentCategory" value={form.documentCategory ?? ""} onChange={(value) => updateOrg("documentCategory", value || null)} placeholder="HOME APPLIANCE REPAIRS AND MAINTENANCE" />
+          <TextField label="Signatory name" name="signatoryName" value={form.signatoryName ?? ""} onChange={(value) => updateOrg("signatoryName", value || null)} placeholder="Nkeng Arrey A" />
+          <TextField label="Signatory title" name="signatoryTitle" value={form.signatoryTitle ?? ""} onChange={(value) => updateOrg("signatoryTitle", value || null)} placeholder="Authorized Signatory" />
+          <div className="md:col-span-2">
+            <TextArea
+              label="Terms & conditions (one per line)"
+              value={(form.documentTerms ?? []).join("\n")}
+              onChange={(value) => updateOrg("documentTerms", value.split("\n").map((line) => line.trim()).filter(Boolean))}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface-200 p-4 md:col-span-2">
+        {localSignature || form.signatureUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={localSignature ?? form.signatureUrl ?? ""} alt="Signature preview" className="h-16 max-w-[220px] rounded-lg border border-border bg-white object-contain p-2" />
+        ) : (
+          <div className="grid h-16 w-40 place-items-center rounded-lg border border-dashed border-border bg-white text-xs text-fg-dim">No signature</div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-fg">Signature image</p>
+          <p className="mt-1 text-xs text-fg-muted">Upload a PNG of the authorized signatory&apos;s signature. It appears on the Signature line in PDFs.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:opacity-90">
+              {signatureBusy ? "Uploading…" : form.signatureUrl ? "Replace signature" : "Upload signature"}
+              <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseSignature} disabled={signatureBusy} />
+            </label>
+            {form.signatureUrl ? <Button type="button" size="sm" variant="secondary" onClick={onRemoveSignature} disabled={signatureBusy}>Remove signature</Button> : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface-200 p-4 md:col-span-2">
+        {localStamp || form.stampUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={localStamp ?? form.stampUrl ?? ""} alt="Stamp preview" className="h-24 w-24 rounded-lg border border-border bg-white object-contain p-2" />
+        ) : (
+          <div className="grid h-24 w-24 place-items-center rounded-lg border border-dashed border-border bg-white text-xs text-fg-dim">No stamp</div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-fg">Official stamp</p>
+          <p className="mt-1 text-xs text-fg-muted">Upload a PNG of your company stamp. It overlays the signatory block on PDFs, matching your printed estimates.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:opacity-90">
+              {stampBusy ? "Uploading…" : form.stampUrl ? "Replace stamp" : "Upload stamp"}
+              <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseStamp} disabled={stampBusy} />
+            </label>
+            {form.stampUrl ? <Button type="button" size="sm" variant="secondary" onClick={onRemoveStamp} disabled={stampBusy}>Remove stamp</Button> : null}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

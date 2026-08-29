@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import multipart from "@fastify/multipart";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
@@ -12,7 +12,7 @@ import {
   type MessageTemplateKind,
 } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
-import { deleteOrgLogo, saveOrgLogo } from "../uploads.js";
+import { deleteOrgLogo, saveOrgLogo, deleteOrgSignature, saveOrgSignature, deleteOrgStamp, saveOrgStamp } from "../uploads.js";
 
 const time = z.string().regex(/^\d{2}:\d{2}$/);
 const documentFormat = z.enum(["email", "envelope"]);
@@ -174,6 +174,13 @@ const patchBody = z.object({
   publicPhone: z.string().nullable().optional(),
   publicAddress: z.string().nullable().optional(),
   removeOpenFieldProAttribution: z.boolean().optional(),
+  registrationNumber: z.string().max(120).nullable().optional(),
+  documentCategory: z.string().max(200).nullable().optional(),
+  signatoryName: z.string().max(120).nullable().optional(),
+  signatoryTitle: z.string().max(120).nullable().optional(),
+  signatureUrl: z.string().url().nullable().optional(),
+  stampUrl: z.string().url().nullable().optional(),
+  documentTerms: z.array(z.string().trim().min(1).max(500)).max(20).optional(),
   businessSettings: businessSettingsSchema.optional(),
 });
 
@@ -232,6 +239,54 @@ export async function orgSettingsRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     await deleteOrgLogo(orgId);
     const [row] = await db.update(orgs).set({ logoUrl: null, updatedAt: new Date() }).where(eq(orgs.id, orgId)).returning();
+    if (!row) return reply.code(404).send({ error: "organization not found" });
+    return { ...row, businessSettings: mergeBusinessSettings(row.businessSettings) };
+  });
+
+  async function uploadBrandingImage(
+    req: FastifyRequest,
+    reply: FastifyReply,
+    asset: "signature" | "stamp",
+    save: typeof saveOrgSignature,
+    remove: typeof deleteOrgSignature,
+    column: "signatureUrl" | "stampUrl",
+  ) {
+    const orgId = await resolveOrgId(req);
+    try {
+      const file = await req.file();
+      if (!file) return reply.code(400).send({ error: `no ${asset} uploaded` });
+      await save(orgId, { stream: file.file, filenameHint: file.filename ?? null });
+      const publicApiOrigin = (process.env.PUBLIC_API_URL ?? `${req.protocol}://${req.hostname}`).replace(/\/$/, "");
+      const assetUrl = `${publicApiOrigin}/api/public/${orgId}/${asset}?v=${Date.now()}`;
+      const [row] = await db.update(orgs).set({ [column]: assetUrl, updatedAt: new Date() }).where(eq(orgs.id, orgId)).returning();
+      if (!row) {
+        await remove(orgId);
+        return reply.code(404).send({ error: "organization not found" });
+      }
+      return reply.code(201).send({ ...row, businessSettings: mergeBusinessSettings(row.businessSettings) });
+    } catch (error) {
+      const uploadError = error as { statusCode?: number; code?: string; message?: string } | null;
+      if (uploadError?.statusCode) return reply.code(uploadError.statusCode).send({ error: uploadError.message ?? `${asset} upload failed` });
+      if (uploadError?.code?.includes("TOO_LARGE")) return reply.code(413).send({ error: `${asset} exceeds the 2 MB size limit` });
+      req.log.error({ err: error }, `organization ${asset} upload failed`);
+      return reply.code(500).send({ error: "internal error" });
+    }
+  }
+
+  app.post("/signature", async (req, reply) => uploadBrandingImage(req, reply, "signature", saveOrgSignature, deleteOrgSignature, "signatureUrl"));
+  app.delete("/signature", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    await deleteOrgSignature(orgId);
+    const [row] = await db.update(orgs).set({ signatureUrl: null, updatedAt: new Date() }).where(eq(orgs.id, orgId)).returning();
+    if (!row) return reply.code(404).send({ error: "organization not found" });
+    return { ...row, businessSettings: mergeBusinessSettings(row.businessSettings) };
+  });
+
+  app.post("/stamp", async (req, reply) => uploadBrandingImage(req, reply, "stamp", saveOrgStamp, deleteOrgStamp, "stampUrl"));
+  app.delete("/stamp", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    await deleteOrgStamp(orgId);
+    const [row] = await db.update(orgs).set({ stampUrl: null, updatedAt: new Date() }).where(eq(orgs.id, orgId)).returning();
     if (!row) return reply.code(404).send({ error: "organization not found" });
     return { ...row, businessSettings: mergeBusinessSettings(row.businessSettings) };
   });

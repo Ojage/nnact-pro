@@ -1,18 +1,20 @@
 /**
  * Resolves the API base URL for Expo / React Native.
  *
- * - Loads from EXPO_PUBLIC_API_URL or app.config.js `extra.apiUrl` (from root .env).
- * - Android emulator: localhost → 192.168.1.191 (host loopback).
- * - Physical device + Expo Go: uses Metro host IP when localhost is configured.
+ * - Defaults to the hosted API (https://api.pro.nnact.com).
+ * - Override with EXPO_PUBLIC_API_URL or root .env for local development.
+ * - When localhost is configured, Android emulator uses 10.0.2.2; physical
+ *   devices use the Metro bundler host IP.
  */
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { NNACT_PRODUCTION_API_URL } from "@nnact/shared";
 
 function configuredOrigin(): string {
   return (
     process.env.EXPO_PUBLIC_API_URL ??
     (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
-    "http://localhost:3003"
+    NNACT_PRODUCTION_API_URL
   );
 }
 
@@ -34,10 +36,10 @@ export function getApiUrl(): string {
   }
 
   const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-  if (!isLoopback) return origin;
+  if (!isLoopback) return origin.replace(/\/$/, "");
 
   if (Platform.OS === "android") {
-    url.hostname = "192.168.1.191";
+    url.hostname = "10.0.2.2";
     return url.origin;
   }
 
@@ -47,13 +49,18 @@ export function getApiUrl(): string {
     return url.origin;
   }
 
-  return origin;
+  return origin.replace(/\/$/, "");
 }
 
 export function formatNetworkError(error: unknown, apiUrl: string): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/network request failed|failed to fetch|network error/i.test(message)) {
-    return `Cannot reach the API at ${apiUrl}. Start it with "pnpm dev:api" and restart Expo after changing .env.`;
+  if (!/network request failed|failed to fetch|network error/i.test(message)) {
+    return message.replace(/^\d+:\s*/, "");
   }
-  return message.replace(/^\d+:\s*/, "");
+
+  const isLocalDev = /localhost|127\.0\.0\.1|10\.0\.2\.2|192\.168\./.test(apiUrl);
+  if (isLocalDev) {
+    return `Cannot reach the API at ${apiUrl}. Start it with "pnpm dev:api", set EXPO_PUBLIC_API_URL in the repo .env, and restart Expo.`;
+  }
+  return `Cannot reach the API at ${apiUrl}. Check your internet connection and try again.`;
 }

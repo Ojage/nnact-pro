@@ -40,6 +40,7 @@ import {
   RESIDENTIAL_CUSTOMERS,
   xaf,
 } from "./nnact-data.js";
+import { seedNnactCatalog } from "./nnact-catalog.js";
 import {
   NNACT_USER_IDS,
   nnactAppointmentId,
@@ -603,6 +604,8 @@ export async function seedNnactDemo(): Promise<void> {
         target: [customerAccountLinks.orgId, customerAccountLinks.customerId],
         set: { linkedVia: "demo_seed" },
       });
+
+    await seedNnactCatalog(tx);
   });
 
   console.log("seed: NNACT demo organization ensured (idempotent)");

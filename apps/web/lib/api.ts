@@ -146,6 +146,13 @@ export interface OrgSettingsDTO {
   publicEmail?: string | null;
   publicPhone?: string | null;
   publicAddress?: string | null;
+  registrationNumber?: string | null;
+  documentCategory?: string | null;
+  signatoryName?: string | null;
+  signatoryTitle?: string | null;
+  signatureUrl?: string | null;
+  stampUrl?: string | null;
+  documentTerms?: string[];
   removeOpenFieldProAttribution: boolean;
   businessSettings: BusinessSettingsDTO;
   updatedAt?: string;
@@ -487,7 +494,7 @@ export const api = {
 
   // ── Organization settings ──
   org: () => request<OrgSettingsDTO>("/api/org/me"),
-  patchOrg: (body: Partial<Pick<OrgSettingsDTO, "name" | "timezone" | "logoUrl" | "brandColor" | "documentFooter" | "publicEmail" | "publicPhone" | "publicAddress" | "removeOpenFieldProAttribution" | "businessSettings">>) =>
+  patchOrg: (body: Partial<Pick<OrgSettingsDTO, "name" | "timezone" | "logoUrl" | "brandColor" | "documentFooter" | "publicEmail" | "publicPhone" | "publicAddress" | "registrationNumber" | "documentCategory" | "signatoryName" | "signatoryTitle" | "signatureUrl" | "stampUrl" | "documentTerms" | "removeOpenFieldProAttribution" | "businessSettings">>) =>
     request<OrgSettingsDTO>("/api/org/me", { method: "PATCH", body: JSON.stringify(body) }),
   uploadOrgLogo: (file: File) => {
     const body = new FormData();
@@ -495,6 +502,18 @@ export const api = {
     return request<OrgSettingsDTO>("/api/org/logo", { method: "POST", body });
   },
   deleteOrgLogo: () => request<OrgSettingsDTO>("/api/org/logo", { method: "DELETE" }),
+  uploadOrgSignature: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<OrgSettingsDTO>("/api/org/signature", { method: "POST", body });
+  },
+  deleteOrgSignature: () => request<OrgSettingsDTO>("/api/org/signature", { method: "DELETE" }),
+  uploadOrgStamp: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<OrgSettingsDTO>("/api/org/stamp", { method: "POST", body });
+  },
+  deleteOrgStamp: () => request<OrgSettingsDTO>("/api/org/stamp", { method: "DELETE" }),
 
   jobs: () => request<JobDTO[]>("/api/jobs"),
   job: (id: string) => request<JobDTO>(`/api/jobs/${id}`),

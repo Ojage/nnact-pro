@@ -11,7 +11,8 @@
     "migrate": "tsx src/migrate.ts",
     "push": "drizzle-kit push",
     "seed": "tsx src/seed.ts",
-    "seed:nnact": "tsx src/seed-nnact.ts"
+    "seed:nnact": "tsx src/seed-nnact.ts",
+    "seed:nnact-catalog": "tsx src/seed-nnact-catalog.ts"
   },
   "dependencies": {
     "@nnact/shared": "workspace:*",

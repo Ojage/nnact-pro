@@ -83,6 +83,9 @@ export function buildGoogleMapsDirectionsToAddress(address: string): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address.trim())}`;
 }
 
+/** Hosted NNACT Pro API — default for mobile apps and production builds. */
+export const NNACT_PRODUCTION_API_URL = "https://api.pro.nnact.com";
+
 export const NNACT_PRODUCT = {
   name: "NNACT Pro",
   slug: "nnact-pro",

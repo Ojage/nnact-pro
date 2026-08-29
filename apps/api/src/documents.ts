@@ -18,7 +18,7 @@ import {
 } from "@nnact/db";
 import { formatDocumentCents, invoiceDocumentData, estimateDocumentData, fieldDocumentTitle, type FieldDocumentData } from "@nnact/shared";
 import { mergeBusinessSettings } from "@nnact/shared";
-import { getOrgLogo } from "./uploads.js";
+import { getOrgLogo, getOrgSignature, getOrgStamp } from "./uploads.js";
 import { renderFieldDocumentPdf } from "./render-document-pdf.js";
 
 export { renderFieldDocumentPdf } from "./render-document-pdf.js";
@@ -32,25 +32,48 @@ export function documentFilename(kind: string, number: string): string {
   return `${kind} ${safe}.pdf`;
 }
 
-async function documentDataWithInlineLogo(data: FieldDocumentData, orgId: string): Promise<FieldDocumentData> {
-  if (!data.branding.logoUrl) return data;
+async function inlineBrandingAsset(
+  orgId: string,
+  url: string | null | undefined,
+  getter: (id: string) => Promise<{ contentType: string; buffer: Buffer } | null>,
+): Promise<string | undefined> {
+  if (!url) return undefined;
   try {
-    const logo = await getOrgLogo(orgId);
-    if (!logo) return data;
-    return {
-      ...data,
-      branding: {
-        ...data.branding,
-        logoUrl: `data:${logo.contentType};base64,${logo.buffer.toString("base64")}`,
-      },
-    };
+    const asset = await getter(orgId);
+    if (!asset) return url;
+    return `data:${asset.contentType};base64,${asset.buffer.toString("base64")}`;
   } catch {
-    return data;
+    return url;
   }
 }
 
+async function documentDataWithInlineBranding(data: FieldDocumentData, orgId: string): Promise<FieldDocumentData> {
+  const logoUrl = await inlineBrandingAsset(orgId, data.branding.logoUrl, getOrgLogo);
+  const signatureImageUrl = data.signatory?.signatureImageUrl
+    ? await inlineBrandingAsset(orgId, data.signatory.signatureImageUrl, getOrgSignature)
+    : undefined;
+  const stampImageUrl = data.signatory?.stampImageUrl
+    ? await inlineBrandingAsset(orgId, data.signatory.stampImageUrl, getOrgStamp)
+    : undefined;
+
+  return {
+    ...data,
+    branding: {
+      ...data.branding,
+      logoUrl: logoUrl ?? data.branding.logoUrl,
+    },
+    signatory: data.signatory
+      ? {
+          ...data.signatory,
+          signatureImageUrl: signatureImageUrl ?? data.signatory.signatureImageUrl,
+          stampImageUrl: stampImageUrl ?? data.signatory.stampImageUrl,
+        }
+      : undefined,
+  };
+}
+
 async function renderStoredDocumentPdf(data: FieldDocumentData, orgId: string): Promise<Buffer> {
-  const branded = await documentDataWithInlineLogo(data, orgId);
+  const branded = await documentDataWithInlineBranding(data, orgId);
   return renderFieldDocumentPdf(branded);
 }
 
@@ -121,6 +144,13 @@ async function orgContext(orgId: string) {
     publicPhone: org.publicPhone,
     publicAddress: org.publicAddress,
     removeOpenFieldProAttribution: org.removeOpenFieldProAttribution ?? false,
+    registrationNumber: org.registrationNumber,
+    documentCategory: org.documentCategory,
+    signatoryName: org.signatoryName,
+    signatoryTitle: org.signatoryTitle,
+    signatureUrl: org.signatureUrl,
+    stampUrl: org.stampUrl,
+    documentTerms: org.documentTerms,
     businessSettings: mergeBusinessSettings(org.businessSettings),
   };
 }
