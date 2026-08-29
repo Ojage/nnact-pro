@@ -22,6 +22,16 @@
     "extra": {
       "companyName": "NNACT",
       "tagline": "The Power of Dreams"
-    }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
+      ]
+    ]
   }
 }
