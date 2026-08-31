@@ -377,36 +377,52 @@ export default function RepairBrainPage() {
 
           <ResultSection title="Procedures" count={results.procedures.length} icon={ListChecks}>
             {results.procedures.map((p) => (
-              <div key={p.id} className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+              <Link
+                key={p.id}
+                href={p.equipmentModelId ? `/repair-brain/models/${p.equipmentModelId}` : "/diagnostic-library"}
+                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+              >
                 <span className="min-w-0 truncate font-medium">{p.title}</span>
                 <Badge variant="outline" className="shrink-0 capitalize">
                   {p.type}
                 </Badge>
-              </div>
+              </Link>
             ))}
           </ResultSection>
 
           <ResultSection title="Documents" count={results.documents.length} icon={FileText}>
             {results.documents.map((d) => (
-              <div key={d.id} className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+              <Link
+                key={d.id}
+                href={d.equipmentModelId ? `/repair-brain/models/${d.equipmentModelId}` : "/repair-brain"}
+                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+              >
                 <span className="min-w-0 truncate font-medium">{d.title}</span>
                 <Badge variant="outline" className="shrink-0 capitalize">
                   {d.documentType.replaceAll("_", " ")}
                 </Badge>
-              </div>
+              </Link>
             ))}
           </ResultSection>
 
           <ResultSection title="Previous Repairs" count={results.repairHistory.length} icon={History}>
             {results.repairHistory.map((r) => (
-              <div key={r.id} className="rounded-md border border-border p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
+              <Link
+                key={r.id}
+                href={r.equipmentModelId ? `/repair-brain/models/${r.equipmentModelId}` : "/repair-brain"}
+                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+              >
+                <div className="min-w-0 flex-1">
                   <Badge variant="secondary" className="shrink-0 capitalize">
                     {r.outcome.replaceAll("_", " ")}
                   </Badge>
-                  {r.conclusion && <span className="min-w-0 flex-1 text-sm text-fg-muted">{r.conclusion}</span>}
+                  {r.conclusion && <span className="mt-1 block text-sm text-fg-muted">{r.conclusion}</span>}
                 </div>
-              </div>
+                <ChevronRight
+                  className="mt-1 size-4 shrink-0 text-fg-dim transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </Link>
             ))}
           </ResultSection>
         </div>

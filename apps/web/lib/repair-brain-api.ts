@@ -85,8 +85,8 @@ export interface RepairBrainSearchResults {
   faults: Array<{ id: string; equipmentModelId: string; title: string; faultCode?: string | null }>;
   parts: Array<{ id: string; equipmentModelId: string; partName: string; oemPartNumber?: string | null }>;
   procedures: Array<{ id: string; equipmentModelId: string; title: string; type: string }>;
-  documents: Array<{ id: string; title: string; documentType: string }>;
-  repairHistory: Array<{ id: string; outcome: string; conclusion?: string | null }>;
+  documents: Array<{ id: string; title: string; documentType: string; equipmentModelId?: string | null }>;
+  repairHistory: Array<{ id: string; outcome: string; conclusion?: string | null; equipmentModelId?: string | null }>;
 }
 
 export interface EquipmentTimeline {

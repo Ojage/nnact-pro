@@ -1,23 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { repairBrainApi, type EquipmentModel } from "@/lib/repair-brain-api";
+import { CreateModelButton } from "@/components/repair-brain/create-model-dialog";
+import { useRepairBrainModelsQuery } from "@/lib/redux/api";
 
 export default function EquipmentModelsListPage() {
-  const [models, setModels] = useState<EquipmentModel[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    repairBrainApi
-      .listModels()
-      .then(setModels)
-      .catch(() => setModels([]))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: models = [], isLoading: loading } = useRepairBrainModelsQuery();
 
   return (
     <div>
@@ -25,11 +16,14 @@ export default function EquipmentModelsListPage() {
         title="Equipment Models"
         description="Reusable technical knowledge catalogued by product identity."
         actions={
-          <Link href="/repair-brain">
-            <Button variant="secondary" size="sm">
-              ← Repair Brain
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/repair-brain">
+              <Button variant="secondary" size="sm">
+                ← Repair Brain
+              </Button>
+            </Link>
+            <CreateModelButton />
+          </div>
         }
       />
 

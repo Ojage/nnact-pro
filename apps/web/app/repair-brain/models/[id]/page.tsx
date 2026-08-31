@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import {
+  AlertCircle,
+  ChevronRight,
+  TriangleAlert,
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { repairBrainApi, type ModelProfile } from "@/lib/repair-brain-api";
+import { Badge } from "@/components/ui/badge";
+import { AddKnowledgeButton } from "@/components/repair-brain/add-knowledge-dialog";
+import { useRepairBrainKnowledgeGapsQuery, useRepairBrainModelProfileQuery } from "@/lib/redux/api";
 
 type Tab =
   | "overview"
@@ -16,7 +23,7 @@ type Tab =
   | "repairs"
   | "parts"
   | "documents"
-  | "measurements"
+  | "testPoints"
   | "history";
 
 function confidenceBadge(status: string) {
@@ -30,27 +37,45 @@ function confidenceBadge(status: string) {
   return tones[status] ?? "bg-surface-400 text-fg-muted";
 }
 
+function coverageScore(profile: {
+  faults: unknown[];
+  repairProcedures: unknown[];
+  testPoints: unknown[];
+  parts: unknown[];
+  documents: unknown[];
+}) {
+  const total = profile.faults.length;
+  if (total === 0) return null;
+  let covered = 0;
+  for (const f of profile.faults) {
+    const fault = f as Record<string, unknown>;
+    const hasProcedure = profile.repairProcedures.some(
+      (p) => (p as Record<string, unknown>).id === fault.id,
+    );
+    const hasTestPoint = profile.testPoints.length > 0;
+    if (hasProcedure || hasTestPoint) covered++;
+  }
+  return Math.round((covered / total) * 100);
+}
+
 export default function EquipmentModelProfilePage() {
   const params = useParams();
   const id = params.id as string;
-  const [profile, setProfile] = useState<ModelProfile | null>(null);
+  const {
+    data: profile,
+    isLoading: loading,
+    error,
+  } = useRepairBrainModelProfileQuery(id);
   const [tab, setTab] = useState<Tab>("overview");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    repairBrainApi
-      .getModelProfile(id)
-      .then(setProfile)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
-  }, [id]);
 
   if (loading) return <div className="p-8 text-fg-muted">Loading model knowledge…</div>;
   if (error || !profile) {
     return (
       <div className="p-8">
-        <p className="text-red">Failed to load model: {error ?? "not found"}</p>
+        <p className="text-red flex items-center gap-2">
+          <AlertCircle className="size-4" />
+          Failed to load model: {error ? "server error" : "not found"}
+        </p>
         <Link href="/repair-brain">
           <Button variant="secondary" size="sm" className="mt-4">
             Back to Repair Brain
@@ -61,6 +86,7 @@ export default function EquipmentModelProfilePage() {
   }
 
   const { model } = profile;
+  const coverage = coverageScore(profile);
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: "overview", label: "Overview" },
     { key: "faults", label: "Known Faults", count: profile.faults.length },
@@ -68,7 +94,7 @@ export default function EquipmentModelProfilePage() {
     { key: "repairs", label: "Repair Procedures", count: profile.repairProcedures.length },
     { key: "parts", label: "Parts", count: profile.parts.length },
     { key: "documents", label: "Documents", count: profile.documents.length },
-    { key: "measurements", label: "Test Points", count: profile.testPoints.length },
+    { key: "testPoints", label: "Test Points", count: profile.testPoints.length },
     { key: "history", label: "Previous Repairs" },
   ];
 
@@ -130,6 +156,25 @@ export default function EquipmentModelProfilePage() {
               <Row label="Total repairs" value={String(profile.repairStats.totalRepairs)} />
               <Row label="Successful" value={String(profile.repairStats.successfulRepairs)} />
               <Row label="Avg labor (min)" value={String(profile.repairStats.averageLaborMinutes)} />
+              {profile.repairStats.totalRepairs > 0 && (
+                <Row
+                  label="Success rate"
+                  value={`${Math.round((profile.repairStats.successfulRepairs / profile.repairStats.totalRepairs) * 100)}%`}
+                />
+              )}
+              {coverage !== null && (
+                <div className="pt-2 border-t border-border">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-fg-muted">Knowledge coverage</span>
+                    <span className={`font-medium ${coverage >= 80 ? "text-green" : coverage >= 50 ? "text-yellow" : "text-red"}`}>
+                      {coverage}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-fg-dim mt-1">
+                    {profile.faults.length} fault{profile.faults.length !== 1 ? "s" : ""} · {profile.repairProcedures.length} procedure{profile.repairProcedures.length !== 1 ? "s" : ""} · {profile.testPoints.length} test point{profile.testPoints.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -159,6 +204,32 @@ export default function EquipmentModelProfilePage() {
               <CardContent className="text-sm">{model.notes}</CardContent>
             </Card>
           )}
+
+          {/* Quick actions */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">Add knowledge</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-sm text-fg-muted">
+                Contribute to this model's profile. Entries save immediately and are attributed to you.
+              </p>
+              <AddKnowledgeButton equipmentModelId={id} />
+            </CardContent>
+          </Card>
+
+          {/* Knowledge gaps */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TriangleAlert className="size-4 text-yellow" aria-hidden />
+                Knowledge gaps
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <KnowledgeGaps id={id} />
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -186,8 +257,17 @@ export default function EquipmentModelProfilePage() {
                         ))}
                       </ul>
                     )}
+                    {f.symptoms && f.symptoms.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {f.symptoms.map((s) => (
+                          <Badge key={s.id} variant="secondary" className="text-[10px]">
+                            {s.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <span className={`rounded px-2 py-0.5 text-xs ${confidenceBadge(f.confidenceStatus)}`}>
+                  <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${confidenceBadge(f.confidenceStatus)}`}>
                     {f.confidenceStatus.replaceAll("_", " ")}
                   </span>
                 </div>
@@ -267,7 +347,7 @@ export default function EquipmentModelProfilePage() {
         </div>
       )}
 
-      {tab === "measurements" && (
+      {tab === "testPoints" && (
         <div className="space-y-3">
           {profile.testPoints.map((tp) => (
             <Card key={tp.id}>
@@ -321,6 +401,44 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between gap-4">
       <span className="text-fg-muted">{label}</span>
       <span className="font-medium text-right">{value}</span>
+    </div>
+  );
+}
+
+function KnowledgeGaps({ id }: { id: string }) {
+  const { data: gaps, isLoading } = useRepairBrainKnowledgeGapsQuery(id);
+
+  if (isLoading) return <p className="text-sm text-fg-muted">Analyzing coverage…</p>;
+  if (!gaps || gaps.length === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-chart-2/30 bg-chart-2/10 p-3 text-sm text-chart-2">
+        All known faults have repair knowledge. No gaps detected.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-fg-muted">
+        {gaps.length} fault{gaps.length !== 1 ? "s" : ""} lack{`${gaps.length === 1 ? "s" : ""}`} repair knowledge:
+      </p>
+      {gaps.map((g) => (
+        <div key={g.faultId} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="truncate text-sm font-medium">{g.title}</span>
+              {g.faultCode && <span className="rounded bg-surface-300 px-1.5 py-0.5 font-mono text-[11px]">{g.faultCode}</span>}
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {g.missing.map((m) => (
+                <Badge key={m} variant="outline" className="text-[10px] text-yellow">
+                  Missing: {m}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

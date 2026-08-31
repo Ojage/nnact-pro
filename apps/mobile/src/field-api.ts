@@ -214,6 +214,92 @@ export async function listJobVoiceNotes(session: StoredStaffSession, jobId: stri
   );
 }
 
+// ── Repair Brain ──
+
+export interface RepairBrainModel {
+  id: string;
+  manufacturer: string;
+  brand?: string | null;
+  modelNumber: string;
+  modelName?: string | null;
+  category: string;
+  subcategory?: string | null;
+  specifications: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export interface RepairBrainFault {
+  id: string;
+  equipmentModelId: string;
+  faultCode?: string | null;
+  title: string;
+  description?: string | null;
+  severity?: string | null;
+  probableCauses: string[];
+  confidenceStatus: string;
+  verificationStatus: string;
+  symptoms?: Array<{ id: string; label: string }>;
+}
+
+export interface RepairBrainModelProfile {
+  model: RepairBrainModel;
+  faults: RepairBrainFault[];
+  repairProcedures: Array<{ id: string; title: string; description?: string | null; requiredTools?: string[]; steps?: Array<{ sequence: number; instruction: string; warning?: string }> }>;
+  parts: Array<{ id: string; partName: string; oemPartNumber?: string | null; lastKnownPriceCents?: number | null }>;
+  testPoints: Array<{ id: string; component?: string | null; description?: string | null; connector?: string | null; pin?: string | null; expectedMin?: string | null; expectedMax?: string | null; unit?: string | null }>;
+  documents: Array<{ id: string; title: string; documentType: string }>;
+  diagnosticWorkflows: Array<{ id: string; name: string }>;
+  repairStats: {
+    totalRepairs: number;
+    successfulRepairs: number;
+    averageLaborMinutes: number;
+    byFault: Record<string, { count: number; topSolutions: Array<{ action: string; count: number }> }>;
+  };
+  instanceCount: number;
+}
+
+export interface RepairBrainSearchResults {
+  models: Array<{ id: string; manufacturer: string; modelNumber: string; modelName?: string | null; category: string }>;
+  faults: Array<{ id: string; equipmentModelId: string; title: string; faultCode?: string | null }>;
+  parts: Array<{ id: string; equipmentModelId: string; partName: string; oemPartNumber?: string | null }>;
+  procedures: Array<{ id: string; equipmentModelId: string; title: string; type: string }>;
+  documents: Array<{ id: string; title: string; documentType: string; equipmentModelId?: string | null }>;
+  repairHistory: Array<{ id: string; outcome: string; conclusion?: string | null; equipmentModelId?: string | null }>;
+}
+
+export async function searchRepairBrain(session: StoredStaffSession, query: string) {
+  return staffFetch<RepairBrainSearchResults>(
+    session,
+    `/api/repair-brain/search?q=${encodeURIComponent(query)}`,
+  );
+}
+
+export async function listRepairBrainModels(session: StoredStaffSession) {
+  return staffFetch<RepairBrainModel[]>(session, "/api/repair-brain/models");
+}
+
+export async function getRepairBrainModelProfile(session: StoredStaffSession, modelId: string) {
+  return staffFetch<RepairBrainModelProfile>(session, `/api/repair-brain/models/${modelId}/profile`);
+}
+
+export async function submitRepairBrainProposal(
+  session: StoredStaffSession,
+  body: { proposalType: string; title: string; payload?: Record<string, unknown>; equipmentModelId?: string },
+) {
+  return staffFetch<Record<string, unknown>>(session, "/api/repair-brain/proposals", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function linkEquipmentToModel(session: StoredStaffSession, equipmentId: string) {
+  return staffFetch<{ equipment: Record<string, unknown>; model: RepairBrainModel | null; created: boolean }>(
+    session,
+    `/api/repair-brain/equipment/${equipmentId}/link-model`,
+    { method: "POST" },
+  );
+}
+
 export async function uploadVoiceNote(
   session: StoredStaffSession,
   jobId: string,

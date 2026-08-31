@@ -16,6 +16,9 @@ import { WelcomeScreen } from "./src/screens/WelcomeScreen";
 import { TodayScreen } from "./src/screens/TodayScreen";
 import { JobsScreen } from "./src/screens/JobsScreen";
 import { DiagnosticsScreen } from "./src/screens/DiagnosticsScreen";
+import { RepairBrainScreen } from "./src/screens/RepairBrainScreen";
+import { RepairBrainModelScreen } from "./src/screens/RepairBrainModelScreen";
+import { RepairBrainSearchScreen } from "./src/screens/RepairBrainSearchScreen";
 import { AccountScreen } from "./src/screens/AccountScreen";
 import { JobDetailScreen } from "./src/screens/JobDetailScreen";
 import { DiagnosticSessionScreen } from "./src/screens/DiagnosticSessionScreen";
@@ -54,6 +57,10 @@ function FieldApp({
   } | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [rbBrowse, setRbBrowse] = useState<"browser" | "search" | null>(null);
+  const [rbBrowseVisible, setRbBrowseVisible] = useState(false);
+  const [rbModelId, setRbModelId] = useState<string | null>(null);
+  const [rbModelVisible, setRbModelVisible] = useState(false);
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [jobVisible, setJobVisible] = useState(false);
@@ -62,7 +69,7 @@ function FieldApp({
   const field = useFieldData(session, onSession);
 
   const overlayActive = Boolean(
-    showNotifications || selectedSessionId || startDiagnostic || selectedJobId,
+    showNotifications || selectedSessionId || startDiagnostic || selectedJobId || rbBrowse || rbModelId,
   );
 
   useEffect(() => {
@@ -121,6 +128,28 @@ function FieldApp({
 
   function closeNotifications() {
     setNotificationsVisible(false);
+  }
+
+  function openRepairBrain(mode: "browser" | "search") {
+    setRbModelId(null);
+    setRbModelVisible(false);
+    setRbBrowse(mode);
+    setRbBrowseVisible(true);
+  }
+
+  function closeRepairBrain() {
+    setRbBrowseVisible(false);
+  }
+
+  function openRepairBrainModel(modelId: string) {
+    setRbBrowse(null);
+    setRbBrowseVisible(false);
+    setRbModelId(modelId);
+    setRbModelVisible(true);
+  }
+
+  function closeRepairBrainModel() {
+    setRbModelVisible(false);
   }
 
   const TAB_ORDER: TabId[] = ["today", "jobs", "diagnostics", "account"];
@@ -226,6 +255,8 @@ function FieldApp({
             diagnostics={field.diagnostics}
             loading={field.loading}
             onOpenSession={openSession}
+            onOpenRepairBrain={() => openRepairBrain("browser")}
+            onOpenRepairBrainSearch={() => openRepairBrain("search")}
             {...searchProps}
           />
         ) : null}
@@ -341,6 +372,45 @@ function FieldApp({
             cachedAppointments={field.appointments}
             cachedDiagnostics={field.diagnostics}
             onJobUpdated={() => void field.refresh()}
+          />
+        </AnimatedScreen>
+      ) : null}
+
+      {rbBrowse ? (
+        <AnimatedScreen
+          visible={rbBrowseVisible}
+          onDismiss={closeRepairBrain}
+          onExited={() => setRbBrowse(null)}
+        >
+          {rbBrowse === "browser" ? (
+            <RepairBrainScreen
+              colors={colors}
+              session={session}
+              onBack={closeRepairBrain}
+              onOpenModel={openRepairBrainModel}
+            />
+          ) : (
+            <RepairBrainSearchScreen
+              colors={colors}
+              session={session}
+              onBack={closeRepairBrain}
+              onOpenModel={openRepairBrainModel}
+            />
+          )}
+        </AnimatedScreen>
+      ) : null}
+
+      {rbModelId ? (
+        <AnimatedScreen
+          visible={rbModelVisible}
+          onDismiss={closeRepairBrainModel}
+          onExited={() => setRbModelId(null)}
+        >
+          <RepairBrainModelScreen
+            colors={colors}
+            session={session}
+            modelId={rbModelId}
+            onBack={closeRepairBrainModel}
           />
         </AnimatedScreen>
       ) : null}
@@ -486,7 +556,8 @@ export default function App() {
     return (
       <>
         <WelcomeScreen colors={colors} onSignIn={() => { setShowLogin(true); setLoginVisible(true); }} {...guestSearchProps} />
-        <AppSearchModal
+
+      <AppSearchModal
           visible={searchOpen}
           colors={colors}
           fonts={searchFonts}

@@ -222,11 +222,27 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
     }
   }
 
+  function classifyMeasurementResult(
+    observed: string,
+    min?: string,
+    max?: string,
+  ): "pass" | "fail" | "within_range" | "out_of_range" | "unknown" {
+    const v = parseFloat(observed);
+    if (isNaN(v)) return "unknown";
+    const lo = min ? parseFloat(min) : undefined;
+    const hi = max ? parseFloat(max) : undefined;
+    if (lo === undefined && hi === undefined) return "unknown";
+    const inRange = (lo === undefined || v >= lo) && (hi === undefined || v <= hi);
+    if (lo !== undefined && hi !== undefined) return inRange ? "within_range" : "out_of_range";
+    return inRange ? "pass" : "fail";
+  }
+
   async function recordMeasurement(e: React.FormEvent) {
     e.preventDefault();
     if (!measParam.trim()) return;
     setBusy(true);
     try {
+      const result = classifyMeasurementResult(measValue, measExpectedMin, measExpectedMax);
       await repairBrainApi.createMeasurement({
         sessionId: sessionId ?? undefined,
         equipmentModelId: model?.id,
@@ -235,7 +251,7 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
         unit: measUnit,
         expectedMin: measExpectedMin || undefined,
         expectedMax: measExpectedMax || undefined,
-        result: measValue ? "unknown" : "unknown",
+        result,
       });
       setMeasParam("");
       setMeasValue("");
@@ -561,11 +577,22 @@ export function JobRepairBrainWorkflow({ jobId, customerId, jobStatus, jobDescri
             </form>
             {(ctx?.fieldMeasurements ?? []).length > 0 && (
               <div className="space-y-1">
-                {ctx!.fieldMeasurements.slice(0, 5).map((m) => (
-                  <div key={String(m.id)} className="text-xs rounded bg-surface-200 px-2 py-1.5">
-                    {String(m.parameter)}: {String(m.observedValue ?? "—")} {String(m.unit ?? "")}
-                  </div>
-                ))}
+                {ctx!.fieldMeasurements.slice(0, 5).map((m) => {
+                  const r = String(m.result ?? "");
+                  const tone = r === "pass" || r === "within_range"
+                    ? "bg-green/10 text-green"
+                    : r === "fail" || r === "out_of_range"
+                      ? "bg-red/10 text-red"
+                      : "bg-surface-400 text-fg-muted";
+                  return (
+                    <div key={String(m.id)} className="flex items-center justify-between text-xs rounded bg-surface-200 px-2 py-1.5">
+                      <span>{String(m.parameter)}: {String(m.observedValue ?? "—")} {String(m.unit ?? "")}</span>
+                      <span className={`rounded px-1.5 py-0.5 font-medium ${tone}`}>
+                        {r ? r.replaceAll("_", " ") : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>

@@ -12,6 +12,8 @@ export function DiagnosticsScreen({
   diagnostics,
   loading,
   onOpenSession,
+  onOpenRepairBrain,
+  onOpenRepairBrainSearch,
   onOpenSearch,
   searchPlaceholder,
   searchFonts,
@@ -20,6 +22,8 @@ export function DiagnosticsScreen({
   diagnostics: DiagnosticListItem[];
   loading: boolean;
   onOpenSession: (sessionId: string) => void;
+  onOpenRepairBrain?: () => void;
+  onOpenRepairBrainSearch?: () => void;
   onOpenSearch?: () => void;
   searchPlaceholder?: string;
   searchFonts?: AppSearchFonts;
@@ -50,6 +54,25 @@ export function DiagnosticsScreen({
         onSearchPress={onOpenSearch}
         searchFonts={searchFonts}
       />
+
+      {onOpenRepairBrain ? (
+        <View style={styles.rbRow}>
+          <TouchableOpacity style={styles.rbCard} activeOpacity={0.85} onPress={onOpenRepairBrain}>
+            <View style={styles.rbIconWrap}>
+              <Ionicons name="library-outline" size={20} color={colors.primary} />
+            </View>
+            <Text style={styles.rbTitle}>Knowledge Base</Text>
+            <Text style={styles.rbSubtitle}>Models, parts &amp; test points</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.rbCard} activeOpacity={0.85} onPress={onOpenRepairBrainSearch}>
+            <View style={styles.rbIconWrap}>
+              <Ionicons name="search-outline" size={20} color={colors.primary} />
+            </View>
+            <Text style={styles.rbTitle}>Search</Text>
+            <Text style={styles.rbSubtitle}>Faults, docs &amp; repairs</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <SegmentedTabs
         colors={colors}
@@ -128,4 +151,24 @@ const createStyles = (colors: Palette) =>
     complaint: { color: colors.mutedForeground, fontSize: 12, lineHeight: 17, marginTop: spacing.sm, fontFamily: fonts.regular },
     cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.sm },
     openHint: { color: colors.primary, fontSize: 12, fontFamily: fonts.semibold },
+    rbRow: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
+    rbCard: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      padding: spacing.md,
+    },
+    rbIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: colors.primaryMuted,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: spacing.sm,
+    },
+    rbTitle: { color: colors.foreground, fontSize: 14, fontFamily: fonts.bold },
+    rbSubtitle: { color: colors.mutedForeground, fontSize: 11, marginTop: 2, fontFamily: fonts.regular },
   });
