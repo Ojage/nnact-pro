@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreateModelButton } from "@/components/repair-brain/create-model-dialog";
+import { ImportKnowledgeButton } from "@/components/repair-brain/import-knowledge-dialog";
 import { useRepairBrainModelsQuery } from "@/lib/redux/api";
 
 export default function EquipmentModelsListPage() {
@@ -22,6 +23,7 @@ export default function EquipmentModelsListPage() {
                 ← Repair Brain
               </Button>
             </Link>
+            <ImportKnowledgeButton />
             <CreateModelButton />
           </div>
         }

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import {
   db,
   equipmentModels,
@@ -52,6 +52,8 @@ import {
   getWorkflowsForFault,
   buildProposalDraft,
   linkEquipmentToModel,
+  computeModelInsights,
+  computeOrgRepairBrainHealth,
 } from "../repair-brain.js";
 
 const modelCreateSchema = z.object({
@@ -254,6 +256,103 @@ export async function repairBrainRoutes(app: FastifyInstance) {
     return updated;
   });
 
+  // ── Intelligence ────────────────────────────────────────────────────
+  app.get("/models/:id/insights", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const [model] = await db
+      .select()
+      .from(equipmentModels)
+      .where(and(eq(equipmentModels.orgId, orgId), eq(equipmentModels.id, id)));
+    if (!model) return reply.code(404).send({ error: "model not found" });
+    return computeModelInsights(orgId, id);
+  });
+
+  app.get("/insights/overview", async (req) => {
+    const orgId = await resolveOrgId(req);
+    return computeOrgRepairBrainHealth(orgId);
+  });
+
+  app.post("/import", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const body = req.body as {
+      models?: Array<Record<string, unknown>>;
+      faults?: Array<Record<string, unknown>>;
+      parts?: Array<Record<string, unknown>>;
+    };
+    const userId = await resolveUserId(req);
+    const counts = { models: 0, faults: 0, parts: 0 };
+
+    for (const raw of body.models ?? []) {
+      const manufacturer = String(raw.manufacturer ?? "").trim();
+      const modelNumber = String(raw.modelNumber ?? "").trim();
+      if (!manufacturer || !modelNumber) continue;
+      const { created } = await upsertEquipmentModel(
+        orgId,
+        {
+          manufacturer,
+          brand: raw.brand ? String(raw.brand) : undefined,
+          modelNumber,
+          modelName: raw.modelName ? String(raw.modelName) : undefined,
+          category: String(raw.category ?? "other"),
+          subcategory: raw.subcategory ? String(raw.subcategory) : undefined,
+          specifications: raw.specifications ? (raw.specifications as Record<string, unknown>) : undefined,
+          notes: raw.notes ? String(raw.notes) : undefined,
+        },
+        userId,
+      );
+      if (created) counts.models++;
+    }
+
+    for (const raw of body.faults ?? []) {
+      const equipmentModelId = String(raw.equipmentModelId ?? "");
+      const title = String(raw.title ?? "").trim();
+      if (!equipmentModelId || !title) continue;
+      await db
+        .insert(knownFaults)
+        .values({
+          orgId,
+          equipmentModelId,
+          faultCode: raw.faultCode ? String(raw.faultCode) : undefined,
+          normalizedFaultCode: raw.faultCode ? normalizeFaultCode(String(raw.faultCode)) : undefined,
+          title,
+          description: raw.description ? String(raw.description) : undefined,
+          probableCauses: Array.isArray(raw.probableCauses) ? (raw.probableCauses as string[]) : [],
+          tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : [],
+          confidenceStatus: "field_observation",
+          verificationStatus: "proposed",
+          createdBy: userId,
+        })
+        .onConflictDoNothing()
+        .returning();
+      counts.faults++;
+    }
+
+    for (const raw of body.parts ?? []) {
+      const equipmentModelId = String(raw.equipmentModelId ?? "");
+      const partName = String(raw.partName ?? "").trim();
+      if (!equipmentModelId || !partName) continue;
+      await db
+        .insert(modelParts)
+        .values({
+          orgId,
+          equipmentModelId,
+          partName,
+          oemPartNumber: raw.oemPartNumber ? String(raw.oemPartNumber) : undefined,
+          reliabilityNotes: raw.reliabilityNotes ? String(raw.reliabilityNotes) : undefined,
+          tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : [],
+          confidenceStatus: "field_observation",
+          verificationStatus: "proposed",
+          createdBy: userId,
+        })
+        .onConflictDoNothing()
+        .returning();
+      counts.parts++;
+    }
+
+    return reply.code(201).send({ counts });
+  });
+
   // ── Known Faults ────────────────────────────────────────────────────
   app.get("/faults", async (req) => {
     const orgId = await resolveOrgId(req);
@@ -344,6 +443,54 @@ export async function repairBrainRoutes(app: FastifyInstance) {
     return fault;
   });
 
+  app.patch("/faults/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const parsed = faultCreateSchema.partial().safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const [existing] = await db
+      .select()
+      .from(knownFaults)
+      .where(and(eq(knownFaults.orgId, orgId), eq(knownFaults.id, id)));
+    if (!existing) return reply.code(404).send({ error: "fault not found" });
+
+    const userId = await resolveUserId(req);
+    await recordKnowledgeRevision(orgId, "known_fault", id, existing as never, userId, "update");
+
+    const [updated] = await db
+      .update(knownFaults)
+      .set({
+        faultCode: parsed.data.faultCode,
+        normalizedFaultCode: parsed.data.faultCode
+          ? normalizeFaultCode(parsed.data.faultCode)
+          : existing.normalizedFaultCode,
+        title: parsed.data.title ?? undefined,
+        description: parsed.data.description,
+        severity: parsed.data.severity,
+        frequency: parsed.data.frequency,
+        safetyWarnings: parsed.data.safetyWarnings ? (parsed.data.safetyWarnings as never[]) : undefined,
+        probableCauses: parsed.data.probableCauses ?? undefined,
+        sourceJobId: parsed.data.sourceJobId,
+        sourceEquipmentId: parsed.data.sourceEquipmentId,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(knownFaults.orgId, orgId), eq(knownFaults.id, id)))
+      .returning();
+    return updated;
+  });
+
+  app.post("/faults/:id/rate", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const [updated] = await db
+      .update(knownFaults)
+      .set({ usefulCount: sql`${knownFaults.usefulCount} + 1`, updatedAt: new Date() })
+      .where(and(eq(knownFaults.orgId, orgId), eq(knownFaults.id, id)))
+      .returning();
+    if (!updated) return reply.code(404).send({ error: "fault not found" });
+    return updated;
+  });
+
   // ── Symptoms ────────────────────────────────────────────────────────
   app.get("/symptoms", async (req) => {
     const orgId = await resolveOrgId(req);
@@ -388,10 +535,57 @@ export async function repairBrainRoutes(app: FastifyInstance) {
         verificationSteps: (body.verificationSteps as string[]) ?? [],
         expectedDurationMinutes: body.expectedDurationMinutes as number | undefined,
         skillLevel: body.skillLevel as string | undefined,
+        tags: (body.tags as string[]) ?? [],
         createdBy: userId,
       })
       .returning();
     return reply.code(201).send(procedure);
+  });
+
+  app.patch("/procedures/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const body = req.body as Record<string, unknown>;
+    const [existing] = await db
+      .select()
+      .from(repairProcedures)
+      .where(and(eq(repairProcedures.orgId, orgId), eq(repairProcedures.id, id)));
+    if (!existing) return reply.code(404).send({ error: "procedure not found" });
+
+    const userId = await resolveUserId(req);
+    await recordKnowledgeRevision(orgId, "repair_procedure", id, existing as never, userId, "update");
+
+    const [updated] = await db
+      .update(repairProcedures)
+      .set({
+        title: (body.title as string) ?? undefined,
+        description: (body.description as string | undefined) ?? undefined,
+        steps: (body.steps as never[] | undefined) ?? undefined,
+        requiredTools: (body.requiredTools as string[] | undefined) ?? undefined,
+        requiredParts: (body.requiredParts as never[] | undefined) ?? undefined,
+        safetyWarnings: (body.safetyWarnings as never[] | undefined) ?? undefined,
+        prerequisites: (body.prerequisites as string[] | undefined) ?? undefined,
+        verificationSteps: (body.verificationSteps as string[] | undefined) ?? undefined,
+        expectedDurationMinutes: (body.expectedDurationMinutes as number | undefined) ?? undefined,
+        skillLevel: (body.skillLevel as string | undefined) ?? undefined,
+        tags: (body.tags as string[] | undefined) ?? undefined,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(repairProcedures.orgId, orgId), eq(repairProcedures.id, id)))
+      .returning();
+    return updated;
+  });
+
+  app.post("/procedures/:id/rate", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const [updated] = await db
+      .update(repairProcedures)
+      .set({ usefulCount: sql`${repairProcedures.usefulCount} + 1`, updatedAt: new Date() })
+      .where(and(eq(repairProcedures.orgId, orgId), eq(repairProcedures.id, id)))
+      .returning();
+    if (!updated) return reply.code(404).send({ error: "procedure not found" });
+    return updated;
   });
 
   // ── Measurements ────────────────────────────────────────────────────
@@ -450,6 +644,38 @@ export async function repairBrainRoutes(app: FastifyInstance) {
     return reply.code(201).send(point);
   });
 
+  app.patch("/test-points/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const body = req.body as Record<string, unknown>;
+    const [existing] = await db
+      .select()
+      .from(testPoints)
+      .where(and(eq(testPoints.orgId, orgId), eq(testPoints.id, id)));
+    if (!existing) return reply.code(404).send({ error: "test point not found" });
+
+    const userId = await resolveUserId(req);
+    await recordKnowledgeRevision(orgId, "test_point", id, existing as never, userId, "update");
+
+    const [updated] = await db
+      .update(testPoints)
+      .set({
+        component: (body.component as string | undefined) ?? undefined,
+        board: (body.board as string | undefined) ?? undefined,
+        connector: (body.connector as string | undefined) ?? undefined,
+        pin: (body.pin as string | undefined) ?? undefined,
+        description: (body.description as string | undefined) ?? undefined,
+        expectedMin: (body.expectedMin as string | undefined) ?? undefined,
+        expectedMax: (body.expectedMax as string | undefined) ?? undefined,
+        expectedExact: (body.expectedExact as string | undefined) ?? undefined,
+        unit: (body.unit as string | undefined) ?? undefined,
+        warning: (body.warning as string | undefined) ?? undefined,
+      })
+      .where(and(eq(testPoints.orgId, orgId), eq(testPoints.id, id)))
+      .returning();
+    return updated;
+  });
+
   // ── Model Parts ─────────────────────────────────────────────────────
   app.get("/parts", async (req) => {
     const orgId = await resolveOrgId(req);
@@ -481,6 +707,50 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       })
       .returning();
     return reply.code(201).send(part);
+  });
+
+  app.patch("/parts/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const body = req.body as Record<string, unknown>;
+    const [existing] = await db
+      .select()
+      .from(modelParts)
+      .where(and(eq(modelParts.orgId, orgId), eq(modelParts.id, id)));
+    if (!existing) return reply.code(404).send({ error: "part not found" });
+
+    const userId = await resolveUserId(req);
+    await recordKnowledgeRevision(orgId, "model_part", id, existing as never, userId, "update");
+
+    const [updated] = await db
+      .update(modelParts)
+      .set({
+        partName: (body.partName as string | undefined) ?? undefined,
+        oemPartNumber: (body.oemPartNumber as string | undefined) ?? undefined,
+        manufacturer: (body.manufacturer as string | undefined) ?? undefined,
+        alternativePartNumber: (body.alternativePartNumber as string | undefined) ?? undefined,
+        specifications: (body.specifications as Record<string, unknown> | undefined) ?? undefined,
+        reliabilityNotes: (body.reliabilityNotes as string | undefined) ?? undefined,
+        lastKnownPriceCents: (body.lastKnownPriceCents as number | undefined) ?? undefined,
+        compatibleModelIds: (body.compatibleModelIds as string[] | undefined) ?? undefined,
+        tags: (body.tags as string[] | undefined) ?? undefined,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(modelParts.orgId, orgId), eq(modelParts.id, id)))
+      .returning();
+    return updated;
+  });
+
+  app.post("/parts/:id/rate", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const [updated] = await db
+      .update(modelParts)
+      .set({ usefulCount: sql`${modelParts.usefulCount} + 1`, updatedAt: new Date() })
+      .where(and(eq(modelParts.orgId, orgId), eq(modelParts.id, id)))
+      .returning();
+    if (!updated) return reply.code(404).send({ error: "part not found" });
+    return updated;
   });
 
   app.get("/parts/:id/procurement", async (req, reply) => {

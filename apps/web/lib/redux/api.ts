@@ -13,6 +13,8 @@ import type {
 import type {
   EquipmentModel,
   ModelProfile,
+  ModelInsights,
+  OrgRepairBrainHealth,
   RepairBrainSearchResults,
 } from "@/lib/repair-brain-api";
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
@@ -443,6 +445,49 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/api/repair-brain/proposals/${id}/verify`, method: "POST" }),
       invalidatesTags: ["Activity"],
     }),
+    repairBrainModelInsights: builder.query<ModelInsights, string>({
+      query: (id) => `/api/repair-brain/models/${id}/insights`,
+      providesTags: ["RepairBrain"],
+    }),
+    repairBrainOrgHealth: builder.query<OrgRepairBrainHealth, void>({
+      query: () => "/api/repair-brain/insights/overview",
+      providesTags: ["RepairBrain"],
+    }),
+    rateKnownFault: builder.mutation<Record<string, unknown>, string>({
+      query: (id) => ({ url: `/api/repair-brain/faults/${id}/rate`, method: "POST" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    rateRepairProcedure: builder.mutation<Record<string, unknown>, string>({
+      query: (id) => ({ url: `/api/repair-brain/procedures/${id}/rate`, method: "POST" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    rateModelPart: builder.mutation<Record<string, unknown>, string>({
+      query: (id) => ({ url: `/api/repair-brain/parts/${id}/rate`, method: "POST" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    patchKnownFault: builder.mutation<Record<string, unknown>, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/faults/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    patchRepairProcedure: builder.mutation<Record<string, unknown>, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/procedures/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    patchModelPart: builder.mutation<Record<string, unknown>, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/parts/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    patchTestPoint: builder.mutation<Record<string, unknown>, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/test-points/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    importRepairBrain: builder.mutation<
+      { counts: { models: number; faults: number; parts: number } },
+      { models?: Record<string, unknown>[]; faults?: Record<string, unknown>[]; parts?: Record<string, unknown>[] }
+    >({
+      query: (body) => ({ url: "/api/repair-brain/import", method: "POST", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
     createKnownFault: builder.mutation<{ fault: Record<string, unknown>; similarExisting: unknown[] }, Record<string, unknown>>({
       query: (body) => ({ url: "/api/repair-brain/faults", method: "POST", body }),
       invalidatesTags: ["RepairBrain"],
@@ -561,6 +606,16 @@ export const {
   usePatchRepairBrainModelMutation,
   useRepairBrainKnowledgeGapsQuery,
   useCreateRepairBrainModelMutation,
+  useRepairBrainModelInsightsQuery,
+  useRepairBrainOrgHealthQuery,
+  useRateKnownFaultMutation,
+  useRateRepairProcedureMutation,
+  useRateModelPartMutation,
+  usePatchKnownFaultMutation,
+  usePatchRepairProcedureMutation,
+  usePatchModelPartMutation,
+  usePatchTestPointMutation,
+  useImportRepairBrainMutation,
   useDocumentsHubQuery,
   useLazyGlobalSearchQuery,
 } = apiSlice;

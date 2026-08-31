@@ -5,8 +5,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   AlertCircle,
+  Check,
   ChevronRight,
+  Clock,
+  Gauge,
+  ListChecks,
   TriangleAlert,
+  Wrench,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +19,13 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Badge } from "@/components/ui/badge";
 import { AddKnowledgeButton } from "@/components/repair-brain/add-knowledge-dialog";
+import { ModelInsightsPanel, ModelInsightsView } from "@/components/repair-brain/model-insights-panel";
+import {
+  EditProcedureButton,
+  AddProcedureButton,
+} from "@/components/repair-brain/procedure-editor-dialog";
+import { EditModelButton } from "@/components/repair-brain/edit-model-dialog";
+import { RateButton } from "@/components/repair-brain/rate-widget";
 import { useRepairBrainKnowledgeGapsQuery, useRepairBrainModelProfileQuery } from "@/lib/redux/api";
 
 type Tab =
@@ -205,16 +217,33 @@ export default function EquipmentModelProfilePage() {
             </Card>
           )}
 
+          {/* Intelligence */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Gauge className="size-4 text-chart-4" aria-hidden />
+                Intelligence & insight
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ModelInsightsPanel modelId={id} />
+            </CardContent>
+          </Card>
+
           {/* Quick actions */}
           <Card className="md:col-span-2">
             <CardHeader>
-              <CardTitle className="text-base">Add knowledge</CardTitle>
+              <CardTitle className="text-base">Maintain knowledge</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="mb-3 text-sm text-fg-muted">
                 Contribute to this model's profile. Entries save immediately and are attributed to you.
               </p>
-              <AddKnowledgeButton equipmentModelId={id} />
+              <div className="flex flex-wrap gap-2">
+                <EditModelButton model={model} />
+                <AddKnowledgeButton equipmentModelId={id} />
+                <AddProcedureButton equipmentModelId={id} />
+              </div>
             </CardContent>
           </Card>
 
@@ -267,9 +296,12 @@ export default function EquipmentModelProfilePage() {
                       </div>
                     )}
                   </div>
-                  <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${confidenceBadge(f.confidenceStatus)}`}>
-                    {f.confidenceStatus.replaceAll("_", " ")}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${confidenceBadge(f.confidenceStatus)}`}>
+                      {f.confidenceStatus.replaceAll("_", " ")}
+                    </span>
+                    <RateButton kind="fault" id={f.id} count={f.usefulCount} />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -299,17 +331,64 @@ export default function EquipmentModelProfilePage() {
 
       {tab === "repairs" && (
         <div className="space-y-3">
-          {profile.repairProcedures.map((p) => (
-            <Card key={p.id}>
-              <CardContent className="pt-4">
-                <div className="font-medium">{p.title}</div>
-                {p.description && <p className="text-sm text-fg-muted mt-1">{p.description}</p>}
-              </CardContent>
-            </Card>
-          ))}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-fg-muted">
+              {profile.repairProcedures.length} procedure{profile.repairProcedures.length !== 1 ? "s" : ""}
+            </p>
+            <AddProcedureButton equipmentModelId={id} />
+          </div>
           {profile.repairProcedures.length === 0 && (
             <p className="text-fg-muted text-sm">No repair procedures yet.</p>
           )}
+          {profile.repairProcedures.map((p) => (
+            <Card key={p.id}>
+              <CardContent className="pt-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium">{p.title}</div>
+                    {p.description && <p className="text-sm text-fg-muted mt-1">{p.description}</p>}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {p.skillLevel && (
+                        <Badge variant="secondary" className="text-[10px] capitalize">
+                          {p.skillLevel.replaceAll("_", " ")}
+                        </Badge>
+                      )}
+                      {p.expectedDurationMinutes != null && (
+                        <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
+                          <Clock className="size-3.5" /> ~{p.expectedDurationMinutes} min
+                        </span>
+                      )}
+                      {(p.requiredTools?.length ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
+                          <Wrench className="size-3.5" /> {p.requiredTools?.join(", ")}
+                        </span>
+                      )}
+                    </div>
+                    {p.steps && p.steps.length > 0 && (
+                      <ol className="mt-3 space-y-1.5 text-sm">
+                        {p.steps.map((s) => (
+                          <li key={s.sequence} className="flex gap-2">
+                            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                              {s.sequence}
+                            </span>
+                            <div className="min-w-0">
+                              <span>{s.instruction}</span>
+                              {s.tool && <span className="ml-1 text-fg-muted">[{s.tool}]</span>}
+                              {s.warning && <span className="ml-1 text-yellow">⚠ {s.warning}</span>}
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <EditProcedureButton procedure={p} />
+                    <RateButton kind="procedure" id={p.id} count={p.usefulCount} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -318,10 +397,25 @@ export default function EquipmentModelProfilePage() {
           {profile.parts.map((p) => (
             <Card key={p.id}>
               <CardContent className="pt-4">
-                <div className="font-medium">{p.partName}</div>
-                {p.oemPartNumber && (
-                  <div className="text-sm text-fg-muted">OEM: {p.oemPartNumber}</div>
-                )}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium">{p.partName}</div>
+                    {p.oemPartNumber && (
+                      <div className="text-sm text-fg-muted">OEM: {p.oemPartNumber}</div>
+                    )}
+                    {p.reliabilityNotes && <p className="mt-1 text-sm text-fg-muted">{p.reliabilityNotes}</p>}
+                    {p.tags && p.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {p.tags.map((t) => (
+                          <Badge key={t} variant="outline" className="text-[10px]">
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <RateButton kind="part" id={p.id} count={p.usefulCount} />
+                </div>
               </CardContent>
             </Card>
           ))}

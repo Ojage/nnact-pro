@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { OrganizationHealthCard } from "@/components/repair-brain/organization-health-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -431,6 +432,8 @@ export default function RepairBrainPage() {
       {/* ── Landing: get started + review + contribute ── */}
       {!searched && (
         <div className="space-y-4">
+          <OrganizationHealthCard />
+
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>

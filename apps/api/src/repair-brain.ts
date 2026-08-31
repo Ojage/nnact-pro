@@ -22,6 +22,8 @@ import {
   jobs,
   jobEquipmentLinks,
   catalogItems,
+  partProcurementRecords,
+  testPoints,
 } from "@nnact/db";
 import {
   normalizeModelIdentifier,
@@ -463,6 +465,8 @@ export async function getModelRepairStats(orgId: string, equipmentModelId: strin
     );
 
   const byFault = new Map<string, { count: number; solutions: Map<string, number> }>();
+  const partUsage = new Map<string, { oem?: string; count: number; costCents?: number }>();
+  let recentOutcomeAt: Date | null = null;
   for (const o of outcomes) {
     const faultKey = o.knownFaultId ?? "unknown";
     const entry = byFault.get(faultKey) ?? { count: 0, solutions: new Map() };
@@ -471,6 +475,13 @@ export async function getModelRepairStats(orgId: string, equipmentModelId: strin
       entry.solutions.set(o.whatWasDone, (entry.solutions.get(o.whatWasDone) ?? 0) + 1);
     }
     byFault.set(faultKey, entry);
+    if (!recentOutcomeAt || o.createdAt > recentOutcomeAt) recentOutcomeAt = o.createdAt;
+    for (const part of o.partsUsed ?? []) {
+      const key = part.partName;
+      const tracked = partUsage.get(key) ?? { oem: part.oemPartNumber, count: 0 };
+      tracked.count++;
+      partUsage.set(key, tracked);
+    }
   }
 
   const successful = outcomes.filter((o) => o.outcome === "successful").length;
@@ -483,6 +494,7 @@ export async function getModelRepairStats(orgId: string, equipmentModelId: strin
     totalRepairs: outcomes.length,
     successfulRepairs: successful,
     averageLaborMinutes: avgLabor,
+    lastRepairAt: recentOutcomeAt?.toISOString() ?? null,
     byFault: Object.fromEntries(
       [...byFault.entries()].map(([k, v]) => [
         k,
@@ -495,6 +507,189 @@ export async function getModelRepairStats(orgId: string, equipmentModelId: strin
         },
       ]),
     ),
+    partUsage: Object.fromEntries(
+      [...partUsage.entries()]
+        .sort((a, b) => b[1].count - a[1].count)
+        .map(([k, v]) => [k, { oemPartNumber: v.oem ?? null, count: v.count }]),
+    ),
+  };
+}
+
+export async function computeModelInsights(orgId: string, equipmentModelId: string) {
+  const [faults, procedures, parts, points, docs] = await Promise.all([
+    db.select().from(knownFaults).where(eq(knownFaults.equipmentModelId, equipmentModelId)),
+    db.select().from(repairProcedures).where(eq(repairProcedures.equipmentModelId, equipmentModelId)),
+    db.select().from(modelParts).where(eq(modelParts.equipmentModelId, equipmentModelId)),
+    db.select().from(testPoints).where(eq(testPoints.equipmentModelId, equipmentModelId)),
+    db.select().from(technicalDocuments).where(eq(technicalDocuments.equipmentModelId, equipmentModelId)),
+  ]);
+
+  const stats = await getModelRepairStats(orgId, equipmentModelId);
+
+  const faultStats = await db
+    .select({ id: knownFaults.id, title: knownFaults.title, faultCode: knownFaults.faultCode })
+    .from(knownFaults)
+    .where(eq(knownFaults.equipmentModelId, equipmentModelId));
+
+  const errorCodeCounts = new Map<string, { title: string; count: number }>();
+  for (const o of await db.select().from(repairOutcomes).where(
+    and(eq(repairOutcomes.orgId, orgId), eq(repairOutcomes.equipmentModelId, equipmentModelId), eq(repairOutcomes.isFailedAttempt, false)),
+  )) {
+    const fault = o.knownFaultId ? faultStats.find((f) => f.id === o.knownFaultId) : undefined;
+    const key = fault?.faultCode ?? o.knownFaultId ?? "unknown";
+    const entry = errorCodeCounts.get(key) ?? { title: fault?.title ?? "Unknown", count: 0 };
+    entry.count++;
+    errorCodeCounts.set(key, entry);
+  }
+
+  const recurringFaults = [...errorCodeCounts.entries()]
+    .map(([id, v]) => ({ knownFaultId: id, ...v }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const procurement = await db
+    .select({
+      partName: modelParts.partName,
+      oemPartNumber: modelParts.oemPartNumber,
+      reliabilityNotes: modelParts.reliabilityNotes,
+      usefulCount: modelParts.usefulCount,
+      records: partProcurementRecords.purchasedAt,
+    })
+    .from(partProcurementRecords)
+    .innerJoin(modelParts, eq(partProcurementRecords.modelPartId, modelParts.id))
+    .where(eq(partProcurementRecords.orgId, orgId));
+
+  const partReliability = new Map<string, { name: string; oem?: string | null; timesProcured: number; note?: string | null }>();
+  for (const row of procurement) {
+    const entry = partReliability.get(row.partName) ?? {
+      name: row.partName,
+      oem: row.oemPartNumber,
+      timesProcured: 0,
+      note: row.reliabilityNotes,
+    };
+    entry.timesProcured++;
+    partReliability.set(row.partName, entry);
+  }
+
+  const faultCoverage = faults.map((f) => ({
+    id: f.id,
+    title: f.title,
+    faultCode: f.faultCode,
+    hasProcedure: procedures.some((p) => p.knownFaultId === f.id) || procedures.length > 0,
+    hasTestPoint: points.length > 0,
+    usefulCount: f.usefulCount,
+  }));
+
+  const verifiedCount = faults.filter((f) => f.verificationStatus === "verified").length;
+  const healthScore = faults.length === 0
+    ? 0
+    : Math.round(
+        (verifiedCount / faults.length) * 50 +
+          (procedures.length >= faults.length ? 25 : (procedures.length / Math.max(faults.length, 1)) * 25) +
+          (points.length >= faults.length ? 25 : (points.length / Math.max(faults.length, 1)) * 25),
+      );
+
+  return {
+    healthScore: Math.min(100, healthScore),
+    insightCounts: {
+      faults: faults.length,
+      procedures: procedures.length,
+      parts: parts.length,
+      testPoints: points.length,
+      documents: docs.length,
+      repairs: stats.totalRepairs,
+    },
+    successRate: stats.totalRepairs ? Math.round((stats.successfulRepairs / stats.totalRepairs) * 100) : 0,
+    lastRepairAt: stats.lastRepairAt,
+    recurringFaults,
+    partReliability: [...partReliability.values()].sort((a, b) => b.timesProcured - a.timesProcured),
+    topPartsUsed: Object.entries(stats.partUsage)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 8)
+      .map(([name, v]) => ({ name, ...v })),
+    coverage: { faultsWithProcedure: faultCoverage.filter((f) => f.hasProcedure).length, faults: faults.length, testPoints: points.length },
+    recency: await recentActivity(orgId, equipmentModelId),
+  };
+}
+
+/** Most recently referenced faults & procedures (recency feeding confidence decay). */
+async function recentActivity(orgId: string, equipmentModelId: string) {
+  const [faults, procedures] = await Promise.all([
+    db.select({ id: knownFaults.id, title: knownFaults.title, lastUsedAt: knownFaults.lastUsedAt }).from(knownFaults).where(eq(knownFaults.equipmentModelId, equipmentModelId)),
+    db.select({ id: repairProcedures.id, title: repairProcedures.title, lastUsedAt: repairProcedures.lastUsedAt }).from(repairProcedures).where(eq(repairProcedures.equipmentModelId, equipmentModelId)),
+  ]);
+  return [...faults.map((f) => ({ id: f.id, title: f.title, kind: "fault" as const, lastUsedAt: f.lastUsedAt })), ...procedures.map((p) => ({ id: p.id, title: p.title, kind: "procedure" as const, lastUsedAt: p.lastUsedAt }))]
+    .filter((x) => x.lastUsedAt)
+    .sort((a, b) => new Date(b.lastUsedAt!).getTime() - new Date(a.lastUsedAt!).getTime())
+    .slice(0, 5);
+}
+
+export async function computeOrgRepairBrainHealth(orgId: string) {
+  const [modelRows, faultRows, procRows, partRows, pointRows, docRows, outcomeRows] = await Promise.all([
+    db.select().from(equipmentModels).where(eq(equipmentModels.orgId, orgId)),
+    db.select().from(knownFaults).where(eq(knownFaults.orgId, orgId)),
+    db.select().from(repairProcedures).where(eq(repairProcedures.orgId, orgId)),
+    db.select().from(modelParts).where(eq(modelParts.orgId, orgId)),
+    db.select().from(testPoints).where(eq(testPoints.orgId, orgId)),
+    db.select().from(technicalDocuments).where(eq(technicalDocuments.orgId, orgId)),
+    db.select().from(repairOutcomes).where(eq(repairOutcomes.orgId, orgId)),
+  ]);
+
+  const totalKnowledge = modelRows.length + faultRows.length + procRows.length + partRows.length + pointRows.length + docRows.length;
+  const verifiedFaults = faultRows.filter((f) => f.verificationStatus === "verified").length;
+  const coveringFaults = faultRows.filter(
+    (f) => procRows.some((p) => p.knownFaultId === f.id) || pointRows.length > 0,
+  ).length;
+
+  const successful = outcomeRows.filter((o) => o.outcome === "successful" && !o.isFailedAttempt).length;
+  const orgHealth =
+    faultRows.length === 0
+      ? 0
+      : Math.round(
+          (verifiedFaults / faultRows.length) * 40 +
+            (coveringFaults / faultRows.length) * 30 +
+            (outcomeRows.length > 0 ? (successful / outcomeRows.length) * 30 : 0),
+        );
+
+  const topFaultCodes = new Map<string, { title: string; count: number }>();
+  for (const o of outcomeRows) {
+    if (o.isFailedAttempt) continue;
+    const fault = faultRows.find((f) => f.id === o.knownFaultId);
+    const key = fault?.faultCode ?? o.knownFaultId ?? "unknown";
+    const e = topFaultCodes.get(key) ?? { title: fault?.title ?? "Unknown", count: 0 };
+    e.count++;
+    topFaultCodes.set(key, e);
+  }
+
+  return {
+    healthScore: Math.min(100, orgHealth),
+    counts: {
+      models: modelRows.length,
+      faults: faultRows.length,
+      procedures: procRows.length,
+      parts: partRows.length,
+      testPoints: pointRows.length,
+      documents: docRows.length,
+      repairs: outcomeRows.length,
+      totalKnowledge,
+    },
+    verifiedFaults,
+    faultsWithCoverage: coveringFaults,
+    successRate: outcomeRows.length ? Math.round((successful / outcomeRows.length) * 100) : 0,
+    topFaultCodes: [...topFaultCodes.entries()]
+      .map(([id, v]) => ({ knownFaultId: id, ...v }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    modelsByKnowledge: modelRows
+      .map((m) => ({
+        id: m.id,
+        manufacturer: m.manufacturer,
+        modelNumber: m.modelNumber,
+        faults: faultRows.filter((f) => f.equipmentModelId === m.id).length,
+        hasCoverage: faultRows.some((f) => f.equipmentModelId === m.id) && (procRows.some((p) => p.equipmentModelId === m.id) || pointRows.some((p) => p.equipmentModelId === m.id)),
+      }))
+      .sort((a, b) => a.hasCoverage === b.hasCoverage ? 0 : a.hasCoverage ? 1 : -1)
+      .slice(0, 50),
   };
 }
 

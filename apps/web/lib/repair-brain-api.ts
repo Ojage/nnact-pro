@@ -59,15 +59,65 @@ export interface KnownFault {
   probableCauses: string[];
   confidenceStatus: string;
   verificationStatus: string;
+  tags?: string[];
+  usefulCount?: number;
+  lastUsedAt?: string | null;
   symptoms?: Array<{ id: string; label: string }>;
+}
+
+export interface RepairProcedure {
+  id: string;
+  equipmentModelId: string;
+  knownFaultId?: string | null;
+  title: string;
+  description?: string | null;
+  prerequisites?: string[];
+  safetyWarnings?: Array<{ type?: string; message?: string }>;
+  requiredTools?: string[];
+  requiredParts?: Array<{ partName: string; oemPartNumber?: string }>;
+  steps?: Array<{ sequence: number; instruction: string; warning?: string; tool?: string; verification?: string }>;
+  expectedDurationMinutes?: number | null;
+  skillLevel?: string | null;
+  verificationSteps?: string[];
+  tags?: string[];
+  usefulCount?: number;
+  lastUsedAt?: string | null;
+}
+
+export interface ModelPart {
+  id: string;
+  equipmentModelId: string;
+  partName: string;
+  oemPartNumber?: string | null;
+  manufacturer?: string | null;
+  alternativePartNumber?: string | null;
+  reliabilityNotes?: string | null;
+  lastKnownPriceCents?: number | null;
+  tags?: string[];
+  usefulCount?: number;
+}
+
+export interface TestPoint {
+  id: string;
+  equipmentModelId: string;
+  component?: string | null;
+  board?: string | null;
+  connector?: string | null;
+  pin?: string | null;
+  description?: string | null;
+  expectedMin?: string | null;
+  expectedMax?: string | null;
+  expectedExact?: string | null;
+  unit?: string | null;
+  warning?: string | null;
 }
 
 export interface ModelProfile {
   model: EquipmentModel;
   faults: KnownFault[];
-  repairProcedures: Array<{ id: string; title: string; description?: string | null }>;
-  parts: Array<{ id: string; partName: string; oemPartNumber?: string | null }>;
-  testPoints: Array<{ id: string; component?: string | null; description?: string | null }>;
+  repairProcedures: RepairProcedure[];
+  parts: ModelPart[];
+  testPoints: TestPoint[];
   documents: Array<{ id: string; title: string; documentType: string }>;
   explodedViews: Array<{ id: string; title: string }>;
   diagnosticWorkflows: Array<{ id: string; name: string }>;
@@ -75,7 +125,9 @@ export interface ModelProfile {
     totalRepairs: number;
     successfulRepairs: number;
     averageLaborMinutes: number;
+    lastRepairAt?: string | null;
     byFault: Record<string, { count: number; topSolutions: Array<{ action: string; count: number }> }>;
+    partUsage?: Record<string, { oemPartNumber?: string | null; count: number }>;
   };
   instanceCount: number;
 }
@@ -95,6 +147,50 @@ export interface EquipmentTimeline {
   diagnosticSessions: Array<Record<string, unknown>>;
   repairOutcomes: Array<Record<string, unknown>>;
   recentMeasurements: Array<Record<string, unknown>>;
+}
+
+export interface ModelInsights {
+  healthScore: number;
+  insightCounts: {
+    faults: number;
+    procedures: number;
+    parts: number;
+    testPoints: number;
+    documents: number;
+    repairs: number;
+  };
+  successRate: number;
+  lastRepairAt: string | null;
+  recurringFaults: Array<{ knownFaultId: string; title: string; count: number }>;
+  partReliability: Array<{ name: string; oem?: string | null; timesProcured: number; note?: string | null }>;
+  topPartsUsed: Array<{ name: string; count: number; oemPartNumber?: string | null }>;
+  coverage: { faultsWithProcedure: number; faults: number; testPoints: number };
+  recency: Array<{ id: string; title: string; kind: string; lastUsedAt: string | null }>;
+}
+
+export interface OrgRepairBrainHealth {
+  healthScore: number;
+  counts: {
+    models: number;
+    faults: number;
+    procedures: number;
+    parts: number;
+    testPoints: number;
+    documents: number;
+    repairs: number;
+    totalKnowledge: number;
+  };
+  verifiedFaults: number;
+  faultsWithCoverage: number;
+  successRate: number;
+  topFaultCodes: Array<{ knownFaultId: string; title: string; count: number }>;
+  modelsByKnowledge: Array<{
+    id: string;
+    manufacturer: string;
+    modelNumber: string;
+    faults: number;
+    hasCoverage: boolean;
+  }>;
 }
 
 export const repairBrainApi = {
