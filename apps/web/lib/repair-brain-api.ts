@@ -134,11 +134,30 @@ export interface ModelProfile {
 
 export interface RepairBrainSearchResults {
   models: Array<{ id: string; manufacturer: string; modelNumber: string; modelName?: string | null; category: string }>;
-  faults: Array<{ id: string; equipmentModelId: string; title: string; faultCode?: string | null }>;
+  faults: Array<{ id: string; equipmentModelId: string; title: string; faultCode?: string | null; snippet?: string }>;
   parts: Array<{ id: string; equipmentModelId: string; partName: string; oemPartNumber?: string | null }>;
-  procedures: Array<{ id: string; equipmentModelId: string; title: string; type: string }>;
-  documents: Array<{ id: string; title: string; documentType: string; equipmentModelId?: string | null }>;
-  repairHistory: Array<{ id: string; outcome: string; conclusion?: string | null; equipmentModelId?: string | null }>;
+  procedures: Array<{ id: string; equipmentModelId?: string | null; title: string; type: string; snippet?: string }>;
+  documents: Array<{ id: string; title: string; documentType: string; equipmentModelId?: string | null; snippet?: string }>;
+  repairHistory: Array<{ id: string; outcome: string; conclusion?: string | null; equipmentModelId?: string | null; snippet?: string }>;
+}
+
+export interface TrendingKnowledge {
+  hotQueries: Array<{ query: string; count: number }>;
+  helpfulFaults: Array<{ id: string; score: number; title: string; equipmentModelId?: string | null }>;
+  helpfulProcedures: Array<{ id: string; score: number; title: string; equipmentModelId?: string | null }>;
+  helpfulParts: Array<{ id: string; score: number; title: string; equipmentModelId?: string | null }>;
+}
+
+export interface SemanticSearchResult {
+  available: boolean;
+  hits: Array<{
+    kind: "fault" | "procedure" | "part";
+    id: string;
+    equipmentModelId: string | null;
+    title: string;
+    snippet: string;
+    score: number;
+  }>;
 }
 
 export interface EquipmentTimeline {

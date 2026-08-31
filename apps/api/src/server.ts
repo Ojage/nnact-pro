@@ -41,6 +41,7 @@ import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
 import { diagnosticOutputRoutes } from "./routes/diagnostic-outputs.js";
 import { voiceNoteRoutes } from "./routes/voice-notes.js";
 import { repairBrainRoutes } from "./routes/repair-brain.js";
+import { closeRedis } from "./repair-brain-cache.js";
 import { passwordChangeRequiredGuard } from "./password-change-guard.js";
 import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
 import { repairBrainAuthorizationGuard } from "./repair-brain-authorization.js";
@@ -87,6 +88,9 @@ export function buildServer(
     logger: true,
     bodyLimit: 1_048_576,
     trustProxy: process.env.TRUST_PROXY === "true",
+  });
+  app.addHook("onClose", async () => {
+    await closeRedis();
   });
   app.register(cors, {
     origin: resolveCorsOrigin(),

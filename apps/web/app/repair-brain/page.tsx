@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { OrganizationHealthCard } from "@/components/repair-brain/organization-health-card";
+import { TrendingPanel } from "@/components/repair-brain/trending-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +36,9 @@ import { LimitedTextarea } from "@/components/ui/limited-textarea";
 import {
   useCreateProposalMutation,
   useLazyRepairBrainSearchQuery,
+  useLazyRepairBrainSemanticSearchQuery,
   useRepairBrainProposalsQuery,
+  useRepairBrainSuggestionsQuery,
   useVerifyProposalMutation,
   type ProposalRow,
 } from "@/lib/redux/api";
@@ -100,10 +103,20 @@ export default function RepairBrainPage() {
   const canReview = session.user?.role === "owner" || session.user?.role === "dispatcher";
   const [query, setQuery] = useState("");
   const [searched, setSearched] = useState(false);
+  const [mode, setMode] = useState<"keyword" | "semantic">("keyword");
 
   const [triggerSearch, searchQuery] = useLazyRepairBrainSearchQuery();
+  const [triggerSemantic, semanticQuery] = useLazyRepairBrainSemanticSearchQuery();
   const results = searchQuery.data ?? EMPTY;
-  const searching = searchQuery.isFetching;
+  const searching = searchQuery.isFetching || semanticQuery.isFetching;
+
+  // ── Autocomplete ──
+  const [autoOpen, setAutoOpen] = useState(false);
+  const autoQuery = useRepairBrainSuggestionsQuery(
+    { q: query, kind: "all" },
+    { skip: query.trim().length < 2 },
+  );
+  const suggestions = autoQuery.data ?? [];
 
   // ── Contribute knowledge ──
   const [contributeOpen, setContributeOpen] = useState(false);
@@ -159,13 +172,17 @@ export default function RepairBrainPage() {
   const search = () => {
     if (query.trim().length < 2) return;
     setSearched(true);
-    void triggerSearch(query.trim());
+    setAutoOpen(false);
+    if (mode === "semantic") void triggerSemantic(query.trim());
+    else void triggerSearch(query.trim());
   };
 
   const runQuery = (next: string) => {
     setQuery(next);
+    setAutoOpen(false);
     setSearched(true);
-    void triggerSearch(next);
+    if (mode === "semantic") void triggerSemantic(next);
+    else void triggerSearch(next);
   };
 
   const clearSearch = () => {
@@ -202,9 +219,14 @@ export default function RepairBrainPage() {
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
+                  setAutoOpen(true);
                   if (!e.target.value) setSearched(false);
                 }}
-                onKeyDown={(e) => e.key === "Enter" && search()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") search();
+                  if (e.key === "Escape") setAutoOpen(false);
+                }}
+                onBlur={() => setTimeout(() => setAutoOpen(false), 150)}
                 placeholder="Search models, fault codes, parts, procedures…"
                 className="pl-9 pr-9"
                 aria-label="Search Repair Brain"
@@ -219,11 +241,49 @@ export default function RepairBrainPage() {
                   <X className="size-4" aria-hidden />
                 </button>
               )}
+              {autoOpen && query.trim().length >= 2 && suggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border border-border bg-surface-200 shadow-lg">
+                  {suggestions.slice(0, 8).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setQuery(s);
+                        runQuery(s);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-surface-300"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <Button onClick={search} loading={searching} disabled={query.trim().length < 2}>
               <Search aria-hidden />
               Search
             </Button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center rounded-lg border border-border bg-surface-200 p-0.5 text-xs" role="group" aria-label="Search mode">
+              <button
+                type="button"
+                onClick={() => setMode("keyword")}
+                className={`rounded-md px-2.5 py-1 transition-colors ${mode === "keyword" ? "bg-surface-300 font-semibold text-fg" : "text-fg-muted"}`}
+              >
+                Keyword
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("semantic")}
+                className={`rounded-md px-2.5 py-1 transition-colors ${mode === "semantic" ? "bg-surface-300 font-semibold text-fg" : "text-fg-muted"}`}
+              >
+                Semantic
+              </button>
+            </div>
+            <span className="text-xs text-fg-dim">Semantic search finds related faults &amp; procedures even when wording differs.</span>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -243,14 +303,16 @@ export default function RepairBrainPage() {
       </Card>
 
       {/* ── Results summary / status ── */}
-      {searched && !searchQuery.isError && (
+      {searched && !(mode === "semantic" ? semanticQuery.isError : searchQuery.isError) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-fg-muted">
             {searching
               ? "Searching the knowledge base…"
-              : `${total} result${total === 1 ? "" : "s"} for “${query.trim()}”`}
+              : mode === "semantic"
+                ? `${semanticQuery.data?.hits.length ?? 0} semantic hit${(semanticQuery.data?.hits.length ?? 0) === 1 ? "" : "s"} for “${query.trim()}”`
+                : `${total} result${total === 1 ? "" : "s"} for “${query.trim()}”`}
           </p>
-          {!searching && total > 0 && (
+          {!searching && mode !== "semantic" && total > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {CATEGORY_META.filter((c) => results[c.key].length > 0).map((c) => (
                 <Badge key={c.key} variant="secondary">
@@ -259,10 +321,17 @@ export default function RepairBrainPage() {
               ))}
             </div>
           )}
+          {!searching && mode === "semantic" && semanticQuery.data && semanticQuery.data.hits.length > 0 && (
+            <Badge variant="secondary">
+              {semanticQuery.data.hits.filter((h) => h.kind === "fault").length} faults ·{" "}
+              {semanticQuery.data.hits.filter((h) => h.kind === "procedure").length} procedures ·{" "}
+              {semanticQuery.data.hits.filter((h) => h.kind === "part").length} parts
+            </Badge>
+          )}
         </div>
       )}
 
-      {searched && searchQuery.isError && (
+      {searched && (mode === "semantic" ? semanticQuery.isError : searchQuery.isError) && (
         <div
           className="mb-4 flex flex-col gap-3 rounded-lg border border-red/30 bg-red/5 p-4 text-sm text-red sm:flex-row sm:items-center sm:justify-between"
           role="alert"
@@ -282,7 +351,27 @@ export default function RepairBrainPage() {
         </div>
       )}
 
-      {searched && !searchQuery.isError && !searching && total === 0 && (
+      {searched && !searching && mode === "semantic" && semanticQuery.data && semanticQuery.data.hits.length === 0 && (
+        <Card className="mb-4">
+          <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+            <Search className="size-6 text-fg-dim" aria-hidden />
+            <p className="font-medium">No semantic matches for “{query.trim()}”</p>
+            <p className="max-w-sm text-sm text-fg-muted">
+              Try switching to Keyword search, or broaden your wording to describe the fault or symptom.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setMode("keyword")}>
+                Switch to Keyword
+              </Button>
+              <Button size="sm" variant="ghost" onClick={clearSearch}>
+                Back to start
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {searched && mode !== "semantic" && !searchQuery.isError && !searching && total === 0 && (
         <Card className="mb-4">
           <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
             <Search className="size-6 text-fg-dim" aria-hidden />
@@ -304,8 +393,40 @@ export default function RepairBrainPage() {
         </Card>
       )}
 
+      {/* ── Semantic results ── */}
+      {searched && mode === "semantic" && !semanticQuery.isError && semanticQuery.data && semanticQuery.data.hits.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <ResultSection
+            title="Semantic matches"
+            count={semanticQuery.data.hits.length}
+            icon={Sparkles}
+          >
+            {semanticQuery.data.hits.map((h) => (
+              <Link
+                key={`${h.kind}-${h.id}`}
+                href={h.equipmentModelId ? `/repair-brain/models/${h.equipmentModelId}` : "/repair-brain/models"}
+                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+              >
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate font-medium">{h.title}</span>
+                    <Badge variant="secondary">{h.kind}</Badge>
+                    <span className="text-[11px] tabular-nums text-fg-dim">{Math.round(h.score * 100)}%</span>
+                  </span>
+                  {h.snippet && <span className="mt-1 block text-xs text-fg-muted">{h.snippet}</span>}
+                </span>
+                <ChevronRight
+                  className="mt-1 size-4 shrink-0 text-fg-dim transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </Link>
+            ))}
+          </ResultSection>
+        </div>
+      )}
+
       {/* ── Results ── */}
-      {searched && !searchQuery.isError && (
+      {searched && mode !== "semantic" && !searchQuery.isError && (
         <div className="grid gap-4 md:grid-cols-2">
           <ResultSection title="Models" count={results.models.length} icon={Boxes}>
             {results.models.map((m) => (
@@ -345,6 +466,7 @@ export default function RepairBrainPage() {
                       </span>
                     )}
                   </span>
+                  {f.snippet && <span className="mt-1 block text-xs text-fg-muted">{f.snippet}</span>}
                   <span className="mt-0.5 block text-xs text-fg-dim">View model profile</span>
                 </span>
                 <ChevronRight
@@ -383,7 +505,10 @@ export default function RepairBrainPage() {
                 href={p.equipmentModelId ? `/repair-brain/models/${p.equipmentModelId}` : "/diagnostic-library"}
                 className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
               >
-                <span className="min-w-0 truncate font-medium">{p.title}</span>
+                <span className="min-w-0">
+                  <span className="truncate font-medium">{p.title}</span>
+                  {p.snippet && <span className="mt-1 block text-xs text-fg-muted">{p.snippet}</span>}
+                </span>
                 <Badge variant="outline" className="shrink-0 capitalize">
                   {p.type}
                 </Badge>
@@ -398,7 +523,10 @@ export default function RepairBrainPage() {
                 href={d.equipmentModelId ? `/repair-brain/models/${d.equipmentModelId}` : "/repair-brain"}
                 className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
               >
-                <span className="min-w-0 truncate font-medium">{d.title}</span>
+                <span className="min-w-0">
+                  <span className="truncate font-medium">{d.title}</span>
+                  {d.snippet && <span className="mt-1 block text-xs text-fg-muted">{d.snippet}</span>}
+                </span>
                 <Badge variant="outline" className="shrink-0 capitalize">
                   {d.documentType.replaceAll("_", " ")}
                 </Badge>
@@ -417,6 +545,7 @@ export default function RepairBrainPage() {
                   <Badge variant="secondary" className="shrink-0 capitalize">
                     {r.outcome.replaceAll("_", " ")}
                   </Badge>
+                  {r.snippet && <span className="mt-1 block text-xs text-fg-muted">{r.snippet}</span>}
                   {r.conclusion && <span className="mt-1 block text-sm text-fg-muted">{r.conclusion}</span>}
                 </div>
                 <ChevronRight
@@ -433,6 +562,7 @@ export default function RepairBrainPage() {
       {!searched && (
         <div className="space-y-4">
           <OrganizationHealthCard />
+          <TrendingPanel />
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card>

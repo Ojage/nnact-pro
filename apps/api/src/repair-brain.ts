@@ -869,9 +869,31 @@ export async function linkEquipmentToModel(orgId: string, equipmentId: string, c
   return { equipment: updated, model, created };
 }
 
+function makeSnippet(text: string, terms: string[]): string {
+  const clean = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const lower = clean.toLowerCase();
+  let idx = -1;
+  let needleLen = 0;
+  for (const t of terms) {
+    const at = lower.indexOf(t);
+    if (at >= 0 && (idx === -1 || at < idx)) {
+      idx = at;
+      needleLen = t.length;
+    }
+  }
+  if (idx === -1) return clean.length > 160 ? `${clean.slice(0, 160)}…` : clean;
+  void needleLen;
+  const start = Math.max(0, idx - 60);
+  const end = Math.min(clean.length, idx + 100);
+  const prefix = start > 0 ? "…" : "";
+  const suffix = end < clean.length ? "…" : "";
+  return `${prefix}${clean.slice(start, end)}${suffix}`;
+}
+
 export async function searchRepairBrain(orgId: string, query: string, limit = 8) {
   const term = `%${query.trim()}%`;
-
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const [models, faults, parts, procedures, documents, repairHistory] = await Promise.all([
     db
       .select({
@@ -882,6 +904,7 @@ export async function searchRepairBrain(orgId: string, query: string, limit = 8)
         category: equipmentModels.category,
       })
       .from(equipmentModels)
+
       .where(
         and(
           eq(equipmentModels.orgId, orgId),
@@ -900,6 +923,7 @@ export async function searchRepairBrain(orgId: string, query: string, limit = 8)
         equipmentModelId: knownFaults.equipmentModelId,
         title: knownFaults.title,
         faultCode: knownFaults.faultCode,
+        description: knownFaults.description,
       })
       .from(knownFaults)
       .where(
@@ -912,7 +936,8 @@ export async function searchRepairBrain(orgId: string, query: string, limit = 8)
           ),
         ),
       )
-      .limit(limit),
+      .limit(limit)
+      .then((rows) => rows.map((r) => ({ ...r, snippet: makeSnippet(r.description || `${r.title} ${r.faultCode ?? ""}`, terms) }))),
     db
       .select({
         id: modelParts.id,
@@ -937,26 +962,31 @@ export async function searchRepairBrain(orgId: string, query: string, limit = 8)
         id: repairProcedures.id,
         equipmentModelId: repairProcedures.equipmentModelId,
         title: repairProcedures.title,
+        description: repairProcedures.description,
       })
       .from(repairProcedures)
       .where(and(eq(repairProcedures.orgId, orgId), ilike(repairProcedures.title, term)))
-      .limit(limit),
+      .limit(limit)
+      .then((rows) => rows.map((r) => ({ ...r, snippet: makeSnippet(r.description || r.title, terms) }))),
     db
       .select({
         id: technicalDocuments.id,
         title: technicalDocuments.title,
         documentType: technicalDocuments.documentType,
         equipmentModelId: technicalDocuments.equipmentModelId,
+        notes: technicalDocuments.notes,
       })
       .from(technicalDocuments)
       .where(and(eq(technicalDocuments.orgId, orgId), ilike(technicalDocuments.title, term)))
-      .limit(limit),
+      .limit(limit)
+      .then((rows) => rows.map((r) => ({ ...r, snippet: makeSnippet(r.notes || r.title, terms) }))),
     db
       .select({
         id: repairOutcomes.id,
         equipmentModelId: repairOutcomes.equipmentModelId,
         outcome: repairOutcomes.outcome,
         conclusion: repairOutcomes.conclusion,
+        whatWasDone: repairOutcomes.whatWasDone,
       })
       .from(repairOutcomes)
       .where(
@@ -965,7 +995,10 @@ export async function searchRepairBrain(orgId: string, query: string, limit = 8)
           or(ilike(repairOutcomes.conclusion, term), ilike(repairOutcomes.whatWasDone, term)),
         ),
       )
-      .limit(limit),
+      .limit(limit)
+      .then((rows) =>
+        rows.map((r) => ({ ...r, snippet: makeSnippet(r.conclusion || r.whatWasDone || "", terms) })),
+      ),
   ]);
 
   const diagnosticProcedures = await db

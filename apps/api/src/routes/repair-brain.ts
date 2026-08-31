@@ -56,6 +56,17 @@ import {
   computeOrgRepairBrainHealth,
 } from "../repair-brain.js";
 
+import {
+  cacheGetJSON,
+  cacheSetJSON,
+  invalidateByPrefix,
+  counterIncr,
+  counterTop,
+  suggestAdd,
+  suggestLookup,
+} from "../repair-brain-cache.js";
+import { semanticSearch, warmSemanticIndex } from "../repair-brain-semantic.js";
+
 const modelCreateSchema = z.object({
   manufacturer: z.string().min(1),
   brand: z.string().optional(),
@@ -145,6 +156,93 @@ async function resolveUserId(req: Parameters<typeof resolveOrgId>[0]): Promise<s
   }
 }
 
+type RepairBrainSearchResult = Awaited<ReturnType<typeof searchRepairBrain>>;
+
+async function seedSuggestions(
+  orgId: string,
+  query: string,
+  result: RepairBrainSearchResult,
+): Promise<void> {
+  const tokens = query.trim().split(/\s+/).filter(Boolean);
+  for (const t of tokens.slice(0, 3)) {
+    if (t.length < 2) continue;
+    await suggestAdd(orgId, "query", t);
+  }
+  for (const m of result.models.slice(0, 5)) {
+    await suggestAdd(orgId, "model", `${m.manufacturer ?? ""} ${m.modelNumber ?? ""}`.trim());
+  }
+  for (const f of result.faults.slice(0, 5)) {
+    if (f.faultCode) await suggestAdd(orgId, "faultCode", f.faultCode);
+  }
+  for (const p of result.parts.slice(0, 5)) {
+    await suggestAdd(orgId, "part", p.partName);
+  }
+}
+
+interface ModelProfileResult {
+  model: typeof equipmentModels.$inferSelect;
+  faults: Array<typeof knownFaults.$inferSelect>;
+  repairProcedures: Array<typeof repairProcedures.$inferSelect>;
+  parts: Array<typeof modelParts.$inferSelect>;
+  testPoints: Array<typeof testPoints.$inferSelect>;
+  documents: Array<typeof technicalDocuments.$inferSelect>;
+  explodedViews: Array<typeof explodedViews.$inferSelect>;
+  diagnosticWorkflows: Array<typeof diagnosticWorkflows.$inferSelect>;
+  repairStats: Awaited<ReturnType<typeof getModelRepairStats>>;
+  instanceCount: number;
+}
+
+async function buildModelProfile(orgId: string, id: string): Promise<ModelProfileResult> {
+  const [model] = await db
+    .select()
+    .from(equipmentModels)
+    .where(and(eq(equipmentModels.orgId, orgId), eq(equipmentModels.id, id)));
+
+  const [faults, procedures, parts, points, docs, views, stats, instances] = await Promise.all([
+    db.select().from(knownFaults).where(eq(knownFaults.equipmentModelId, id)),
+    db.select().from(repairProcedures).where(eq(repairProcedures.equipmentModelId, id)),
+    db.select().from(modelParts).where(eq(modelParts.equipmentModelId, id)),
+    db.select().from(testPoints).where(eq(testPoints.equipmentModelId, id)),
+    db.select().from(technicalDocuments).where(eq(technicalDocuments.equipmentModelId, id)),
+    db.select().from(explodedViews).where(eq(explodedViews.equipmentModelId, id)),
+    getModelRepairStats(orgId, id),
+    db
+      .select({ id: equipment.id, serialNumber: equipment.serialNumber, customerId: equipment.customerId })
+      .from(equipment)
+      .where(and(eq(equipment.orgId, orgId), eq(equipment.equipmentModelId, id)))
+      .limit(50),
+  ]);
+
+  const workflowLinks = await db
+    .select({ ext: diagnosticWorkflowExtensions, workflow: diagnosticWorkflows })
+    .from(diagnosticWorkflowExtensions)
+    .innerJoin(diagnosticWorkflows, eq(diagnosticWorkflowExtensions.workflowId, diagnosticWorkflows.id))
+    .where(eq(diagnosticWorkflowExtensions.equipmentModelId, id));
+
+  return {
+    model: model!,
+    faults,
+    repairProcedures: procedures,
+    parts,
+    testPoints: points,
+    documents: docs,
+    explodedViews: views,
+    diagnosticWorkflows: workflowLinks.map((w) => w.workflow),
+    repairStats: stats,
+    instanceCount: instances.length,
+  };
+}
+
+async function invalidateOrgCache(orgId: string): Promise<void> {
+  await invalidateByPrefix(`rb:org:${orgId}:`);
+}
+
+async function invalidateModelCache(orgId: string, modelId: string): Promise<void> {
+  await invalidateByPrefix(`rb:org:${orgId}:model:${modelId}:`);
+  await invalidateByPrefix(`rb:org:${orgId}:search:`);
+  await invalidateByPrefix(`rb:org:${orgId}:overview`);
+}
+
 export async function repairBrainRoutes(app: FastifyInstance) {
   // ── Search ──────────────────────────────────────────────────────────
   app.get("/search", async (req) => {
@@ -153,7 +251,19 @@ export async function repairBrainRoutes(app: FastifyInstance) {
     if (!q || q.trim().length < 2) {
       return { models: [], faults: [], parts: [], procedures: [], documents: [], repairHistory: [] };
     }
-    return searchRepairBrain(orgId, q);
+    const cacheKey = `rb:org:${orgId}:search:${q.trim().toLowerCase()}`;
+    const cached = await cacheGetJSON<
+      RepairBrainSearchResult[]
+    >(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    const result = await searchRepairBrain(orgId, q);
+    await cacheSetJSON(cacheKey, result, 120);
+    await seedSuggestions(orgId, q, result);
+    await counterIncr(`rb:org:${orgId}:trending:queries`, q.trim().toLowerCase());
+    void warmSemanticIndex(orgId);
+    return result;
   });
 
   // ── Equipment Models ────────────────────────────────────────────────
@@ -189,39 +299,12 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       .where(and(eq(equipmentModels.orgId, orgId), eq(equipmentModels.id, id)));
     if (!model) return reply.code(404).send({ error: "model not found" });
 
-    const [faults, procedures, parts, points, docs, views, stats, instances] = await Promise.all([
-      db.select().from(knownFaults).where(eq(knownFaults.equipmentModelId, id)),
-      db.select().from(repairProcedures).where(eq(repairProcedures.equipmentModelId, id)),
-      db.select().from(modelParts).where(eq(modelParts.equipmentModelId, id)),
-      db.select().from(testPoints).where(eq(testPoints.equipmentModelId, id)),
-      db.select().from(technicalDocuments).where(eq(technicalDocuments.equipmentModelId, id)),
-      db.select().from(explodedViews).where(eq(explodedViews.equipmentModelId, id)),
-      getModelRepairStats(orgId, id),
-      db
-        .select({ id: equipment.id, serialNumber: equipment.serialNumber, customerId: equipment.customerId })
-        .from(equipment)
-        .where(and(eq(equipment.orgId, orgId), eq(equipment.equipmentModelId, id)))
-        .limit(50),
-    ]);
-
-    const workflowLinks = await db
-      .select({ ext: diagnosticWorkflowExtensions, workflow: diagnosticWorkflows })
-      .from(diagnosticWorkflowExtensions)
-      .innerJoin(diagnosticWorkflows, eq(diagnosticWorkflowExtensions.workflowId, diagnosticWorkflows.id))
-      .where(eq(diagnosticWorkflowExtensions.equipmentModelId, id));
-
-    return {
-      model,
-      faults,
-      repairProcedures: procedures,
-      parts,
-      testPoints: points,
-      documents: docs,
-      explodedViews: views,
-      diagnosticWorkflows: workflowLinks.map((w) => w.workflow),
-      repairStats: stats,
-      instanceCount: instances.length,
-    };
+    const cacheKey = `rb:org:${orgId}:model:${id}:profile`;
+    const cached = await cacheGetJSON<ModelProfileResult>(cacheKey);
+    if (cached) return cached;
+    const result = await buildModelProfile(orgId, id);
+    await cacheSetJSON(cacheKey, result, 300);
+    return result;
   });
 
   app.post("/models", async (req, reply) => {
@@ -230,6 +313,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const userId = await resolveUserId(req);
     const result = await upsertEquipmentModel(orgId, parsed.data, userId);
+    await invalidateOrgCache(orgId);
     return reply.code(result.created ? 201 : 200).send(result);
   });
 
@@ -253,6 +337,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       .set({ ...parsed.data, updatedAt: new Date() })
       .where(and(eq(equipmentModels.orgId, orgId), eq(equipmentModels.id, id)))
       .returning();
+    await invalidateModelCache(orgId, id);
     return updated;
   });
 
@@ -265,16 +350,120 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       .from(equipmentModels)
       .where(and(eq(equipmentModels.orgId, orgId), eq(equipmentModels.id, id)));
     if (!model) return reply.code(404).send({ error: "model not found" });
-    return computeModelInsights(orgId, id);
+    const cacheKey = `rb:org:${orgId}:model:${id}:insights`;
+    const cached = await cacheGetJSON<Record<string, unknown>>(cacheKey);
+    if (cached) return cached;
+    const insights = await computeModelInsights(orgId, id);
+    await cacheSetJSON(cacheKey, insights, 180);
+    return insights;
   });
 
   app.get("/insights/overview", async (req) => {
     const orgId = await resolveOrgId(req);
-    return computeOrgRepairBrainHealth(orgId);
+    const cacheKey = `rb:org:${orgId}:overview`;
+    const cached = await cacheGetJSON<Record<string, unknown>>(cacheKey);
+    if (cached) return cached;
+    const overview = await computeOrgRepairBrainHealth(orgId);
+    await cacheSetJSON(cacheKey, overview, 180);
+    return overview;
+  });
+
+  // ── Typeahead autocomplete ──────────────────────────────────────────
+  app.get("/autocomplete", async (req) => {
+    const orgId = await resolveOrgId(req);
+    const { q, kind } = req.query as { q?: string; kind?: string };
+    if (!q || q.trim().length < 2) return [];
+    const candidates = await suggestLookup(orgId, kind && kind !== "all" ? kind : "query", q.trim());
+    if (candidates.length > 0) return candidates;
+    // Seed from a lightweight DB scan on a cold cache so the first request still returns.
+    return db
+      .select({ label: sql<string>`${equipmentModels.manufacturer} || ' ' || ${equipmentModels.modelNumber}` })
+      .from(equipmentModels)
+      .where(and(eq(equipmentModels.orgId, orgId), sql`(${equipmentModels.manufacturer} || ' ' || ${equipmentModels.modelNumber}) ILIKE ${`%${q.trim()}%`}`))
+      .limit(8)
+      .then((rows) => rows.map((r) => r.label));
+  });
+
+  // ── Semantic (vector) search ────────────────────────────────────────
+  app.get("/semantic-search", async (req) => {
+    const orgId = await resolveOrgId(req);
+    const { q, limit } = req.query as { q?: string; limit?: string };
+    if (!q || q.trim().length < 2) return { available: true, hits: [] };
+    const n = Math.min(20, Math.max(1, Number(limit) || 8));
+    const cacheKey = `rb:org:${orgId}:semantic:${q.trim().toLowerCase()}:${n}`;
+    const cached = await cacheGetJSON<Record<string, unknown>>(cacheKey);
+    if (cached) return cached;
+    const result = await semanticSearch(orgId, q, n);
+    await cacheSetJSON(cacheKey, result, 600);
+    return result;
+  });
+
+  // ── Trending / hot knowledge ────────────────────────────────────────
+  app.get("/trending", async (req) => {
+    const orgId = await resolveOrgId(req);
+    const cacheKey = `rb:org:${orgId}:trending`;
+    const cached = await cacheGetJSON<Record<string, unknown>>(cacheKey);
+    if (cached) return cached;
+
+    const [queries, helpfulFaults, helpfulProcedures, helpfulParts] = await Promise.all([
+      counterTop(`rb:org:${orgId}:trending:queries`, 10),
+      counterTop(`rb:org:${orgId}:trending:helpful:fault`, 10),
+      counterTop(`rb:org:${orgId}:trending:helpful:procedure`, 10),
+      counterTop(`rb:org:${orgId}:trending:helpful:part`, 10),
+    ]);
+
+    const resolveFaults = async (ids: Array<{ id: string; score: number }>) => {
+      if (ids.length === 0) return [];
+      const rows = await db
+        .select({ id: knownFaults.id, title: knownFaults.title, equipmentModelId: knownFaults.equipmentModelId })
+        .from(knownFaults)
+        .where(and(eq(knownFaults.orgId, orgId), sql`${knownFaults.id} = ANY(${ids.map((x) => x.id)}::uuid[])`));
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      return ids.flatMap((x) => {
+        const row = byId.get(x.id);
+        return row ? [{ id: x.id, score: x.score, title: row.title, equipmentModelId: row.equipmentModelId }] : [];
+      });
+    };
+
+    const resolveProcedures = async (ids: Array<{ id: string; score: number }>) => {
+      if (ids.length === 0) return [];
+      const rows = await db
+        .select({ id: repairProcedures.id, title: repairProcedures.title, equipmentModelId: repairProcedures.equipmentModelId })
+        .from(repairProcedures)
+        .where(and(eq(repairProcedures.orgId, orgId), sql`${repairProcedures.id} = ANY(${ids.map((x) => x.id)}::uuid[])`));
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      return ids.flatMap((x) => {
+        const row = byId.get(x.id);
+        return row ? [{ id: x.id, score: x.score, title: row.title, equipmentModelId: row.equipmentModelId }] : [];
+      });
+    };
+
+    const resolveParts = async (ids: Array<{ id: string; score: number }>) => {
+      if (ids.length === 0) return [];
+      const rows = await db
+        .select({ id: modelParts.id, title: modelParts.partName, equipmentModelId: modelParts.equipmentModelId })
+        .from(modelParts)
+        .where(and(eq(modelParts.orgId, orgId), sql`${modelParts.id} = ANY(${ids.map((x) => x.id)}::uuid[])`));
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      return ids.flatMap((x) => {
+        const row = byId.get(x.id);
+        return row ? [{ id: x.id, score: x.score, title: row.title, equipmentModelId: row.equipmentModelId }] : [];
+      });
+    };
+
+    const result = {
+      hotQueries: queries.map((x) => ({ query: x.id, count: x.score })),
+      helpfulFaults: await resolveFaults(helpfulFaults),
+      helpfulProcedures: await resolveProcedures(helpfulProcedures),
+      helpfulParts: await resolveParts(helpfulParts),
+    };
+    await cacheSetJSON(cacheKey, result, 120);
+    return result;
   });
 
   app.post("/import", async (req, reply) => {
     const orgId = await resolveOrgId(req);
+    await invalidateOrgCache(orgId);
     const body = req.body as {
       models?: Array<Record<string, unknown>>;
       faults?: Array<Record<string, unknown>>;
@@ -402,11 +591,11 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       await db.insert(faultSymptoms).values({ orgId, faultId: fault.id, symptomId: symptom.id }).onConflictDoNothing();
     }
 
+    await invalidateModelCache(orgId, fault.equipmentModelId);
     return reply.code(201).send({ fault, similarExisting: similar });
   });
 
-  app.get("/faults/:id", async (req, reply) => {
-    const orgId = await resolveOrgId(req);
+  app.get("/faults/:id", async (req, reply) => {    const orgId = await resolveOrgId(req);
     const { id } = req.params as { id: string };
     const [fault] = await db
       .select()
@@ -440,6 +629,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       .where(and(eq(knownFaults.orgId, orgId), eq(knownFaults.id, id)))
       .returning();
     if (!fault) return reply.code(404).send({ error: "fault not found" });
+    await invalidateModelCache(orgId, fault.equipmentModelId);
     return fault;
   });
 
@@ -476,6 +666,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       })
       .where(and(eq(knownFaults.orgId, orgId), eq(knownFaults.id, id)))
       .returning();
+    await invalidateModelCache(orgId, updated.equipmentModelId);
     return updated;
   });
 
@@ -488,6 +679,8 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       .where(and(eq(knownFaults.orgId, orgId), eq(knownFaults.id, id)))
       .returning();
     if (!updated) return reply.code(404).send({ error: "fault not found" });
+    await counterIncr(`rb:org:${orgId}:trending:helpful:fault`, id);
+    await invalidateModelCache(orgId, updated.equipmentModelId);
     return updated;
   });
 
@@ -539,6 +732,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
         createdBy: userId,
       })
       .returning();
+    await invalidateModelCache(orgId, procedure.equipmentModelId);
     return reply.code(201).send(procedure);
   });
 
@@ -573,6 +767,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       })
       .where(and(eq(repairProcedures.orgId, orgId), eq(repairProcedures.id, id)))
       .returning();
+    await invalidateModelCache(orgId, updated.equipmentModelId);
     return updated;
   });
 
@@ -585,6 +780,8 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       .where(and(eq(repairProcedures.orgId, orgId), eq(repairProcedures.id, id)))
       .returning();
     if (!updated) return reply.code(404).send({ error: "procedure not found" });
+    await counterIncr(`rb:org:${orgId}:trending:helpful:procedure`, id);
+    await invalidateModelCache(orgId, updated.equipmentModelId);
     return updated;
   });
 
@@ -641,6 +838,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
         createdBy: userId,
       })
       .returning();
+    await invalidateModelCache(orgId, point.equipmentModelId);
     return reply.code(201).send(point);
   });
 
@@ -673,6 +871,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       })
       .where(and(eq(testPoints.orgId, orgId), eq(testPoints.id, id)))
       .returning();
+    await invalidateModelCache(orgId, updated.equipmentModelId);
     return updated;
   });
 
@@ -706,6 +905,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
         createdBy: userId,
       })
       .returning();
+    await invalidateModelCache(orgId, part.equipmentModelId);
     return reply.code(201).send(part);
   });
 
@@ -738,6 +938,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       })
       .where(and(eq(modelParts.orgId, orgId), eq(modelParts.id, id)))
       .returning();
+    await invalidateModelCache(orgId, updated.equipmentModelId);
     return updated;
   });
 
@@ -750,6 +951,8 @@ export async function repairBrainRoutes(app: FastifyInstance) {
       .where(and(eq(modelParts.orgId, orgId), eq(modelParts.id, id)))
       .returning();
     if (!updated) return reply.code(404).send({ error: "part not found" });
+    await counterIncr(`rb:org:${orgId}:trending:helpful:part`, id);
+    await invalidateModelCache(orgId, updated.equipmentModelId);
     return updated;
   });
 

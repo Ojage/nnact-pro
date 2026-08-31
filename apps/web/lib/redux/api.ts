@@ -16,6 +16,8 @@ import type {
   ModelInsights,
   OrgRepairBrainHealth,
   RepairBrainSearchResults,
+  TrendingKnowledge,
+  SemanticSearchResult,
 } from "@/lib/repair-brain-api";
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import type { PortalLinkDTO, PortalLinkScope, DocumentHubEntryDTO } from "@/lib/api";
@@ -488,6 +490,18 @@ export const apiSlice = createApi({
       query: (body) => ({ url: "/api/repair-brain/import", method: "POST", body }),
       invalidatesTags: ["RepairBrain"],
     }),
+    repairBrainTrending: builder.query<TrendingKnowledge, void>({
+      query: () => "/api/repair-brain/trending",
+      providesTags: ["RepairBrain"],
+    }),
+    repairBrainSemanticSearch: builder.query<SemanticSearchResult, string>({
+      query: (q) => `/api/repair-brain/semantic-search?q=${encodeURIComponent(q)}&limit=8`,
+      providesTags: ["RepairBrain"],
+    }),
+    repairBrainSuggestions: builder.query<string[], { q: string; kind?: string }>({
+      query: ({ q, kind }) => `/api/repair-brain/autocomplete?q=${encodeURIComponent(q)}${kind ? `&kind=${kind}` : ""}`,
+      providesTags: ["RepairBrain"],
+    }),
     createKnownFault: builder.mutation<{ fault: Record<string, unknown>; similarExisting: unknown[] }, Record<string, unknown>>({
       query: (body) => ({ url: "/api/repair-brain/faults", method: "POST", body }),
       invalidatesTags: ["RepairBrain"],
@@ -616,6 +630,10 @@ export const {
   usePatchModelPartMutation,
   usePatchTestPointMutation,
   useImportRepairBrainMutation,
+  useRepairBrainTrendingQuery,
+  useRepairBrainSemanticSearchQuery,
+  useLazyRepairBrainSemanticSearchQuery,
+  useRepairBrainSuggestionsQuery,
   useDocumentsHubQuery,
   useLazyGlobalSearchQuery,
 } = apiSlice;
