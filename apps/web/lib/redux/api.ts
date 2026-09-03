@@ -30,6 +30,24 @@ import type {
   TrendingKnowledge,
   SemanticSearchResult,
 } from "@/lib/repair-brain-api";
+import type {
+  ComponentKind,
+  EquipmentCategoryDTO,
+  EquipmentCategoryTemplate,
+  EquipmentComponentDTO,
+  EquipmentConnectorDTO,
+  EquipmentErrorCodeDTO,
+  EquipmentSubsystemDTO,
+  EquipmentSystemDTO,
+  EquipmentTaxonomyDTO,
+  EquipmentTerminalDTO,
+  KnowledgeArticleDTO,
+  KnowledgeEdgeDTO,
+  KnowledgeTemplateSection,
+  MeasurementPointDTO,
+  OperatingSequenceDTO,
+  ServiceModeDTO,
+} from "@nnact/shared";
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import type { PortalLinkDTO, PortalLinkScope, DocumentHubEntryDTO } from "@/lib/api";
 
@@ -640,6 +658,227 @@ export const apiSlice = createApi({
       providesTags: ["RepairBrain"],
     }),
 
+    // ── Model Workspace / Knowledge Composer ──
+    workspaceCategories: builder.query<EquipmentCategoryDTO[], void>({
+      query: () => "/api/repair-brain/categories",
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceCategory: builder.query<EquipmentCategoryDTO & { sections: unknown[] }, string>({
+      query: (id) => `/api/repair-brain/categories/${id}`,
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceTaxonomy: builder.query<EquipmentTaxonomyDTO, string>({
+      query: (categoryId) => `/api/repair-brain/taxonomy/${categoryId}`,
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceSystems: builder.query<EquipmentSystemDTO[], string | undefined>({
+      query: (categoryId) => `/api/repair-brain/systems${categoryId ? `?categoryId=${categoryId}` : ""}`,
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceSubsystems: builder.query<EquipmentSubsystemDTO[], string | undefined>({
+      query: (systemId) => `/api/repair-brain/subsystems${systemId ? `?systemId=${systemId}` : ""}`,
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceComponents: builder.query<EquipmentComponentDTO[], string | undefined>({
+      query: (subsystemId) => `/api/repair-brain/components${subsystemId ? `?subsystemId=${subsystemId}` : ""}`,
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceErrorCodes: builder.query<EquipmentErrorCodeDTO[], { equipmentModelId?: string; categoryId?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.equipmentModelId) qs.set("equipmentModelId", params.equipmentModelId);
+        if (params?.categoryId) qs.set("categoryId", params.categoryId);
+        const suffix = qs.toString();
+        return `/api/repair-brain/errors${suffix ? `?${suffix}` : ""}`;
+      },
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceSequences: builder.query<OperatingSequenceDTO[], { equipmentModelId?: string; categoryId?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.equipmentModelId) qs.set("equipmentModelId", params.equipmentModelId);
+        if (params?.categoryId) qs.set("categoryId", params.categoryId);
+        const suffix = qs.toString();
+        return `/api/repair-brain/sequences${suffix ? `?${suffix}` : ""}`;
+      },
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceServiceModes: builder.query<ServiceModeDTO[], { equipmentModelId?: string; categoryId?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.equipmentModelId) qs.set("equipmentModelId", params.equipmentModelId);
+        if (params?.categoryId) qs.set("categoryId", params.categoryId);
+        const suffix = qs.toString();
+        return `/api/repair-brain/service-modes${suffix ? `?${suffix}` : ""}`;
+      },
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceArticles: builder.query<KnowledgeArticleDTO[], { equipmentModelId?: string; categoryId?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.equipmentModelId) qs.set("equipmentModelId", params.equipmentModelId);
+        if (params?.categoryId) qs.set("categoryId", params.categoryId);
+        const suffix = qs.toString();
+        return `/api/repair-brain/articles${suffix ? `?${suffix}` : ""}`;
+      },
+      providesTags: ["RepairBrain"],
+    }),
+    workspaceEdges: builder.query<KnowledgeEdgeDTO[], { equipmentModelId?: string; categoryId?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.equipmentModelId) qs.set("equipmentModelId", params.equipmentModelId);
+        if (params?.categoryId) qs.set("categoryId", params.categoryId);
+        const suffix = qs.toString();
+        return `/api/repair-brain/edges${suffix ? `?${suffix}` : ""}`;
+      },
+      providesTags: ["RepairBrain"],
+    }),
+    createWorkspaceCategory: builder.mutation<EquipmentCategoryDTO, { name: string; description?: string }>({
+      query: (body) => ({ url: "/api/repair-brain/categories", method: "POST", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    updateWorkspaceCategory: builder.mutation<
+      EquipmentCategoryDTO,
+      { id: string; body: Partial<{ name: string; description?: string | null }> }
+    >({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/categories/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceCategory: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/categories/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    putTemplateSections: builder.mutation<
+      EquipmentCategoryDTO,
+      { id: string; sections: Array<{ sectionKey: string; label: string; group?: string | null; kind?: string; ordinal: number }> }
+    >({
+      query: ({ id, sections }) => ({
+        url: `/api/repair-brain/categories/${id}/template/sections`,
+        method: "PUT",
+        body: sections,
+      }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceSystem: builder.mutation<EquipmentSystemDTO, { categoryId: string; body: Record<string, unknown> }>({
+      query: ({ categoryId, body }) => ({
+        url: `/api/repair-brain/systems?categoryId=${categoryId}`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    updateWorkspaceSystem: builder.mutation<EquipmentSystemDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/systems/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceSystem: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/systems/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceSubsystem: builder.mutation<EquipmentSubsystemDTO, { systemId: string; body: Record<string, unknown> }>({
+      query: ({ systemId, body }) => ({
+        url: `/api/repair-brain/subsystems?systemId=${systemId}`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    updateWorkspaceSubsystem: builder.mutation<EquipmentSubsystemDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/subsystems/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceSubsystem: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/subsystems/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceComponent: builder.mutation<EquipmentComponentDTO, { subsystemId: string; body: Record<string, unknown> }>({
+      query: ({ subsystemId, body }) => ({
+        url: `/api/repair-brain/components?subsystemId=${subsystemId}`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    updateWorkspaceComponent: builder.mutation<EquipmentComponentDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/components/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceComponent: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/components/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceConnector: builder.mutation<EquipmentConnectorDTO, { componentId: string; body: Record<string, unknown> }>({
+      query: ({ componentId, body }) => ({
+        url: `/api/repair-brain/connectors?componentId=${componentId}`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceConnector: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/connectors/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceMeasurementPoint: builder.mutation<MeasurementPointDTO, { body: Record<string, unknown> }>({
+      query: ({ body }) => ({ url: "/api/repair-brain/measurement-points", method: "POST", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    updateWorkspaceMeasurementPoint: builder.mutation<
+      MeasurementPointDTO,
+      { id: string; body: Record<string, unknown> }
+    >({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/measurement-points/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceMeasurementPoint: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/measurement-points/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceErrorCode: builder.mutation<EquipmentErrorCodeDTO, { body: Record<string, unknown> }>({
+      query: ({ body }) => ({ url: "/api/repair-brain/errors", method: "POST", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    updateWorkspaceErrorCode: builder.mutation<EquipmentErrorCodeDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/errors/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceErrorCode: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/errors/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceSequence: builder.mutation<OperatingSequenceDTO, { body: Record<string, unknown> }>({
+      query: ({ body }) => ({ url: "/api/repair-brain/sequences", method: "POST", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    updateWorkspaceSequence: builder.mutation<OperatingSequenceDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/sequences/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceSequence: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/sequences/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceArticle: builder.mutation<KnowledgeArticleDTO, { body: Record<string, unknown> }>({
+      query: ({ body }) => ({ url: "/api/repair-brain/articles", method: "POST", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    updateWorkspaceArticle: builder.mutation<KnowledgeArticleDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/repair-brain/articles/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceArticle: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/articles/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    createWorkspaceEdge: builder.mutation<KnowledgeEdgeDTO, { body: Record<string, unknown> }>({
+      query: ({ body }) => ({ url: "/api/repair-brain/edges", method: "POST", body }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+    deleteWorkspaceEdge: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/repair-brain/edges/${id}`, method: "DELETE" }),
+      invalidatesTags: ["RepairBrain"],
+    }),
+
     documentsHub: builder.query<DocumentHubEntryDTO[], void>({
       query: () => "/api/documents",
       providesTags: ["Document"],
@@ -879,6 +1118,46 @@ export const {
   useLazyRepairBrainSemanticSearchQuery,
   useRepairBrainSuggestionsQuery,
   useDocumentsHubQuery,
+  useWorkspaceCategoriesQuery,
+  useWorkspaceCategoryQuery,
+  useWorkspaceTaxonomyQuery,
+  useWorkspaceSystemsQuery,
+  useWorkspaceSubsystemsQuery,
+  useWorkspaceComponentsQuery,
+  useWorkspaceErrorCodesQuery,
+  useWorkspaceSequencesQuery,
+  useWorkspaceServiceModesQuery,
+  useWorkspaceArticlesQuery,
+  useWorkspaceEdgesQuery,
+  useCreateWorkspaceCategoryMutation,
+  useUpdateWorkspaceCategoryMutation,
+  useDeleteWorkspaceCategoryMutation,
+  usePutTemplateSectionsMutation,
+  useCreateWorkspaceSystemMutation,
+  useUpdateWorkspaceSystemMutation,
+  useDeleteWorkspaceSystemMutation,
+  useCreateWorkspaceSubsystemMutation,
+  useUpdateWorkspaceSubsystemMutation,
+  useDeleteWorkspaceSubsystemMutation,
+  useCreateWorkspaceComponentMutation,
+  useUpdateWorkspaceComponentMutation,
+  useDeleteWorkspaceComponentMutation,
+  useCreateWorkspaceConnectorMutation,
+  useDeleteWorkspaceConnectorMutation,
+  useCreateWorkspaceMeasurementPointMutation,
+  useUpdateWorkspaceMeasurementPointMutation,
+  useDeleteWorkspaceMeasurementPointMutation,
+  useCreateWorkspaceErrorCodeMutation,
+  useUpdateWorkspaceErrorCodeMutation,
+  useDeleteWorkspaceErrorCodeMutation,
+  useCreateWorkspaceSequenceMutation,
+  useUpdateWorkspaceSequenceMutation,
+  useDeleteWorkspaceSequenceMutation,
+  useCreateWorkspaceArticleMutation,
+  useUpdateWorkspaceArticleMutation,
+  useDeleteWorkspaceArticleMutation,
+  useCreateWorkspaceEdgeMutation,
+  useDeleteWorkspaceEdgeMutation,
   useLazyGlobalSearchQuery,
   useNewsletterSubscribersQuery,
   useUpdateNewsletterSubscriberMutation,

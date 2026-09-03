@@ -41,6 +41,7 @@ import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
 import { diagnosticOutputRoutes } from "./routes/diagnostic-outputs.js";
 import { voiceNoteRoutes } from "./routes/voice-notes.js";
 import { repairBrainRoutes } from "./routes/repair-brain.js";
+import { repairBrainIntelligenceRoutes } from "./routes/repair-brain-intelligence.js";
 import { closeRedis } from "./repair-brain-cache.js";
 import { passwordChangeRequiredGuard } from "./password-change-guard.js";
 import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
@@ -258,6 +259,7 @@ export function buildServer(
   app.register(diagnosticOutputRoutes, { prefix: withVersion("/diagnostics") });
   app.register(voiceNoteRoutes, { prefix: withVersion("") });
   app.register(repairBrainRoutes, { prefix: withVersion("/repair-brain") });
+  app.register(repairBrainIntelligenceRoutes, { prefix: withVersion("/repair-brain") });
   app.register(notificationRoutes, { prefix: withVersion("/notifications") });
   app.register(pushTokenRoutes, { prefix: withVersion("/push-tokens") });
   app.register(walkthroughRoutes, { prefix: withVersion("/me") });
@@ -310,6 +312,7 @@ export function buildServer(
   app.register(diagnosticOutputRoutes, { prefix: withLegacy("/diagnostics") });
   app.register(voiceNoteRoutes, { prefix: withLegacy("") });
   app.register(repairBrainRoutes, { prefix: withLegacy("/repair-brain") });
+  app.register(repairBrainIntelligenceRoutes, { prefix: withLegacy("/repair-brain") });
   app.register(notificationRoutes, { prefix: withLegacy("/notifications") });
   app.register(pushTokenRoutes, { prefix: withLegacy("/push-tokens") });
   app.register(walkthroughRoutes, { prefix: withLegacy("/me") });
