@@ -29,7 +29,7 @@ jobs:
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Checkout marketing site
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Ojage/nnact-webapp
           ssh-key: ${{ secrets.MARKETING_REPO_DEPLOY_KEY }}
