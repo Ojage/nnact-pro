@@ -13,7 +13,13 @@ import {
   normalizeModelIdentifier as sharedNormalizeModel,
   normalizeFaultCode as sharedNormalizeFault,
   normalizeSymptomLabel as sharedNormalizeSymptom,
+  slugifyName,
 } from "@nnact/shared";
+import {
+  toErrorCodeDTO,
+  toCategoryDTO,
+  toManufacturerDTO,
+} from "../src/repair-brain-intelligence.js";
 
 test("normalizeModelIdentifier deduplicates manufacturer + model variants", () => {
   assert.equal(normalizeModelIdentifier("Samsung", "WW90T4040CE"), "samsungww90t4040ce");
@@ -297,3 +303,82 @@ test("field workflow lifecycle: equipment link → diagnosis → outcome → pro
   assert.ok(afterOutcome.payload.whatWasDone);
   assert.ok(afterOutcome.payload.measurements);
 });
+
+// ── Engineering Intelligence (taxonomy / templates / DTO mappers) ────────
+
+test("slugifyName normalizes names into stable slugs", () => {
+  assert.equal(slugifyName("Top Load Washer"), "top-load-washer");
+  assert.equal(slugifyName("  Refrigerator!  "), "refrigerator");
+  assert.equal(slugifyName("AirConditioner"), "airconditioner");
+  assert.equal(slugifyName("LG   Dryer"), "lg-dryer");
+  assert.equal(slugifyName(""), "");
+});
+
+test("toCategoryDTO maps a category row to its DTO", () => {
+  const row = {
+    id: "cat-1",
+    orgId: "org-1",
+    name: "Front Load Washer",
+    slug: "front-load-washer",
+    subcategory: null,
+    productFamily: null,
+    description: null,
+    template: { sections: [{ key: "drainage", label: "Drainage", group: "Machine", kind: "system", ordinal: 1 }] },
+    createdById: null,
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-02T00:00:00Z"),
+  } as never;
+  const dto = toCategoryDTO(row as never);
+  assert.equal(dto.name, "Front Load Washer");
+  assert.equal(dto.slug, "front-load-washer");
+  assert.equal(dto.template.sections[0].key, "drainage");
+  assert.equal(dto.createdAt, "2024-01-01T00:00:00.000Z");
+});
+
+test("toManufacturerDTO maps a manufacturer row to its DTO", () => {
+  const row = {
+    id: "mfr-1",
+    orgId: "org-1",
+    name: "LG",
+    slug: "lg",
+    country: "South Korea",
+    notes: null,
+    createdById: null,
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  } as never;
+  const dto = toManufacturerDTO(row as never);
+  assert.equal(dto.name, "LG");
+  assert.equal(dto.country, "South Korea");
+});
+
+test("toErrorCodeDTO maps an error code row to its DTO", () => {
+  const row = {
+    id: "ec-1",
+    orgId: "org-1",
+    equipmentModelId: "mdl-1",
+    systemId: null,
+    code: "OE",
+    normalizedCode: "oe",
+    meaning: "Drain error",
+    description: null,
+    preconditions: [],
+    likelyCauses: ["Clogged pump", "Blocked hose"],
+    correctiveActions: ["Clean pump filter"],
+    severity: "medium",
+    tags: [],
+    confidenceStatus: "field_observation",
+    verificationStatus: "field_note",
+    verifiedBy: null,
+    verifiedAt: null,
+    revision: 1,
+    createdById: null,
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  } as never;
+  const dto = toErrorCodeDTO(row as never);
+  assert.equal(dto.normalizedCode, "oe");
+  assert.deepEqual(dto.likelyCauses, ["Clogged pump", "Blocked hose"]);
+  assert.equal(dto.revision, 1);
+});
+

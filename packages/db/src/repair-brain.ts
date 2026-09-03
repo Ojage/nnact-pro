@@ -16,10 +16,11 @@ import {
   timestamp,
   boolean,
   jsonb,
+  doublePrecision,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import type { SafetyWarning } from "@nnact/shared";
+import type { SafetyWarning, EquipmentCategoryTemplate } from "@nnact/shared";
 import { catalogItems, equipment, jobs, orgs, photos, users } from "./schema.js";
 import { diagnosticSessions, diagnosticWorkflows } from "./diagnostics.js";
 
@@ -125,6 +126,10 @@ export const equipmentModels = pgTable(
     category: text("category").notNull(),
     subcategory: text("subcategory"),
     productFamily: text("product_family"),
+    /** Normalized reference to the equipment category the model belongs to (if resolved). */
+    categoryId: uuid("category_id").references(() => equipmentCategories.id, { onDelete: "set null" }),
+    /** Normalized reference to the manufacturer the model belongs to (if resolved). */
+    manufacturerId: uuid("manufacturer_id").references(() => manufacturers.id, { onDelete: "set null" }),
     manufactureYears: jsonb("manufacture_years").$type<{ from?: number; to?: number } | null>(),
     specifications: jsonb("specifications")
       .$type<Record<string, unknown>>()
@@ -584,5 +589,458 @@ export const diagnosticWorkflowExtensions = pgTable(
   },
   (t) => ({
     workflowUnique: uniqueIndex("diagnostic_workflow_extensions_workflow_idx").on(t.workflowId),
+  }),
+);
+
+/* ------------------------------------------------------------------ *
+ * Universal equipment knowledge taxonomy                              *
+ *                                                                     *
+ * These tables normalize the equipment hierarchy that was previously  *
+ * plain text on `equipment_models`, and make knowledge template        *
+ * configuration, system/component topology, connectors, and generic   *
+ * graph relationships first-class. Washers are only one configuration *
+ * of this model; any equipment category can be represented.           *
+ * ------------------------------------------------------------------ */
+
+const slug = () => text("slug").notNull();
+
+/**
+ * Normalized equipment category, e.g. "Washing Machine". Carries a
+ * configuration-driven knowledge template (set of sections/groupings).
+ */
+export const equipmentCategories = pgTable(
+  "equipment_categories",
+  {
+    id: id(),
+    orgId: orgId(),
+    name: text("name").notNull(),
+    slug: slug(),
+    subcategory: text("subcategory"),
+    productFamily: text("product_family"),
+    description: text("description"),
+    template: jsonb("template")
+      .$type<EquipmentCategoryTemplate>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgSlug: uniqueIndex("equipment_categories_org_slug_idx").on(t.orgId, t.slug),
+    orgName: index("equipment_categories_org_name_idx").on(t.orgId, t.name),
+  }),
+);
+
+/** Normalized manufacturer, e.g. "LG". */
+export const manufacturers = pgTable(
+  "manufacturers",
+  {
+    id: id(),
+    orgId: orgId(),
+    name: text("name").notNull(),
+    slug: slug(),
+    country: text("country"),
+    notes: text("notes"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgSlug: uniqueIndex("manufacturers_org_slug_idx").on(t.orgId, t.slug),
+  }),
+);
+
+/** A major functional system of an equipment category, e.g. "Water Inlet". */
+export const equipmentSystems = pgTable(
+  "equipment_systems",
+  {
+    id: id(),
+    orgId: orgId(),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => equipmentCategories.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: slug(),
+    reference: text("reference"),
+    description: text("description"),
+    ordinal: integer("ordinal").default(0).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgCategoryOrdinal: index("equipment_systems_org_category_ordinal_idx").on(
+      t.orgId,
+      t.categoryId,
+      t.ordinal,
+    ),
+    categorySlug: uniqueIndex("equipment_systems_category_slug_idx").on(t.categoryId, t.slug),
+  }),
+);
+
+/** A subassembly of a system, e.g. "Inlet Valve Assembly". */
+export const equipmentSubsystems = pgTable(
+  "equipment_subsystems",
+  {
+    id: id(),
+    orgId: orgId(),
+    systemId: uuid("system_id")
+      .notNull()
+      .references(() => equipmentSystems.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: slug(),
+    reference: text("reference"),
+    description: text("description"),
+    ordinal: integer("ordinal").default(0).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgSystemOrdinal: index("equipment_subsystems_org_system_ordinal_idx").on(
+      t.orgId,
+      t.systemId,
+      t.ordinal,
+    ),
+    systemSlug: uniqueIndex("equipment_subsystems_system_slug_idx").on(t.systemId, t.slug),
+  }),
+);
+
+export const componentKind = pgEnum("equipment_component_kind", [
+  "generic",
+  "actuator",
+  "sensor",
+  "pcb",
+  "connector",
+  "wiring",
+  "harness",
+  "valve",
+  "motor",
+  "compressor",
+  "pump",
+  "heater",
+  "fan",
+  "belt",
+  "seal",
+  "filter",
+]);
+
+/** A physical component of a subsystem, e.g. "Solenoid Inlet Valve". */
+export const equipmentComponents = pgTable(
+  "equipment_components",
+  {
+    id: id(),
+    orgId: orgId(),
+    subsystemId: uuid("subsystem_id")
+      .notNull()
+      .references(() => equipmentSubsystems.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: slug(),
+    kind: componentKind("kind").default("generic").notNull(),
+    reference: text("reference"),
+    manufacturerPartNumber: text("manufacturer_part_number"),
+    description: text("description"),
+    ordinal: integer("ordinal").default(0).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgSubsystemOrdinal: index("equipment_components_org_subsystem_ordinal_idx").on(
+      t.orgId,
+      t.subsystemId,
+      t.ordinal,
+    ),
+    subsystemSlug: uniqueIndex("equipment_components_subsystem_slug_idx").on(t.subsystemId, t.slug),
+    partNumber: index("equipment_components_part_number_idx").on(t.orgId, t.manufacturerPartNumber),
+  }),
+);
+
+/**
+ * A connector on a component or PCB (e.g. "CN4"). Contains multi-pin
+ * terminals and is the anchor for structured measurement points.
+ */
+export const equipmentConnectors = pgTable(
+  "equipment_connectors",
+  {
+    id: id(),
+    orgId: orgId(),
+    componentId: uuid("component_id")
+      .notNull()
+      .references(() => equipmentComponents.id, { onDelete: "cascade" }),
+    /** Optional PCB/board reference the connector lives on, e.g. "Main PCB". */
+    board: text("board"),
+    label: text("label").notNull(),
+    description: text("description"),
+    ordinal: integer("ordinal").default(0).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgComponentOrdinal: index("equipment_connectors_org_component_ordinal_idx").on(
+      t.orgId,
+      t.componentId,
+      t.ordinal,
+    ),
+    componentLabel: uniqueIndex("equipment_connectors_component_label_idx").on(
+      t.componentId,
+      t.label,
+    ),
+  }),
+);
+
+/** A single pin within a connector, e.g. "Pin 2 -> Drain Pump Live". */
+export const equipmentTerminals = pgTable(
+  "equipment_terminals",
+  {
+    id: id(),
+    orgId: orgId(),
+    connectorId: uuid("connector_id")
+      .notNull()
+      .references(() => equipmentConnectors.id, { onDelete: "cascade" }),
+    pin: integer("pin").notNull(),
+    signal: text("signal"),
+    wireColor: text("wire_color"),
+    description: text("description"),
+    ordinal: integer("ordinal").default(0).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    connectorPin: uniqueIndex("equipment_terminals_connector_pin_idx").on(t.connectorId, t.pin),
+  }),
+);
+
+/** A structured, expected-range measurement location on the machine. */
+export const measurementPoints = pgTable(
+  "measurement_points",
+  {
+    id: id(),
+    orgId: orgId(),
+    componentId: uuid("component_id").references(() => equipmentComponents.id, {
+      onDelete: "cascade",
+    }),
+    connectorId: uuid("connector_id").references(() => equipmentConnectors.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(),
+    parameter: text("parameter").notNull(),
+    unit: text("unit"),
+    expectedMin: doublePrecision("expected_min"),
+    expectedMax: doublePrecision("expected_max"),
+    expectedExact: doublePrecision("expected_exact"),
+    measurementConditions: text("measurement_conditions"),
+    instrumentRequired: text("instrument_required"),
+    safetyNotes: text("safety_notes"),
+    reference: text("reference"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgComponent: index("measurement_points_org_component_idx").on(t.orgId, t.componentId),
+    orgConnector: index("measurement_points_org_connector_idx").on(t.orgId, t.connectorId),
+  }),
+);
+
+/**
+ * Configuration-driven knowledge template section. Defines the left-hand
+ * navigation and content layout for an equipment category, so washers and
+ * air conditioners expose different templates without code changes.
+ */
+export const knowledgeTemplateSections = pgTable(
+  "knowledge_template_sections",
+  {
+    id: id(),
+    orgId: orgId(),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => equipmentCategories.id, { onDelete: "cascade" }),
+    /** Stable section key, e.g. "drainage" or "refrigeration-circuit". */
+    sectionKey: text("section_key").notNull(),
+    label: text("label").notNull(),
+    /** Grouping bucket for navigation, e.g. "Machine", "Diagnostics", "Field Intelligence". */
+    group: text("group"),
+    kind: text("kind").default("content").notNull(),
+    ordinal: integer("ordinal").default(0).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgCategoryOrdinal: index("knowledge_template_sections_org_category_ordinal_idx").on(
+      t.orgId,
+      t.categoryId,
+      t.ordinal,
+    ),
+    categorySection: uniqueIndex("knowledge_template_sections_category_section_idx").on(
+      t.categoryId,
+      t.sectionKey,
+    ),
+  }),
+);
+
+/** First-class model error code, e.g. OE — "Drain error". */
+export const equipmentErrorCodes = pgTable(
+  "equipment_error_codes",
+  {
+    id: id(),
+    orgId: orgId(),
+    equipmentModelId: uuid("equipment_model_id")
+      .notNull()
+      .references(() => equipmentModels.id, { onDelete: "cascade" }),
+    systemId: uuid("system_id").references(() => equipmentSystems.id, { onDelete: "set null" }),
+    code: text("code").notNull(),
+    normalizedCode: text("normalized_code").notNull(),
+    meaning: text("meaning"),
+    description: text("description"),
+    preconditions: jsonb("preconditions").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    likelyCauses: jsonb("likely_causes").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    correctiveActions: jsonb("corrective_actions")
+      .$type<string[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    severity: text("severity"),
+    tags: jsonb("tags").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    confidenceStatus: knowledgeConfidence("confidence_status").default("unverified").notNull(),
+    verificationStatus: knowledgeVerificationStatus("verification_status")
+      .default("field_note")
+      .notNull(),
+    verifiedBy: uuid("verified_by").references(() => users.id, { onDelete: "set null" }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    revision: integer("revision").default(1).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgModelCode: uniqueIndex("equipment_error_codes_org_model_code_idx").on(
+      t.orgId,
+      t.equipmentModelId,
+      t.normalizedCode,
+    ),
+    orgNormalized: index("equipment_error_codes_org_normalized_idx").on(t.orgId, t.normalizedCode),
+  }),
+);
+
+/** Operating (washing/cycling) sequences for a model. */
+export const operatingSequences = pgTable(
+  "operating_sequences",
+  {
+    id: id(),
+    orgId: orgId(),
+    equipmentModelId: uuid("equipment_model_id")
+      .notNull()
+      .references(() => equipmentModels.id, { onDelete: "cascade" }),
+    systemId: uuid("system_id").references(() => equipmentSystems.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    phase: text("phase"),
+    description: text("description"),
+    steps: jsonb("steps")
+      .$type<Array<{ sequence: number; label: string; detail?: string; duration?: string }>>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    ordinal: integer("ordinal").default(0).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgModelOrdinal: index("operating_sequences_org_model_ordinal_idx").on(
+      t.orgId,
+      t.equipmentModelId,
+      t.ordinal,
+    ),
+  }),
+);
+
+/** Service-mode (diagnostic/setup) access for a model. */
+export const serviceModes = pgTable(
+  "service_modes",
+  {
+    id: id(),
+    orgId: orgId(),
+    equipmentModelId: uuid("equipment_model_id")
+      .notNull()
+      .references(() => equipmentModels.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    entryProcedure: text("entry_procedure"),
+    parameters: jsonb("parameters")
+      .$type<Array<{ code: string; label: string; description?: string }>>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    description: text("description"),
+    safetyWarnings: jsonb("safety_warnings")
+      .$type<SafetyWarning[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgModelName: uniqueIndex("service_modes_org_model_name_idx").on(t.orgId, t.equipmentModelId, t.name),
+  }),
+);
+
+/**
+ * Published knowledge article. Represents human-reviewed, canonical
+ * explanatory knowledge (as opposed to a raw entity like a fault).
+ */
+export const knowledgeArticles = pgTable(
+  "knowledge_articles",
+  {
+    id: id(),
+    orgId: orgId(),
+    equipmentModelId: uuid("equipment_model_id").references(() => equipmentModels.id, {
+      onDelete: "cascade",
+    }),
+    categoryId: uuid("category_id").references(() => equipmentCategories.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    kind: text("kind").default("article").notNull(),
+    body: text("body").notNull(),
+    summary: text("summary"),
+    tags: jsonb("tags").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    verificationStatus: knowledgeVerificationStatus("verification_status")
+      .default("field_note")
+      .notNull(),
+    verifiedBy: uuid("verified_by").references(() => users.id, { onDelete: "set null" }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    revision: integer("revision").default(1).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    orgModelSlug: uniqueIndex("knowledge_articles_org_model_slug_idx").on(t.orgId, t.equipmentModelId, t.slug),
+    orgCategory: index("knowledge_articles_org_category_idx").on(t.orgId, t.categoryId),
+  }),
+);
+
+/** Generic, typed graph edge between any two Repair Brain entities. */
+export const knowledgeEdges = pgTable(
+  "knowledge_edges",
+  {
+    id: id(),
+    orgId: orgId(),
+    sourceType: text("source_type").notNull(),
+    sourceId: uuid("source_id").notNull(),
+    relationship: text("relationship").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    meta: jsonb("meta").$type<Record<string, unknown>>().default(sql`'{}'::jsonb`).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    sourceIdx: index("knowledge_edges_org_source_idx").on(t.orgId, t.sourceType, t.sourceId),
+    targetIdx: index("knowledge_edges_org_target_idx").on(t.orgId, t.targetType, t.targetId),
+    uniqueEdge: uniqueIndex("knowledge_edges_unique_idx").on(
+      t.sourceType,
+      t.sourceId,
+      t.relationship,
+      t.targetType,
+      t.targetId,
+    ),
   }),
 );

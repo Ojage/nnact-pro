@@ -218,6 +218,13 @@
       "when": 1790000000700,
       "tag": "0032_content_studio_body_document",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790000000900,
+      "tag": "0033_brief_wraith",
+      "breakpoints": true
     }
   ]
 }

@@ -312,3 +312,244 @@ export function normalizeFaultCode(code: string): string {
 export function normalizeSymptomLabel(label: string): string {
   return label.toLowerCase().trim().replace(/\s+/g, " ");
 }
+
+/**
+ * Configuration-driven knowledge template for an equipment category.
+ * Washers, refrigerators and air conditioners each define their own set of
+ * navigation sections without any code changes to the generic engine.
+ */
+export interface KnowledgeTemplateSection {
+  /** Stable section key, e.g. "drainage" or "refrigeration-circuit". */
+  key: string;
+  label: string;
+  /** Grouping bucket for navigation, e.g. "Machine", "Diagnostics", "Field Intelligence". */
+  group?: string;
+  /** Content kind: "content" | "system" | "components" | "error-codes" | "sequences" | "service-mode" | "articles" | "repair-cases". */
+  kind: string;
+  ordinal: number;
+}
+
+export interface EquipmentCategoryTemplate {
+  sections: KnowledgeTemplateSection[];
+}
+
+/** Normalize a category or manufacturer name into a stable slug. */
+export function slugifyName(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export interface EquipmentCategoryDTO {
+  id: string;
+  orgId: string;
+  name: string;
+  slug: string;
+  subcategory?: string | null;
+  productFamily?: string | null;
+  description?: string | null;
+  template: EquipmentCategoryTemplate;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ManufacturerDTO {
+  id: string;
+  orgId: string;
+  name: string;
+  slug: string;
+  country?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EquipmentSystemDTO {
+  id: string;
+  orgId: string;
+  categoryId: string;
+  name: string;
+  slug: string;
+  reference?: string | null;
+  description?: string | null;
+  ordinal: number;
+}
+
+export interface EquipmentSubsystemDTO {
+  id: string;
+  orgId: string;
+  systemId: string;
+  name: string;
+  slug: string;
+  reference?: string | null;
+  description?: string | null;
+  ordinal: number;
+}
+
+export type ComponentKind =
+  | "generic"
+  | "actuator"
+  | "sensor"
+  | "pcb"
+  | "connector"
+  | "wiring"
+  | "harness"
+  | "valve"
+  | "motor"
+  | "compressor"
+  | "pump"
+  | "heater"
+  | "fan"
+  | "belt"
+  | "seal"
+  | "filter";
+
+export interface EquipmentComponentDTO {
+  id: string;
+  orgId: string;
+  subsystemId: string;
+  name: string;
+  slug: string;
+  kind: ComponentKind;
+  reference?: string | null;
+  manufacturerPartNumber?: string | null;
+  description?: string | null;
+  ordinal: number;
+}
+
+export interface EquipmentConnectorDTO {
+  id: string;
+  orgId: string;
+  componentId: string;
+  board?: string | null;
+  label: string;
+  description?: string | null;
+  ordinal: number;
+}
+
+export interface EquipmentTerminalDTO {
+  id: string;
+  orgId: string;
+  connectorId: string;
+  pin: number;
+  signal?: string | null;
+  wireColor?: string | null;
+  description?: string | null;
+  ordinal?: number | null;
+}
+
+export interface MeasurementPointDTO {
+  id: string;
+  orgId: string;
+  componentId?: string | null;
+  connectorId?: string | null;
+  name: string;
+  parameter: string;
+  unit?: string | null;
+  expectedMin?: number | null;
+  expectedMax?: number | null;
+  expectedExact?: number | null;
+  measurementConditions?: string | null;
+  instrumentRequired?: string | null;
+  safetyNotes?: string | null;
+  reference?: string | null;
+}
+
+export interface KnowledgeTemplateSectionDTO {
+  id: string;
+  orgId: string;
+  categoryId: string;
+  sectionKey: string;
+  label: string;
+  group?: string | null;
+  kind: string;
+  ordinal: number;
+}
+
+export interface EquipmentErrorCodeDTO {
+  id: string;
+  orgId: string;
+  equipmentModelId: string;
+  systemId?: string | null;
+  code: string;
+  normalizedCode: string;
+  meaning?: string | null;
+  description?: string | null;
+  preconditions: string[];
+  likelyCauses: string[];
+  correctiveActions: string[];
+  severity?: string | null;
+  confidenceStatus: KnowledgeConfidence;
+  verificationStatus: KnowledgeVerificationStatus;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OperatingSequenceDTO {
+  id: string;
+  orgId: string;
+  equipmentModelId: string;
+  systemId?: string | null;
+  name: string;
+  phase?: string | null;
+  description?: string | null;
+  steps: Array<{ sequence: number; label: string; detail?: string; duration?: string }>;
+  ordinal: number;
+}
+
+export interface ServiceModeDTO {
+  id: string;
+  orgId: string;
+  equipmentModelId: string;
+  name: string;
+  entryProcedure?: string | null;
+  parameters: Array<{ code: string; label: string; description?: string }>;
+  description?: string | null;
+  safetyWarnings: SafetyWarning[];
+}
+
+export interface KnowledgeArticleDTO {
+  id: string;
+  orgId: string;
+  equipmentModelId?: string | null;
+  categoryId?: string | null;
+  title: string;
+  slug: string;
+  kind: string;
+  body: string;
+  summary?: string | null;
+  tags: string[];
+  verificationStatus: KnowledgeVerificationStatus;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgeEdgeDTO {
+  id: string;
+  orgId: string;
+  sourceType: string;
+  sourceId: string;
+  relationship: string;
+  targetType: string;
+  targetId: string;
+  meta: Record<string, unknown>;
+  createdAt: string;
+}
+
+/**
+ * A decoded taxonomy tree for a model/workspace: category template joined
+ * with the normalized systems/subsystems/components/connectors topology.
+ */
+export interface EquipmentTaxonomyDTO {
+  category?: EquipmentCategoryDTO | null;
+  template: KnowledgeTemplateSection[];
+  systems: Array<
+    EquipmentSystemDTO & {
+      subsystems: Array<EquipmentSubsystemDTO & { components: EquipmentComponentDTO[] }>;
+    }
+  >;
+}
