@@ -1,6 +1,17 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { ActivityDTO, CustomerDTO, JobDTO, JobVoiceNoteDTO, UserDTO } from "@nnact/shared";
 import type {
+  ChannelPublicationDTO,
+  ChannelVariantDTO,
+  ContentCategoryDTO,
+  ContentItemDTO,
+  ContentMediaDTO,
+  ContentVersionDTO,
+  PublicationAttemptDTO,
+  PublishingConnectionDTO,
+  PublishingChannel,
+} from "@nnact/shared";
+import type {
   Estimate,
   EstimateDetail,
   EstimateOption,
@@ -22,7 +33,7 @@ import type {
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import type { PortalLinkDTO, PortalLinkScope, DocumentHubEntryDTO } from "@/lib/api";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 // ── DTOs (list/detail shapes not exported from the legacy api client) ──
 
@@ -84,6 +95,85 @@ export interface ProposalRow {
   createdAt: string;
 }
 
+export interface NewsletterSubscriberDTO {
+  id: string;
+  orgId: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  channels: string[];
+  source: string;
+  status: "subscribed" | "unsubscribed" | "bounced";
+  verifiedAt: string | null;
+  unsubscribedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewsletterSubscribersResponseDTO {
+  subscribers: NewsletterSubscriberDTO[];
+  total: number;
+}
+
+export interface UpdateNewsletterSubscriberPayload {
+  status: "subscribed" | "unsubscribed" | "bounced";
+}
+
+// ── Content Studio DTOs ──
+export interface ContentDetailDTO extends ContentItemDTO {
+  variants: ChannelVariantDTO[];
+  versions: ContentVersionDTO[];
+  publications: ChannelPublicationDTO[];
+}
+
+export interface ContentListResponseDTO {
+  items: ContentItemDTO[];
+  total: number;
+}
+
+export interface CreateContentPayload {
+  type: string;
+  title: string;
+  summary?: string | null;
+  body?: string;
+  bodyDocument?: unknown[] | null;
+  categoryId?: string | null;
+  tagNames?: string[];
+  visibility?: string;
+  language?: string;
+  featuredMediaId?: string | null;
+}
+
+export interface PublishOutcomeDTO {
+  contentId: string;
+  status: string;
+  publications: ChannelPublicationDTO[];
+}
+
+export interface ConnectionDTO {
+  id: string;
+  channel: PublishingChannel;
+  status: string;
+  accountName?: string | null;
+  accountId?: string | null;
+  lastValidatedAt?: string | null;
+  lastError?: string | null;
+  metadata?: Record<string, unknown>;
+  capabilities: {
+    channel: PublishingChannel;
+    supportsScheduling: boolean;
+    supportsText: boolean;
+    supportsImages: boolean;
+    supportsVideo: boolean;
+    maxTextLength: number;
+  };
+}
+
+export interface ConnectionsResponseDTO {
+  channels: PublishingChannel[];
+  connections: ConnectionDTO[];
+}
+
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({
@@ -108,6 +198,10 @@ export const apiSlice = createApi({
     "Photo",
     "Document",
     "RepairBrain",
+    "Newsletter",
+    "Content",
+    "Publication",
+    "Connection",
   ],
   endpoints: (builder) => ({
     // ── Jobs ──
@@ -550,6 +644,156 @@ export const apiSlice = createApi({
       query: () => "/api/documents",
       providesTags: ["Document"],
     }),
+
+    // ── Newsletter ──
+    newsletterSubscribers: builder.query<NewsletterSubscribersResponseDTO, { skip?: number; take?: number; search?: string; status?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.skip) qs.set("skip", String(params.skip));
+        if (params?.take) qs.set("take", String(params.take));
+        if (params?.search) qs.set("search", params.search);
+        if (params?.status) qs.set("status", params.status);
+        const suffix = qs.toString();
+        return `/api/newsletter${suffix ? `?${suffix}` : ""}`;
+      },
+      providesTags: ["Newsletter"],
+    }),
+    updateNewsletterSubscriber: builder.mutation<NewsletterSubscriberDTO, { id: string; data: UpdateNewsletterSubscriberPayload }>({
+      query: ({ id, data }) => ({ url: `/api/newsletter/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Newsletter"],
+    }),
+
+    // ── Content Studio ──
+    contentItems: builder.query<ContentListResponseDTO, { skip?: number; take?: number; status?: string; type?: string; search?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.skip) qs.set("skip", String(params.skip));
+        if (params?.take) qs.set("take", String(params.take));
+        if (params?.status) qs.set("status", params.status);
+        if (params?.type) qs.set("type", params.type);
+        if (params?.search) qs.set("search", params.search);
+        const suffix = qs.toString();
+        return `/api/content${suffix ? `?${suffix}` : ""}`;
+      },
+      providesTags: ["Content"],
+    }),
+    contentItem: builder.query<ContentDetailDTO, string>({
+      query: (id) => `/api/content/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Content", id }],
+    }),
+    createContentItem: builder.mutation<ContentItemDTO, CreateContentPayload>({
+      query: (body) => ({ url: "/api/content", method: "POST", body }),
+      invalidatesTags: ["Content"],
+    }),
+    patchContentItem: builder.mutation<ContentItemDTO, { id: string; data: Partial<CreateContentPayload> }>({
+      query: ({ id, data }) => ({ url: `/api/content/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Content", id: arg.id }],
+    }),
+    deleteContentItem: builder.mutation<{ ok: true }, string>({
+      query: (id) => ({ url: `/api/content/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Content"],
+    }),
+    submitContentReview: builder.mutation<{ status: string }, string>({
+      query: (id) => ({ url: `/api/content/${id}/submit-review`, method: "POST" }),
+      invalidatesTags: (_result, _error, id) => [{ type: "Content", id }],
+    }),
+    approveContent: builder.mutation<{ status: string }, string>({
+      query: (id) => ({ url: `/api/content/${id}/approve`, method: "POST" }),
+      invalidatesTags: (_result, _error, id) => [{ type: "Content", id }],
+    }),
+    rejectContent: builder.mutation<{ status: string }, string>({
+      query: (id) => ({ url: `/api/content/${id}/reject`, method: "POST" }),
+      invalidatesTags: (_result, _error, id) => [{ type: "Content", id }],
+    }),
+    publishContent: builder.mutation<PublishOutcomeDTO, { id: string; channels?: PublishingChannel[]; scheduledAt?: string }>({
+      query: ({ id, channels, scheduledAt }) => ({ url: `/api/content/${id}/publish`, method: "POST", body: { channels, scheduledAt } }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Content", id: arg.id }, "Publication"],
+    }),
+    scheduleContent: builder.mutation<PublishOutcomeDTO, { id: string; channels?: PublishingChannel[]; scheduledAt: string }>({
+      query: ({ id, channels, scheduledAt }) => ({ url: `/api/content/${id}/schedule`, method: "POST", body: { channels, scheduledAt } }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Content", id: arg.id }, "Publication"],
+    }),
+    unpublishContent: builder.mutation<{ contentId: string; removedExternal: number; archived: boolean }, string>({
+      query: (id) => ({ url: `/api/content/${id}/unpublish`, method: "POST" }),
+      invalidatesTags: (_result, _error, id) => [{ type: "Content", id }, "Publication"],
+    }),
+    upsertContentVariant: builder.mutation<
+      ChannelVariantDTO,
+      { id: string; channel: string; data: { enabled?: boolean; titleOverride?: string | null; bodyOverride?: string | null; caption?: string | null; mediaOverrideId?: string | null; linkBehavior?: string | null; hashtags?: string[] } }
+    >({
+      query: ({ id, channel, data }) => ({ url: `/api/content/${id}/variants/${channel}`, method: "PUT", body: data }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Content", id: arg.id }],
+    }),
+    contentCategories: builder.query<ContentCategoryDTO[], void>({
+      query: () => "/api/content/categories",
+      providesTags: ["Content"],
+    }),
+    createContentCategory: builder.mutation<ContentCategoryDTO, { name: string; description?: string }>({
+      query: (body) => ({ url: "/api/content/categories", method: "POST", body }),
+      invalidatesTags: ["Content"],
+    }),
+    contentTags: builder.query<{ id: string; orgId: string; name: string; slug: string }[], void>({
+      query: () => "/api/content/tags",
+      providesTags: ["Content"],
+    }),
+    contentMedia: builder.query<ContentMediaDTO[], void>({
+      query: () => "/api/content/media",
+      providesTags: ["Content"],
+    }),
+    uploadContentMedia: builder.mutation<ContentMediaDTO, File>({
+      query: (file) => {
+        const body = new FormData();
+        body.append("file", file);
+        return { url: "/api/content/media", method: "POST", body };
+      },
+      invalidatesTags: ["Content"],
+    }),
+    patchContentMedia: builder.mutation<ContentMediaDTO, { id: string; data: { altText?: string | null; caption?: string | null; approvedForMarketing?: boolean } }>({
+      query: ({ id, data }) => ({ url: `/api/content/media/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Content"],
+    }),
+
+    // ── Publishing ──
+    contentPublications: builder.query<{ items: ChannelPublicationDTO[]; total: number }, { skip?: number; take?: number; status?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.skip) qs.set("skip", String(params.skip));
+        if (params?.take) qs.set("take", String(params.take));
+        if (params?.status) qs.set("status", params.status);
+        const suffix = qs.toString();
+        return `/api/content/publications${suffix ? `?${suffix}` : ""}`;
+      },
+      providesTags: ["Publication"],
+    }),
+    retryPublication: builder.mutation<ChannelPublicationDTO, string>({
+      query: (id) => ({ url: `/api/content/publications/${id}/retry`, method: "POST" }),
+      invalidatesTags: ["Publication"],
+    }),
+    publicationAttempts: builder.query<PublicationAttemptDTO[], string>({
+      query: (id) => `/api/content/publications/${id}/attempts`,
+      providesTags: (_result, _error, id) => [{ type: "Publication", id }],
+    }),
+
+    // ── Connections ──
+    publishingConnections: builder.query<ConnectionsResponseDTO, void>({
+      query: () => "/api/connections",
+      providesTags: ["Connection"],
+    }),
+    oauthConnectionStart: builder.mutation<{ url: string; state: string }, PublishingChannel>({
+      query: (channel) => ({ url: `/api/connections/${channel}/oauth/start`, method: "POST" }),
+    }),
+    oauthConnectionCallback: builder.mutation<{ channel: string; status: string }, { channel: PublishingChannel; code: string; state: string }>({
+      query: ({ channel, code, state }) => ({ url: `/api/connections/${channel}/oauth/callback`, method: "POST", body: { code, state } }),
+      invalidatesTags: ["Connection"],
+    }),
+    disconnectConnection: builder.mutation<{ channel: string; status: string }, PublishingChannel>({
+      query: (channel) => ({ url: `/api/connections/${channel}/disconnect`, method: "POST" }),
+      invalidatesTags: ["Connection"],
+    }),
+    validateConnection: builder.mutation<{ valid: boolean; accountName?: string | null; accountId?: string | null; errorCode?: string | null; errorMessage?: string | null }, PublishingChannel>({
+      query: (channel) => ({ url: `/api/connections/${channel}/validate`, method: "POST" }),
+      invalidatesTags: ["Connection"],
+    }),
   }),
 });
 
@@ -636,4 +880,32 @@ export const {
   useRepairBrainSuggestionsQuery,
   useDocumentsHubQuery,
   useLazyGlobalSearchQuery,
+  useNewsletterSubscribersQuery,
+  useUpdateNewsletterSubscriberMutation,
+  useContentItemsQuery,
+  useContentItemQuery,
+  useCreateContentItemMutation,
+  usePatchContentItemMutation,
+  useDeleteContentItemMutation,
+  useSubmitContentReviewMutation,
+  useApproveContentMutation,
+  useRejectContentMutation,
+  usePublishContentMutation,
+  useScheduleContentMutation,
+  useUnpublishContentMutation,
+  useUpsertContentVariantMutation,
+  useContentCategoriesQuery,
+  useCreateContentCategoryMutation,
+  useContentTagsQuery,
+  useContentMediaQuery,
+  useUploadContentMediaMutation,
+  usePatchContentMediaMutation,
+  useContentPublicationsQuery,
+  useRetryPublicationMutation,
+  usePublicationAttemptsQuery,
+  usePublishingConnectionsQuery,
+  useOauthConnectionStartMutation,
+  useOauthConnectionCallbackMutation,
+  useDisconnectConnectionMutation,
+  useValidateConnectionMutation,
 } = apiSlice;

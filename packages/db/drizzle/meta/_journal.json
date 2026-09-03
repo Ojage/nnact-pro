@@ -197,6 +197,27 @@
       "when": 1789000000000,
       "tag": "0029_repair_brain_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790000000300,
+      "tag": "0030_crazy_the_captain",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790000000500,
+      "tag": "0031_content_studio",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790000000700,
+      "tag": "0032_content_studio_body_document",
+      "breakpoints": true
     }
   ]
 }
