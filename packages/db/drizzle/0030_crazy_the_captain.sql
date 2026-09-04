@@ -78,7 +78,7 @@ DO $$ BEGIN
  CREATE TYPE "public"."technical_document_type" AS ENUM('service_manual', 'user_manual', 'wiring_diagram', 'schematic', 'datasheet', 'board_image', 'exploded_view', 'internal_report', 'field_note', 'video', 'audio', 'supplier_document');
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint
-CREATE TABLE "device_push_tokens" (
+CREATE TABLE IF NOT EXISTS "device_push_tokens" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE "device_push_tokens" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "documents" (
+CREATE TABLE IF NOT EXISTS "documents" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"kind" text NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE "documents" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "estimate_option_line_items" (
+CREATE TABLE IF NOT EXISTS "estimate_option_line_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"option_id" uuid NOT NULL,
@@ -116,7 +116,7 @@ CREATE TABLE "estimate_option_line_items" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "estimate_options" (
+CREATE TABLE IF NOT EXISTS "estimate_options" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"estimate_id" uuid NOT NULL,
@@ -128,7 +128,7 @@ CREATE TABLE "estimate_options" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "invoice_line_items" (
+CREATE TABLE IF NOT EXISTS "invoice_line_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"invoice_id" uuid NOT NULL,
@@ -141,7 +141,7 @@ CREATE TABLE "invoice_line_items" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "job_voice_notes" (
+CREATE TABLE IF NOT EXISTS "job_voice_notes" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"job_id" uuid NOT NULL,
@@ -156,7 +156,7 @@ CREATE TABLE "job_voice_notes" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "message_logs" (
+CREATE TABLE IF NOT EXISTS "message_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"kind" text NOT NULL,
@@ -176,7 +176,7 @@ CREATE TABLE "message_logs" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "newsletter_subscribers" (
+CREATE TABLE IF NOT EXISTS "newsletter_subscribers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"email" text NOT NULL,
@@ -193,7 +193,7 @@ CREATE TABLE "newsletter_subscribers" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "portal_links" (
+CREATE TABLE IF NOT EXISTS "portal_links" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"customer_id" uuid NOT NULL,
@@ -209,7 +209,7 @@ CREATE TABLE "portal_links" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "customer_service_plans" (
+CREATE TABLE IF NOT EXISTS "customer_service_plans" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"customer_id" uuid NOT NULL,
@@ -226,7 +226,7 @@ CREATE TABLE "customer_service_plans" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "service_plan_visits" (
+CREATE TABLE IF NOT EXISTS "service_plan_visits" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"customer_service_plan_id" uuid NOT NULL,
@@ -241,7 +241,7 @@ CREATE TABLE "service_plan_visits" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "service_plans" (
+CREATE TABLE IF NOT EXISTS "service_plans" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"name" text NOT NULL,
@@ -257,7 +257,7 @@ CREATE TABLE "service_plans" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "diagnostic_correction_reports" (
+CREATE TABLE IF NOT EXISTS "diagnostic_correction_reports" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"workflow_id" uuid NOT NULL,
@@ -275,7 +275,7 @@ CREATE TABLE "diagnostic_correction_reports" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "diagnostic_measurements" (
+CREATE TABLE IF NOT EXISTS "diagnostic_measurements" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"session_id" uuid NOT NULL,
@@ -290,7 +290,7 @@ CREATE TABLE "diagnostic_measurements" (
 	"recorded_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "diagnostic_sessions" (
+CREATE TABLE IF NOT EXISTS "diagnostic_sessions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"job_id" uuid NOT NULL,
@@ -314,7 +314,7 @@ CREATE TABLE "diagnostic_sessions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "diagnostic_steps" (
+CREATE TABLE IF NOT EXISTS "diagnostic_steps" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"workflow_id" uuid NOT NULL,
@@ -347,7 +347,7 @@ CREATE TABLE "diagnostic_steps" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "diagnostic_workflows" (
+CREATE TABLE IF NOT EXISTS "diagnostic_workflows" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"name" text NOT NULL,
@@ -366,7 +366,7 @@ CREATE TABLE "diagnostic_workflows" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "job_equipment_links" (
+CREATE TABLE IF NOT EXISTS "job_equipment_links" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"job_id" uuid NOT NULL,
@@ -375,7 +375,7 @@ CREATE TABLE "job_equipment_links" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "trace_routes" (
+CREATE TABLE IF NOT EXISTS "trace_routes" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"step_id" uuid NOT NULL,
@@ -392,7 +392,7 @@ CREATE TABLE "trace_routes" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "diagnostic_workflow_extensions" (
+CREATE TABLE IF NOT EXISTS "diagnostic_workflow_extensions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"workflow_id" uuid NOT NULL,
@@ -401,7 +401,7 @@ CREATE TABLE "diagnostic_workflow_extensions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "equipment_models" (
+CREATE TABLE IF NOT EXISTS "equipment_models" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"manufacturer" text NOT NULL,
@@ -422,7 +422,7 @@ CREATE TABLE "equipment_models" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "exploded_view_components" (
+CREATE TABLE IF NOT EXISTS "exploded_view_components" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"exploded_view_id" uuid NOT NULL,
@@ -433,7 +433,7 @@ CREATE TABLE "exploded_view_components" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "exploded_views" (
+CREATE TABLE IF NOT EXISTS "exploded_views" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"equipment_model_id" uuid NOT NULL,
@@ -446,7 +446,7 @@ CREATE TABLE "exploded_views" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "fault_symptoms" (
+CREATE TABLE IF NOT EXISTS "fault_symptoms" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"fault_id" uuid NOT NULL,
@@ -454,7 +454,7 @@ CREATE TABLE "fault_symptoms" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "field_measurements" (
+CREATE TABLE IF NOT EXISTS "field_measurements" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"session_id" uuid,
@@ -475,7 +475,7 @@ CREATE TABLE "field_measurements" (
 	"recorded_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "knowledge_proposals" (
+CREATE TABLE IF NOT EXISTS "knowledge_proposals" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"source_job_id" uuid,
@@ -497,7 +497,7 @@ CREATE TABLE "knowledge_proposals" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "knowledge_revisions" (
+CREATE TABLE IF NOT EXISTS "knowledge_revisions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"entity_type" text NOT NULL,
@@ -508,7 +508,7 @@ CREATE TABLE "knowledge_revisions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "known_faults" (
+CREATE TABLE IF NOT EXISTS "known_faults" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"equipment_model_id" uuid NOT NULL,
@@ -536,7 +536,7 @@ CREATE TABLE "known_faults" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "model_parts" (
+CREATE TABLE IF NOT EXISTS "model_parts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"equipment_model_id" uuid NOT NULL,
@@ -560,7 +560,7 @@ CREATE TABLE "model_parts" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "part_procurement_records" (
+CREATE TABLE IF NOT EXISTS "part_procurement_records" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"model_part_id" uuid NOT NULL,
@@ -573,7 +573,7 @@ CREATE TABLE "part_procurement_records" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "repair_outcomes" (
+CREATE TABLE IF NOT EXISTS "repair_outcomes" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"job_id" uuid NOT NULL,
@@ -597,7 +597,7 @@ CREATE TABLE "repair_outcomes" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "repair_procedures" (
+CREATE TABLE IF NOT EXISTS "repair_procedures" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"equipment_model_id" uuid NOT NULL,
@@ -626,7 +626,7 @@ CREATE TABLE "repair_procedures" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "symptoms" (
+CREATE TABLE IF NOT EXISTS "symptoms" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"label" text NOT NULL,
@@ -637,7 +637,7 @@ CREATE TABLE "symptoms" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "technical_documents" (
+CREATE TABLE IF NOT EXISTS "technical_documents" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"title" text NOT NULL,
@@ -660,7 +660,7 @@ CREATE TABLE "technical_documents" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "test_points" (
+CREATE TABLE IF NOT EXISTS "test_points" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"equipment_model_id" uuid NOT NULL,
@@ -681,14 +681,14 @@ CREATE TABLE "test_points" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-DROP INDEX "api_tokens_org_idx";--> statement-breakpoint
-DROP INDEX "appts_window_idx";--> statement-breakpoint
-DROP INDEX "catalog_org_category_idx";--> statement-breakpoint
-DROP INDEX "notif_user_idx";--> statement-breakpoint
-DROP INDEX "notif_unread_idx";--> statement-breakpoint
-DROP INDEX "photos_org_job_idx";--> statement-breakpoint
-DROP INDEX "plugin_events_status_idx";--> statement-breakpoint
-DROP INDEX "plugin_events_due_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "api_tokens_org_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "appts_window_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "catalog_org_category_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "notif_user_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "notif_unread_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "photos_org_job_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "plugin_events_status_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "plugin_events_due_idx";--> statement-breakpoint
 ALTER TABLE "api_tokens" ALTER COLUMN "scopes" SET DATA TYPE jsonb;--> statement-breakpoint
 ALTER TABLE "api_tokens" ALTER COLUMN "scopes" SET DEFAULT '[]'::jsonb;--> statement-breakpoint
 ALTER TABLE "photos" ALTER COLUMN "id" DROP DEFAULT;--> statement-breakpoint
@@ -698,245 +698,611 @@ ALTER TABLE "plugins" ALTER COLUMN "events" SET DEFAULT '[]'::jsonb;--> statemen
 ALTER TABLE "plugins" ALTER COLUMN "scopes" SET DATA TYPE jsonb;--> statement-breakpoint
 ALTER TABLE "plugins" ALTER COLUMN "scopes" SET DEFAULT '[]'::jsonb;--> statement-breakpoint
 ALTER TABLE "plugins" ALTER COLUMN "transform" SET DEFAULT 'identity';--> statement-breakpoint
-ALTER TABLE "equipment" ADD COLUMN "property_id" uuid;--> statement-breakpoint
-ALTER TABLE "equipment" ADD COLUMN "equipment_model_id" uuid;--> statement-breakpoint
-ALTER TABLE "equipment" ADD COLUMN "asset_tag" text;--> statement-breakpoint
-ALTER TABLE "equipment" ADD COLUMN "condition" text;--> statement-breakpoint
-ALTER TABLE "equipment" ADD COLUMN "last_maintenance" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "equipment" ADD COLUMN "next_maintenance" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "equipment" ADD COLUMN "nameplate_photo_id" uuid;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "number" text DEFAULT 'EST-1000' NOT NULL;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "expires_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "accepted_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "accepted_by_name" text;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "status" "estimate_status" DEFAULT 'draft' NOT NULL;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "pricing" jsonb;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "selected_option_id" uuid;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "signature_name" text;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "sent_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "declined_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "copied_to_job_at" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "deposit_cents" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
-ALTER TABLE "estimates" ADD COLUMN "deposit_invoice_id" uuid;--> statement-breakpoint
-ALTER TABLE "invoices" ADD COLUMN "pricing" jsonb;--> statement-breakpoint
-ALTER TABLE "jobs" ADD COLUMN "source" text DEFAULT 'staff' NOT NULL;--> statement-breakpoint
-ALTER TABLE "jobs" ADD COLUMN "service_category" text;--> statement-breakpoint
-ALTER TABLE "jobs" ADD COLUMN "service_address" text;--> statement-breakpoint
-ALTER TABLE "jobs" ADD COLUMN "preferred_date" text;--> statement-breakpoint
-ALTER TABLE "jobs" ADD COLUMN "preferred_time" text;--> statement-breakpoint
-ALTER TABLE "jobs" ADD COLUMN "tracking_token_hash" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "logo_url" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "brand_color" text DEFAULT '#22C55E' NOT NULL;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "document_footer" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "registration_number" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "document_category" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "signatory_name" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "signatory_title" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "signature_url" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "stamp_url" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "document_terms" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "public_email" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "public_phone" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "public_address" text;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "remove_openfieldpro_attribution" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "business_settings" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
-ALTER TABLE "orgs" ADD COLUMN "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
-ALTER TABLE "photos" ADD COLUMN "category" "photo_category" DEFAULT 'other' NOT NULL;--> statement-breakpoint
-ALTER TABLE "photos" ADD COLUMN "equipment_id" uuid;--> statement-breakpoint
-ALTER TABLE "plugin_installs" ADD COLUMN "installed_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "must_change_password" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "walkthrough_progress" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
-ALTER TABLE "device_push_tokens" ADD CONSTRAINT "device_push_tokens_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "device_push_tokens" ADD CONSTRAINT "device_push_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "documents" ADD CONSTRAINT "documents_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "estimate_option_line_items" ADD CONSTRAINT "estimate_option_line_items_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "estimate_option_line_items" ADD CONSTRAINT "estimate_option_line_items_option_id_estimate_options_id_fk" FOREIGN KEY ("option_id") REFERENCES "public"."estimate_options"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "estimate_options" ADD CONSTRAINT "estimate_options_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "estimate_options" ADD CONSTRAINT "estimate_options_estimate_id_estimates_id_fk" FOREIGN KEY ("estimate_id") REFERENCES "public"."estimates"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "invoice_line_items" ADD CONSTRAINT "invoice_line_items_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "invoice_line_items" ADD CONSTRAINT "invoice_line_items_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_voice_notes" ADD CONSTRAINT "job_voice_notes_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_voice_notes" ADD CONSTRAINT "job_voice_notes_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_voice_notes" ADD CONSTRAINT "job_voice_notes_author_user_id_users_id_fk" FOREIGN KEY ("author_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "message_logs" ADD CONSTRAINT "message_logs_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "message_logs" ADD CONSTRAINT "message_logs_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "newsletter_subscribers" ADD CONSTRAINT "newsletter_subscribers_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "portal_links" ADD CONSTRAINT "portal_links_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "portal_links" ADD CONSTRAINT "portal_links_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "customer_service_plans" ADD CONSTRAINT "customer_service_plans_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "customer_service_plans" ADD CONSTRAINT "customer_service_plans_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "customer_service_plans" ADD CONSTRAINT "customer_service_plans_service_plan_id_service_plans_id_fk" FOREIGN KEY ("service_plan_id") REFERENCES "public"."service_plans"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "service_plan_visits" ADD CONSTRAINT "service_plan_visits_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "service_plan_visits" ADD CONSTRAINT "service_plan_visits_customer_service_plan_id_customer_service_plans_id_fk" FOREIGN KEY ("customer_service_plan_id") REFERENCES "public"."customer_service_plans"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "service_plan_visits" ADD CONSTRAINT "service_plan_visits_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "service_plans" ADD CONSTRAINT "service_plans_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_workflow_id_diagnostic_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."diagnostic_workflows"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_step_id_diagnostic_steps_id_fk" FOREIGN KEY ("step_id") REFERENCES "public"."diagnostic_steps"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_reported_by_users_id_fk" FOREIGN KEY ("reported_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_step_id_diagnostic_steps_id_fk" FOREIGN KEY ("step_id") REFERENCES "public"."diagnostic_steps"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_entered_by_users_id_fk" FOREIGN KEY ("entered_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_photo_id_photos_id_fk" FOREIGN KEY ("photo_id") REFERENCES "public"."photos"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_equipment_id_equipment_id_fk" FOREIGN KEY ("equipment_id") REFERENCES "public"."equipment"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_workflow_id_diagnostic_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."diagnostic_workflows"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_started_by_users_id_fk" FOREIGN KEY ("started_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_steps" ADD CONSTRAINT "diagnostic_steps_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_steps" ADD CONSTRAINT "diagnostic_steps_workflow_id_diagnostic_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."diagnostic_workflows"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_workflows" ADD CONSTRAINT "diagnostic_workflows_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_equipment_links" ADD CONSTRAINT "job_equipment_links_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_equipment_links" ADD CONSTRAINT "job_equipment_links_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_equipment_links" ADD CONSTRAINT "job_equipment_links_equipment_id_equipment_id_fk" FOREIGN KEY ("equipment_id") REFERENCES "public"."equipment"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_equipment_links" ADD CONSTRAINT "job_equipment_links_linked_by_users_id_fk" FOREIGN KEY ("linked_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "trace_routes" ADD CONSTRAINT "trace_routes_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "trace_routes" ADD CONSTRAINT "trace_routes_step_id_diagnostic_steps_id_fk" FOREIGN KEY ("step_id") REFERENCES "public"."diagnostic_steps"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_workflow_extensions" ADD CONSTRAINT "diagnostic_workflow_extensions_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_workflow_extensions" ADD CONSTRAINT "diagnostic_workflow_extensions_workflow_id_diagnostic_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."diagnostic_workflows"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_workflow_extensions" ADD CONSTRAINT "diagnostic_workflow_extensions_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "diagnostic_workflow_extensions" ADD CONSTRAINT "diagnostic_workflow_extensions_known_fault_id_known_faults_id_fk" FOREIGN KEY ("known_fault_id") REFERENCES "public"."known_faults"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "equipment_models" ADD CONSTRAINT "equipment_models_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "equipment_models" ADD CONSTRAINT "equipment_models_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exploded_view_components" ADD CONSTRAINT "exploded_view_components_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exploded_view_components" ADD CONSTRAINT "exploded_view_components_exploded_view_id_exploded_views_id_fk" FOREIGN KEY ("exploded_view_id") REFERENCES "public"."exploded_views"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exploded_view_components" ADD CONSTRAINT "exploded_view_components_model_part_id_model_parts_id_fk" FOREIGN KEY ("model_part_id") REFERENCES "public"."model_parts"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exploded_views" ADD CONSTRAINT "exploded_views_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exploded_views" ADD CONSTRAINT "exploded_views_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exploded_views" ADD CONSTRAINT "exploded_views_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fault_symptoms" ADD CONSTRAINT "fault_symptoms_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fault_symptoms" ADD CONSTRAINT "fault_symptoms_fault_id_known_faults_id_fk" FOREIGN KEY ("fault_id") REFERENCES "public"."known_faults"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fault_symptoms" ADD CONSTRAINT "fault_symptoms_symptom_id_symptoms_id_fk" FOREIGN KEY ("symptom_id") REFERENCES "public"."symptoms"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_test_point_id_test_points_id_fk" FOREIGN KEY ("test_point_id") REFERENCES "public"."test_points"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_recorded_by_users_id_fk" FOREIGN KEY ("recorded_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_source_job_id_jobs_id_fk" FOREIGN KEY ("source_job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_source_equipment_id_equipment_id_fk" FOREIGN KEY ("source_equipment_id") REFERENCES "public"."equipment"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_source_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("source_session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_source_repair_outcome_id_repair_outcomes_id_fk" FOREIGN KEY ("source_repair_outcome_id") REFERENCES "public"."repair_outcomes"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_proposed_by_users_id_fk" FOREIGN KEY ("proposed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_revisions" ADD CONSTRAINT "knowledge_revisions_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_revisions" ADD CONSTRAINT "knowledge_revisions_changed_by_users_id_fk" FOREIGN KEY ("changed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_source_job_id_jobs_id_fk" FOREIGN KEY ("source_job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_source_equipment_id_equipment_id_fk" FOREIGN KEY ("source_equipment_id") REFERENCES "public"."equipment"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_catalog_item_id_catalog_items_id_fk" FOREIGN KEY ("catalog_item_id") REFERENCES "public"."catalog_items"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "part_procurement_records" ADD CONSTRAINT "part_procurement_records_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "part_procurement_records" ADD CONSTRAINT "part_procurement_records_model_part_id_model_parts_id_fk" FOREIGN KEY ("model_part_id") REFERENCES "public"."model_parts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "part_procurement_records" ADD CONSTRAINT "part_procurement_records_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "part_procurement_records" ADD CONSTRAINT "part_procurement_records_requested_by_users_id_fk" FOREIGN KEY ("requested_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_equipment_id_equipment_id_fk" FOREIGN KEY ("equipment_id") REFERENCES "public"."equipment"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_diagnostic_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("diagnostic_session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_known_fault_id_known_faults_id_fk" FOREIGN KEY ("known_fault_id") REFERENCES "public"."known_faults"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_repair_procedure_id_repair_procedures_id_fk" FOREIGN KEY ("repair_procedure_id") REFERENCES "public"."repair_procedures"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_technician_id_users_id_fk" FOREIGN KEY ("technician_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_known_fault_id_known_faults_id_fk" FOREIGN KEY ("known_fault_id") REFERENCES "public"."known_faults"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_source_job_id_jobs_id_fk" FOREIGN KEY ("source_job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "symptoms" ADD CONSTRAINT "symptoms_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "symptoms" ADD CONSTRAINT "symptoms_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_known_fault_id_known_faults_id_fk" FOREIGN KEY ("known_fault_id") REFERENCES "public"."known_faults"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_repair_procedure_id_repair_procedures_id_fk" FOREIGN KEY ("repair_procedure_id") REFERENCES "public"."repair_procedures"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_uploaded_by_users_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "test_points" ADD CONSTRAINT "test_points_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "test_points" ADD CONSTRAINT "test_points_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "test_points" ADD CONSTRAINT "test_points_photo_id_photos_id_fk" FOREIGN KEY ("photo_id") REFERENCES "public"."photos"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "test_points" ADD CONSTRAINT "test_points_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "device_push_tokens_token_idx" ON "device_push_tokens" USING btree ("token");--> statement-breakpoint
-CREATE INDEX "device_push_tokens_user_idx" ON "device_push_tokens" USING btree ("org_id","user_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "documents_org_kind_document_idx" ON "documents" USING btree ("org_id","kind","document_id");--> statement-breakpoint
-CREATE INDEX "estimate_option_lines_org_option_idx" ON "estimate_option_line_items" USING btree ("org_id","option_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "estimate_options_position_idx" ON "estimate_options" USING btree ("estimate_id","position");--> statement-breakpoint
-CREATE INDEX "estimate_options_org_estimate_idx" ON "estimate_options" USING btree ("org_id","estimate_id");--> statement-breakpoint
-CREATE INDEX "invoice_line_items_org_invoice_idx" ON "invoice_line_items" USING btree ("org_id","invoice_id");--> statement-breakpoint
-CREATE INDEX "job_voice_notes_job_idx" ON "job_voice_notes" USING btree ("org_id","job_id");--> statement-breakpoint
-CREATE INDEX "job_voice_notes_author_idx" ON "job_voice_notes" USING btree ("org_id","author_user_id");--> statement-breakpoint
-CREATE INDEX "message_logs_org_document_idx" ON "message_logs" USING btree ("org_id","kind","document_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "newsletter_subscribers_org_email_idx" ON "newsletter_subscribers" USING btree ("org_id","email");--> statement-breakpoint
-CREATE INDEX "newsletter_subscribers_org_status_idx" ON "newsletter_subscribers" USING btree ("org_id","status");--> statement-breakpoint
-CREATE UNIQUE INDEX "portal_links_hash_idx" ON "portal_links" USING btree ("token_hash");--> statement-breakpoint
-CREATE INDEX "portal_links_org_customer_idx" ON "portal_links" USING btree ("org_id","customer_id");--> statement-breakpoint
-CREATE INDEX "customer_service_plans_customer_idx" ON "customer_service_plans" USING btree ("org_id","customer_id","status");--> statement-breakpoint
-CREATE INDEX "customer_service_plans_plan_idx" ON "customer_service_plans" USING btree ("org_id","service_plan_id");--> statement-breakpoint
-CREATE INDEX "service_plan_visits_plan_idx" ON "service_plan_visits" USING btree ("org_id","customer_service_plan_id","status");--> statement-breakpoint
-CREATE INDEX "service_plan_visits_due_idx" ON "service_plan_visits" USING btree ("org_id","due_at");--> statement-breakpoint
-CREATE INDEX "service_plans_org_idx" ON "service_plans" USING btree ("org_id","active");--> statement-breakpoint
-CREATE INDEX "diagnostic_corrections_workflow_idx" ON "diagnostic_correction_reports" USING btree ("workflow_id","status","severity");--> statement-breakpoint
-CREATE INDEX "diagnostic_measurements_session_idx" ON "diagnostic_measurements" USING btree ("session_id","recorded_at");--> statement-breakpoint
-CREATE INDEX "diagnostic_measurements_step_idx" ON "diagnostic_measurements" USING btree ("step_id");--> statement-breakpoint
-CREATE INDEX "diagnostic_sessions_org_status_idx" ON "diagnostic_sessions" USING btree ("org_id","status");--> statement-breakpoint
-CREATE INDEX "diagnostic_sessions_job_idx" ON "diagnostic_sessions" USING btree ("job_id","created_at");--> statement-breakpoint
-CREATE INDEX "diagnostic_sessions_equipment_idx" ON "diagnostic_sessions" USING btree ("equipment_id","created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "diagnostic_steps_workflow_key_idx" ON "diagnostic_steps" USING btree ("workflow_id","step_key");--> statement-breakpoint
-CREATE INDEX "diagnostic_steps_sequence_idx" ON "diagnostic_steps" USING btree ("workflow_id","sequence");--> statement-breakpoint
-CREATE INDEX "diagnostic_workflows_org_status_idx" ON "diagnostic_workflows" USING btree ("org_id","lifecycle_status","support_status");--> statement-breakpoint
-CREATE INDEX "diagnostic_workflows_model_idx" ON "diagnostic_workflows" USING btree ("org_id","make","model_family");--> statement-breakpoint
-CREATE UNIQUE INDEX "job_equipment_links_job_idx" ON "job_equipment_links" USING btree ("job_id");--> statement-breakpoint
-CREATE INDEX "job_equipment_links_equipment_idx" ON "job_equipment_links" USING btree ("org_id","equipment_id");--> statement-breakpoint
-CREATE INDEX "trace_routes_step_idx" ON "trace_routes" USING btree ("step_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "diagnostic_workflow_extensions_workflow_idx" ON "diagnostic_workflow_extensions" USING btree ("workflow_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "equipment_models_org_normalized_idx" ON "equipment_models" USING btree ("org_id","normalized_identifier");--> statement-breakpoint
-CREATE INDEX "equipment_models_org_category_idx" ON "equipment_models" USING btree ("org_id","category");--> statement-breakpoint
-CREATE INDEX "equipment_models_search_idx" ON "equipment_models" USING btree ("org_id","manufacturer","model_number");--> statement-breakpoint
-CREATE INDEX "exploded_view_components_view_idx" ON "exploded_view_components" USING btree ("exploded_view_id");--> statement-breakpoint
-CREATE INDEX "exploded_views_model_idx" ON "exploded_views" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "fault_symptoms_pair_idx" ON "fault_symptoms" USING btree ("fault_id","symptom_id");--> statement-breakpoint
-CREATE INDEX "field_measurements_session_idx" ON "field_measurements" USING btree ("session_id");--> statement-breakpoint
-CREATE INDEX "field_measurements_model_idx" ON "field_measurements" USING btree ("equipment_model_id");--> statement-breakpoint
-CREATE INDEX "knowledge_proposals_status_idx" ON "knowledge_proposals" USING btree ("org_id","status");--> statement-breakpoint
-CREATE INDEX "knowledge_proposals_model_idx" ON "knowledge_proposals" USING btree ("equipment_model_id");--> statement-breakpoint
-CREATE INDEX "knowledge_revisions_entity_idx" ON "knowledge_revisions" USING btree ("org_id","entity_type","entity_id");--> statement-breakpoint
-CREATE INDEX "known_faults_model_idx" ON "known_faults" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
-CREATE INDEX "known_faults_code_idx" ON "known_faults" USING btree ("org_id","normalized_fault_code");--> statement-breakpoint
-CREATE INDEX "model_parts_model_idx" ON "model_parts" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
-CREATE INDEX "model_parts_oem_idx" ON "model_parts" USING btree ("org_id","oem_part_number");--> statement-breakpoint
-CREATE INDEX "part_procurement_part_idx" ON "part_procurement_records" USING btree ("model_part_id","purchased_at");--> statement-breakpoint
-CREATE INDEX "repair_outcomes_job_idx" ON "repair_outcomes" USING btree ("job_id");--> statement-breakpoint
-CREATE INDEX "repair_outcomes_equipment_idx" ON "repair_outcomes" USING btree ("equipment_id","created_at");--> statement-breakpoint
-CREATE INDEX "repair_outcomes_model_idx" ON "repair_outcomes" USING btree ("org_id","equipment_model_id","outcome");--> statement-breakpoint
-CREATE INDEX "repair_procedures_model_idx" ON "repair_procedures" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
-CREATE INDEX "repair_procedures_fault_idx" ON "repair_procedures" USING btree ("known_fault_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "symptoms_org_normalized_idx" ON "symptoms" USING btree ("org_id","normalized_label");--> statement-breakpoint
-CREATE INDEX "technical_documents_model_idx" ON "technical_documents" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
-CREATE INDEX "technical_documents_type_idx" ON "technical_documents" USING btree ("org_id","document_type");--> statement-breakpoint
-CREATE INDEX "test_points_model_idx" ON "test_points" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
-ALTER TABLE "equipment" ADD CONSTRAINT "equipment_property_id_properties_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."properties"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "estimates" ADD CONSTRAINT "estimates_deposit_invoice_id_invoices_id_fk" FOREIGN KEY ("deposit_invoice_id") REFERENCES "public"."invoices"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "appointments_org_starts_idx" ON "appointments" USING btree ("org_id","starts_at");--> statement-breakpoint
-CREATE INDEX "appointments_job_idx" ON "appointments" USING btree ("job_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "catalog_categories_org_name_idx" ON "catalog_categories" USING btree ("org_id","name");--> statement-breakpoint
-CREATE INDEX "catalog_items_org_active_idx" ON "catalog_items" USING btree ("org_id","active");--> statement-breakpoint
-CREATE INDEX "catalog_items_category_idx" ON "catalog_items" USING btree ("category_id");--> statement-breakpoint
-CREATE INDEX "equipment_model_idx" ON "equipment" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
-CREATE INDEX "equipment_serial_idx" ON "equipment" USING btree ("org_id","serial_number");--> statement-breakpoint
-CREATE UNIQUE INDEX "jobs_tracking_hash_idx" ON "jobs" USING btree ("tracking_token_hash");--> statement-breakpoint
-CREATE INDEX "notifications_user_unread_idx" ON "notifications" USING btree ("user_id","read","created_at");--> statement-breakpoint
-CREATE INDEX "photos_job_idx" ON "photos" USING btree ("org_id","job_id");--> statement-breakpoint
-CREATE INDEX "plugin_events_retry_idx" ON "plugin_events" USING btree ("status","next_attempt_at");--> statement-breakpoint
-ALTER TABLE "catalog_items" DROP COLUMN "version";--> statement-breakpoint
-ALTER TABLE "catalog_items" DROP COLUMN "updated_at";--> statement-breakpoint
-ALTER TABLE "plugin_installs" DROP COLUMN "created_at";
+ALTER TABLE "equipment" ADD COLUMN IF NOT EXISTS "property_id" uuid;--> statement-breakpoint
+ALTER TABLE "equipment" ADD COLUMN IF NOT EXISTS "equipment_model_id" uuid;--> statement-breakpoint
+ALTER TABLE "equipment" ADD COLUMN IF NOT EXISTS "asset_tag" text;--> statement-breakpoint
+ALTER TABLE "equipment" ADD COLUMN IF NOT EXISTS "condition" text;--> statement-breakpoint
+ALTER TABLE "equipment" ADD COLUMN IF NOT EXISTS "last_maintenance" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "equipment" ADD COLUMN IF NOT EXISTS "next_maintenance" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "equipment" ADD COLUMN IF NOT EXISTS "nameplate_photo_id" uuid;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "number" text DEFAULT 'EST-1000' NOT NULL;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "expires_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "accepted_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "accepted_by_name" text;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "status" "estimate_status" DEFAULT 'draft' NOT NULL;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "pricing" jsonb;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "selected_option_id" uuid;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "signature_name" text;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "sent_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "declined_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "copied_to_job_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "deposit_cents" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "estimates" ADD COLUMN IF NOT EXISTS "deposit_invoice_id" uuid;--> statement-breakpoint
+ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "pricing" jsonb;--> statement-breakpoint
+ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "source" text DEFAULT 'staff' NOT NULL;--> statement-breakpoint
+ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "service_category" text;--> statement-breakpoint
+ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "service_address" text;--> statement-breakpoint
+ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "preferred_date" text;--> statement-breakpoint
+ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "preferred_time" text;--> statement-breakpoint
+ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "tracking_token_hash" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "logo_url" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "brand_color" text DEFAULT '#22C55E' NOT NULL;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "document_footer" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "registration_number" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "document_category" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "signatory_name" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "signatory_title" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "signature_url" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "stamp_url" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "document_terms" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "public_email" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "public_phone" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "public_address" text;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "remove_openfieldpro_attribution" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "business_settings" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "orgs" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "photos" ADD COLUMN IF NOT EXISTS "category" "photo_category" DEFAULT 'other' NOT NULL;--> statement-breakpoint
+ALTER TABLE "photos" ADD COLUMN IF NOT EXISTS "equipment_id" uuid;--> statement-breakpoint
+ALTER TABLE "plugin_installs" ADD COLUMN IF NOT EXISTS "installed_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "must_change_password" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "walkthrough_progress" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "device_push_tokens" ADD CONSTRAINT "device_push_tokens_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "device_push_tokens" ADD CONSTRAINT "device_push_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "documents" ADD CONSTRAINT "documents_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "estimate_option_line_items" ADD CONSTRAINT "estimate_option_line_items_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "estimate_option_line_items" ADD CONSTRAINT "estimate_option_line_items_option_id_estimate_options_id_fk" FOREIGN KEY ("option_id") REFERENCES "public"."estimate_options"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "estimate_options" ADD CONSTRAINT "estimate_options_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "estimate_options" ADD CONSTRAINT "estimate_options_estimate_id_estimates_id_fk" FOREIGN KEY ("estimate_id") REFERENCES "public"."estimates"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "invoice_line_items" ADD CONSTRAINT "invoice_line_items_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "invoice_line_items" ADD CONSTRAINT "invoice_line_items_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "job_voice_notes" ADD CONSTRAINT "job_voice_notes_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "job_voice_notes" ADD CONSTRAINT "job_voice_notes_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "job_voice_notes" ADD CONSTRAINT "job_voice_notes_author_user_id_users_id_fk" FOREIGN KEY ("author_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "message_logs" ADD CONSTRAINT "message_logs_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "message_logs" ADD CONSTRAINT "message_logs_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "newsletter_subscribers" ADD CONSTRAINT "newsletter_subscribers_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "portal_links" ADD CONSTRAINT "portal_links_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "portal_links" ADD CONSTRAINT "portal_links_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "customer_service_plans" ADD CONSTRAINT "customer_service_plans_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "customer_service_plans" ADD CONSTRAINT "customer_service_plans_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "customer_service_plans" ADD CONSTRAINT "customer_service_plans_service_plan_id_service_plans_id_fk" FOREIGN KEY ("service_plan_id") REFERENCES "public"."service_plans"("id") ON DELETE restrict ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "service_plan_visits" ADD CONSTRAINT "service_plan_visits_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "service_plan_visits" ADD CONSTRAINT "service_plan_visits_customer_service_plan_id_customer_service_plans_id_fk" FOREIGN KEY ("customer_service_plan_id") REFERENCES "public"."customer_service_plans"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "service_plan_visits" ADD CONSTRAINT "service_plan_visits_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "service_plans" ADD CONSTRAINT "service_plans_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_workflow_id_diagnostic_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."diagnostic_workflows"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_step_id_diagnostic_steps_id_fk" FOREIGN KEY ("step_id") REFERENCES "public"."diagnostic_steps"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_correction_reports" ADD CONSTRAINT "diagnostic_correction_reports_reported_by_users_id_fk" FOREIGN KEY ("reported_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_step_id_diagnostic_steps_id_fk" FOREIGN KEY ("step_id") REFERENCES "public"."diagnostic_steps"("id") ON DELETE restrict ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_entered_by_users_id_fk" FOREIGN KEY ("entered_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_measurements" ADD CONSTRAINT "diagnostic_measurements_photo_id_photos_id_fk" FOREIGN KEY ("photo_id") REFERENCES "public"."photos"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_equipment_id_equipment_id_fk" FOREIGN KEY ("equipment_id") REFERENCES "public"."equipment"("id") ON DELETE restrict ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_workflow_id_diagnostic_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."diagnostic_workflows"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_sessions" ADD CONSTRAINT "diagnostic_sessions_started_by_users_id_fk" FOREIGN KEY ("started_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_steps" ADD CONSTRAINT "diagnostic_steps_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_steps" ADD CONSTRAINT "diagnostic_steps_workflow_id_diagnostic_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."diagnostic_workflows"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_workflows" ADD CONSTRAINT "diagnostic_workflows_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "job_equipment_links" ADD CONSTRAINT "job_equipment_links_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "job_equipment_links" ADD CONSTRAINT "job_equipment_links_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "job_equipment_links" ADD CONSTRAINT "job_equipment_links_equipment_id_equipment_id_fk" FOREIGN KEY ("equipment_id") REFERENCES "public"."equipment"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "job_equipment_links" ADD CONSTRAINT "job_equipment_links_linked_by_users_id_fk" FOREIGN KEY ("linked_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "trace_routes" ADD CONSTRAINT "trace_routes_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "trace_routes" ADD CONSTRAINT "trace_routes_step_id_diagnostic_steps_id_fk" FOREIGN KEY ("step_id") REFERENCES "public"."diagnostic_steps"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_workflow_extensions" ADD CONSTRAINT "diagnostic_workflow_extensions_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_workflow_extensions" ADD CONSTRAINT "diagnostic_workflow_extensions_workflow_id_diagnostic_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."diagnostic_workflows"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_workflow_extensions" ADD CONSTRAINT "diagnostic_workflow_extensions_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "diagnostic_workflow_extensions" ADD CONSTRAINT "diagnostic_workflow_extensions_known_fault_id_known_faults_id_fk" FOREIGN KEY ("known_fault_id") REFERENCES "public"."known_faults"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "equipment_models" ADD CONSTRAINT "equipment_models_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "equipment_models" ADD CONSTRAINT "equipment_models_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "exploded_view_components" ADD CONSTRAINT "exploded_view_components_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "exploded_view_components" ADD CONSTRAINT "exploded_view_components_exploded_view_id_exploded_views_id_fk" FOREIGN KEY ("exploded_view_id") REFERENCES "public"."exploded_views"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "exploded_view_components" ADD CONSTRAINT "exploded_view_components_model_part_id_model_parts_id_fk" FOREIGN KEY ("model_part_id") REFERENCES "public"."model_parts"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "exploded_views" ADD CONSTRAINT "exploded_views_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "exploded_views" ADD CONSTRAINT "exploded_views_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "exploded_views" ADD CONSTRAINT "exploded_views_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "fault_symptoms" ADD CONSTRAINT "fault_symptoms_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "fault_symptoms" ADD CONSTRAINT "fault_symptoms_fault_id_known_faults_id_fk" FOREIGN KEY ("fault_id") REFERENCES "public"."known_faults"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "fault_symptoms" ADD CONSTRAINT "fault_symptoms_symptom_id_symptoms_id_fk" FOREIGN KEY ("symptom_id") REFERENCES "public"."symptoms"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_test_point_id_test_points_id_fk" FOREIGN KEY ("test_point_id") REFERENCES "public"."test_points"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "field_measurements" ADD CONSTRAINT "field_measurements_recorded_by_users_id_fk" FOREIGN KEY ("recorded_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_source_job_id_jobs_id_fk" FOREIGN KEY ("source_job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_source_equipment_id_equipment_id_fk" FOREIGN KEY ("source_equipment_id") REFERENCES "public"."equipment"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_source_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("source_session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_source_repair_outcome_id_repair_outcomes_id_fk" FOREIGN KEY ("source_repair_outcome_id") REFERENCES "public"."repair_outcomes"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_proposed_by_users_id_fk" FOREIGN KEY ("proposed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_proposals" ADD CONSTRAINT "knowledge_proposals_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_revisions" ADD CONSTRAINT "knowledge_revisions_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "knowledge_revisions" ADD CONSTRAINT "knowledge_revisions_changed_by_users_id_fk" FOREIGN KEY ("changed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_source_job_id_jobs_id_fk" FOREIGN KEY ("source_job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_source_equipment_id_equipment_id_fk" FOREIGN KEY ("source_equipment_id") REFERENCES "public"."equipment"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "known_faults" ADD CONSTRAINT "known_faults_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_catalog_item_id_catalog_items_id_fk" FOREIGN KEY ("catalog_item_id") REFERENCES "public"."catalog_items"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "model_parts" ADD CONSTRAINT "model_parts_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "part_procurement_records" ADD CONSTRAINT "part_procurement_records_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "part_procurement_records" ADD CONSTRAINT "part_procurement_records_model_part_id_model_parts_id_fk" FOREIGN KEY ("model_part_id") REFERENCES "public"."model_parts"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "part_procurement_records" ADD CONSTRAINT "part_procurement_records_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "part_procurement_records" ADD CONSTRAINT "part_procurement_records_requested_by_users_id_fk" FOREIGN KEY ("requested_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_equipment_id_equipment_id_fk" FOREIGN KEY ("equipment_id") REFERENCES "public"."equipment"("id") ON DELETE restrict ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_diagnostic_session_id_diagnostic_sessions_id_fk" FOREIGN KEY ("diagnostic_session_id") REFERENCES "public"."diagnostic_sessions"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_known_fault_id_known_faults_id_fk" FOREIGN KEY ("known_fault_id") REFERENCES "public"."known_faults"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_repair_procedure_id_repair_procedures_id_fk" FOREIGN KEY ("repair_procedure_id") REFERENCES "public"."repair_procedures"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_outcomes" ADD CONSTRAINT "repair_outcomes_technician_id_users_id_fk" FOREIGN KEY ("technician_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_known_fault_id_known_faults_id_fk" FOREIGN KEY ("known_fault_id") REFERENCES "public"."known_faults"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_source_job_id_jobs_id_fk" FOREIGN KEY ("source_job_id") REFERENCES "public"."jobs"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "repair_procedures" ADD CONSTRAINT "repair_procedures_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "symptoms" ADD CONSTRAINT "symptoms_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "symptoms" ADD CONSTRAINT "symptoms_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_known_fault_id_known_faults_id_fk" FOREIGN KEY ("known_fault_id") REFERENCES "public"."known_faults"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_repair_procedure_id_repair_procedures_id_fk" FOREIGN KEY ("repair_procedure_id") REFERENCES "public"."repair_procedures"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_uploaded_by_users_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "technical_documents" ADD CONSTRAINT "technical_documents_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "test_points" ADD CONSTRAINT "test_points_org_id_orgs_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "test_points" ADD CONSTRAINT "test_points_equipment_model_id_equipment_models_id_fk" FOREIGN KEY ("equipment_model_id") REFERENCES "public"."equipment_models"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "test_points" ADD CONSTRAINT "test_points_photo_id_photos_id_fk" FOREIGN KEY ("photo_id") REFERENCES "public"."photos"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "test_points" ADD CONSTRAINT "test_points_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "device_push_tokens_token_idx" ON "device_push_tokens" USING btree ("token");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "device_push_tokens_user_idx" ON "device_push_tokens" USING btree ("org_id","user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "documents_org_kind_document_idx" ON "documents" USING btree ("org_id","kind","document_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "estimate_option_lines_org_option_idx" ON "estimate_option_line_items" USING btree ("org_id","option_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "estimate_options_position_idx" ON "estimate_options" USING btree ("estimate_id","position");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "estimate_options_org_estimate_idx" ON "estimate_options" USING btree ("org_id","estimate_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "invoice_line_items_org_invoice_idx" ON "invoice_line_items" USING btree ("org_id","invoice_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "job_voice_notes_job_idx" ON "job_voice_notes" USING btree ("org_id","job_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "job_voice_notes_author_idx" ON "job_voice_notes" USING btree ("org_id","author_user_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "message_logs_org_document_idx" ON "message_logs" USING btree ("org_id","kind","document_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "newsletter_subscribers_org_email_idx" ON "newsletter_subscribers" USING btree ("org_id","email");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "newsletter_subscribers_org_status_idx" ON "newsletter_subscribers" USING btree ("org_id","status");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "portal_links_hash_idx" ON "portal_links" USING btree ("token_hash");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "portal_links_org_customer_idx" ON "portal_links" USING btree ("org_id","customer_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "customer_service_plans_customer_idx" ON "customer_service_plans" USING btree ("org_id","customer_id","status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "customer_service_plans_plan_idx" ON "customer_service_plans" USING btree ("org_id","service_plan_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "service_plan_visits_plan_idx" ON "service_plan_visits" USING btree ("org_id","customer_service_plan_id","status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "service_plan_visits_due_idx" ON "service_plan_visits" USING btree ("org_id","due_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "service_plans_org_idx" ON "service_plans" USING btree ("org_id","active");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_corrections_workflow_idx" ON "diagnostic_correction_reports" USING btree ("workflow_id","status","severity");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_measurements_session_idx" ON "diagnostic_measurements" USING btree ("session_id","recorded_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_measurements_step_idx" ON "diagnostic_measurements" USING btree ("step_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_sessions_org_status_idx" ON "diagnostic_sessions" USING btree ("org_id","status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_sessions_job_idx" ON "diagnostic_sessions" USING btree ("job_id","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_sessions_equipment_idx" ON "diagnostic_sessions" USING btree ("equipment_id","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "diagnostic_steps_workflow_key_idx" ON "diagnostic_steps" USING btree ("workflow_id","step_key");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_steps_sequence_idx" ON "diagnostic_steps" USING btree ("workflow_id","sequence");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_workflows_org_status_idx" ON "diagnostic_workflows" USING btree ("org_id","lifecycle_status","support_status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "diagnostic_workflows_model_idx" ON "diagnostic_workflows" USING btree ("org_id","make","model_family");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "job_equipment_links_job_idx" ON "job_equipment_links" USING btree ("job_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "job_equipment_links_equipment_idx" ON "job_equipment_links" USING btree ("org_id","equipment_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "trace_routes_step_idx" ON "trace_routes" USING btree ("step_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "diagnostic_workflow_extensions_workflow_idx" ON "diagnostic_workflow_extensions" USING btree ("workflow_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "equipment_models_org_normalized_idx" ON "equipment_models" USING btree ("org_id","normalized_identifier");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "equipment_models_org_category_idx" ON "equipment_models" USING btree ("org_id","category");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "equipment_models_search_idx" ON "equipment_models" USING btree ("org_id","manufacturer","model_number");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "exploded_view_components_view_idx" ON "exploded_view_components" USING btree ("exploded_view_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "exploded_views_model_idx" ON "exploded_views" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "fault_symptoms_pair_idx" ON "fault_symptoms" USING btree ("fault_id","symptom_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "field_measurements_session_idx" ON "field_measurements" USING btree ("session_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "field_measurements_model_idx" ON "field_measurements" USING btree ("equipment_model_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "knowledge_proposals_status_idx" ON "knowledge_proposals" USING btree ("org_id","status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "knowledge_proposals_model_idx" ON "knowledge_proposals" USING btree ("equipment_model_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "knowledge_revisions_entity_idx" ON "knowledge_revisions" USING btree ("org_id","entity_type","entity_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "known_faults_model_idx" ON "known_faults" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "known_faults_code_idx" ON "known_faults" USING btree ("org_id","normalized_fault_code");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "model_parts_model_idx" ON "model_parts" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "model_parts_oem_idx" ON "model_parts" USING btree ("org_id","oem_part_number");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "part_procurement_part_idx" ON "part_procurement_records" USING btree ("model_part_id","purchased_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "repair_outcomes_job_idx" ON "repair_outcomes" USING btree ("job_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "repair_outcomes_equipment_idx" ON "repair_outcomes" USING btree ("equipment_id","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "repair_outcomes_model_idx" ON "repair_outcomes" USING btree ("org_id","equipment_model_id","outcome");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "repair_procedures_model_idx" ON "repair_procedures" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "repair_procedures_fault_idx" ON "repair_procedures" USING btree ("known_fault_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "symptoms_org_normalized_idx" ON "symptoms" USING btree ("org_id","normalized_label");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "technical_documents_model_idx" ON "technical_documents" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "technical_documents_type_idx" ON "technical_documents" USING btree ("org_id","document_type");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "test_points_model_idx" ON "test_points" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "equipment" ADD CONSTRAINT "equipment_property_id_properties_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."properties"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "estimates" ADD CONSTRAINT "estimates_deposit_invoice_id_invoices_id_fk" FOREIGN KEY ("deposit_invoice_id") REFERENCES "public"."invoices"("id") ON DELETE set null ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "appointments_org_starts_idx" ON "appointments" USING btree ("org_id","starts_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "appointments_job_idx" ON "appointments" USING btree ("job_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "catalog_categories_org_name_idx" ON "catalog_categories" USING btree ("org_id","name");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "catalog_items_org_active_idx" ON "catalog_items" USING btree ("org_id","active");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "catalog_items_category_idx" ON "catalog_items" USING btree ("category_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "equipment_model_idx" ON "equipment" USING btree ("org_id","equipment_model_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "equipment_serial_idx" ON "equipment" USING btree ("org_id","serial_number");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "jobs_tracking_hash_idx" ON "jobs" USING btree ("tracking_token_hash");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "notifications_user_unread_idx" ON "notifications" USING btree ("user_id","read","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "photos_job_idx" ON "photos" USING btree ("org_id","job_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "plugin_events_retry_idx" ON "plugin_events" USING btree ("status","next_attempt_at");--> statement-breakpoint
+ALTER TABLE "catalog_items" DROP COLUMN IF EXISTS "version";--> statement-breakpoint
+ALTER TABLE "catalog_items" DROP COLUMN IF EXISTS "updated_at";--> statement-breakpoint
+ALTER TABLE "plugin_installs" DROP COLUMN IF EXISTS "created_at";
