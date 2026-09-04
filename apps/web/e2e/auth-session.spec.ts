@@ -100,7 +100,7 @@ test("desktop login uses an HTTP-only session and exposes sign out", async ({ pa
   expect(response?.headers()["x-frame-options"]).toBe("DENY");
 
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByText("New organization registration is controlled by the deployment owner")).toBeVisible();
+  await expect(page.getByText("technical operations workspace")).toBeVisible();
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await page.screenshot({ path: path.join(artifactDir, "login-desktop.png"), fullPage: true });
 

@@ -16,5 +16,122 @@
     "compensatingControl": "The vulnerable parsers are only reachable through Metro's explicit image-dimension probing of developer-local source assets during mobile development and builds. The API and web production runtimes never load or execute image-size, and no product code parses untrusted image buffers with it. A remote attacker has no input path to this code in any deployed service.",
     "owner": "Nikolas Marconcini",
     "expiresAt": "2027-02-22"
+  },
+  {
+    "ghsa": "GHSA-34x7-hfp2-rc4v",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "node-tar hardlink path traversal (CVE-2021-37713). tar@6.2.1 is the latest release in the 6.x line; no patched 6.x version exists. tar@7.x is a breaking major version change that is incompatible with the current Expo/RN toolchain. tar is used only as a transitive dependency of build tooling and is never invoked on untrusted archives in production.",
+    "compensatingControl": "tar is only invoked by npm/pnpm/Metro build tooling on trusted, developer-curated archives. Production API and web runtimes never extract or create tar archives. Build pipelines run in sandboxed CI environments with ephemeral filesystems.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-8qq5-rm4j-mr97",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "node-tar symlink poisoning (CVE-2021-37712). tar@6.2.1 is the latest 6.x release; tar@7.x is a breaking change. tar is a transitive build-tool dependency only.",
+    "compensatingControl": "tar is only invoked by build tooling on trusted archives in sandboxed CI environments. Not reachable from production services.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-83g3-92jg-28cx",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "node-tar hardlink escape via symlink chain (CVE-2021-37701). tar@6.2.1 is the latest 6.x; no patched version available. Build-tool-only transitive dependency.",
+    "compensatingControl": "tar extraction occurs only in sandboxed CI during builds, on trusted archives. Not reachable from production.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-qffp-2rhf-9h96",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "tar hardlink path traversal via drive-relative linkpath. tar@6.2.1 is the latest 6.x; tar@7.x would be a breaking upgrade. Build-tool transitive dependency only.",
+    "compensatingControl": "Only reachable through build tooling on developer-curated archives in sandboxed CI. Not in production runtime paths.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-9ppj-qmqm-q256",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "node-tar symlink path traversal via drive-relative linkpath. tar@6.2.1 is latest 6.x; tar@7.x is breaking. Build-tool transitive dependency only.",
+    "compensatingControl": "Only invoked by build tooling in sandboxed CI on trusted archives. Not reachable from production services.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-r6q2-hw4h-h46w",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "Race condition in node-tar path reservations via Unicode ligature collisions. tar@6.2.1 is latest 6.x; tar@7.x is breaking. Build-tool transitive dependency only.",
+    "compensatingControl": "Race condition requires concurrent extraction on macOS APFS, which only occurs in local dev. CI runs on Linux. Not reachable from production.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-23hp-3jrh-7fpw",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "node-tar decompression/parse DoS via unlimited input. tar@6.2.1 is latest 6.x; tar@7.x is breaking. Build-tool transitive dependency only.",
+    "compensatingControl": "tar extraction occurs only in sandboxed CI on trusted, finite-size archives. Production services never parse tar streams.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-8x88-c5mf-7j5w",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "Negative tar entry size causes infinite loop. tar@6.2.1 is latest 6.x; tar@7.x is breaking. Build-tool transitive dependency only.",
+    "compensatingControl": "tar extraction only occurs in sandboxed CI on trusted archives. Not reachable from production services.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-r292-9mhp-454m",
+    "package": "tar",
+    "version": "6.2.1",
+    "rationale": "Uncontrolled recursion in mapHas/filesFilter allows stack-overflow DoS via crafted long-path tar. tar@6.2.1 is latest 6.x; tar@7.x is breaking. Build-tool transitive dependency only.",
+    "compensatingControl": "tar extraction only occurs in sandboxed CI on trusted archives. Not reachable from production services.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-3ppc-4f35-3m26",
+    "package": "minimatch",
+    "version": "3.1.5",
+    "rationale": "minimatch ReDoS via repeated wildcards with non-matching literal. minimatch@3.1.5 is the latest 3.x release; no patched 3.x version exists. This version is pulled transitively by @expo/cli, @expo/fingerprint, @expo/metro-config, glob, and node-dir — all mobile-toolchain packages. minimatch@5+/9+/10+ do not carry this advisory. Production API and web runtimes do not load minimatch.",
+    "compensatingControl": "minimatch is only used by Expo/Metro build tooling on developer-controlled glob patterns during local development and CI builds. The ReDoS requires crafted input with repeated wildcards, which is not possible through any production API input path.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-7r86-cg39-jmmj",
+    "package": "minimatch",
+    "version": "3.1.5",
+    "rationale": "minimatch ReDoS via matchOne() combinatorial backtracking. minimatch@3.1.5 is latest 3.x; no fix in 3.x line. Transitive dependency of Expo/Metro mobile toolchain only.",
+    "compensatingControl": "Only reachable through Expo/Metro build tooling on developer-controlled glob patterns. Not in production runtime paths.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-23c5-xmqv-rm74",
+    "package": "minimatch",
+    "version": "3.1.5",
+    "rationale": "minimatch ReDoS via nested *() extglobs. minimatch@3.1.5 is latest 3.x; no fix in 3.x line. Transitive dependency of Expo/Metro mobile toolchain only.",
+    "compensatingControl": "Only reachable through Expo/Metro build tooling on developer-controlled glob patterns. Not in production runtime paths.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-jmr9-qjv8-65gv",
+    "package": "extract-zip",
+    "version": "2.0.1",
+    "rationale": "extract-zip unvalidated symlink path traversal. extract-zip@2.0.1 is the latest and only maintained release; no patched version exists. It is a transitive dependency of Playwright (used only for e2e test execution) and is not in any production runtime.",
+    "compensatingControl": "extract-zip is only invoked by Playwright during local development and CI e2e test runs to unpack browser downloads. It operates on trusted archives from official Playwright CDN endpoints. Production API and web services never load or execute extract-zip.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
   }
 ]

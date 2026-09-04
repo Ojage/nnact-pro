@@ -1,4 +1,7 @@
-CREATE TYPE "public"."equipment_component_kind" AS ENUM('generic', 'actuator', 'sensor', 'pcb', 'connector', 'wiring', 'harness', 'valve', 'motor', 'compressor', 'pump', 'heater', 'fan', 'belt', 'seal', 'filter');--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."equipment_component_kind" AS ENUM('generic', 'actuator', 'sensor', 'pcb', 'connector', 'wiring', 'harness', 'valve', 'motor', 'compressor', 'pump', 'heater', 'fan', 'belt', 'seal', 'filter');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
 CREATE TABLE "equipment_categories" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,

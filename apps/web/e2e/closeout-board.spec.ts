@@ -52,6 +52,7 @@ async function mockCloseoutApi(
     const request = route.request();
     const url = new URL(request.url());
 
+    if (url.pathname === "/api/auth/me") return fulfillJson(route, { id: "owner-1", name: "Morgan Owner", email: "owner@example.test", role: "owner" });
     if (url.pathname === "/api/notifications/unread-count") return fulfillJson(route, { count: 0 });
     if (url.pathname === "/api/notifications") return fulfillJson(route, []);
     if (url.pathname === "/api/jobs" && request.method() === "GET") return fulfillJson(route, data.jobs);

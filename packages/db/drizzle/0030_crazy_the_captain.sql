@@ -1,23 +1,83 @@
-CREATE TYPE "public"."estimate_status" AS ENUM('draft', 'sent', 'approved', 'declined', 'expired');--> statement-breakpoint
-CREATE TYPE "public"."newsletter_status" AS ENUM('subscribed', 'unsubscribed', 'bounced');--> statement-breakpoint
-CREATE TYPE "public"."photo_category" AS ENUM('nameplate', 'before_repair', 'after_repair', 'component', 'board', 'wiring', 'damage', 'measurement', 'part', 'other');--> statement-breakpoint
-CREATE TYPE "public"."service_plan_status" AS ENUM('active', 'paused', 'canceled', 'expired');--> statement-breakpoint
-CREATE TYPE "public"."service_visit_status" AS ENUM('planned', 'scheduled', 'completed', 'skipped');--> statement-breakpoint
-CREATE TYPE "public"."correction_severity" AS ENUM('low', 'medium', 'high', 'safety_critical');--> statement-breakpoint
-CREATE TYPE "public"."correction_status" AS ENUM('open', 'triaged', 'in_review', 'fixed', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."diagnostic_mode" AS ENUM('field', 'guided', 'both');--> statement-breakpoint
-CREATE TYPE "public"."diagnostic_session_status" AS ENUM('not_started', 'identification_required', 'workflow_ready', 'testing', 'blocked', 'inconclusive', 'diagnosed', 'escalated', 'under_review', 'completed');--> statement-breakpoint
-CREATE TYPE "public"."diagnostic_step_type" AS ENUM('check', 'decision', 'reference', 'stop');--> statement-breakpoint
-CREATE TYPE "public"."workflow_lifecycle_status" AS ENUM('draft', 'extracted', 'needs_endpoint_review', 'needs_route_review', 'needs_electrical_review', 'needs_field_review', 'pilot', 'validated', 'published', 'suspended', 'retired');--> statement-breakpoint
-CREATE TYPE "public"."workflow_support_status" AS ENUM('validated', 'pilot', 'experimental', 'unsupported');--> statement-breakpoint
-CREATE TYPE "public"."knowledge_confidence" AS ENUM('unverified', 'field_observation', 'repeated_success', 'technician_verified', 'senior_verified', 'manufacturer_confirmed');--> statement-breakpoint
-CREATE TYPE "public"."knowledge_proposal_status" AS ENUM('field_note', 'proposed', 'reviewed', 'verified', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."knowledge_proposal_type" AS ENUM('fault', 'symptom', 'diagnostic_procedure', 'repair_procedure', 'part', 'measurement', 'test_point', 'document');--> statement-breakpoint
-CREATE TYPE "public"."knowledge_source_type" AS ENUM('field_job', 'manufacturer', 'supplier', 'internal_research', 'field_observation', 'verified_internal');--> statement-breakpoint
-CREATE TYPE "public"."knowledge_verification_status" AS ENUM('field_note', 'proposed', 'reviewed', 'verified', 'rejected', 'archived');--> statement-breakpoint
-CREATE TYPE "public"."measurement_result" AS ENUM('pass', 'fail', 'unknown', 'within_range', 'out_of_range');--> statement-breakpoint
-CREATE TYPE "public"."repair_outcome_status" AS ENUM('successful', 'partial', 'failed', 'temporary_fix', 'waiting_for_part', 'customer_declined', 'replacement_recommended', 'unrepairable');--> statement-breakpoint
-CREATE TYPE "public"."technical_document_type" AS ENUM('service_manual', 'user_manual', 'wiring_diagram', 'schematic', 'datasheet', 'board_image', 'exploded_view', 'internal_report', 'field_note', 'video', 'audio', 'supplier_document');--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."estimate_status" AS ENUM('draft', 'sent', 'approved', 'declined', 'expired');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."newsletter_status" AS ENUM('subscribed', 'unsubscribed', 'bounced');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."photo_category" AS ENUM('nameplate', 'before_repair', 'after_repair', 'component', 'board', 'wiring', 'damage', 'measurement', 'part', 'other');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."service_plan_status" AS ENUM('active', 'paused', 'canceled', 'expired');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."service_visit_status" AS ENUM('planned', 'scheduled', 'completed', 'skipped');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."correction_severity" AS ENUM('low', 'medium', 'high', 'safety_critical');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."correction_status" AS ENUM('open', 'triaged', 'in_review', 'fixed', 'rejected');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."diagnostic_mode" AS ENUM('field', 'guided', 'both');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."diagnostic_session_status" AS ENUM('not_started', 'identification_required', 'workflow_ready', 'testing', 'blocked', 'inconclusive', 'diagnosed', 'escalated', 'under_review', 'completed');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."diagnostic_step_type" AS ENUM('check', 'decision', 'reference', 'stop');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."workflow_lifecycle_status" AS ENUM('draft', 'extracted', 'needs_endpoint_review', 'needs_route_review', 'needs_electrical_review', 'needs_field_review', 'pilot', 'validated', 'published', 'suspended', 'retired');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."workflow_support_status" AS ENUM('validated', 'pilot', 'experimental', 'unsupported');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."knowledge_confidence" AS ENUM('unverified', 'field_observation', 'repeated_success', 'technician_verified', 'senior_verified', 'manufacturer_confirmed');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."knowledge_proposal_status" AS ENUM('field_note', 'proposed', 'reviewed', 'verified', 'rejected');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."knowledge_proposal_type" AS ENUM('fault', 'symptom', 'diagnostic_procedure', 'repair_procedure', 'part', 'measurement', 'test_point', 'document');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."knowledge_source_type" AS ENUM('field_job', 'manufacturer', 'supplier', 'internal_research', 'field_observation', 'verified_internal');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."knowledge_verification_status" AS ENUM('field_note', 'proposed', 'reviewed', 'verified', 'rejected', 'archived');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."measurement_result" AS ENUM('pass', 'fail', 'unknown', 'within_range', 'out_of_range');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."repair_outcome_status" AS ENUM('successful', 'partial', 'failed', 'temporary_fix', 'waiting_for_part', 'customer_declined', 'replacement_recommended', 'unrepairable');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."technical_document_type" AS ENUM('service_manual', 'user_manual', 'wiring_diagram', 'schematic', 'datasheet', 'board_image', 'exploded_view', 'internal_report', 'field_note', 'video', 'audio', 'supplier_document');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
 CREATE TABLE "device_push_tokens" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,

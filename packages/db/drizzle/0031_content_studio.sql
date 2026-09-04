@@ -1,9 +1,27 @@
-CREATE TYPE "public"."content_type" AS ENUM('ARTICLE', 'MAINTENANCE_TIP', 'FIELD_STORY', 'PROJECT_SHOWCASE', 'ANNOUNCEMENT', 'CAMPAIGN', 'VIDEO', 'SOCIAL_POST');--> statement-breakpoint
-CREATE TYPE "public"."content_status" AS ENUM('DRAFT', 'IN_REVIEW', 'APPROVED', 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'ARCHIVED', 'REJECTED');--> statement-breakpoint
-CREATE TYPE "public"."content_visibility" AS ENUM('PUBLIC', 'UNLISTED', 'PRIVATE');--> statement-breakpoint
-CREATE TYPE "public"."publishing_channel" AS ENUM('WEBSITE', 'LINKEDIN', 'FACEBOOK', 'INSTAGRAM');--> statement-breakpoint
-CREATE TYPE "public"."channel_publication_status" AS ENUM('DRAFT', 'READY', 'SCHEDULED', 'QUEUED', 'PUBLISHING', 'PUBLISHED', 'FAILED', 'CANCELLED');--> statement-breakpoint
-CREATE TYPE "public"."connection_status" AS ENUM('CONNECTED', 'DISCONNECTED', 'EXPIRED', 'ERROR');--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."content_type" AS ENUM('ARTICLE', 'MAINTENANCE_TIP', 'FIELD_STORY', 'PROJECT_SHOWCASE', 'ANNOUNCEMENT', 'CAMPAIGN', 'VIDEO', 'SOCIAL_POST');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."content_status" AS ENUM('DRAFT', 'IN_REVIEW', 'APPROVED', 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'ARCHIVED', 'REJECTED');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."content_visibility" AS ENUM('PUBLIC', 'UNLISTED', 'PRIVATE');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."publishing_channel" AS ENUM('WEBSITE', 'LINKEDIN', 'FACEBOOK', 'INSTAGRAM');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."channel_publication_status" AS ENUM('DRAFT', 'READY', 'SCHEDULED', 'QUEUED', 'PUBLISHING', 'PUBLISHED', 'FAILED', 'CANCELLED');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."connection_status" AS ENUM('CONNECTED', 'DISCONNECTED', 'EXPIRED', 'ERROR');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
 CREATE TABLE "content_categories" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
