@@ -42,6 +42,7 @@ import { diagnosticOutputRoutes } from "./routes/diagnostic-outputs.js";
 import { voiceNoteRoutes } from "./routes/voice-notes.js";
 import { repairBrainRoutes } from "./routes/repair-brain.js";
 import { repairBrainIntelligenceRoutes } from "./routes/repair-brain-intelligence.js";
+import { smsAdminRoutes } from "./routes/sms.js";
 import { closeRedis } from "./repair-brain-cache.js";
 import { passwordChangeRequiredGuard } from "./password-change-guard.js";
 import { diagnosticAuthoringGuard } from "./diagnostic-authoring-guard.js";
@@ -246,6 +247,7 @@ export function buildServer(
   app.register(recurringRoutes, { prefix: withVersion("/recurring") });
   app.register(photoRoutes, { prefix: withVersion("/photos") });
   app.register(catalogRoutes, { prefix: withVersion("/catalog") });
+  app.register(smsAdminRoutes, { prefix: withVersion("") });
   app.register(publicRoutes, { prefix: withVersion("/public") });
   app.register(portalRoutes, { prefix: withVersion("/portal") });
   app.register(messageRoutes, { prefix: withVersion("") });

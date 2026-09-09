@@ -92,6 +92,9 @@ export const users = pgTable(
     id: id(),
     orgId: orgId(),
     email: text("email").notNull(),
+    /** E.164-ish phone number (e.g. 237XXXXXXXXX); nullable for password-only accounts. */
+    phone: text("phone"),
+    phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true }),
     name: text("name").notNull(),
     role: userRole("role").default("technician").notNull(),
     passwordHash: text("password_hash"),
@@ -106,6 +109,31 @@ export const users = pgTable(
   },
   (t) => ({ orgEmail: index("users_org_email_idx").on(t.orgId, t.email) }),
 );
+
+export const verificationCodes = pgTable(
+  "verification_codes",
+  {
+    id: id(),
+    /** Purpose-scoped code target: "phone" | "email". */
+    purpose: text("purpose").default("phone").notNull(),
+    channel: text("channel").notNull(),
+    /** Normalized recipient: E.164 phone number or lowercase email. */
+    target: text("target").notNull(),
+    /** Stores a SHA-256 hex hash of the code; the plaintext code is never persisted. */
+    codeHash: text("code_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Max attempts; consumed once verified or exhausted. */
+    attempts: integer("attempts").default(0).notNull(),
+    maxAttempts: integer("max_attempts").default(5).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: ts(),
+  },
+  (t) => ({
+    targetPurpose: index("verification_codes_target_purpose_idx").on(t.target, t.purpose),
+  }),
+);
+
+export type VerificationCode = typeof verificationCodes.$inferSelect;
 
 export const customers = pgTable(
   "customers",

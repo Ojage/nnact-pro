@@ -18,6 +18,8 @@ import {
   revokeRefreshToken,
   rotateRefreshToken,
 } from "../refresh-tokens.js";
+import { normalizePhone } from "../sms/phone.js";
+import { requestOtp, verifyOtp } from "../sms/otp.js";
 
 const registerBody = z.object({
   orgName: z.string().trim().min(1).max(200),
@@ -27,8 +29,21 @@ const registerBody = z.object({
 });
 
 const loginBody = z.object({
-  email: z.string().trim().email().max(320),
+  email: z.string().trim().email().max(320).optional(),
+  phone: z.string().trim().min(7).max(20).optional(),
   password: z.string().min(1).max(128),
+}).refine((body) => Boolean(body.email || body.phone), {
+  message: "provide an email or phone",
+  path: ["email"],
+});
+
+const otpRequestBody = z.object({
+  phone: z.string().trim().min(7).max(20),
+});
+
+const otpVerifyBody = z.object({
+  phone: z.string().trim().min(7).max(20),
+  code: z.string().trim().regex(/^\d{6}$/),
 });
 
 const changePasswordBody = z.object({
@@ -50,10 +65,14 @@ const loginRateLimit = createFixedWindowRateLimit({
   max: 10,
   windowMs: 15 * 60 * 1000,
   key: (request: FastifyRequest) => {
-    const email = typeof (request.body as { email?: unknown } | undefined)?.email === "string"
-      ? (request.body as { email: string }).email.trim().toLowerCase()
-      : "unknown";
-    return `${requestIpKey(request)}:${email}`;
+    const body = request.body as { email?: unknown; phone?: unknown } | undefined;
+    const identity =
+      typeof body?.email === "string"
+        ? body.email.trim().toLowerCase()
+        : typeof body?.phone === "string"
+          ? normalizePhone(body.phone)
+          : "unknown";
+    return `${requestIpKey(request)}:${identity}`;
   },
 });
 
@@ -189,12 +208,63 @@ export async function authRoutes(app: FastifyInstance) {
     reply.header("Cache-Control", "no-store");
     const parsed = loginBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    const email = parsed.data.email.toLowerCase();
+    const email = parsed.data.email?.trim().toLowerCase();
+    const phone = parsed.data.phone ? normalizePhone(parsed.data.phone) : undefined;
 
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    let user;
+    if (phone) {
+      [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+    } else {
+      const lookupEmail = email!;
+      [user] = await db.select().from(users).where(eq(users.email, lookupEmail)).limit(1);
+    }
     if (!user || !user.active || !user.passwordHash || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
       return reply.code(401).send({ error: "invalid credentials" });
     }
+
+    return staffAuthResponse(app, reply, {
+      id: user.id,
+      orgId: user.orgId,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      mustChangePassword: user.mustChangePassword,
+    }, req, true);
+  });
+
+  app.post("/otp/request", { preHandler: loginRateLimit }, async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    if (!process.env.ETECH_KEYS_LOGIN && !process.env.ETECH_KEYS_API_KEY) {
+      return reply.code(503).send({ error: "SMS not configured", hint: "set ETECH_KEYS_LOGIN/ETECH_KEYS_PASSWORD or ETECH_KEYS_API_KEY" });
+    }
+    const parsed = otpRequestBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const phone = normalizePhone(parsed.data.phone);
+
+    const [user] = await db.select({ id: users.id, phone: users.phone }).from(users).where(eq(users.phone, phone)).limit(1);
+    // Do not reveal whether the phone number is registered.
+    if (!user) return reply.code(202).send({ sent: true, message: "if the number is registered, a code was sent" });
+
+    const result = await requestOtp(phone, "phone", "login");
+    return reply.code(202).send({ sent: result.sent, ...(result.devCode ? { devCode: result.devCode } : {}) });
+  });
+
+  app.post("/otp/verify", async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const parsed = otpVerifyBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const phone = normalizePhone(parsed.data.phone);
+
+    const [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+    if (!user?.active) return reply.code(401).send({ error: "invalid credentials" });
+
+    const result = await verifyOtp(phone, parsed.data.code, "login");
+    if (!result.ok) {
+      const reason = result.reason === "too_many_attempts" ? "too many attempts" : "invalid or expired code";
+      return reply.code(401).send({ error: reason });
+    }
+
+    await db.update(users).set({ phoneVerifiedAt: new Date() }).where(eq(users.id, user.id));
 
     return staffAuthResponse(app, reply, {
       id: user.id,

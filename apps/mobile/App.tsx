@@ -568,7 +568,7 @@ export default function App() {
           onSelect={handleGuestSearchSelect}
         />
         {signingOut ? <LoadingOverlay colors={colors} message="Signing out…" /> : null}
-        <StatusBar style={scheme === "light" ? "dark" : "light"} />
+        <StatusBar style={searchOpen ? "dark" : "light"} />
       </>
     );
   }

@@ -12,6 +12,9 @@ export const customerAccounts = pgTable(
   {
     id: id(),
     email: text("email").notNull(),
+    /** E.164-ish phone number (e.g. 237XXXXXXXXX); nullable for password-only accounts. */
+    phone: text("phone"),
+    phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true }),
     name: text("name").notNull(),
     passwordHash: text("password_hash").notNull(),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),

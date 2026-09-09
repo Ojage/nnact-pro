@@ -25,6 +25,35 @@ export async function staffLogin(email: string, password: string): Promise<Store
   return toStoredSession(payload);
 }
 
+export async function staffLoginWithPhone(phone: string, password: string): Promise<StoredStaffSession> {
+  const payload = await request<StaffAuthResponseDTO & { orgId: string }>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ phone, password }),
+  });
+  return toStoredSession(payload);
+}
+
+export interface OtpRequestResult {
+  sent: boolean;
+  devCode?: string;
+  message?: string;
+}
+
+export async function staffRequestOtp(phone: string): Promise<OtpRequestResult> {
+  return request<OtpRequestResult>("/api/auth/otp/request", {
+    method: "POST",
+    body: JSON.stringify({ phone }),
+  });
+}
+
+export async function staffVerifyOtp(phone: string, code: string): Promise<StoredStaffSession> {
+  const payload = await request<StaffAuthResponseDTO & { orgId: string }>("/api/auth/otp/verify", {
+    method: "POST",
+    body: JSON.stringify({ phone, code }),
+  });
+  return toStoredSession(payload);
+}
+
 export async function staffMe(accessToken: string): Promise<StaffAuthResponseDTO["user"]> {
   return request<StaffAuthResponseDTO["user"]>("/api/auth/me", {
     headers: { authorization: `Bearer ${accessToken}` },

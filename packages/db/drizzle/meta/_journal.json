@@ -225,6 +225,13 @@
       "when": 1790000000900,
       "tag": "0033_brief_wraith",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790000001100,
+      "tag": "0034_common_hannibal_king",
+      "breakpoints": true
     }
   ]
 }

@@ -182,7 +182,11 @@ const createStyles = (colors: Palette) =>
       height: "100%",
     },
     imageOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
       backgroundColor: "rgba(0, 37, 93, 0.08)",
     },
     badge: {

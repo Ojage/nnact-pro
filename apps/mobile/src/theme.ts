@@ -32,6 +32,15 @@ const light = {
   warning: "#9a6700",
   danger: "#d4111e",
 
+  // NNACT brand identity — warm gold with charcoal.
+  brandOrange: "#d99e00",
+  brandOrangeBright: "#f2b705",
+  brandOrangeDeep: "#b8860b",
+  brandOrangeMuted: "#fdf2cf",
+  brandCharcoal: "#17120d",
+  brandCharcoalElevated: "#241c15",
+  brandWarmWhite: "#faf5ee",
+
   heroGradientStart: "#0056d2",
   heroGradientEnd: "#00255d",
 
@@ -71,6 +80,15 @@ const dark: Palette = {
   success: "#3fb950",
   warning: "#d29922",
   danger: "#f85149",
+
+  // NNACT brand identity — warm gold with charcoal.
+  brandOrange: "#ffc400",
+  brandOrangeBright: "#ffd54a",
+  brandOrangeDeep: "#ffb300",
+  brandOrangeMuted: "#413206",
+  brandCharcoal: "#17120d",
+  brandCharcoalElevated: "#241c15",
+  brandWarmWhite: "#faf5ee",
 
   heroGradientStart: "#0d419d",
   heroGradientEnd: "#051c44",

@@ -116,6 +116,33 @@ export async function login(email: string, password: string): Promise<LoginResul
   });
 }
 
+export async function loginWithPhone(phone: string, password: string): Promise<LoginResult> {
+  return request("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ phone, password }),
+  });
+}
+
+export interface OtpRequestResult {
+  sent: boolean;
+  devCode?: string;
+  message?: string;
+}
+
+export async function requestOtp(phone: string): Promise<OtpRequestResult> {
+  return request("/api/auth/otp/request", {
+    method: "POST",
+    body: JSON.stringify({ phone }),
+  });
+}
+
+export async function verifyOtp(phone: string, code: string): Promise<LoginResult> {
+  return request("/api/auth/otp/verify", {
+    method: "POST",
+    body: JSON.stringify({ phone, code }),
+  });
+}
+
 export async function currentUser(): Promise<LoginResult["user"]> {
   return parseSessionUser(await request<unknown>("/api/auth/me"));
 }

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Audio } from "expo-av";
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from "expo-audio";
 import { Ionicons } from "@expo/vector-icons";
 import type { StoredStaffSession } from "../auth-storage";
 import { uploadVoiceNote } from "../field-api";
@@ -31,7 +31,7 @@ export function VoiceNoteRecorder({
   onUploaded: () => void;
 }) {
   const styles = createStyles(colors);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -41,10 +41,10 @@ export function VoiceNoteRecorder({
   const startTimeRef = useRef(0);
 
   useEffect(() => {
-    void Audio.requestPermissionsAsync();
-    void Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
+    void AudioModule.requestRecordingPermissionsAsync();
+    void setAudioModeAsync({
+      allowsRecording: true,
+      playsInSilentMode: true,
     });
   }, []);
 
@@ -72,15 +72,13 @@ export function VoiceNoteRecorder({
     if (isUploading) return;
     setError(null);
     try {
-      const perm = await Audio.requestPermissionsAsync();
+      const perm = await AudioModule.requestRecordingPermissionsAsync();
       if (!perm.granted) {
         setError("Microphone permission is required for voice notes.");
         return;
       }
-      const rec = new Audio.Recording();
-      await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await rec.startAsync();
-      recordingRef.current = rec;
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setIsRecording(true);
       startTimeRef.current = Date.now();
       stopTimer();
@@ -90,23 +88,24 @@ export function VoiceNoteRecorder({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start recording");
     }
-  }, [isUploading]);
+  }, [isUploading, recorder]);
 
   const finishRecording = useCallback(async () => {
-    const recording = recordingRef.current;
-    if (!recording) return;
+    try {
+      await recorder.stop();
+    } catch {
+      // no active recording (already stopped)
+    }
     stopTimer();
     setIsRecording(false);
     const durationMs = Date.now() - startTimeRef.current;
     setElapsedMs(0);
+    const uri = recorder.uri;
 
+    if (!uri || durationMs < 400) return;
+
+    setIsUploading(true);
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      recordingRef.current = null;
-      if (!uri || durationMs < 400) return;
-
-      setIsUploading(true);
       await uploadVoiceNote(session, jobId, uri, durationMs);
       onUploaded();
     } catch (err) {
@@ -114,7 +113,7 @@ export function VoiceNoteRecorder({
     } finally {
       setIsUploading(false);
     }
-  }, [jobId, onUploaded, session]);
+  }, [jobId, onUploaded, recorder, session]);
 
   return (
     <View style={styles.wrap}>

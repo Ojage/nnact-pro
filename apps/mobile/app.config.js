@@ -18,30 +18,47 @@ const googleServicesPath = process.env.GOOGLE_SERVICES_JSON
   ? path.resolve(__dirname, process.env.GOOGLE_SERVICES_JSON)
   : path.resolve(__dirname, "google-services.json");
 
-const appJson = require("./app.json");
-
 module.exports = {
   expo: {
-    ...appJson.expo,
-    plugins: [...(appJson.expo.plugins ?? []), ["expo-notifications", { defaultChannel: "field-assignments" }]],
-    android: {
-      ...appJson.expo.android,
-      ...(fs.existsSync(googleServicesPath) ? { googleServicesFile: googleServicesPath } : {}),
-      permissions: [...(appJson.expo.android?.permissions ?? []), "RECORD_AUDIO"],
+    name: "NNACT Pro Tech",
+    slug: "nnact-pro-tech",
+    version: "0.1.0",
+    description:
+      "NNACT Pro — field operations for HVAC, refrigeration, electrical, solar, and maintenance teams. Dispatch, diagnostics, Repair Brain, and mobile technician workflows.",
+    orientation: "portrait",
+    userInterfaceStyle: "automatic",
+    icon: "./assets/icon.png",
+    experiments: {
+      tsconfigPaths: false,
     },
+    plugins: [
+      [
+        "expo-splash-screen",
+        { image: "./assets/icon.png", resizeMode: "contain", backgroundColor: "#0f172a" },
+      ],
+      ["expo-notifications", { defaultChannel: "field-assignments" }],
+    ],
     ios: {
-      ...appJson.expo.ios,
+      supportsTablet: true,
+      bundleIdentifier: "com.nnact.pro",
       infoPlist: {
-        ...(appJson.expo.ios?.infoPlist ?? {}),
         NSMicrophoneUsageDescription:
           "NNACT Pro records voice notes on jobs so dispatch can hear field updates immediately.",
       },
     },
+    android: {
+      package: "com.nnact.nnact_technician",
+      permissions: ["RECORD_AUDIO"],
+      ...(fs.existsSync(googleServicesPath) ? { googleServicesFile: googleServicesPath } : {}),
+    },
     extra: {
-      ...appJson.expo.extra,
+      companyName: "NNACT",
+      tagline: "The Power of Dreams",
       apiUrl,
       eas: {
-        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "b56512d5-5af4-4588-9aae-e05de839bc71",
+        projectId:
+          process.env.EXPO_PUBLIC_EAS_PROJECT_ID ||
+          "b56512d5-5af4-4588-9aae-e05de839bc71",
       },
     },
   },

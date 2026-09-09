@@ -58,6 +58,33 @@ export async function customerLogin(email: string, password: string): Promise<St
   }));
 }
 
+export async function customerLoginWithPhone(phone: string, password: string): Promise<StoredCustomerSession> {
+  return toStoredSession(await request<CustomerAuthResponseDTO>("/api/customer-auth/login", {
+    method: "POST",
+    body: JSON.stringify({ phone, password }),
+  }));
+}
+
+export interface OtpRequestResult {
+  sent: boolean;
+  devCode?: string;
+  message?: string;
+}
+
+export async function customerRequestOtp(phone: string): Promise<OtpRequestResult> {
+  return request<OtpRequestResult>("/api/customer-auth/otp/request", {
+    method: "POST",
+    body: JSON.stringify({ phone }),
+  });
+}
+
+export async function customerVerifyOtp(phone: string, code: string): Promise<StoredCustomerSession> {
+  return toStoredSession(await request<CustomerAuthResponseDTO>("/api/customer-auth/otp/verify", {
+    method: "POST",
+    body: JSON.stringify({ phone, code }),
+  }));
+}
+
 export async function customerRefresh(refreshToken: string): Promise<StoredCustomerSession> {
   return toStoredSession(await request<CustomerAuthResponseDTO>("/api/customer-auth/refresh", {
     method: "POST",

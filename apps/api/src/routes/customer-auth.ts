@@ -10,6 +10,8 @@ import { ACCESS_TOKEN_TTL_SECONDS, issueRefreshToken, revokeRefreshToken, rotate
 import { clearCustomerSessionCookie, setCustomerSessionCookie } from "../customer-session-cookie.js";
 import { buildPortalSession } from "../portal-session.js";
 import { activePortalLinkForCustomer } from "../customer-auth-context.js";
+import { normalizePhone } from "../sms/phone.js";
+import { requestOtp, verifyOtp } from "../sms/otp.js";
 import {
   portalApproveEstimateForActiveLink,
   portalCheckoutForActiveLink,
@@ -32,8 +34,21 @@ const registerBody = z.object({
 });
 
 const loginBody = z.object({
-  email: z.string().trim().email().max(320),
+  email: z.string().trim().email().max(320).optional(),
+  phone: z.string().trim().min(7).max(20).optional(),
   password: z.string().min(1).max(128),
+}).refine((body) => Boolean(body.email || body.phone), {
+  message: "provide an email or phone",
+  path: ["email"],
+});
+
+const otpRequestBody = z.object({
+  phone: z.string().trim().min(7).max(20),
+});
+
+const otpVerifyBody = z.object({
+  phone: z.string().trim().min(7).max(20),
+  code: z.string().trim().regex(/^\d{6}$/),
 });
 
 const refreshBody = z.object({
@@ -44,10 +59,14 @@ const authRateLimit = createFixedWindowRateLimit({
   max: 10,
   windowMs: 15 * 60 * 1000,
   key: (request: FastifyRequest) => {
-    const email = typeof (request.body as { email?: unknown } | undefined)?.email === "string"
-      ? (request.body as { email: string }).email.trim().toLowerCase()
-      : "unknown";
-    return `${requestIpKey(request)}:customer:${email}`;
+    const body = request.body as { email?: unknown; phone?: unknown } | undefined;
+    const identity =
+      typeof body?.email === "string"
+        ? body.email.trim().toLowerCase()
+        : typeof body?.phone === "string"
+          ? normalizePhone(body.phone)
+          : "unknown";
+    return `${requestIpKey(request)}:customer:${identity}`;
   },
 });
 
@@ -172,12 +191,56 @@ export async function customerAuthRoutes(app: FastifyInstance) {
     reply.header("Cache-Control", "no-store");
     const parsed = loginBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    const email = parsed.data.email.toLowerCase();
+    const email = parsed.data.email?.trim().toLowerCase();
+    const phone = parsed.data.phone ? normalizePhone(parsed.data.phone) : undefined;
 
-    const [account] = await db.select().from(customerAccounts).where(eq(customerAccounts.email, email)).limit(1);
+    let account;
+    if (phone) {
+      [account] = await db.select().from(customerAccounts).where(eq(customerAccounts.phone, phone)).limit(1);
+    } else {
+      const lookupEmail = email!;
+      [account] = await db.select().from(customerAccounts).where(eq(customerAccounts.email, lookupEmail)).limit(1);
+    }
     if (!account?.active || !(await verifyPassword(parsed.data.password, account.passwordHash))) {
       return reply.code(401).send({ error: "invalid credentials" });
     }
+
+    return authResponse(app, reply, account, req);
+  });
+
+  app.post("/otp/request", { preHandler: authRateLimit }, async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    if (!process.env.ETECH_KEYS_LOGIN && !process.env.ETECH_KEYS_API_KEY) {
+      return reply.code(503).send({ error: "SMS not configured", hint: "set ETECH_KEYS_LOGIN/ETECH_KEYS_PASSWORD or ETECH_KEYS_API_KEY" });
+    }
+    const parsed = otpRequestBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const phone = normalizePhone(parsed.data.phone);
+
+    const [account] = await db.select({ id: customerAccounts.id, phone: customerAccounts.phone }).from(customerAccounts).where(eq(customerAccounts.phone, phone)).limit(1);
+    // Do not reveal whether the number is registered.
+    if (!account) return reply.code(202).send({ sent: true, message: "if the number is registered, a code was sent" });
+
+    const result = await requestOtp(phone, "phone", "login");
+    return reply.code(202).send({ sent: result.sent, ...(result.devCode ? { devCode: result.devCode } : {}) });
+  });
+
+  app.post("/otp/verify", async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const parsed = otpVerifyBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const phone = normalizePhone(parsed.data.phone);
+
+    const [account] = await db.select().from(customerAccounts).where(eq(customerAccounts.phone, phone)).limit(1);
+    if (!account?.active) return reply.code(401).send({ error: "invalid credentials" });
+
+    const result = await verifyOtp(phone, parsed.data.code, "login");
+    if (!result.ok) {
+      const reason = result.reason === "too_many_attempts" ? "too many attempts" : "invalid or expired code";
+      return reply.code(401).send({ error: reason });
+    }
+
+    await db.update(customerAccounts).set({ phoneVerifiedAt: new Date() }).where(eq(customerAccounts.id, account.id));
 
     return authResponse(app, reply, account, req);
   });

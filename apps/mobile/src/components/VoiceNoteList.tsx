@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Audio, type AVPlaybackStatus } from "expo-av";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Ionicons } from "@expo/vector-icons";
 import type { JobVoiceNoteDTO } from "@nnact/shared";
 import { voiceNoteFileUrl } from "../field-api";
@@ -33,74 +33,55 @@ export function VoiceNoteList({
   notes: JobVoiceNoteDTO[];
 }) {
   const styles = createStyles(colors);
-  const soundRef = useRef<Audio.Sound | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [progress, setProgress] = useState<{ positionMs: number; durationMs: number } | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const stopPlayback = useCallback(async () => {
-    const sound = soundRef.current;
-    soundRef.current = null;
-    if (sound) {
-      try {
-        await sound.unloadAsync();
-      } catch {
-        // already unloaded
-      }
-    }
-    setPlayingId(null);
-    setProgress(null);
-  }, []);
-
-  const togglePlay = useCallback(
-    async (note: JobVoiceNoteDTO) => {
-      if (playingId === note.id) {
-        await stopPlayback();
-        return;
-      }
-      await stopPlayback().catch(() => {});
-      setLoadingId(note.id);
-      setError(null);
-      try {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: voiceNoteFileUrl(note.id, accessToken) },
-          { shouldPlay: true },
-        );
-        soundRef.current = sound;
-        setPlayingId(note.id);
-        setProgress({ positionMs: 0, durationMs: note.durationMs || 0 });
-        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
-          if (!status.isLoaded) return;
-          if (status.didJustFinish) {
-            void stopPlayback();
-            return;
-          }
-          setProgress({
-            positionMs: status.positionMillis ?? 0,
-            durationMs: status.durationMillis ?? note.durationMs ?? 0,
-          });
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not play voice note");
-      } finally {
-        setLoadingId(null);
-      }
-    },
-    [accessToken, playingId, stopPlayback],
-  );
+  const source = playingId ? { uri: voiceNoteFileUrl(playingId, accessToken) } : null;
+  const player = useAudioPlayer(source);
+  const status = useAudioPlayerStatus(player);
 
   useEffect(() => {
-    return () => {
-      const sound = soundRef.current;
-      soundRef.current = null;
-      if (sound) void sound.unloadAsync().catch(() => {});
-    };
-  }, []);
+    if (!playingId) return;
+    if (status.isLoaded) {
+      setLoadingId(null);
+      player.play();
+      return;
+    }
+    const timer = setTimeout(() => {
+      setLoadingId(null);
+      setError("Could not load voice note");
+      setPlayingId(null);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [playingId, player, status.isLoaded]);
+
+  useEffect(() => {
+    if (playingId && status.didJustFinish) {
+      player.pause();
+      setPlayingId(null);
+    }
+  }, [playingId, player, status.didJustFinish]);
+
+  const togglePlay = useCallback(
+    (note: JobVoiceNoteDTO) => {
+      if (playingId === note.id) {
+        player.pause();
+        setPlayingId(null);
+        return;
+      }
+      if (playingId) player.pause();
+      setError(null);
+      setLoadingId(note.id);
+      setPlayingId(note.id);
+    },
+    [playingId, player],
+  );
 
   if (notes.length === 0) return null;
 
-  const ratio = progress && progress.durationMs > 0 ? Math.min(1, progress.positionMs / progress.durationMs) : 0;
+  const activeRatio =
+    playingId && status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
 
   return (
     <View style={styles.wrap}>
@@ -116,7 +97,7 @@ export function VoiceNoteList({
               style={[styles.playButton, isActive && styles.playButtonActive]}
               activeOpacity={0.8}
               disabled={isLoading}
-              onPress={() => void togglePlay(note)}
+              onPress={() => togglePlay(note)}
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color={colors.onEmphasis} />
@@ -135,12 +116,12 @@ export function VoiceNoteList({
                   {note.authorName}
                   {note.durationMs ? ` · ${formatDuration(note.durationMs)}` : ""}
                 </Text>
-                {isActive && ratio > 0 ? (
-                  <Text style={styles.progressText}>{formatDuration(progress?.positionMs ?? 0)}</Text>
+                {isActive && activeRatio > 0 ? (
+                  <Text style={styles.progressText}>{formatDuration((status.currentTime ?? 0) * 1000)}</Text>
                 ) : null}
               </View>
               <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${isActive ? ratio * 100 : 0}%` }]} />
+                <View style={[styles.progressFill, { width: `${isActive ? activeRatio * 100 : 0}%` }]} />
               </View>
             </View>
 
