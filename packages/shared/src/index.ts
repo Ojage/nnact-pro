@@ -308,4 +308,4 @@ export interface SyncResponseDTO {
   results: SyncResultDTO[];
 }
 
-export * from "./recurrence.ts";
+export * from "./recurrence.js";
