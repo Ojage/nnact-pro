@@ -24,6 +24,10 @@ ENV NODE_ENV=production
 EXPOSE 3000
 USER node
 
+# Warm the corepack cache for the runtime user (build-time cache lives under
+# root, the container runs as node and would otherwise fetch pnpm on boot).
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD wget -q -O - http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1
 

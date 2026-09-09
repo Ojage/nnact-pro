@@ -53,6 +53,11 @@ EXPOSE 3001
 
 USER node
 
+# Warm the corepack cache for the runtime user so the first container start
+# does not download the pnpm tarball from the npm registry (root's cache is
+# not visible to the node user once the container boots).
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD wget -q -O - http://127.0.0.1:3001/api/health >/dev/null 2>&1 || exit 1
 

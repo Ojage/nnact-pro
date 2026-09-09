@@ -18,4 +18,8 @@ RUN pnpm install --frozen-lockfile --offline --reporter=silent
 ENV NODE_ENV=production
 USER node
 
+# Warm the corepack cache for the runtime user (build-time cache lives under
+# root, the container runs as node and would otherwise fetch pnpm on boot).
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
 CMD ["pnpm", "--filter", "@nnact/worker", "exec", "tsx", "src/index.ts"]
