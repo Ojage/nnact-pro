@@ -120,28 +120,14 @@ export function PrimaryButton({
   fullWidth?: boolean;
 }) {
   const styles = createStyles(colors);
-  const variantStyle = {
-    primary: styles.btnPrimary,
-    secondary: styles.btnSecondary,
-    accent: styles.btnAccent,
-    danger: styles.btnDanger,
-    ghost: styles.btnGhost,
-  }[variant];
-  const textStyle = {
-    primary: styles.btnPrimaryText,
-    secondary: styles.btnSecondaryText,
-    accent: styles.btnAccentText,
-    danger: styles.btnDangerText,
-    ghost: styles.btnGhostText,
-  }[variant];
-  const spinnerColor = {
-    primary: colors.onEmphasis,
-    secondary: colors.foreground,
-    accent: colors.primaryDark,
-    danger: colors.danger,
-    ghost: colors.primary,
-  }[variant];
-  const sizeStyle = { sm: styles.btnSm, md: styles.btnMd, lg: styles.btnLg }[size];
+  // All variants adopt the sign-in button's look: yellow fill, navy label,
+  // pill radius, medium height. Only `danger` differs (solid red fill) because
+  // it always marks a destructive action.
+  const destructive = variant === "danger";
+  const variantStyle = destructive ? styles.btnDanger : styles.btnPrimary;
+  const textStyle = destructive ? styles.btnDangerText : styles.btnPrimaryText;
+  const spinnerColor = destructive ? colors.onEmphasis : colors.primaryDark;
+  const sizeStyle = styles.btnMd;
   const isDisabled = disabled || loading;
 
   return (
@@ -518,8 +504,8 @@ const createStyles = (colors: Palette) =>
     },
     sectionTitle: { color: colors.foreground, fontSize: 18, fontFamily: fonts.bold },
     sectionAction: { color: colors.primary, fontSize: 14, fontFamily: fonts.semibold },
-    btnPrimary: { backgroundColor: colors.primary, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
-    btnPrimaryText: { color: colors.onEmphasis, fontFamily: fonts.bold },
+    btnPrimary: { backgroundColor: colors.accent, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+    btnPrimaryText: { color: colors.primaryDark, fontFamily: fonts.bold },
     btnSecondary: {
       backgroundColor: colors.surfaceMuted,
       borderRadius: radius.pill,
@@ -531,8 +517,8 @@ const createStyles = (colors: Palette) =>
     btnSecondaryText: { color: colors.foreground, fontFamily: fonts.bold },
     btnAccent: { backgroundColor: colors.accent, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
     btnAccentText: { color: colors.primaryDark, fontFamily: fonts.bold },
-    btnDanger: { backgroundColor: colors.dangerAlpha, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
-    btnDangerText: { color: colors.danger, fontFamily: fonts.bold },
+    btnDanger: { backgroundColor: colors.danger, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+    btnDangerText: { color: colors.onEmphasis, fontFamily: fonts.bold },
     btnGhost: {
       backgroundColor: colors.surfaceMuted,
       borderWidth: 1,

@@ -1,11 +1,14 @@
-import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { NNACT_COMPANY } from "@nnact/shared";
 import { HeroCarousel } from "../components/HeroCarousel";
-import { Card, HeroBanner, PrimaryButton, SectionHeader } from "../components/ui";
-import { BrandLogo, type AppSearchFonts } from "@nnact/mobile-ui";
+import { ImageHero, clamp } from "../components/ImageHero";
+import { Card, PrimaryButton, SectionHeader } from "../components/ui";
+import { type AppSearchFonts } from "@nnact/mobile-ui";
 import { SERVICE_CAROUSEL_SLIDES } from "../content/home-carousels";
 import { fonts, spacing, type Palette } from "../theme";
+
+const HERO_IMAGE = require("../../assets/photos/nnact-protech-app-hero.png");
 
 const HIGHLIGHTS = [
   {
@@ -43,14 +46,15 @@ export function WelcomeScreen({
   searchFonts?: AppSearchFonts;
 }) {
   const styles = createStyles(colors);
+  const { height: windowHeight } = useWindowDimensions();
+  const heroHeight = clamp(Math.round(windowHeight * 0.5), 340, 400);
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.logoRow}>
-        <BrandLogo size={64} />
-      </View>
-      <HeroBanner
+      <ImageHero
         colors={colors}
+        image={HERO_IMAGE}
+        heroHeight={heroHeight}
         eyebrow={NNACT_COMPANY.shortName}
         title="Professional service, simplified"
         subtitle={NNACT_COMPANY.customerPromise}
@@ -58,11 +62,9 @@ export function WelcomeScreen({
         onSearchPress={onOpenSearch}
         searchFonts={searchFonts}
       >
-        <View style={styles.heroActions}>
-          <PrimaryButton colors={colors} label="Sign in" onPress={onSignIn} variant="accent" size="md" />
-          <PrimaryButton colors={colors} label="Create account" onPress={onSignUp} variant="secondary" size="md" />
-        </View>
-      </HeroBanner>
+        <PrimaryButton colors={colors} label="Sign in" onPress={onSignIn} variant="accent" />
+        <PrimaryButton colors={colors} label="Create account" onPress={onSignUp} variant="secondary" />
+      </ImageHero>
 
       <SectionHeader colors={colors} title="What you can do with NNACT" />
       <View style={styles.highlights}>
@@ -89,7 +91,7 @@ export function WelcomeScreen({
         <Text style={styles.ctaCopy}>
           Request a visit without signing in — our team will confirm your appointment.
         </Text>
-        <PrimaryButton colors={colors} label="Request service" onPress={onBook} variant="accent" size="md" />
+        <PrimaryButton colors={colors} label="Request service" onPress={onBook} variant="accent" />
       </View>
 
       <View style={styles.contactCard}>
@@ -100,7 +102,6 @@ export function WelcomeScreen({
           label={`Call ${NNACT_COMPANY.contact.phones[0]}`}
           onPress={() => void Linking.openURL(`tel:${NNACT_COMPANY.contact.phones[0].replace(/\s/g, "")}`)}
           variant="ghost"
-          size="md"
         />
       </View>
 
@@ -113,8 +114,6 @@ const createStyles = (colors: Palette) =>
   StyleSheet.create({
     scroll: { flex: 1, backgroundColor: colors.background },
     content: { paddingBottom: spacing.lg },
-    logoRow: { alignItems: "center", paddingTop: spacing.xl, paddingBottom: spacing.xs },
-    heroActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.lg },
     highlights: { paddingHorizontal: spacing.lg, gap: spacing.sm },
     highlightRow: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
     highlightIcon: {

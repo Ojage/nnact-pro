@@ -1,10 +1,13 @@
-import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { NNACT_COMPANY } from "@nnact/shared";
 import { HeroCarousel } from "../components/HeroCarousel";
-import { HeroBanner, PrimaryButton, SectionHeader, StatCard } from "../components/ui";
+import { ImageHero, clamp } from "../components/ImageHero";
+import { PrimaryButton, SectionHeader, StatCard } from "../components/ui";
 import type { AppSearchFonts } from "@nnact/mobile-ui";
 import { buildActionCarouselSlides, SERVICE_CAROUSEL_SLIDES } from "../content/home-carousels";
 import { fonts, spacing, type Palette } from "../theme";
+
+const HERO_IMAGE = require("../../assets/photos/nnact-protech-app-hero.png");
 
 export function HomeScreen({
   colors,
@@ -30,6 +33,8 @@ export function HomeScreen({
   searchFonts?: AppSearchFonts;
 }) {
   const styles = createStyles(colors);
+  const { height: windowHeight } = useWindowDimensions();
+  const heroHeight = clamp(Math.round(windowHeight * 0.5), 340, 400);
   const firstName = accountName?.split(" ")[0] ?? "there";
   const actionSlides = buildActionCarouselSlides(pendingEstimates);
 
@@ -43,8 +48,10 @@ export function HomeScreen({
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <HeroBanner
+      <ImageHero
         colors={colors}
+        image={HERO_IMAGE}
+        heroHeight={heroHeight}
         eyebrow={NNACT_COMPANY.shortName}
         title={`Welcome back, ${firstName}`}
         subtitle="Your estimates, invoices, and service history — all in one place."
@@ -52,11 +59,9 @@ export function HomeScreen({
         onSearchPress={onOpenSearch}
         searchFonts={searchFonts}
       >
-        <View style={styles.heroActions}>
-          <PrimaryButton colors={colors} label="Request service" onPress={onBook} variant="accent" size="md" />
-          <PrimaryButton colors={colors} label="View activity" onPress={onOpenActivity} variant="ghost" size="md" />
-        </View>
-      </HeroBanner>
+        <PrimaryButton colors={colors} label="Request service" onPress={onBook} variant="accent" />
+        <PrimaryButton colors={colors} label="View activity" onPress={onOpenActivity} variant="ghost" />
+      </ImageHero>
 
       {pendingEstimates || outstandingBalance ? (
         <View style={styles.statsRow}>
