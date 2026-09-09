@@ -104,8 +104,8 @@ test("desktop login uses an HTTP-only session and exposes sign out", async ({ pa
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await page.screenshot({ path: path.join(artifactDir, "login-desktop.png"), fullPage: true });
 
-  await page.getByLabel("Email").fill("owner@example.test");
-  await page.getByLabel("Password").fill("correct-horse-battery-staple");
+  await page.getByLabel("Email", { exact: true }).fill("owner@example.test");
+  await page.getByLabel("Password", { exact: true }).fill("correct-horse-battery-staple");
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page).toHaveURL("/");

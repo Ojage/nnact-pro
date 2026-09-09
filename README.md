@@ -98,7 +98,7 @@ EXPO_PUBLIC_API_URL=http://localhost:3003 pnpm --filter @nnact/mobile dev
 ```
 
 - With Expo Go installed, scan the QR code from `localhost:8081`.
-- The app defaults to `http://localhost:3001` when `EXPO_PUBLIC_API_URL` is
+- The app defaults to `http://localhost:3003` when `EXPO_PUBLIC_API_URL` is
   unset (`apps/mobile/App.tsx`). For a physical device point it at the API host's
   LAN IP, e.g. `EXPO_PUBLIC_API_URL=http://192.168.1.191:3003`.
 - No emulator is required; the app runs through Expo Go on the phone.

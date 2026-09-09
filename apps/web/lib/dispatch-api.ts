@@ -1,7 +1,7 @@
 import type { JobDTO, UserDTO } from "@nnact/shared";
 import { loadingStore } from "@/lib/loadingStore";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 export interface DispatchAppointment {
   id: string;

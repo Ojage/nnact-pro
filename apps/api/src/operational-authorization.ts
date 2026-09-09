@@ -8,6 +8,7 @@ const OWNER_ONLY_WRITE_PREFIXES = [
   "/api/users",
   "/api/org",
   "/api/plugins",
+  "/api/connections",
 ];
 
 const OFFICE_WRITE_PREFIXES = [
@@ -19,6 +20,7 @@ const OFFICE_WRITE_PREFIXES = [
   "/api/service-plans",
   "/api/recurring",
   "/api/reviews",
+  "/api/content",
 ];
 
 export function requiredRolesForRequest(method: string, rawUrl: string): UserRole[] | null {

@@ -72,20 +72,24 @@ export function DocumentPreviewWorkbench({
             <p className="mt-1 text-xs text-fg-muted">Changes appear here before they are saved or sent.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <ToggleGroup
-              type="single"
-              value={viewport}
-              onValueChange={(value) => value && setViewport(value as "page" | "phone")}
-              className="rounded-lg border border-border bg-surface-200 p-1"
-              aria-label="Preview viewport"
-            >
-              <ToggleGroupItem value="page" className="min-h-8 rounded-md px-2.5 text-xs font-semibold data-[state=on]:bg-surface-50 data-[state=on]:text-fg data-[state=on]:shadow-sm">
+            <div role="group" aria-label="Preview viewport" className="flex rounded-lg border border-border bg-surface-200 p-1">
+              <button
+                type="button"
+                aria-pressed={viewport === "page"}
+                onClick={() => setViewport("page")}
+                className={`min-h-8 rounded-md px-2.5 text-xs font-semibold ${viewport === "page" ? "bg-surface-50 text-fg shadow-sm" : "text-fg-muted"}`}
+              >
                 Page
-              </ToggleGroupItem>
-              <ToggleGroupItem value="phone" className="min-h-8 rounded-md px-2.5 text-xs font-semibold data-[state=on]:bg-surface-50 data-[state=on]:text-fg data-[state=on]:shadow-sm">
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewport === "phone"}
+                onClick={() => setViewport("phone")}
+                className={`min-h-8 rounded-md px-2.5 text-xs font-semibold ${viewport === "phone" ? "bg-surface-50 text-fg shadow-sm" : "text-fg-muted"}`}
+              >
                 Phone
-              </ToggleGroupItem>
-            </ToggleGroup>
+              </button>
+            </div>
             {viewport === "page" ? (
               <Label className="flex items-center gap-2 text-xs font-normal text-fg-muted">
                 Zoom
@@ -111,25 +115,20 @@ export function DocumentPreviewWorkbench({
           </div>
         </div>
 
-        {documents.length > 1 ? (
-          <ToggleGroup
-            type="single"
-            value={documentId}
-            onValueChange={(value) => value && setDocumentId(value)}
-            className="mt-4 flex flex-wrap gap-2"
-            aria-label="Document type"
-          >
+          <div role="tablist" aria-label="Document type" className="mt-4 flex flex-wrap gap-2">
             {documents.map((document) => (
-              <ToggleGroupItem
+              <button
                 key={document.id}
-                value={document.id}
-                className="min-h-9 rounded-lg border px-3 text-xs font-semibold data-[state=on]:border-accent data-[state=on]:bg-accent data-[state=on]:text-surface-50"
+                type="button"
+                role="tab"
+                aria-selected={activeDocument?.id === document.id}
+                onClick={() => setDocumentId(document.id)}
+                className={`min-h-9 rounded-lg border px-3 text-xs font-semibold ${activeDocument?.id === document.id ? "border-accent bg-accent text-surface-50" : "border-border bg-surface-100 text-fg-muted hover:text-fg"}`}
               >
                 {document.label}
-              </ToggleGroupItem>
+              </button>
             ))}
-          </ToggleGroup>
-        ) : null}
+          </div>
 
         {activeDocument?.variants?.length ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">

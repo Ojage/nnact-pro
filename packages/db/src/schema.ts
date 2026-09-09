@@ -693,6 +693,43 @@ export const messageLogs = pgTable(
   }),
 );
 
+// Newsletter / mailing-list subscription lifecycle.
+export const newsletterStatus = pgEnum("newsletter_status", [
+  "subscribed",
+  "unsubscribed",
+  "bounced",
+]);
+
+export const newsletterSubscribers = pgTable(
+  "newsletter_subscribers",
+  {
+    id: id(),
+    orgId: orgId(),
+    // Normalized to lowercase before insert; unique per org so a person can
+    // receive marketing for each business they follow but never duplicate.
+    email: text("email").notNull(),
+    name: text("name"),
+    // Optional WhatsApp number (E.164-ish) captured for staff/broadcast follow-up.
+    phone: text("phone"),
+    // Preferred delivery channels, e.g. ["email","whatsapp"]. Stored as a text
+    // array (Postgres text[]) — kept simple and portable; validated in the API.
+    channels: text("channels").array().notNull().default(["email"]),
+    // Which surface created the subscription (footer, home cta, contact, booking).
+    source: text("source").default("footer").notNull(),
+    status: newsletterStatus("status").default("subscribed").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+    version: version(),
+    updatedAt: updatedAt(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgEmail: uniqueIndex("newsletter_subscribers_org_email_idx").on(t.orgId, t.email),
+    orgEmailStatus: index("newsletter_subscribers_org_status_idx").on(t.orgId, t.status),
+  }),
+);
+
 export const documents = pgTable(
   "documents",
   {

@@ -30,6 +30,17 @@ async function mockEstimate(page: Page) {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === `/api/estimates/${estimate.id}` && request.method() === "GET") return json(route, estimate);
+    if (path === "/api/auth/me") return json(route, { id: "owner-1", name: "Morgan Owner", email: "owner@example.test", role: "owner" });
+    if (path === "/api/jobs" && request.method() === "GET") {
+      return json(route, [
+        { id: "job-1", customerId: "customer-1", title: "Dryer not heating", status: "in_progress", scheduledAt: "2026-07-20T13:00:00.000Z", assignedTo: "tech-1", total: 20_000, createdAt: "2026-07-16T12:00:00.000Z" },
+      ]);
+    }
+    if (path === "/api/customers" && request.method() === "GET") {
+      return json(route, [
+        { id: "customer-1", name: "Taylor Morgan", email: "taylor@example.test", phone: "515-555-0101", createdAt: "2026-07-15T12:00:00.000Z" },
+      ]);
+    }
     if (path === `/api/estimates/${estimate.id}/send` && request.method() === "POST") {
       estimate.status = "sent";
       return json(route, estimate);
@@ -49,7 +60,9 @@ test("dispatcher reviews Good, Better, Best and marks the estimate sent", async 
   await page.getByRole("tab", { name: /Best/ }).click();
   await expect(page.getByText("Best repair")).toBeVisible();
   await page.getByRole("button", { name: "Mark sent" }).click();
-  await expect(page.getByText(/sent · 3 options/)).toBeVisible();
+  await page.getByRole("button", { name: "Yes, mark sent" }).click();
+  await expect(page.getByText("sent", { exact: true })).toBeVisible();
+  await expect(page.getByText("3 options")).toBeVisible();
 });
 
 test("estimate option editor has no horizontal overflow on mobile", async ({ page }) => {

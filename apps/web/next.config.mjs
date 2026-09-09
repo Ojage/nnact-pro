@@ -10,7 +10,7 @@ const repoRoot = path.join(__dirname, "../..");
 // Monorepo: load the repository root .env so NEXT_PUBLIC_* matches API_PORT/CORS_ORIGIN.
 loadEnvConfig(repoRoot);
 
-const apiOrigin = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").origin;
+const apiOrigin = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003").origin;
 const developmentSockets = process.env.NODE_ENV === "production" ? "" : " ws://127.0.0.1:* ws://localhost:*";
 const developmentEval = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
 const contentSecurityPolicy = [

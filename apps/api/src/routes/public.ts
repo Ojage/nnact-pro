@@ -2,11 +2,13 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { and, eq, inArray, or } from "drizzle-orm";
-import { db, orgs, customers, properties, jobs, users } from "@nnact/db";
+import { db, orgs, customers, properties, jobs, users, newsletterSubscribers } from "@nnact/db";
 import {
   type PublicBookingResultDTO,
   type PublicRequestStatusDTO,
   type JobStatus,
+  type NewsletterSubscribeDTO,
+  type NewsletterUnsubscribeDTO,
 } from "@nnact/shared";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 import { getOrgLogo, getOrgSignature, getOrgStamp } from "../uploads.js";
@@ -207,6 +209,75 @@ const bookingRateLimit = createFixedWindowRateLimit({
     return `${requestIpKey(request)}:${orgId}`;
   },
 });
+
+// Newsletter subscription rate limit: 5 requests per hour per IP per org
+const newsletterRateLimit = createFixedWindowRateLimit({
+  max: 5,
+  windowMs: 60 * 60 * 1000,
+  key: (request: FastifyRequest) => {
+    const orgId = (request.params as { orgId?: string } | undefined)?.orgId ?? "default";
+    return `${requestIpKey(request)}:${orgId}:newsletter`;
+  },
+});
+
+// Zod schema for newsletter subscribe
+const newsletterSubscribeBody = z.object({
+  email: z.string().trim().email().max(320),
+  name: z.string().trim().min(1).max(200).optional(),
+  phone: z.string().trim().max(50).optional(),
+  channels: z.array(z.enum(["email", "whatsapp"])).default(["email"]).optional(),
+  source: z.string().trim().max(50).default("footer").optional(),
+});
+
+const newsletterSubscribeBodySchema = {
+  type: "object",
+  required: ["email"],
+  properties: {
+    email: { type: "string", format: "email", maxLength: 320 },
+    name: { type: "string", minLength: 1, maxLength: 200 },
+    phone: { type: "string", maxLength: 50 },
+    channels: {
+      type: "array",
+      items: { type: "string", enum: ["email", "whatsapp"] },
+      default: ["email"],
+    },
+    source: { type: "string", maxLength: 50, default: "footer" },
+  },
+};
+
+// Zod schema for newsletter unsubscribe
+const newsletterUnsubscribeBody = z.object({
+  email: z.string().trim().email().max(320),
+});
+
+const newsletterUnsubscribeBodySchema = {
+  type: "object",
+  required: ["email"],
+  properties: {
+    email: { type: "string", format: "email", maxLength: 320 },
+  },
+};
+
+const newsletterSubscribeResponseSchema = {
+  type: "object",
+  required: ["ok", "subscriberId", "email", "channels"],
+  properties: {
+    ok: { type: "boolean", enum: [true] },
+    subscriberId: { type: "string", format: "uuid" },
+    email: { type: "string", format: "email" },
+    name: { type: "string", nullable: true },
+    channels: { type: "array", items: { type: "string" } },
+  },
+};
+
+const newsletterUnsubscribeResponseSchema = {
+  type: "object",
+  required: ["ok", "email"],
+  properties: {
+    ok: { type: "boolean", enum: [true] },
+    email: { type: "string", format: "email" },
+  },
+};
 
 function customerAppUrl(path = ""): string {
   const base = process.env.CUSTOMER_APP_URL?.replace(/\/$/, "") ?? "http://localhost:3002";
@@ -594,6 +665,253 @@ export async function publicRoutes(app: FastifyInstance) {
       const result = await submitPublicBooking(orgId, parsed.data, reply);
       if (!result) return;
       return reply.code(201).send(result);
+    },
+  });
+
+  // Newsletter subscription — default organization
+  app.post("/default/newsletter/subscribe", {
+    preHandler: newsletterRateLimit,
+    schema: {
+      tags: ["Public"],
+      summary: "Subscribe to newsletter for the default organization",
+      body: newsletterSubscribeBodySchema,
+      response: {
+        201: newsletterSubscribeResponseSchema,
+        400: errorResponseSchema,
+        404: errorResponseSchema,
+        429: errorResponseSchema,
+      },
+    },
+    handler: async (req, reply) => {
+      const orgId = resolveDefaultOrgId();
+      if (!orgId) return reply.code(404).send({ error: "default organization is not configured" });
+      const parsed = newsletterSubscribeBody.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      const { email, name, phone, channels, source } = parsed.data;
+      const normalizedEmail = email.toLowerCase();
+
+      // Upsert: insert new or reactivate existing
+      const [subscriber] = await db
+        .insert(newsletterSubscribers)
+        .values({
+          orgId,
+          email: normalizedEmail,
+          name: name ?? null,
+          phone: phone ?? null,
+          channels: channels ?? ["email"],
+          source: source ?? "footer",
+          status: "subscribed",
+          verifiedAt: new Date(),
+          unsubscribedAt: null,
+        })
+        .onConflictDoUpdate({
+          target: [newsletterSubscribers.orgId, newsletterSubscribers.email],
+          set: {
+            name: name ?? newsletterSubscribers.name,
+            phone: phone ?? newsletterSubscribers.phone,
+            channels: channels ?? newsletterSubscribers.channels,
+            source: source ?? newsletterSubscribers.source,
+            status: "subscribed",
+            verifiedAt: new Date(),
+            unsubscribedAt: null,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ id: newsletterSubscribers.id });
+
+      // Fire-and-forget confirmation email
+      if (channels?.includes("email") ?? true) {
+        void (async () => {
+          try {
+            const [org] = await db.select({ name: orgs.name }).from(orgs).where(eq(orgs.id, orgId));
+            if (org) {
+              await sendEmail({
+                to: normalizedEmail,
+                subject: `Thanks for subscribing to ${org.name} updates`,
+                text: [
+                  `Hi ${name ?? "there"},`,
+                  "",
+                  `Thanks for subscribing to ${org.name} news and updates!`,
+                  `We'll keep you posted on service tips, seasonal offers, and company news.`,
+                  "",
+                  `If you didn't request this, you can unsubscribe anytime by replying to this email.`,
+                  "",
+                  `Thanks,`,
+                  org.name,
+                ].join("\n"),
+              });
+            }
+          } catch (err) {
+            console.error("[public] newsletter confirmation email failed:", err);
+          }
+        })();
+      }
+
+      return reply.code(201).send({
+        ok: true,
+        subscriberId: subscriber.id,
+        email: normalizedEmail,
+        name: name ?? null,
+        channels: channels ?? ["email"],
+      });
+    },
+  });
+
+  // Newsletter subscription — specific organization
+  app.post("/:orgId/newsletter/subscribe", {
+    preHandler: newsletterRateLimit,
+    schema: {
+      tags: ["Public"],
+      summary: "Subscribe to newsletter for an organization",
+      params: { type: "object", required: ["orgId"], properties: { orgId: { type: "string", format: "uuid" } } },
+      body: newsletterSubscribeBodySchema,
+      response: {
+        201: newsletterSubscribeResponseSchema,
+        400: errorResponseSchema,
+        404: errorResponseSchema,
+        429: errorResponseSchema,
+      },
+    },
+    handler: async (req, reply) => {
+      const { orgId } = req.params as { orgId: string };
+      const [org] = await db.select({ id: orgs.id, name: orgs.name }).from(orgs).where(eq(orgs.id, orgId));
+      if (!org) return reply.code(404).send({ error: "business not found" });
+      const parsed = newsletterSubscribeBody.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      const { email, name, phone, channels, source } = parsed.data;
+      const normalizedEmail = email.toLowerCase();
+
+      const [subscriber] = await db
+        .insert(newsletterSubscribers)
+        .values({
+          orgId,
+          email: normalizedEmail,
+          name: name ?? null,
+          phone: phone ?? null,
+          channels: channels ?? ["email"],
+          source: source ?? "footer",
+          status: "subscribed",
+          verifiedAt: new Date(),
+          unsubscribedAt: null,
+        })
+        .onConflictDoUpdate({
+          target: [newsletterSubscribers.orgId, newsletterSubscribers.email],
+          set: {
+            name: name ?? newsletterSubscribers.name,
+            phone: phone ?? newsletterSubscribers.phone,
+            channels: channels ?? newsletterSubscribers.channels,
+            source: source ?? newsletterSubscribers.source,
+            status: "subscribed",
+            verifiedAt: new Date(),
+            unsubscribedAt: null,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ id: newsletterSubscribers.id });
+
+      if (channels?.includes("email") ?? true) {
+        void (async () => {
+          try {
+            await sendEmail({
+              to: normalizedEmail,
+              subject: `Thanks for subscribing to ${org.name} updates`,
+              text: [
+                `Hi ${name ?? "there"},`,
+                "",
+                `Thanks for subscribing to ${org.name} news and updates!`,
+                `We'll keep you posted on service tips, seasonal offers, and company news.`,
+                "",
+                `If you didn't request this, you can unsubscribe anytime by replying to this email.`,
+                "",
+                `Thanks,`,
+                org.name,
+              ].join("\n"),
+            });
+          } catch (err) {
+            console.error("[public] newsletter confirmation email failed:", err);
+          }
+        })();
+      }
+
+      return reply.code(201).send({
+        ok: true,
+        subscriberId: subscriber.id,
+        email: normalizedEmail,
+        name: name ?? null,
+        channels: channels ?? ["email"],
+      });
+    },
+  });
+
+  // Newsletter unsubscribe — default organization
+  app.post("/default/newsletter/unsubscribe", {
+    preHandler: newsletterRateLimit,
+    schema: {
+      tags: ["Public"],
+      summary: "Unsubscribe from newsletter for the default organization",
+      body: newsletterUnsubscribeBodySchema,
+      response: {
+        200: newsletterUnsubscribeResponseSchema,
+        400: errorResponseSchema,
+        404: errorResponseSchema,
+        429: errorResponseSchema,
+      },
+    },
+    handler: async (req, reply) => {
+      const orgId = resolveDefaultOrgId();
+      if (!orgId) return reply.code(404).send({ error: "default organization is not configured" });
+      const parsed = newsletterUnsubscribeBody.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      const { email } = parsed.data;
+      const normalizedEmail = email.toLowerCase();
+
+      await db
+        .update(newsletterSubscribers)
+        .set({
+          status: "unsubscribed",
+          unsubscribedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(newsletterSubscribers.orgId, orgId), eq(newsletterSubscribers.email, normalizedEmail)));
+
+      return { ok: true, email: normalizedEmail };
+    },
+  });
+
+  // Newsletter unsubscribe — specific organization
+  app.post("/:orgId/newsletter/unsubscribe", {
+    preHandler: newsletterRateLimit,
+    schema: {
+      tags: ["Public"],
+      summary: "Unsubscribe from newsletter for an organization",
+      params: { type: "object", required: ["orgId"], properties: { orgId: { type: "string", format: "uuid" } } },
+      body: newsletterUnsubscribeBodySchema,
+      response: {
+        200: newsletterUnsubscribeResponseSchema,
+        400: errorResponseSchema,
+        404: errorResponseSchema,
+        429: errorResponseSchema,
+      },
+    },
+    handler: async (req, reply) => {
+      const { orgId } = req.params as { orgId: string };
+      const [org] = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId));
+      if (!org) return reply.code(404).send({ error: "business not found" });
+      const parsed = newsletterUnsubscribeBody.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      const { email } = parsed.data;
+      const normalizedEmail = email.toLowerCase();
+
+      await db
+        .update(newsletterSubscribers)
+        .set({
+          status: "unsubscribed",
+          unsubscribedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(newsletterSubscribers.orgId, orgId), eq(newsletterSubscribers.email, normalizedEmail)));
+
+      return { ok: true, email: normalizedEmail };
     },
   });
 }

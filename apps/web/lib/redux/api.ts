@@ -225,7 +225,7 @@ export const apiSlice = createApi({
     // ── Jobs ──
     jobs: builder.query<JobDTO[], void>({
       query: () => "/api/jobs",
-      providesTags: ["Job"],
+      providesTags: (result) => Array.isArray(result) ? ["Job", ...result.map(({ id }) => ({ type: "Job" as const, id }))] : ["Job"],
     }),
     job: builder.query<JobDTO, string>({
       query: (id) => `/api/jobs/${id}`,
@@ -275,7 +275,7 @@ export const apiSlice = createApi({
     // ── Customers ──
     customers: builder.query<CustomerDTO[], void>({
       query: () => "/api/customers",
-      providesTags: ["Customer"],
+      providesTags: (result) => Array.isArray(result) ? ["Customer", ...result.map(({ id }) => ({ type: "Customer" as const, id }))] : ["Customer"],
     }),
     customer: builder.query<CustomerDTO, string>({
       query: (id) => `/api/customers/${id}`,
@@ -332,7 +332,7 @@ export const apiSlice = createApi({
     // ── Invoices ──
     invoices: builder.query<InvoiceDTO[], void>({
       query: () => "/api/invoices",
-      providesTags: ["Invoice"],
+      providesTags: (result) => Array.isArray(result) ? ["Invoice", ...result.map(({ id }) => ({ type: "Invoice" as const, id }))] : ["Invoice"],
     }),
     invoice: builder.query<InvoiceDetail, string>({
       query: (id) => `/api/invoices/${id}`,
@@ -375,7 +375,7 @@ export const apiSlice = createApi({
     // ── Estimates ──
     estimates: builder.query<Estimate[], void>({
       query: () => "/api/estimates",
-      providesTags: ["Estimate"],
+      providesTags: (result) => Array.isArray(result) ? ["Estimate", ...result.map(({ id }) => ({ type: "Estimate" as const, id }))] : ["Estimate"],
     }),
     estimate: builder.query<EstimateDetail, string>({
       query: (id) => `/api/estimates/${id}`,

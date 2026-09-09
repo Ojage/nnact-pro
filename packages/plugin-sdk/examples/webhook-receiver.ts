@@ -10,7 +10,7 @@ import { createWebhookHandler, OFPClient, type PluginEventEnvelope } from "../sr
 
 const SECRET = process.env.NNPWEBHOOK_SECRET ?? "whsec_dev";
 const TOKEN = process.env.NNPTOKEN ?? "";
-const NNPBASE = process.env.NNPBASE ?? "http://localhost:3001";
+const NNPBASE = process.env.NNPBASE ?? "http://localhost:3003";
 const PORT = Number(process.env.PORT ?? 4500);
 
 const client = new OFPClient({ baseUrl: NNPBASE, token: TOKEN });

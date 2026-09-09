@@ -89,7 +89,7 @@ test("invoice and estimate settings provide an interactive live customer preview
   await expect(preview.getByRole("tab", { name: "Invoice" })).toHaveAttribute("aria-selected", "true");
 
   const invoiceFrame = page.frameLocator('iframe[title="Invoice customer preview"]');
-  await expect(invoiceFrame.getByText("Marco's Appliance Repair Company", { exact: true })).toBeVisible();
+  await expect(invoiceFrame.locator("body")).toContainText("Marco's Appliance Repair Company");
   await page.getByLabel("Default invoice message").fill("Preview updates immediately.");
   await expect(page.frameLocator('iframe[title="Invoice customer preview"]').locator("body")).toContainText("Preview updates immediately.");
 
@@ -110,7 +110,7 @@ test("company settings upload, preview, and remove a logo", async ({ page }) => 
   await page.context().addCookies([{ name: "NNPsession", value: "session", domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
   await page.goto("/settings?section=company");
 
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.getByLabel("Upload company logo").setInputFiles({
     name: "marcos-logo.png",
     mimeType: "image/png",
     buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"),

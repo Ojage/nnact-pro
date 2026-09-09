@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -233,23 +232,28 @@ export default function SchedulePage() {
         <>
           {/* ── View toggle + search ── */}
           <div className="mb-4 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
-            <ToggleGroup
-              type="single"
-              value={view}
-              onValueChange={(value) => value && setView(value as ViewMode)}
-              className="w-fit overflow-hidden rounded-lg border border-border bg-surface-300"
+            <div
+              role="tablist"
               aria-label="Schedule view"
+              className="w-fit overflow-hidden rounded-lg border border-border bg-surface-300"
             >
               {(["day", "week", "month"] as const).map((mode) => (
-                <ToggleGroupItem
+                <button
                   key={mode}
-                  value={mode}
-                  className="rounded-none px-4 py-1.5 text-xs capitalize data-[state=on]:bg-accent data-[state=on]:text-white"
+                  type="button"
+                  role="tab"
+                  aria-selected={view === mode}
+                  onClick={() => setView(mode)}
+                  className={`rounded-none px-4 py-1.5 text-xs capitalize ${
+                    view === mode
+                      ? "bg-accent text-white"
+                      : "text-fg-muted hover:text-fg"
+                  }`}
                 >
                   {mode}
-                </ToggleGroupItem>
+                </button>
               ))}
-            </ToggleGroup>
+            </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" onClick={() => moveDate(-1)} aria-label={`Previous ${view}`}>← Previous</Button>
               <Button variant="secondary" size="sm" onClick={() => setFocusDate(new Date())}>Today</Button>

@@ -6,7 +6,7 @@ import {
   registerWebPushToken,
 } from "./firebase-client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 export type LiveNotificationHandlers = {
   onUnreadCount?: (count: number) => void;

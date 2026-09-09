@@ -60,7 +60,7 @@ PR 1 ──┬──> PR 2 ──┬──> PR 3
 **Smoke test (after merge):**
 ```bash
 # start api with dev DB, then:
-curl -X POST http://localhost:3001/api/sync \
+curl -X POST http://localhost:3003/api/sync \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
   -d '{"ops":[{"op":"create","table":"jobs","id":"<uuid>","payload":{"customerId":"...","title":"test"},"version":1}]}'

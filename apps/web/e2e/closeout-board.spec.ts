@@ -73,14 +73,16 @@ async function mockCloseoutApi(
       const body = request.postDataJSON() as Record<string, unknown>;
       capture.invoices.push(body);
       const job = data.jobs.find((row) => row.id === body.jobId);
-      return fulfillJson(route, {
+      const invoice = {
         id: "invoice-created",
         jobId: body.jobId,
         number: "INV-1002",
         status: "draft",
         total: job?.total ?? 0,
         createdAt: isoAt(15),
-      }, 201);
+      };
+      data.invoices.unshift(invoice);
+      return fulfillJson(route, invoice, 201);
     }
 
     return fulfillJson(route, {});
@@ -104,7 +106,7 @@ test("desktop closeout moves completed work into invoicing", async ({ page }) =>
   await expect(page.getByText("Awaiting start").first()).toBeVisible();
   await expect(page.getByText("Needs pricing").first()).toBeVisible();
   await expect(page.getByText("Dishwasher leaking")).toBeVisible();
-  await expect(page.getByText("$0.00")).toBeVisible();
+  await expect(page.getByText("FCFA 0")).toBeVisible();
   await expect(page.getByRole("link", { name: /Job Closeout/ })).toHaveAttribute("aria-current", "page");
 
   await page.screenshot({ path: path.join(artifactDir, "closeout-board-desktop.png"), fullPage: true });

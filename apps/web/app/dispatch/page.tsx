@@ -133,6 +133,7 @@ function DispatchCard({
         <div data-tour="dispatch-assign">
           <FormSelect
             id={`assign-${appointment.id}`}
+            ariaLabel={`Assign ${title}`}
             value={appointment.technicianId ?? ""}
             onChange={(technicianId) => onAssign(appointment, technicianId || null)}
             allowEmpty
@@ -141,6 +142,7 @@ function DispatchCard({
             disabled={saving}
             size="sm"
             className="mt-1.5"
+            native
             options={technicians.map((technician) => ({
               value: technician.id,
               label: technician.name,

@@ -1,6 +1,6 @@
 import type { PortalSessionDTO, PublicBookingConfigDTO, PublicBookingResultDTO, PublicRequestStatusDTO } from "@nnact/shared";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

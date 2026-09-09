@@ -12,7 +12,7 @@ import {
   useMarkVoiceNoteReadMutation,
 } from "@/lib/redux/api";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 function formatDuration(ms: number): string {
   const total = Math.floor(ms / 1000);

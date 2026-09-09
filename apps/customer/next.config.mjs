@@ -2,7 +2,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const apiOrigin = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").origin;
+const apiOrigin = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003").origin;
 const developmentSockets = process.env.NODE_ENV === "production" ? "" : " ws://127.0.0.1:* ws://localhost:*";
 const developmentEval = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
 const contentSecurityPolicy = [

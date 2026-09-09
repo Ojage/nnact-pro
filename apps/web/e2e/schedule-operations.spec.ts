@@ -29,6 +29,7 @@ async function mockScheduleApi(
   let appointmentRequests = 0;
   await page.route("http://127.0.0.1:3001/api/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname === "/api/auth/me") return fulfillJson(route, { id: "owner-1", name: "Morgan Owner", email: "owner@example.test", role: "owner" });
     if (url.pathname === "/api/notifications/unread-count") return fulfillJson(route, { count: 0 });
     if (url.pathname === "/api/notifications") return fulfillJson(route, []);
     if (url.pathname === "/api/appointments") {

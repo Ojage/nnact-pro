@@ -12,6 +12,9 @@ import {
 } from "../../api/src/maintenance.ts";
 import { retryDueDeliveries } from "../../api/src/plugins/retry.ts";
 import { notify } from "./notify.ts";
+import { PublicationWorker } from "../../api/src/publishing/application/worker.ts";
+import { defaultRegistry } from "../../api/src/publishing/registry.ts";
+import { DbMediaProvider } from "../../api/src/publishing/infra/media.ts";
 
 const INTERVAL = Number(process.env.WORKER_INTERVAL_MS ?? 60_000);
 const STATUS_PORT = Number(process.env.WORKER_STATUS_PORT ?? 3020);
@@ -50,6 +53,18 @@ async function sendReminders(now: Date) {
   }
 }
 
+async function processPublications(now: Date) {
+  const publicApiBase = (process.env.PUBLIC_API_URL ?? process.env.PUBLIC_WEB_URL ?? "http://localhost:3003").replace(/\/$/, "");
+  const worker = new PublicationWorker({
+    registry: defaultRegistry(),
+    media: new DbMediaProvider({ publicApiBaseUrl: publicApiBase }),
+  });
+  const summary = await worker.sweep(now);
+  if (summary.processed > 0 || summary.promoted > 0) {
+    console.log(`[worker] publications: ${summary.processed} processed (${summary.succeeded} ok, ${summary.failed} failed), ${summary.promoted} scheduled promoted`);
+  }
+}
+
 async function tick() {
   const finish = drain.begin();
   if (!finish) return;
@@ -59,6 +74,7 @@ async function tick() {
     await sendReminders(now);
     const r = await retryDueDeliveries(now);
     if (r.due > 0) console.log(`[worker] webhook retries: ${r.delivered} delivered, ${r.dead} dead of ${r.due} due`);
+    await processPublications(now);
   } catch (e) {
     console.error(`[worker] tick error: ${(e as Error).message}`);
   } finally {

@@ -37,6 +37,15 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/service-plans", label: "Service Plans", icon: "◌" },
       { href: "/documents", label: "Documents", icon: "▤" },
       { href: "/price-book", label: "Price Book", icon: "⊡" },
+      { href: "/newsletter", label: "Newsletter", icon: "✉", tour: "nav-newsletter" },
+    ],
+  },
+  {
+    label: "Marketing",
+    links: [
+      { href: "/content", label: "Content Studio", icon: "✎", tour: "nav-content" },
+      { href: "/publications", label: "Publications", icon: "⇪", tour: "nav-publications" },
+      { href: "/connections", label: "Channels", icon: "⇄", tour: "nav-connections" },
     ],
   },
   {

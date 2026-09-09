@@ -156,3 +156,16 @@ export interface PublicRequestStatusDTO {
   scheduledAt?: string | null;
   updatedAt: string;
 }
+
+export interface NewsletterSubscribeDTO {
+  ok: true;
+  subscriberId: string;
+  email: string;
+  name?: string | null;
+  channels: string[];
+}
+
+export interface NewsletterUnsubscribeDTO {
+  ok: true;
+  email: string;
+}

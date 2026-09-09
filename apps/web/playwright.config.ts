@@ -17,6 +17,7 @@ export default defineConfig({
     : "list",
   use: {
     baseURL,
+    storageState: "./e2e/.auth/walkthrough-seen.json",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

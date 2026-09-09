@@ -125,7 +125,7 @@ jobs:
           tail -n 180 /tmp/nnactpro-web-build.log
           exit $code
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_API_URL: http://localhost:3003
       - name: Upload web compiler log
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

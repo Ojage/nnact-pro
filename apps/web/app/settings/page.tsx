@@ -472,7 +472,7 @@ function CompanySection({ form, updateOrg, updateSettings, logoBusy, signatureBu
           <div className="mt-3 flex flex-wrap gap-2">
             <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:opacity-90">
               {logoBusy ? "Uploading…" : form.logoUrl ? "Replace logo" : "Upload logo"}
-              <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseLogo} disabled={logoBusy} />
+              <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Upload company logo" onChange={chooseLogo} disabled={logoBusy} />
             </label>
             {form.logoUrl ? <Button type="button" size="sm" variant="secondary" onClick={onRemoveLogo} disabled={logoBusy}>Remove logo</Button> : null}
           </div>

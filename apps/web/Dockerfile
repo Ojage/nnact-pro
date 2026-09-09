@@ -9,7 +9,7 @@ COPY scripts/verify-lockfile.mjs ./scripts/verify-lockfile.mjs
 COPY apps ./apps
 COPY packages ./packages
 
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=http://localhost:3003
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 RUN pnpm install:verified \

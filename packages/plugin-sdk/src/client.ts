@@ -1,7 +1,7 @@
 // Typed client for the OFP inbound plugin API (/api/plugin/v1/*). A plugin
 // authenticates with the per-install scoped token it was issued at install.
 export interface OFPClientOptions {
-  /** OFP API base, e.g. "https://app.example.com" or "http://localhost:3001". */
+  /** OFP API base, e.g. "https://app.example.com" or "http://localhost:3003". */
   baseUrl: string;
   /** The install's scoped token (NNP…). */
   token: string;

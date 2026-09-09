@@ -66,6 +66,7 @@ async function mockIntakeApi(
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
 
+    if (pathname === "/api/auth/me") return fulfillJson(route, { id: "owner-1", name: "Morgan Owner", email: "owner@example.test", role: "owner" });
     if (pathname === "/api/notifications/unread-count") return fulfillJson(route, { count: 0 });
     if (pathname === "/api/notifications") return fulfillJson(route, []);
     if (pathname === "/api/customers" && request.method() === "GET") return fulfillJson(route, customers);
@@ -126,8 +127,8 @@ test("dispatcher creates and schedules a job for an existing customer", async ({
 
   await page.getByLabel("Job title").fill("Refrigerator not cooling");
   await page.getByLabel("Customer complaint and access notes").fill("Fresh-food section is warm. Call before arrival; dog will be secured.");
-  await page.getByLabel("Visit length").selectOption("120");
-  await page.getByLabel("Technician").selectOption("tech-1");
+  await page.getByLabel("Visit length", { exact: true }).selectOption("120");
+  await page.getByLabel("Technician", { exact: true }).selectOption("tech-1");
 
   await page.screenshot({ path: path.join(artifactDir, "new-job-scheduled-desktop.png"), fullPage: true });
 

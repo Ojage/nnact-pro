@@ -116,7 +116,7 @@ export function resolvePublicApiOrigin(req?: FastifyRequest): string {
     const host = typeof forwardedHost === "string" ? forwardedHost.split(",")[0]?.trim() : req.hostname;
     return `${proto}://${host}`;
   }
-  return "http://localhost:3001";
+  return "http://localhost:3003";
 }
 
 export function publicLogoUrl(orgId: string, origin: string): string {

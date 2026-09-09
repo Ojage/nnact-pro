@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { FormSelect } from "@/components/ui/form-select";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Label } from "@/components/ui/label";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
@@ -145,22 +144,21 @@ export default function NewJobPage() {
               <p className="text-xs text-fg-muted">Attach this job to an existing customer or create the customer during intake.</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ToggleGroup
-                type="single"
-                value={customerMode}
-                onValueChange={(value) => value && setCustomerMode(value as "existing" | "new")}
-                className="grid w-full grid-cols-2 gap-2 rounded-xl bg-surface-100 p-1"
-              >
+              <div className="grid w-full grid-cols-2 gap-2 rounded-xl bg-surface-100 p-1">
                 {(["existing", "new"] as const).map((mode) => (
-                  <ToggleGroupItem
+                  <button
                     key={mode}
-                    value={mode}
-                    className="h-auto rounded-lg px-3 py-2 text-sm font-semibold capitalize data-[state=on]:bg-accent data-[state=on]:text-white"
+                    type="button"
+                    aria-pressed={customerMode === mode}
+                    onClick={() => setCustomerMode(mode)}
+                    className={`h-auto rounded-lg px-3 py-2 text-sm font-semibold capitalize ${
+                      customerMode === mode ? "bg-accent text-white" : "text-fg-muted hover:text-fg"
+                    }`}
                   >
                     {mode} customer
-                  </ToggleGroupItem>
+                  </button>
                 ))}
-              </ToggleGroup>
+              </div>
 
               {customerMode === "existing" ? (
                 <div>
@@ -171,6 +169,7 @@ export default function NewJobPage() {
                     onChange={setCustomerId}
                     disabled={loading}
                     allowEmpty
+                    native
                     placeholder={loading ? "Loading customers…" : "Select a customer"}
                     emptyLabel={loading ? "Loading customers…" : "Select a customer"}
                     options={customers.map((customer) => ({
@@ -256,6 +255,7 @@ export default function NewJobPage() {
                         id="duration"
                         value={durationMinutes}
                         onChange={setDurationMinutes}
+                        native
                         options={[
                           { value: "30", label: "30 minutes" },
                           { value: "60", label: "1 hour" },
@@ -276,6 +276,7 @@ export default function NewJobPage() {
                         value={technicianId}
                         onChange={setTechnicianId}
                         allowEmpty
+                        native
                         placeholder="Unassigned"
                         emptyLabel="Unassigned"
                         options={technicians.map((technician) => ({

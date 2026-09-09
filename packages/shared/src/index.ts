@@ -15,6 +15,7 @@ export * from "./walkthroughs.js";
 export * from "./content.js";
 export * from "./content-document.js";
 export * from "./publishing.js";
+export * from "./phone.js";
 
 // Shared domain enums + DTO types used by api, web, and mobile.
 
