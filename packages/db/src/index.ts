@@ -23,4 +23,5 @@ export * from "./service-plans.js";
 export * from "./diagnostics.js";
 export * from "./repair-brain.js";
 export * from "./auth-accounts.js";
+export * from "./content.js";
 export * from "./etech-keys.js";
