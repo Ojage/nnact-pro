@@ -1,0 +1,32 @@
+# VCS / tooling
+.git
+.gitignore
+.github
+.idea
+.vscode
+*.md
+
+# Dependencies (reinstalled inside the image)
+**/node_modules
+.pnpm-store
+
+# Build artifacts
+**/dist
+**/.next
+**/.expo
+**/build
+**/coverage
+**/playwright-report
+**/test-results
+**/*.tsbuildinfo
+
+# Local / runtime data (DB volumes live on the host)
+data
+*.log
+.env
+.env.*
+!.env.example
+
+# Package archives
+*.tgz
+*.tar.gz

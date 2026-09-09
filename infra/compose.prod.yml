@@ -28,9 +28,9 @@ services:
 
   migrate:
     profiles: ["tools"]
-    build:
-      context: ..
-      dockerfile: apps/api/Dockerfile
+    # Reuses the API image (same build). ci-deploy.sh builds it once via the
+    # `api` service and runs this migration job without a duplicate `--build`.
+    image: ${NNPAPI_IMAGE:-nnact/api:prod}
     environment:
       DATABASE_URL: postgres://ofp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ofp
       ALLOW_SCHEMA_PUSH: ${ALLOW_SCHEMA_PUSH:-false}
@@ -50,6 +50,7 @@ services:
     restart: "no"
 
   api:
+    image: ${NNPAPI_IMAGE:-nnact/api:prod}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -96,6 +97,7 @@ services:
     restart: unless-stopped
 
   web:
+    image: ${NNPWEB_IMAGE:-nnact/web:prod}
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
@@ -118,6 +120,7 @@ services:
     restart: unless-stopped
 
   worker:
+    image: ${NNPWORKER_IMAGE:-nnact/worker:prod}
     build:
       context: ..
       dockerfile: apps/worker/Dockerfile

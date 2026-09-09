@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      include_marketing:
+        description: "Rebuild and sync the marketing site (usually deployed by nnact-webapp itself)"
+        type: boolean
+        default: false
 
 concurrency:
   group: nnact-pro-production-deploy
@@ -28,7 +33,17 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Decide whether to build the marketing site
+        id: mkt
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=${{ github.event.inputs.include_marketing == 'true' && 'true' || 'false' }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout marketing site
+        if: steps.mkt.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Ojage/nnact-webapp
@@ -36,6 +51,7 @@ jobs:
           path: marketing-src
 
       - name: Build marketing site
+        if: steps.mkt.outputs.run == 'true'
         working-directory: marketing-src
         env:
           VITE_API_URL: ${{ vars.MARKETING_API_URL }}
@@ -45,6 +61,7 @@ jobs:
           npm run build
 
       - name: Sync marketing dist to VPS
+        if: steps.mkt.outputs.run == 'true'
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}

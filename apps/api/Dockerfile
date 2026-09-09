@@ -29,13 +29,19 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 WORKDIR /app
 
+# Lockfile-first: populate the pnpm store once so source-only rebuilds never
+# re-resolve or re-download the dependency tree. This layer only invalidates
+# when the lockfile or the workspace manifests change.
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml pnpm-lock.expected.sha256 ./
 COPY patches ./patches
 COPY scripts/verify-lockfile.mjs ./scripts/verify-lockfile.mjs
-COPY apps ./apps
-COPY packages ./packages
+RUN node scripts/verify-lockfile.mjs \
+  && pnpm fetch --ignore-scripts
 
-RUN pnpm install:verified \
+# Source after deps: edits to app/package code reuse the store layer above.
+COPY packages ./packages
+COPY apps/api ./apps/api
+RUN pnpm install --frozen-lockfile --offline --reporter=silent \
   && pnpm --filter @nnact/api build \
   && mkdir -p /uploads \
   && chown -R node:node /uploads /app/apps/api/dist

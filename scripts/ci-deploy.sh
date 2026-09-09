@@ -53,8 +53,77 @@ export ALLOW_SCHEMA_PUSH=true
 
 "${COMPOSE[@]}" -f infra/compose.prod.yml config >/dev/null
 
-echo "Building production images (this may take several minutes)..."
-"${COMPOSE[@]}" -f infra/compose.prod.yml build api web worker migrate
+# ---------------------------------------------------------------------------
+# Change-aware builds: rebuild only the images whose source actually moved,
+# so an api-only or web-only commit deploys in seconds instead of minutes.
+# `data/.deployed-sha` records the last successfully deployed commit; the first
+# deploy (or a missing image) falls back to building everything.
+# ---------------------------------------------------------------------------
+API_IMG="${NNPAPI_IMAGE:-nnact/api:prod}"
+WEB_IMG="${NNPWEB_IMAGE:-nnact/web:prod}"
+WORKER_IMG="${NNPWORKER_IMAGE:-nnact/worker:prod}"
+
+DEPLOY_MARKER="data/.deployed-sha"
+mkdir -p "$(dirname "$DEPLOY_MARKER")"
+LAST_SHA="$(cat "$DEPLOY_MARKER" 2>/dev/null || true)"
+
+build_all=false
+needs_api=false
+needs_web=false
+needs_worker=false
+needs_migrate=false
+
+if [ "${CI_DEPLOY_SKIP_GIT:-}" = "true" ] || [ -z "$LAST_SHA" ]; then
+  build_all=true
+elif ! command -v node >/dev/null 2>&1; then
+  echo "node not found on host — falling back to a full rebuild."
+  build_all=true
+else
+  # Pure classifier in scripts/change-detect.mjs (unit-tested) maps the
+  # changed-file set to the images that must be rebuilt.
+  eval "$(node scripts/change-detect.mjs "$LAST_SHA")"
+  needs_api="$API"
+  needs_web="$WEB"
+  needs_worker="$WORKER"
+  needs_migrate="$MIGRATE"
+  if [ "$ALL" = "true" ]; then
+    echo "Everything changed — rebuilding all images."
+  fi
+fi
+
+if [ "$build_all" = true ]; then
+  needs_api=true
+  needs_web=true
+  needs_worker=true
+  needs_migrate=true
+  echo "No previous deploy marker — building all images."
+fi
+
+# A missing image must always be (re)built even when nothing changed on disk.
+for pair in "api:$API_IMG" "web:$WEB_IMG" "worker:$WORKER_IMG"; do
+  key="${pair%%:*}"; img="${pair#*:}"
+  if ! docker image inspect "$img" >/dev/null 2>&1; then
+    echo "Image $img missing — forcing a rebuild."
+    case "$key" in
+      api) needs_api=true ;;
+      web) needs_web=true ;;
+      worker) needs_worker=true ;;
+    esac
+  fi
+done
+
+TO_BUILD=()
+[ "$needs_api" = true ] && TO_BUILD+=(api)
+[ "$needs_web" = true ] && TO_BUILD+=(web)
+[ "$needs_worker" = true ] && TO_BUILD+=(worker)
+
+echo "Affected images: ${TO_BUILD[*]:-none} (previous commit: ${LAST_SHA:-none})"
+if [ "${#TO_BUILD[@]}" -gt 0 ]; then
+  echo "Building production images..."
+  "${COMPOSE[@]}" -f infra/compose.prod.yml build "${TO_BUILD[@]}"
+else
+  echo "No image sources changed — reusing existing images."
+fi
 
 echo "Starting data services..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml up -d postgres redis
@@ -71,15 +140,19 @@ if [ -n "$OPS_STATE" ] && [ ! -f "$OPS_STATE/maintenance.json" ]; then
     postgis/postgis:16-3.4 sh -c 'printf "%s\n" "{\"version\":1,\"active\":false}" > /state/maintenance.json'
 fi
 
-echo "Applying database migrations..."
-"${COMPOSE[@]}" -f infra/compose.prod.yml --profile tools run --build --rm -e ALLOW_SCHEMA_PUSH=true migrate
+if [ "$needs_migrate" = true ]; then
+  echo "Applying database migrations..."
+  "${COMPOSE[@]}" -f infra/compose.prod.yml --profile tools run --rm -e ALLOW_SCHEMA_PUSH=true migrate
+else
+  echo "No database changes — skipping migrations."
+fi
 
 echo "Starting application stack..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml up -d api web worker caddy --remove-orphans
 
 echo "Waiting for services..."
 healthy=false
-for _attempt in $(seq 1 60); do
+for _attempt in $(seq 1 40); do
   status="$(${COMPOSE[@]} -f infra/compose.prod.yml ps 2>/dev/null || true)"
   if printf '%s\n' "$status" | grep -qi "unhealthy"; then
     echo "A service became unhealthy." >&2
@@ -112,6 +185,13 @@ fi
 
 echo "Verifying production CORS origins..."
 verify_cors
+
+# Record the commit now on disk so the NEXT deploy can skip images that did
+# not change. Written only after every step above succeeded.
+if [ "${CI_DEPLOY_SKIP_GIT:-}" != "true" ]; then
+  printf '%s\n' "$(git rev-parse HEAD)" > "$DEPLOY_MARKER"
+  echo "Deploy marker updated to $(cat "$DEPLOY_MARKER")."
+fi
 
 echo "Deploy complete."
 echo "Staff app:  https://${NNPSITE_ADDRESS:-unknown}"

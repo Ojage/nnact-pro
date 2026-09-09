@@ -3,13 +3,17 @@ FROM node:22-alpine
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 WORKDIR /app
 
+# Lockfile-first: populate the pnpm store once (see apps/api/Dockerfile).
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml pnpm-lock.expected.sha256 ./
 COPY patches ./patches
 COPY scripts/verify-lockfile.mjs ./scripts/verify-lockfile.mjs
-COPY apps ./apps
-COPY packages ./packages
+RUN node scripts/verify-lockfile.mjs \
+  && pnpm fetch --ignore-scripts
 
-RUN pnpm install:verified
+# Source after deps: only apps/worker + packages invalidate this build.
+COPY packages ./packages
+COPY apps/worker ./apps/worker
+RUN pnpm install --frozen-lockfile --offline --reporter=silent
 
 ENV NODE_ENV=production
 USER node
