@@ -7,17 +7,9 @@
     ".": "./index.ts"
   },
   "peerDependencies": {
-    "@expo/vector-icons": "*",
-    "@nnact/shared": "workspace:*",
-    "react": "^18.3.1",
-    "react-native": "*"
+    "@nnact/shared": "workspace:*"
   },
   "devDependencies": {
-    "@expo/vector-icons": "^14.0.4",
-    "@nnact/shared": "workspace:*",
-    "@types/react": "^18.3.0",
-    "react": "18.3.1",
-    "react-native": "0.76.0",
     "typescript": "^5.6.0"
   }
 }

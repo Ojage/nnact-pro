@@ -16,9 +16,31 @@ function requireFromProject(projectRoot, name) {
 
 /** Shared Metro config for pnpm monorepo Expo apps. */
 function createExpoMetroConfig(projectRoot) {
-  const { getDefaultConfig } = requireFromProject(projectRoot, "expo/metro-config");
+  // SDK 52 exposes the config as `expo/metro-config`; SDK 57+ ships `@expo/metro-config`.
+  let getDefaultConfig;
+  try {
+    getDefaultConfig = requireFromProject(projectRoot, "expo/metro-config").getDefaultConfig;
+  } catch {
+    getDefaultConfig = requireFromProject(projectRoot, "@expo/metro-config").getDefaultConfig;
+  }
   const { resolve: resolveModule } = requireFromProject(projectRoot, "metro-resolver");
-  const exclusionList = requireFromProject(projectRoot, "metro-config/src/defaults/exclusionList");
+  // metro 0.84+ restricts subpaths via "exports"; SDK 57 (metro 0.84.5) exposes
+  // `metro-config/private/*`, older SDKs (metro 0.81) resolve `src/...` directly.
+  let exclusionList;
+  for (const subpath of [
+    "metro-config/private/defaults/exclusionList",
+    "metro-config/src/defaults/exclusionList",
+  ]) {
+    try {
+      exclusionList = requireFromProject(projectRoot, subpath);
+      // metro 0.84 ships Babel-interop CJS (exports.default).
+      exclusionList = exclusionList.default || exclusionList;
+      break;
+    } catch {
+      // try next metro-config entry point for this SDK
+    }
+  }
+  if (!exclusionList) throw new Error("metro-config exclusionList is not resolvable");
 
   const monorepoRoot = path.resolve(projectRoot, "../..");
   const config = getDefaultConfig(projectRoot);

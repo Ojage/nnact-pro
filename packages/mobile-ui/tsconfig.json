@@ -6,7 +6,10 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@nnact/shared": ["../shared/src/index.ts"]
+      "@nnact/shared": ["../shared/src/index.ts"],
+      "react": ["../apps/customer-mobile/node_modules/react"],
+      "react-native": ["../apps/customer-mobile/node_modules/react-native"],
+      "@expo/vector-icons": ["../apps/customer-mobile/node_modules/@expo/vector-icons"]
     }
   },
   "include": ["./**/*.ts", "./**/*.tsx"]

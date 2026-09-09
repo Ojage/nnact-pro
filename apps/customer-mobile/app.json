@@ -13,6 +13,9 @@
       "backgroundColor": "#0f172a"
     },
     "icon": "./assets/icon.png",
+    "experiments": {
+      "tsconfigPaths": false
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nnact.customer"
