@@ -68,6 +68,18 @@ export async function sendTestSms(
   return { provider: "etechkeys", id: result.id, creditsUsed: result.creditsUsed };
 }
 
-export function isSmsConfigured(): boolean {
-  return isConfiguredEtechKeys();
+/**
+ * Whether SMS can be sent right now. Credentials may come from environment
+ * variables (which also seed the settings row on first access) or from the
+ * persisted EtechKeys settings row saved through the owner dashboard.
+ */
+export async function isSmsConfigured(): Promise<boolean> {
+  if (isConfiguredEtechKeys()) return true;
+  try {
+    const row = await etechKeysSettingsStore.resolve();
+    if (!row?.isActive) return false;
+    return Boolean((row.username && row.password) || row.apiKey);
+  } catch {
+    return false;
+  }
 }

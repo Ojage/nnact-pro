@@ -12,6 +12,7 @@ import { buildPortalSession } from "../portal-session.js";
 import { activePortalLinkForCustomer } from "../customer-auth-context.js";
 import { normalizePhone } from "../sms/phone.js";
 import { requestOtp, verifyOtp } from "../sms/otp.js";
+import { isSmsConfigured } from "../sms/sms.js";
 import {
   portalApproveEstimateForActiveLink,
   portalCheckoutForActiveLink,
@@ -210,8 +211,8 @@ export async function customerAuthRoutes(app: FastifyInstance) {
 
   app.post("/otp/request", { preHandler: authRateLimit }, async (req, reply) => {
     reply.header("Cache-Control", "no-store");
-    if (!process.env.ETECH_KEYS_LOGIN && !process.env.ETECH_KEYS_API_KEY) {
-      return reply.code(503).send({ error: "SMS not configured", hint: "set ETECH_KEYS_LOGIN/ETECH_KEYS_PASSWORD or ETECH_KEYS_API_KEY" });
+    if (!(await isSmsConfigured())) {
+      return reply.code(503).send({ error: "SMS not configured", hint: "configure the SMS provider in the owner dashboard" });
     }
     const parsed = otpRequestBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });

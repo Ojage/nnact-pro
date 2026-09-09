@@ -46,7 +46,7 @@ export async function smsAdminRoutes(app: FastifyInstance) {
 
     const rows = await etechKeysSettingsStore.findAll();
     return {
-      configured: isSmsConfigured(),
+      configured: await isSmsConfigured(),
       provider: "etechkeys",
       settings: rows.map((row) => ({
         id: row.id,
@@ -104,7 +104,7 @@ export async function smsAdminRoutes(app: FastifyInstance) {
     const claims = await requireOwner(req, reply);
     if (!claims) return;
     await etechKeysService.onModuleInit();
-    return { ok: true, configured: isSmsConfigured() };
+    return { ok: true, configured: await isSmsConfigured() };
   });
 
   app.post("/sms/test", async (req, reply) => {

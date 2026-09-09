@@ -20,6 +20,7 @@ import {
 } from "../refresh-tokens.js";
 import { normalizePhone } from "../sms/phone.js";
 import { requestOtp, verifyOtp } from "../sms/otp.js";
+import { isSmsConfigured } from "../sms/sms.js";
 
 const registerBody = z.object({
   orgName: z.string().trim().min(1).max(200),
@@ -234,8 +235,8 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post("/otp/request", { preHandler: loginRateLimit }, async (req, reply) => {
     reply.header("Cache-Control", "no-store");
-    if (!process.env.ETECH_KEYS_LOGIN && !process.env.ETECH_KEYS_API_KEY) {
-      return reply.code(503).send({ error: "SMS not configured", hint: "set ETECH_KEYS_LOGIN/ETECH_KEYS_PASSWORD or ETECH_KEYS_API_KEY" });
+    if (!(await isSmsConfigured())) {
+      return reply.code(503).send({ error: "SMS not configured", hint: "configure the SMS provider in the owner dashboard" });
     }
     const parsed = otpRequestBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
