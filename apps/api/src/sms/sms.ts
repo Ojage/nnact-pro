@@ -46,6 +46,28 @@ export async function sendSms(
   if (!options?.provider) await etechKeysSettingsStore.resolve();
 }
 
+export interface SendTestSmsResult {
+  provider: SmsProvider;
+  id?: string;
+  creditsUsed?: number;
+}
+
+export async function sendTestSms(
+  to: string,
+  message: string,
+  from?: string,
+): Promise<SendTestSmsResult> {
+  const sender = await resolveActiveProvider();
+  const result = sender.sendTestSms ? await sender.sendTestSms(to, message, from) : null;
+  // Fire a tick on the store so any DB-persisted provider state is read next send.
+  await etechKeysSettingsStore.resolve();
+  if (!result) {
+    await sender.sendSMS({ to, message, from });
+    return { provider: "etechkeys" };
+  }
+  return { provider: "etechkeys", id: result.id, creditsUsed: result.creditsUsed };
+}
+
 export function isSmsConfigured(): boolean {
   return isConfiguredEtechKeys();
 }

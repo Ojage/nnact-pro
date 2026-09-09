@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { cameroonCarrier, cameroonCarrierLabel, isValidCameroonMobile, normalizePhone } from "@nnact/shared";
 import { verifiedClaims } from "../operational-authorization.js";
 import { etechKeysSettingsStore } from "../sms/etech-keys-store.js";
 import { etechKeysService } from "../sms/etech-keys.js";
-import { isSmsConfigured } from "../sms/sms.js";
+import { sendTestSms, isSmsConfigured } from "../sms/sms.js";
+import { SmsError } from "../sms/types.js";
 
 const settingsSchema = z.object({
   name: z.string().trim().min(1).max(80).default("default"),
@@ -14,6 +16,11 @@ const settingsSchema = z.object({
   apiKey: z.string().trim().max(320).nullable().optional(),
   senderId: z.string().trim().max(80).nullable().optional(),
   isActive: z.boolean().optional(),
+});
+
+const testSchema = z.object({
+  to: z.string().trim().min(1).max(40),
+  message: z.string().trim().min(1).max(160).optional(),
 });
 
 function mask(value: string | null | undefined): string | null {
@@ -98,5 +105,50 @@ export async function smsAdminRoutes(app: FastifyInstance) {
     if (!claims) return;
     await etechKeysService.onModuleInit();
     return { ok: true, configured: isSmsConfigured() };
+  });
+
+  app.post("/sms/test", async (req, reply) => {
+    const claims = await requireOwner(req, reply);
+    if (!claims) return;
+
+    const parsed = testSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "A phone number is required." });
+    }
+
+    const { to, message } = parsed.data;
+    const normalized = normalizePhone(to);
+    if (!isValidCameroonMobile(normalized)) {
+      return reply.code(400).send({
+        error: "Enter a valid Cameroon mobile number (MTN, Orange or Camtel), e.g. 670 12 34 56.",
+      });
+    }
+
+    const active = await etechKeysSettingsStore.resolve();
+    const hasAuth = Boolean((active.username && active.password) || active.apiKey);
+    if (!hasAuth || !active.isActive) {
+      return reply.code(400).send({ error: "SMS is not configured yet. Save provider credentials first." });
+    }
+
+    await etechKeysService.onModuleInit();
+    const body = message ?? `This is a test message from ${active.senderId ?? "NNACT"}. If you received this, SMS is working end to end.`;
+
+    try {
+      const result = await sendTestSms(normalized, body);
+      const carrier = cameroonCarrier(normalized);
+      return {
+        ok: true,
+        provider: result.provider,
+        to: normalized,
+        carrier,
+        carrierLabel: carrier ? cameroonCarrierLabel(carrier) : null,
+        smsId: result.id ?? null,
+        creditsUsed: result.creditsUsed ?? null,
+        message: body,
+      };
+    } catch (error) {
+      if (error instanceof SmsError) return reply.code(error.statusCode).send({ error: error.message });
+      return reply.code(502).send({ error: error instanceof Error ? error.message : "Failed to send test SMS." });
+    }
   });
 }

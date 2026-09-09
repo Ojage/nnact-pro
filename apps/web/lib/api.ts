@@ -541,6 +541,17 @@ export interface SmsSettingsDTO {
   settings: SmsSettingsRow[];
 }
 
+export interface SmsTestResultDTO {
+  ok: boolean;
+  provider: string;
+  to: string;
+  carrier: string | null;
+  carrierLabel: string | null;
+  smsId: string | null;
+  creditsUsed: number | null;
+  message: string;
+}
+
 export const api = {
   health: () => request<{ ok: boolean }>("/api/health"),
 
@@ -573,6 +584,8 @@ export const api = {
     request<{ id: string; ok: boolean }>("/api/sms/settings", { method: "POST", body: JSON.stringify(body) }),
   refreshEtechKeys: () =>
     request<{ ok: boolean; configured: boolean }>("/api/sms/providers/etechkeys/refresh", { method: "POST" }),
+  testSms: (body: { to: string; message?: string }) =>
+    request<SmsTestResultDTO>("/api/sms/test", { method: "POST", body: JSON.stringify(body) }),
 
   jobs: () => request<JobDTO[]>("/api/jobs"),
   job: (id: string) => request<JobDTO>(`/api/jobs/${id}`),
@@ -725,7 +738,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  patchUser: (id: string, body: { role?: string; active?: boolean }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  patchUser: (id: string, body: { name?: string; email?: string; phone?: string | null; role?: string; active?: boolean }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteUser: (id: string) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
 
   // ── Guided-walkthrough progress (server-authoritative) ──

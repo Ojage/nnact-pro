@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CircleAlert, CheckCircle2 } from "lucide-react";
+import { CircleAlert, CheckCircle2, SendHorizonal } from "lucide-react";
+import { cameroonCarrierLabel, isValidCameroonMobile, normalizePhone } from "@nnact/shared";
 import { api, type SmsSettingsDTO, type SmsSettingsRow } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LimitedTextarea } from "@/components/ui/limited-textarea";
 
 interface FormState {
   baseUrl: string;
@@ -49,6 +51,11 @@ export function SmsSettingsEditor() {
   const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [testPhone, setTestPhone] = useState("");
+  const [testMessage, setTestMessage] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +140,29 @@ export function SmsSettingsEditor() {
       setError(err instanceof Error ? err.message : "Could not refresh the provider session.");
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  const testValid = isValidCameroonMobile(testPhone);
+  const testCarrier = testValid ? cameroonCarrierLabel(normalizePhone(testPhone)) : null;
+
+  async function sendTest() {
+    if (!testValid) return;
+    setTesting(true);
+    setTestStatus(null);
+    setTestError(null);
+    try {
+      const result = await api.testSms({ to: testPhone, message: testMessage.trim() || undefined });
+      const to = result.to.replace(/^237/, "+237 ");
+      setTestStatus(
+        `SMS sent to ${to}${result.carrierLabel ? ` (${result.carrierLabel})` : ""} via ${result.provider}.${
+          result.smsId ? ` Provider id: ${result.smsId}.` : ""
+        }`,
+      );
+    } catch (err) {
+      setTestError(err instanceof Error ? err.message : "Could not send the test SMS.");
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -270,6 +300,80 @@ export function SmsSettingsEditor() {
             <CircleAlert className="size-4" /> {error}
           </p>
         ) : null}
+
+        <div className="border-t border-border pt-4">
+          <h3 className="text-sm font-semibold">Send a test SMS</h3>
+          <p className="mt-1 text-sm text-fg-muted">
+            Sends a real message through EtechKeys using the credentials above, so you can verify the whole path end to
+            end. A text will arrive on the number you enter within a few seconds.
+          </p>
+
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="sms-test-phone">
+                {fieldLabel("Phone number", "MTN, Orange or Camtel Cameroon mobile, e.g. 670 12 34 56.")}
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="sms-test-phone"
+                  inputMode="tel"
+                  value={testPhone}
+                  onChange={(event) => setTestPhone(event.target.value)}
+                  placeholder="670 12 34 56"
+                  aria-invalid={testPhone.trim().length > 0 && !testValid}
+                />
+                {testCarrier ? (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-500/10 px-2.5 text-xs font-medium text-emerald-600">
+                    {testCarrier}
+                  </span>
+                ) : null}
+              </div>
+              {testPhone.trim().length > 0 && !testValid ? (
+                <p className="text-xs text-destructive">Enter a valid Cameroon mobile number (9 digits).</p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sms-test-message">
+                {fieldLabel("Message", "Max 160 characters. Leave blank for a default test message.")}
+              </Label>
+              <LimitedTextarea
+                id="sms-test-message"
+                maxLength={160}
+                rows={3}
+                value={testMessage}
+                onChange={(event) => setTestMessage(event.target.value)}
+                placeholder="This is a test message from NNACT. If you received this, SMS is working end to end."
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button
+              onClick={() => void sendTest()}
+              disabled={!configured || !testValid || testing}
+              loading={testing}
+            >
+              {testing ? "Sending…" : "Send test SMS"}
+              {!testing ? <SendHorizonal className="size-4" /> : null}
+            </Button>
+            {!configured ? (
+              <p className="text-xs text-fg-muted">Save provider credentials before sending a test SMS.</p>
+            ) : !testValid ? (
+              <p className="text-xs text-fg-muted">Enter a valid MTN, Orange or Camtel number first.</p>
+            ) : null}
+          </div>
+
+          {testStatus ? (
+            <p className="mt-2 flex items-start gap-1.5 text-sm text-emerald-600">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> {testStatus}
+            </p>
+          ) : null}
+          {testError ? (
+            <p className="mt-2 flex items-start gap-1.5 text-sm text-destructive">
+              <CircleAlert className="mt-0.5 size-4 shrink-0" /> {testError}
+            </p>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

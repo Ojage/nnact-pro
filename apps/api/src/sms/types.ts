@@ -19,6 +19,8 @@ export interface SendSMSOptions {
 /** A sender idempotently delivers a message. */
 export interface ISmsSender {
   sendSMS(options: SendSMSOptions): Promise<void>;
+  /** Optional single-recipient send that returns the provider id (used by test-SMS). */
+  sendTestSms?(to: string, message: string, from?: string): Promise<{ id?: string; creditsUsed?: number }>;
 }
 
 export const SMS_PROVIDERS = ["etechkeys", "infobip", "echosms"] as const;

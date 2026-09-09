@@ -163,3 +163,13 @@ test("etechkeys sendSMS normalizes and delivers to batch recipients", async () =
   const sentTos = calls.filter((c) => c.url.includes("/send-sms")).map((c) => c.body!.to);
   assert.deepEqual(sentTos, ["237671234567", "237690001122"]);
 });
+
+test("etechkeys sendTestSms returns the provider id and credits used", async () => {
+  const calls: Array<{ url: string; body?: unknown }> = [];
+  const service = buildService(calls);
+  const result = await service.sendTestSms("671234567", "test message");
+  assert.equal(result.id, "sms-1");
+  assert.equal(result.creditsUsed, 1);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1].body, { sender_id: "ETECH KEYS", to: "237671234567", msg: "test message" });
+});

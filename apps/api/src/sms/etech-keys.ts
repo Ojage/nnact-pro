@@ -92,7 +92,7 @@ export class EtechKeysService implements ISmsSender {
     }
   }
 
-  private async sendToSingle(options: SendSMSOptions): Promise<void> {
+  private async sendToSingle(options: SendSMSOptions): Promise<{ id?: string; creditsUsed?: number } | null> {
     if (!this.config) await this.reloadConfig();
     if (!this.config!.isActive) throw new SmsError("EtechKeys provider is inactive", 503, "etechkeys");
 
@@ -102,25 +102,32 @@ export class EtechKeysService implements ISmsSender {
 
     if (hasCredentials) {
       try {
-        await this.sendWithBearer(to, options.message, senderId!);
-        return;
+        return await this.sendWithBearer(to, options.message, senderId!);
       } catch (error) {
         if (error instanceof SmsError && (error.statusCode === 401 || error.statusCode === 403)) {
           // Token expired — refresh once and retry.
           this.bearerToken = null;
-          await this.sendWithBearer(to, options.message, senderId!);
-          return;
+          return this.sendWithBearer(to, options.message, senderId!);
         }
         throw error;
       }
     }
 
     if (this.config!.apiKey) {
-      await this.sendWithApiKey(to, options.message, senderId!);
-      return;
+      return this.sendWithApiKey(to, options.message, senderId!);
     }
 
     throw new SmsError("EtechKeys is not configured: set ETECH_KEYS_LOGIN/PASSWORD or ETECH_KEYS_API_KEY", 503, "etechkeys");
+  }
+
+  /** Sends a single test message and returns the provider id + credits used. */
+  async sendTestSms(
+    to: string,
+    message: string,
+    from?: string,
+  ): Promise<{ id?: string; creditsUsed?: number }> {
+    const result = (await this.sendToSingle({ to, message, from })) ?? {};
+    return { id: result.id, creditsUsed: result.creditsUsed };
   }
 
   private async authenticate(): Promise<string> {
@@ -139,7 +146,7 @@ export class EtechKeysService implements ISmsSender {
     return this.bearerToken;
   }
 
-  private async sendWithBearer(to: string, message: string, senderId: string): Promise<void> {
+  private async sendWithBearer(to: string, message: string, senderId: string): Promise<{ id?: string; creditsUsed?: number }> {
     const { baseUrl } = this.config!;
     const token = await this.authenticate();
     const data = await this.postJson<{ success?: boolean; id?: string; credits_used?: number; error?: string }>(
@@ -147,23 +154,24 @@ export class EtechKeysService implements ISmsSender {
       { sender_id: senderId, to, msg: message },
       token,
     );
-    this.classifyResponse(data);
+    return this.classifyResponse(data);
   }
 
-  private async sendWithApiKey(to: string, message: string, senderId: string): Promise<void> {
+  private async sendWithApiKey(to: string, message: string, senderId: string): Promise<{ id?: string; creditsUsed?: number }> {
     const { baseUrl, apiKey } = this.config!;
     const data = await this.postJson<{ success?: boolean; id?: string; credits_used?: number; error?: string }>(
       `${baseUrl}/api/v1/send-sms-key`,
       { api_key: apiKey!, sender_id: senderId, destinataire: to, message },
     );
-    this.classifyResponse(data);
+    return this.classifyResponse(data);
   }
 
-  private classifyResponse(data: unknown): void {
+  private classifyResponse(data: unknown): { id?: string; creditsUsed?: number } {
     const body = (data ?? {}) as SmsApiResponse;
     if (body.success === false || (body && !("success" in body) && body.error)) {
       throw new SmsError(body.error ?? "EtechKeys reported a failed SMS send", 502, "etechkeys");
     }
+    return { id: body.id, creditsUsed: body.credits_used };
   }
 
   async getSmsLogs(page = 1, perPage = 50): Promise<unknown> {
