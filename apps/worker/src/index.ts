@@ -5,7 +5,7 @@
 import { and, eq, lte, gte } from "drizzle-orm";
 import { createServer } from "node:http";
 import { db, recurringJobs, jobs, appointments } from "@nnact/db";
-import { catchUp } from "../../api/src/recurrence.ts";
+import { catchUp } from "@nnact/shared";
 import {
   WorkerDrainTracker,
   maintenanceReaderFromEnvironment,

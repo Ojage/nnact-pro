@@ -1,4 +1,4 @@
-// node --experimental-strip-types --test test/recurrence.test.ts
+// node --experimental-strip-types --test test/recurrence.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { nextOccurrence, isDue, catchUp } from "../src/recurrence.ts";

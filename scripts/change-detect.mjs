@@ -35,7 +35,9 @@ export function classify(files) {
 
   const api = shared || anyPackage || startsWithAny("apps/api/");
   const web = shared || anyPackage || startsWithAny("apps/web/");
-  const worker = shared || anyPackage || startsWithAny("apps/worker/");
+  // The worker imports api source modules directly (../../api/src/...) and is
+  // therefore rebuilt whenever apps/api changes, not just apps/worker.
+  const worker = shared || anyPackage || startsWithAny("apps/worker/") || startsWithAny("apps/api/");
   const migrate = startsWithAny("packages/db/");
 
   return { api, web, worker, migrate };
@@ -65,10 +67,24 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 
 if (isMain) {
   const lastSha = process.argv[2] ?? "";
-  const files = changedSince(lastSha);
-  // No previous deploy marker (or missing ref): force a full rebuild.
-  const decision = files === null ? { api: true, web: true, worker: true, migrate: true } : classify(files);
-  process.stdout.write(`${render(decision)}\n`);
+  if (lastSha === "--stdin") {
+    // Printed by ci-deploy.sh so node does not have to exist on the VPS: the
+    // VPS pipes `git diff --name-only` (git is present) into a node container
+    // which classifies the lines without needing git itself.
+    const input = await new Promise((resolveAll) => {
+      let data = "";
+      process.stdin.setEncoding("utf8");
+      process.stdin.on("data", (chunk) => { data += chunk; });
+      process.stdin.on("end", () => resolveAll(data));
+    });
+    const files = input.split("\n").map((l) => l.trim()).filter(Boolean);
+    process.stdout.write(`${render(classify(files))}\n`);
+  } else {
+    const files = changedSince(lastSha);
+    // No previous deploy marker (or missing ref): force a full rebuild.
+    const decision = files === null ? { api: true, web: true, worker: true, migrate: true } : classify(files);
+    process.stdout.write(`${render(decision)}\n`);
+  }
 }
 
 export { changedSince, render };

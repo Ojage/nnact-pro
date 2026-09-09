@@ -7,9 +7,19 @@ test("touching apps/web only rebuilds web", () => {
   assert.deepEqual(d, { api: false, web: true, worker: false, migrate: false });
 });
 
-test("touching apps/api only rebuilds api", () => {
+test("touching apps/api only rebuilds api (and worker, which imports api source)", () => {
   const d = classify(["apps/api/src/routes/sms.ts"]);
-  assert.deepEqual(d, { api: true, web: false, worker: false, migrate: false });
+  assert.deepEqual(d, { api: true, web: false, worker: true, migrate: false });
+});
+
+test("worker consumes api source, so apps/api changes rebuild worker too", () => {
+  const d = classify(["apps/api/src/recurrence.ts"]);
+  assert.deepEqual(d, { api: true, web: false, worker: true, migrate: false });
+});
+
+test("apps/worker changes rebuild only worker", () => {
+  const d = classify(["apps/worker/src/index.ts"]);
+  assert.deepEqual(d, { api: false, web: false, worker: true, migrate: false });
 });
 
 test("touching a shared package rebuilds every image but not migrations", () => {

@@ -307,3 +307,5 @@ export interface SyncRequestDTO {
 export interface SyncResponseDTO {
   results: SyncResultDTO[];
 }
+
+export * from "./recurrence.ts";

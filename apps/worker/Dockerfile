@@ -12,6 +12,10 @@ RUN node scripts/verify-lockfile.mjs \
 
 # Source after deps: only apps/worker + packages invalidate this build.
 COPY packages ./packages
+# The worker imports api source modules directly (../../api/src/...), so the
+# api tree must be present at runtime; its deps (drizzle/@nnact-*) are all in
+# the worker's own dependency set and land in the node_modules linked below.
+COPY apps/api ./apps/api
 COPY apps/worker ./apps/worker
 RUN pnpm install --frozen-lockfile --offline --reporter=silent
 

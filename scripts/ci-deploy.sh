@@ -75,19 +75,27 @@ needs_migrate=false
 
 if [ "${CI_DEPLOY_SKIP_GIT:-}" = "true" ] || [ -z "$LAST_SHA" ]; then
   build_all=true
-elif ! command -v node >/dev/null 2>&1; then
-  echo "node not found on host — falling back to a full rebuild."
-  build_all=true
 else
   # Pure classifier in scripts/change-detect.mjs (unit-tested) maps the
-  # changed-file set to the images that must be rebuilt.
-  eval "$(node scripts/change-detect.mjs "$LAST_SHA")"
-  needs_api="$API"
-  needs_web="$WEB"
-  needs_worker="$WORKER"
-  needs_migrate="$MIGRATE"
-  if [ "$ALL" = "true" ]; then
-    echo "Everything changed — rebuilding all images."
+  # changed-file set to the images that must be rebuilt. It runs inside a
+  # throwaway node container so the VPS does not need node installed; git is
+  # already present, so the diff is computed here on the host.
+  DETECT_OUT="$(git diff --name-only "$LAST_SHA"..HEAD \
+    | docker run -i --rm \
+        -v "$ROOT_DIR/scripts:/scripts:ro" \
+        node:22-alpine node /scripts/change-detect.mjs --stdin)" || true
+  eval "$DETECT_OUT"
+  if [ -z "${API:-}" ]; then
+    echo "Change detection failed — falling back to a full rebuild."
+    build_all=true
+  else
+    needs_api="$API"
+    needs_web="$WEB"
+    needs_worker="$WORKER"
+    needs_migrate="$MIGRATE"
+    if [ "$ALL" = "true" ]; then
+      echo "Everything changed — rebuilding all images."
+    fi
   fi
 fi
 
@@ -150,16 +158,34 @@ fi
 echo "Starting application stack..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml up -d api web worker caddy --remove-orphans
 
-echo "Waiting for services..."
+echo "Waiting for services to become healthy..."
 healthy=false
-for _attempt in $(seq 1 40); do
-  status="$(${COMPOSE[@]} -f infra/compose.prod.yml ps 2>/dev/null || true)"
-  if printf '%s\n' "$status" | grep -qi "unhealthy"; then
-    echo "A service became unhealthy." >&2
-    printf '%s\n' "$status" >&2
+for _attempt in $(seq 1 60); do
+  any_unhealthy=false
+  all_ready=true
+  for svc in api web worker; do
+    cid="$(${COMPOSE[@]} -f infra/compose.prod.yml ps -q "$svc" 2>/dev/null | tr -d '[:space:]')"
+    if [ -z "$cid" ]; then
+      all_ready=false
+      continue
+    fi
+    state="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null)"
+    case "$state" in
+      healthy) ;;
+      running) ;; # no healthcheck configured -> Up is good enough
+      starting | "")
+        all_ready=false ;;
+      *)
+        echo "Service $svc is in bad state ($state)." >&2
+        any_unhealthy=true ;;
+    esac
+  done
+  if [ "$any_unhealthy" = true ]; then
+    echo "A service became unhealthy — aborting." >&2
+    "${COMPOSE[@]}" -f infra/compose.prod.yml ps >&2
     exit 1
   fi
-  if printf '%s\n' "$status" | grep -q "api" && printf '%s\n' "$status" | grep -q "web"; then
+  if [ "$all_ready" = true ]; then
     healthy=true
     break
   fi
