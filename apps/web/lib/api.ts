@@ -519,6 +519,28 @@ export interface PortalSessionDTO {
   serviceHistory: import("@nnact/shared").PortalServiceHistoryDTO[];
 }
 
+export interface SmsSettingsRow {
+  id: string;
+  name: string;
+  baseUrl: string | null;
+  legacyBaseUrl: string | null;
+  username: string | null;
+  usernameMasked: string | null;
+  passwordMasked: string | null;
+  apiKeyMasked: string | null;
+  senderId: string | null;
+  isActive: boolean;
+  providerType: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SmsSettingsDTO {
+  configured: boolean;
+  provider: string;
+  settings: SmsSettingsRow[];
+}
+
 export const api = {
   health: () => request<{ ok: boolean }>("/api/health"),
 
@@ -544,6 +566,13 @@ export const api = {
     return request<OrgSettingsDTO>("/api/org/stamp", { method: "POST", body });
   },
   deleteOrgStamp: () => request<OrgSettingsDTO>("/api/org/stamp", { method: "DELETE" }),
+
+  // ── SMS provider (EtechKeys) ──
+  smsSettings: () => request<SmsSettingsDTO>("/api/sms/settings"),
+  saveSmsSettings: (body: Record<string, unknown>) =>
+    request<{ id: string; ok: boolean }>("/api/sms/settings", { method: "POST", body: JSON.stringify(body) }),
+  refreshEtechKeys: () =>
+    request<{ ok: boolean; configured: boolean }>("/api/sms/providers/etechkeys/refresh", { method: "POST" }),
 
   jobs: () => request<JobDTO[]>("/api/jobs"),
   job: (id: string) => request<JobDTO>(`/api/jobs/${id}`),

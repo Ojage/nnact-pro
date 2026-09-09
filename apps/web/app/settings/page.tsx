@@ -18,10 +18,11 @@ import { FormSelect, type FormSelectOption } from "@/components/ui/form-select";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { TeamMemberCreatedDialog } from "@/components/team-member-created-dialog";
+import { SmsSettingsEditor } from "@/components/settings/sms-settings-editor";
 import { buildTeamMemberDefaultPassword } from "@nnact/shared";
 import type { CreateTeamMemberResponseDTO } from "@nnact/shared";
 
-type Tab = "company" | "hours" | "areas" | "invoice" | "estimate" | "payments" | "taxes" | "messages" | "numbering" | "portal" | "currency" | "team";
+type Tab = "company" | "hours" | "areas" | "invoice" | "estimate" | "payments" | "taxes" | "messages" | "numbering" | "portal" | "currency" | "sms" | "team";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "company", label: "Company" },
@@ -35,13 +36,14 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "numbering", label: "Numbering" },
   { id: "portal", label: "Portal" },
   { id: "currency", label: "Currency" },
+  { id: "sms", label: "SMS Provider" },
   { id: "team", label: "Team" },
 ];
 
 const TAB_GROUPS: { label: string; tabs: Tab[] }[] = [
   { label: "Business", tabs: ["company", "hours", "areas", "team"] },
   { label: "Sales & payments", tabs: ["invoice", "estimate", "payments", "taxes", "currency"] },
-  { label: "Customer experience", tabs: ["messages", "numbering", "portal"] },
+  { label: "Customer experience", tabs: ["messages", "numbering", "portal", "sms"] },
 ];
 
 interface User {
@@ -111,7 +113,7 @@ export default function SettingsPage() {
           </nav>
         </aside>
 
-        {tab === "team" ? <TeamTab /> : <BusinessSettingsTab tab={tab} onDirtyChange={setDirty} />}
+        {tab === "sms" ? <SmsSettingsEditor /> : tab === "team" ? <TeamTab /> : <BusinessSettingsTab tab={tab} onDirtyChange={setDirty} />}
       </div>
     </div>
   );

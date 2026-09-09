@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import { login, loginWithPhone, requestOtp, verifyOtp } from "@/lib/api";
@@ -11,33 +11,83 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { BrandMark } from "@/components/brand-mark";
-import { NNACT_COMPANY } from "@nnact/shared";
+import {
+  NNACT_COMPANY,
+  cameroonCarrierLabel,
+  isValidCameroonMobile,
+  normalizePhone,
+} from "@nnact/shared";
 
 type LoginMode = "password" | "otp";
+type OtpStage = "phone" | "code";
+
+const OTP_DIGITS = 6;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<LoginMode>("password");
+  const [otpStage, setOtpStage] = useState<OtpStage>("phone");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [requestedPhone, setRequestedPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  const [digits, setDigits] = useState<string[]>(() => Array(OTP_DIGITS).fill(""));
   const [devCode, setDevCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  const isPhoneValid = isValidCameroonMobile(phone);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setInterval(() => setResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(timer);
+  }, [resendIn > 0]);
+
+  function reportError(err: unknown) {
+    const message = err instanceof Error ? err.message : "Sign-in failed";
+    if (message.includes("401") || message.toLowerCase().includes("invalid credentials")) {
+      setError(
+        "Invalid credentials or code. If this is a fresh setup, run: pnpm infra:up && pnpm db:push && pnpm seed:nnact",
+      );
+    } else if (
+      message.toLowerCase().includes("failed to fetch") ||
+      message.toLowerCase().includes("network") ||
+      message.includes("ECONNREFUSED")
+    ) {
+      setError(
+        `Cannot reach the API (${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003"}). Start it with: pnpm dev:api`,
+      );
+    } else {
+      setError(message);
+    }
+  }
 
   async function onSendCode() {
-    setError(null);
-    if (!phone.trim()) {
-      setError("Enter your phone number first.");
+    if (!isPhoneValid) {
+      setError("Enter a valid MTN, Orange, or Camtel number.");
       return;
     }
+    setError(null);
     setSendingCode(true);
     try {
-      const result = await requestOtp(phone.trim());
+      const target = normalizePhone(phone);
+      const result = await requestOtp(target);
       if (result.devCode) setDevCode(result.devCode);
-      if (!result.sent) setError("Could not send a code right now. Try again in a minute.");
+      if (!result.sent) {
+        setError("Could not send a code right now. Try again in a minute.");
+        return;
+      }
+      setRequestedPhone(target);
+      setDigits(Array(OTP_DIGITS).fill(""));
+      setOtpStage("code");
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+      setTimeout(() => otpRefs.current[0]?.focus(), 150);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send a code.");
     } finally {
@@ -45,14 +95,61 @@ export default function LoginPage() {
     }
   }
 
+  function handleOtpChange(index: number, text: string) {
+    const cleaned = text.replace(/\D+/g, "");
+    if (!cleaned) {
+      setDigits((d) => {
+        const next = [...d];
+        next[index] = "";
+        return next;
+      });
+      if (index > 0) otpRefs.current[index - 1]?.focus();
+      return;
+    }
+    const next = [...digits];
+    let caret = index;
+    for (const char of cleaned) {
+      if (caret >= OTP_DIGITS) break;
+      next[caret] = char;
+      caret += 1;
+    }
+    setDigits(next);
+    if (cleaned.length > 1 || caret < OTP_DIGITS) {
+      otpRefs.current[Math.min(caret, OTP_DIGITS - 1)]?.focus();
+    } else {
+      void verifyOtpCode(next.join(""));
+    }
+  }
+
+  async function verifyOtpCode(code: string) {
+    if (verifying || code.length !== OTP_DIGITS) return;
+    setVerifying(true);
+    setError(null);
+    try {
+      await verifyOtp(requestedPhone, code);
+      router.replace("/");
+      router.refresh();
+    } catch (err) {
+      reportError(err);
+      setDigits(Array(OTP_DIGITS).fill(""));
+      otpRefs.current[0]?.focus();
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  function resetOtp() {
+    setDigits(Array(OTP_DIGITS).fill(""));
+    setOtpStage("phone");
+    setRequestedPhone("");
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      if (mode === "otp") {
-        await verifyOtp(phone.trim(), code.trim());
-      } else if (email.includes("@")) {
+      if (email.includes("@")) {
         await login(email.trim(), password);
       } else {
         await loginWithPhone(email.trim(), password);
@@ -60,22 +157,7 @@ export default function LoginPage() {
       router.replace("/");
       router.refresh();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Sign-in failed";
-      if (message.includes("401") || message.toLowerCase().includes("invalid credentials")) {
-        setError(
-          "Invalid credentials or code. If this is a fresh setup, run: pnpm infra:up && pnpm db:push && pnpm seed:nnact",
-        );
-      } else if (
-        message.toLowerCase().includes("failed to fetch") ||
-        message.toLowerCase().includes("network") ||
-        message.includes("ECONNREFUSED")
-      ) {
-        setError(
-          `Cannot reach the API (${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003"}). Start it with: pnpm dev:api`,
-        );
-      } else {
-        setError(message);
-      }
+      reportError(err);
     } finally {
       setSubmitting(false);
     }
@@ -100,6 +182,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setMode(tab);
                   setError(null);
+                  if (tab === "otp") setOtpStage("phone");
                 }}
                 className={
                   mode === tab
@@ -111,100 +194,137 @@ export default function LoginPage() {
               </button>
             ))}
           </div>
-          <form onSubmit={onSubmit} className="space-y-4" noValidate>
-            {mode === "otp" ? (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="otp-phone" className="text-xs text-fg-muted">
-                    Phone number
-                  </Label>
+          {mode === "password" ? (
+            <form onSubmit={onSubmit} className="space-y-4" noValidate>
+              <div className="space-y-2">
+                <Label htmlFor="login-email" className="text-xs text-fg-muted">
+                  Email or phone
+                </Label>
+                <Input
+                  id="login-email"
+                  type="text"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com or 6XX XX XX XX"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password" className="text-xs text-fg-muted">
+                  Password
+                </Label>
+                <PasswordInput
+                  id="login-password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Password"
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" loading={submitting}>
+                Sign in
+              </Button>
+            </form>
+          ) : otpStage === "phone" ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="otp-phone" className="text-xs text-fg-muted">
+                  Phone number
+                </Label>
+                <Input
+                  id="otp-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="6XX XX XX XX"
+                />
+                <p className="text-xs text-fg-muted">
+                  {phone.trim()
+                    ? isPhoneValid
+                      ? `${cameroonCarrierLabel(phone)} · we'll text you a 6-digit code`
+                      : "Enter a valid MTN, Orange, or Camtel number."
+                    : "We'll text you a 6-digit sign-in code."}
+                </p>
+              </div>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => void onSendCode()}
+                disabled={!isPhoneValid}
+                loading={sendingCode}
+              >
+                {sendingCode ? "Requesting…" : "Request Short Code"}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-fg">Enter the 6-digit code</p>
+                <p className="text-xs text-fg-muted">
+                  Sent to {requestedPhone}
+                </p>
+              </div>
+              <div className="flex justify-between gap-2">
+                {digits.map((digit, index) => (
                   <Input
-                    id="otp-phone"
-                    type="tel"
-                    autoComplete="tel"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    placeholder="6XX XX XX XX"
-                    required
-                  />
-                </div>
-                {devCode ? (
-                  <p className="text-xs text-emerald-600">
-                    Dev code: {devCode} (SMS provider not configured)
-                  </p>
-                ) : null}
-                <div className="flex items-end gap-2">
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="otp-code" className="text-xs text-fg-muted">
-                      6-digit code
-                    </Label>
-                    <Input
-                      id="otp-code"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]{6}"
-                      maxLength={6}
-                      autoComplete="one-time-code"
-                      value={code}
-                      onChange={(event) => setCode(event.target.value)}
-                      placeholder="123456"
-                      required
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void onSendCode()}
-                    disabled={sendingCode || !phone.trim()}
-                    className="whitespace-nowrap"
-                  >
-                    {sendingCode ? "Sending…" : "Send code"}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="login-email" className="text-xs text-fg-muted">
-                    Email or phone
-                  </Label>
-                  <Input
-                    id="login-email"
+                    key={index}
+                    ref={(el) => {
+                      otpRefs.current[index] = el;
+                    }}
                     type="text"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="you@example.com or 6XX XX XX XX"
-                    required
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={digit}
+                    onChange={(event) => handleOtpChange(index, event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Backspace" && !digit && index > 0) {
+                        otpRefs.current[index - 1]?.focus();
+                      }
+                    }}
+                    onFocus={(event) => event.target.select()}
+                    disabled={verifying}
+                    maxLength={6}
+                    className="h-14 w-12 px-0 text-center text-lg font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    aria-label={`Digit ${index + 1} of ${OTP_DIGITS}`}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password" className="text-xs text-fg-muted">
-                    Password
-                  </Label>
-                  <PasswordInput
-                    id="login-password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Password"
-                    required
-                  />
-                </div>
-              </>
-            )}
-            <Button type="submit" className="w-full" loading={submitting}>
-              {mode === "otp" ? "Sign in with code" : "Sign in"}
-            </Button>
-            {error && (
+                ))}
+              </div>
+              {devCode ? (
+                <p className="text-xs text-emerald-600">
+                  Dev code: {devCode} (SMS provider not configured)
+                </p>
+              ) : null}
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={resetOtp}
+                  className="font-medium text-fg-muted hover:text-fg"
+                >
+                  Change number
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onSendCode()}
+                  disabled={resendIn > 0 || sendingCode}
+                  className="font-medium text-fg hover:text-fg disabled:cursor-not-allowed disabled:text-fg-muted"
+                >
+                  {resendIn > 0 ? `Resend code in ${resendIn}s` : sendingCode ? "Sending…" : "Resend code"}
+                </button>
+              </div>
+              {verifying ? <p className="text-xs text-fg-muted">Signing you in…</p> : null}
+            </div>
+          )}
+          {error && (
+            <div className="mt-4">
               <Alert variant="destructive">
                 <AlertCircle />
-                <AlertDescription>
-                  Sign-in failed. Verify your credentials and try again.
-                </AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
-            )}
-          </form>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
