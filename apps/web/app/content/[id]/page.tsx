@@ -13,6 +13,7 @@ import {
   useUnpublishContentMutation,
   useUpsertContentVariantMutation,
   useContentMediaQuery,
+  explainRtkError,
 } from "@/lib/redux/api";
 import type { PublishingChannel, BodyDocument } from "@nnact/shared";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -60,6 +61,7 @@ export default function ContentEditorPage() {
   const [sources, setSources] = useState<PublishingChannel[]>(["WEBSITE"]);
   const [scheduleAt, setScheduleAt] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -79,8 +81,10 @@ export default function ContentEditorPage() {
       try {
         await patchContent({ id, data }).unwrap();
         setSaveState("saved");
-      } catch {
+        setSaveError(null);
+      } catch (err) {
         setSaveState("error");
+        setSaveError(explainRtkError(err));
       }
     },
     [id, patchContent],
@@ -169,7 +173,7 @@ export default function ContentEditorPage() {
         description={`${item.type} · /${item.slug}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`text-xs ${saveState === "error" ? "text-red" : "text-fg-muted"}`}>{saveLabel[saveState]}</span>
+            <span className={`text-xs ${saveState === "error" ? "text-red" : "text-fg-muted"}`}>{saveError ?? saveLabel[saveState]}</span>
             <Button variant="outline" onClick={() => setPreviewOpen(true)}>Preview</Button>
             {item.status === "PUBLISHED" && (
               <Button variant="danger" loading={unpublishing} onClick={handleUnpublish}>Unpublish + Archive</Button>

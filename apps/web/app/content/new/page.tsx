@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCreateContentItemMutation, useContentCategoriesQuery, useContentTagsQuery } from "@/lib/redux/api";
+import {
+  explainRtkError,
+  useCreateContentItemMutation,
+  useContentCategoriesQuery,
+  useContentTagsQuery,
+} from "@/lib/redux/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -56,8 +61,8 @@ export default function NewContentPage() {
         tagNames: selectedTags,
       }).unwrap();
       router.push(`/content/${created.id}`);
-    } catch {
-      setError("Failed to create content. Check permissions and try again.");
+    } catch (err) {
+      setError(explainRtkError(err, "Failed to create content. Check permissions and try again."));
     }
   };
 

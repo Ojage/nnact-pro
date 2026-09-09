@@ -1188,3 +1188,15 @@ export const {
   useDisconnectConnectionMutation,
   useValidateConnectionMutation,
 } = apiSlice;
+
+/** Extract a readable message from an RTK Query / fetchBaseQuery error. */
+export function explainRtkError(err: unknown, fallback = "Request failed"): string {
+  if (!err || typeof err !== "object") return fallback;
+  const e = err as { status?: unknown; data?: unknown; error?: unknown };
+  const data = e.data as { error?: unknown; message?: unknown } | undefined;
+  if (typeof data?.error === "string" && data.error) return data.error;
+  if (typeof data?.message === "string" && data.message) return data.message;
+  if (typeof e.error === "string" && e.error) return e.error;
+  if (typeof e.status === "number") return `Request failed (HTTP ${e.status})`;
+  return fallback;
+}
