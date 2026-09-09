@@ -22,6 +22,7 @@ import {
   type TemplateVariables,
 } from "./message-templates.js";
 import { sendEmail, type EmailAttachment, type SendResult } from "./mailer.js";
+import { renderDocumentMessageHtml, renderEstimateEmailHtml, renderInvoiceEmailHtml } from "./emails/templates.js";
 
 export const MESSAGE_KINDS = ["invoice", "estimate"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
@@ -110,6 +111,10 @@ export interface MessageDelivery {
   recipient: string;
   subject: string;
   body: string;
+  /** Branded HTML body; falls back to a branded wrap of `body` when absent. */
+  html?: string;
+  /** Organization display name used by the fallback HTML frame's footer. */
+  companyName?: string;
   /** Optional durable document attached to the email. */
   attachments?: EmailAttachment[];
   /** Injected for tests; defaults to the real SMTP mailer. */
@@ -123,7 +128,16 @@ async function attemptDelivery(
   let outcome: DeliveryOutcome;
   try {
     const result = await (delivery.deliver ??
-      (() => sendEmail({ to: delivery.recipient, subject: delivery.subject, text: delivery.body, attachments: delivery.attachments })))();
+      ((d: MessageDelivery) =>
+        sendEmail({
+          to: d.recipient,
+          subject: d.subject,
+          text: d.body,
+          html:
+            d.html ??
+            renderDocumentMessageHtml({ companyName: d.companyName ?? "", subject: d.subject, body: d.body }),
+          attachments: d.attachments,
+        })))(delivery);
     outcome = result
       ? { ok: true, messageId: result.messageId }
       : { ok: false, error: "email is not configured" };
@@ -176,6 +190,7 @@ export async function retryMessage(
   if (!canRetryMessage(log.status)) {
     return { statusCode: 409, error: "only failed messages can be retried" };
   }
+  const [org] = await db.select({ name: orgs.name }).from(orgs).where(eq(orgs.id, orgId));
   return attemptDelivery(log, {
     orgId,
     kind: log.kind as MessageKind,
@@ -184,6 +199,9 @@ export async function retryMessage(
     recipient: log.recipient,
     subject: log.subject,
     body: log.body,
+    // The branded HTML frame is rebuilt from the stored snapshot so retries
+    // render the same message the customer originally received.
+    html: renderDocumentMessageHtml({ companyName: org?.name ?? "", subject: log.subject, body: log.body }),
     // The stored document is re-attached on retry so the customer always
     // receives the same durable PDF.
     attachments: resolveAttachment ? await resolveAttachment(log) : undefined,
@@ -214,6 +232,8 @@ export type EmailDraft =
       recipientName: string;
       subject: string;
       body: string;
+      /** Branded HTML rendering of the email. */
+      html: string;
       variables: TemplateVariables;
     }
   | { ok: false; statusCode: number; error: string };
@@ -267,6 +287,12 @@ export async function buildInvoiceEmail(orgId: string, invoiceId: string): Promi
     recipientName: customer.name,
     subject: rendered.subject,
     body: rendered.body,
+    html: renderInvoiceEmailHtml({
+      companyName: org?.name ?? "",
+      customerName: customer.name,
+      subject: rendered.subject,
+      body: rendered.body,
+    }).html,
     variables: rendered.variables,
   };
 }
@@ -308,6 +334,12 @@ export async function buildEstimateEmail(orgId: string, estimateId: string): Pro
     recipientName: customer.name,
     subject: rendered.subject,
     body: rendered.body,
+    html: renderEstimateEmailHtml({
+      companyName: org?.name ?? "",
+      customerName: customer.name,
+      subject: rendered.subject,
+      body: rendered.body,
+    }).html,
     variables: rendered.variables,
   };
 }

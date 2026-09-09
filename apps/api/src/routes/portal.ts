@@ -40,6 +40,7 @@ import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { renderMessageTemplate } from "../message-templates.js";
 import { resolveSmtpConfig, sendEmail } from "../mailer.js";
+import { renderPortalLinkEmailHtml } from "../emails/templates.js";
 import { nextEstimateLifecycle } from "./estimates.js";
 import { createDepositInvoiceTx } from "../estimate-approval.js";
 
@@ -218,7 +219,17 @@ export async function portalRoutes(app: FastifyInstance) {
     const subject = renderMessageTemplate(settings.messages.portalLinkSubject, variables);
     const body = renderMessageTemplate(settings.messages.portalLinkBody, variables);
 
-    const result = await sendEmail({ to: customer.email, subject, text: body });
+    const result = await sendEmail({
+      to: customer.email,
+      subject,
+      text: body,
+      html: renderPortalLinkEmailHtml({
+        companyName: org.name,
+        customerName: customer.name,
+        body,
+        portalLink: portalUrl,
+      }).html,
+    });
     if (!result) return reply.code(501).send({ error: "email is not configured" });
 
     await db

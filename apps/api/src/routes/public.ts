@@ -18,6 +18,7 @@ import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";
 import { safeNotifyUser } from "../notify-user.js";
 import { sendEmail } from "../mailer.js";
+import { renderBookingConfirmationEmailHtml, renderNewsletterWelcomeEmailHtml } from "../emails/templates.js";
 import { bookingConfigForOrg, marketingProfileForOrg } from "../public-marketing.js";
 
 const bookBody = z.object({
@@ -324,7 +325,7 @@ function sendBookingConfirmationEmail(input: {
 }): void {
   void (async () => {
     try {
-      await sendEmail({
+await sendEmail({
         to: input.to,
         subject: `We received your ${input.orgName} service request`,
         text: [
@@ -333,7 +334,7 @@ function sendBookingConfirmationEmail(input: {
           `We've received your request for: ${input.service}`,
           `Request reference: ${input.requestId}`,
           "",
-          `You can check the status of your request anytime here:`,
+          "You can check the status of your request anytime here:",
           input.trackingUrl,
           "",
           "Our dispatch team will reach out to confirm a time — usually within 24 hours.",
@@ -341,6 +342,13 @@ function sendBookingConfirmationEmail(input: {
           `Thanks,`,
           input.orgName,
         ].join("\n"),
+        html: renderBookingConfirmationEmailHtml({
+          companyName: input.orgName,
+          customerName: input.customerName,
+          service: input.service,
+          requestId: input.requestId,
+          trackingUrl: input.trackingUrl,
+        }).html,
       });
     } catch (err) {
       console.error("[public] booking confirmation email failed:", err);
@@ -725,20 +733,12 @@ export async function publicRoutes(app: FastifyInstance) {
           try {
             const [org] = await db.select({ name: orgs.name }).from(orgs).where(eq(orgs.id, orgId));
             if (org) {
+              const welcome = renderNewsletterWelcomeEmailHtml({ companyName: org.name, name });
               await sendEmail({
                 to: normalizedEmail,
                 subject: `Thanks for subscribing to ${org.name} updates`,
-                text: [
-                  `Hi ${name ?? "there"},`,
-                  "",
-                  `Thanks for subscribing to ${org.name} news and updates!`,
-                  `We'll keep you posted on service tips, seasonal offers, and company news.`,
-                  "",
-                  `If you didn't request this, you can unsubscribe anytime by replying to this email.`,
-                  "",
-                  `Thanks,`,
-                  org.name,
-                ].join("\n"),
+                text: welcome.text,
+                html: welcome.html,
               });
             }
           } catch (err) {
@@ -812,20 +812,12 @@ export async function publicRoutes(app: FastifyInstance) {
       if (channels?.includes("email") ?? true) {
         void (async () => {
           try {
+            const welcome = renderNewsletterWelcomeEmailHtml({ companyName: org.name, name });
             await sendEmail({
               to: normalizedEmail,
               subject: `Thanks for subscribing to ${org.name} updates`,
-              text: [
-                `Hi ${name ?? "there"},`,
-                "",
-                `Thanks for subscribing to ${org.name} news and updates!`,
-                `We'll keep you posted on service tips, seasonal offers, and company news.`,
-                "",
-                `If you didn't request this, you can unsubscribe anytime by replying to this email.`,
-                "",
-                `Thanks,`,
-                org.name,
-              ].join("\n"),
+              text: welcome.text,
+              html: welcome.html,
             });
           } catch (err) {
             console.error("[public] newsletter confirmation email failed:", err);

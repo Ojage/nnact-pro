@@ -88,6 +88,7 @@ export async function messageRoutes(app: FastifyInstance) {
       recipient: draft.recipient,
       subject: draft.subject,
       body: draft.body,
+      html: draft.html,
       attachments: [{ filename: document.row.filename, content: document.buffer, contentType: "application/pdf" }],
     });
     if (log.status === "sent") {
@@ -134,6 +135,7 @@ export async function messageRoutes(app: FastifyInstance) {
       recipient: draft.recipient,
       subject: draft.subject,
       body: draft.body,
+      html: draft.html,
       attachments: [{ filename: document.row.filename, content: document.buffer, contentType: "application/pdf" }],
     });
     if (log.status === "sent") {

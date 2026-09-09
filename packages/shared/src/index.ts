@@ -7,6 +7,7 @@ export * from "./documents.js";
 export * from "./business-settings.js";
 export * from "./operations.js";
 export * from "./message-templates.js";
+export * from "./sms-templates.js";
 export * from "./notifications.js";
 export * from "./currency.js";
 export * from "./repair-brain.js";

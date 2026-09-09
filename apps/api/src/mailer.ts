@@ -22,6 +22,8 @@ export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
+  /** Optional branded HTML body; when absent clients fall back to `text`. */
+  html?: string;
   attachments?: EmailAttachment[];
 }
 
@@ -71,6 +73,7 @@ export async function sendEmail(
     to: message.to,
     subject: message.subject,
     text: message.text,
+    ...(message.html ? { html: message.html } : {}),
     attachments: message.attachments?.map((attachment) => ({
       filename: attachment.filename,
       content: attachment.content,

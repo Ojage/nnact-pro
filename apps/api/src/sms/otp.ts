@@ -11,6 +11,7 @@
 import { createHash, randomInt } from "node:crypto";
 import { and, eq, gt, isNull, lte } from "drizzle-orm";
 import { db, verificationCodes } from "@nnact/db";
+import { renderSmsTemplate } from "./templates.js";
 import { sendSms } from "./sms.js";
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
@@ -19,7 +20,7 @@ export const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 export const OTP_HOURLY_LIMIT = 5;
 
 const OTP_TEXT = (code: string) =>
-  `Your NNACT verification code is ${code}. It expires in 10 minutes. Never share it with anyone.`;
+  renderSmsTemplate("otp_login", { code, companyName: process.env.SMS_ALIAS ?? "NNACT", ttlMinutes: OTP_TTL_MS / 60_000 });
 
 export interface OtpRequestResult {
   sent: boolean;
