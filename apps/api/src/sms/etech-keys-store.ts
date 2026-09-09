@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, etechKeysSettings } from "@nnact/db";
 import type { EtechKeysSettingsRow } from "./etech-keys-config.js";
-import { configFromRow, defaultEtechKeysConfig } from "./etech-keys-config.js";
+import { configFromRow, defaultEtechKeysConfig, normalizeEtechKeysBaseUrl } from "./etech-keys-config.js";
 
 export type { EtechKeysSettingsRow };
 export { configFromRow };
@@ -41,7 +41,7 @@ export const etechKeysSettingsStore = {
       .insert(etechKeysSettings)
       .values({
         name: data.name ?? "default",
-        baseUrl: data.baseUrl ?? defaultEtechKeysConfig().baseUrl,
+        baseUrl: normalizeEtechKeysBaseUrl(data.baseUrl ?? defaultEtechKeysConfig().baseUrl),
         legacyBaseUrl: data.legacyBaseUrl ?? defaultEtechKeysConfig().legacyBaseUrl,
         username: data.username ?? null,
         password: data.password ?? null,
@@ -57,7 +57,7 @@ export const etechKeysSettingsStore = {
   async update(id: string, data: Partial<Omit<EtechKeysSettingsRow, "id">>): Promise<EtechKeysSettingsRow | null> {
     const set: Record<string, unknown> = {};
     if (data.name !== undefined) set.name = data.name;
-    if (data.baseUrl !== undefined) set.baseUrl = data.baseUrl;
+    if (data.baseUrl !== undefined) set.baseUrl = normalizeEtechKeysBaseUrl(data.baseUrl);
     if (data.legacyBaseUrl !== undefined) set.legacyBaseUrl = data.legacyBaseUrl;
     if (data.username !== undefined) set.username = data.username;
     if (data.password !== undefined) set.password = data.password;

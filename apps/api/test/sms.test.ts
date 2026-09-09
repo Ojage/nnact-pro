@@ -78,7 +78,7 @@ function buildService(calls: Array<{ url: string; body?: unknown; headers?: Reco
         body: init?.body ? JSON.parse(String(init.body)) : undefined,
         headers: Object.fromEntries(new Headers(init?.headers).entries()),
       });
-      if (String(url).endsWith("/api/login")) return jsonResponse({ token: "ID|tok" });
+      if (String(url).endsWith("/api/v1/login")) return jsonResponse({ token: "ID|tok" });
       return jsonResponse({ success: true, id: "sms-1", credits_used: 1 });
     });
   return service;
@@ -90,7 +90,7 @@ test("etechkeys sendSMS authenticates then posts the message", async () => {
   await service.sendSMS({ to: "671234567", message: "votre code 123456" });
 
   assert.equal(calls.length, 2);
-  assert.match(calls[0].url, /\/api\/login$/);
+  assert.match(calls[0].url, /\/api\/v1\/login$/);
   assert.deepEqual(calls[0].body, { username: "user", password: "pass" });
   assert.match(calls[1].url, /\/api\/v1\/send-sms$/);
   assert.deepEqual(calls[1].body, { sender_id: "ETECH KEYS", to: "237671234567", msg: "votre code 123456" });
@@ -100,7 +100,7 @@ test("etechkeys retries once after a 401 by refreshing the token", async () => {
   let loginCalls = 0;
   let sendCalls = 0;
   const service = new EtechKeysService()._injectStore({ resolve: async () => ROW })._injectFetch(async (url) => {
-    if (String(url).endsWith("/api/login")) {
+    if (String(url).endsWith("/api/v1/login")) {
       loginCalls += 1;
       return jsonResponse({ token: "ID|newtok" });
     }
@@ -140,7 +140,7 @@ test("etechkeys throws when unconfigured", async () => {
 
 test("etechkeys maps provider success=false to an SmsError", async () => {
   const service = new EtechKeysService()._injectStore({ resolve: async () => ROW })._injectFetch(async (url) => {
-    if (String(url).endsWith("/api/login")) return jsonResponse({ token: "t" });
+    if (String(url).endsWith("/api/v1/login")) return jsonResponse({ token: "t" });
     return jsonResponse({ success: false, error: "insufficient credits" });
   });
   await assert.rejects(
@@ -162,6 +162,24 @@ test("etechkeys sendSMS normalizes and delivers to batch recipients", async () =
   await service.sendSMS({ to: ["671234567", "+237690001122"], message: "batch" });
   const sentTos = calls.filter((c) => c.url.includes("/send-sms")).map((c) => c.body!.to);
   assert.deepEqual(sentTos, ["237671234567", "237690001122"]);
+});
+
+test("etechkeys tolerates a stored versioned base URL and logs in at /api/v1/login", async () => {
+  const versionedRow = { ...ROW, baseUrl: "https://v1.api.etech-keys.example/api/v1" };
+  const calls: Array<{ url: string }> = [];
+  const service = new EtechKeysService()
+    ._injectStore({ resolve: async () => versionedRow })
+    ._injectFetch(async (url, init) => {
+      calls.push({ url: String(url) });
+      if (String(url).endsWith("/api/v1/login")) return jsonResponse({ token: "ID|tok" });
+      return jsonResponse({ success: true, id: "sms-ok" });
+    });
+
+  await service.sendTestSms("671234567", "ping");
+  assert.deepEqual(
+    calls.map((c) => c.url),
+    ["https://v1.api.etech-keys.example/api/v1/login", "https://v1.api.etech-keys.example/api/v1/send-sms"],
+  );
 });
 
 test("etechkeys sendTestSms returns the provider id and credits used", async () => {

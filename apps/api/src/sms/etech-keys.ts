@@ -1,7 +1,7 @@
 /**
  * EtechKeys SMS provider — implements ISmsSender using the v1 API.
  *
- * Primary flow  : POST /api/login -> bearer token (cached in memory) -> POST /api/v1/send-sms
+ * Primary flow  : POST /api/v1/login -> bearer token (cached in memory) -> POST /api/v1/send-sms
  * Fallback flow : POST /api/v1/send-sms-key with an API key + destinataire
  *
  * The bearer token is cached for the lifetime of the process and refreshed on
@@ -13,6 +13,7 @@ import { SmsError } from "./types.js";
 import { etechKeysSettingsStore } from "./etech-keys-store.js";
 import { normalizePhone } from "./phone.js";
 import type { EtechKeysConfig } from "./etech-keys-config.js";
+import { normalizeEtechKeysBaseUrl as normalizeBaseUrl } from "./etech-keys-config.js";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
@@ -62,7 +63,7 @@ export class EtechKeysService implements ISmsSender {
   private async reloadConfig(): Promise<void> {
     const row = await this._store.resolve();
     this.config = {
-      baseUrl: row.baseUrl,
+      baseUrl: normalizeBaseUrl(row.baseUrl),
       legacyBaseUrl: row.legacyBaseUrl,
       username: row.username ?? undefined,
       password: row.password ?? undefined,
@@ -136,7 +137,7 @@ export class EtechKeysService implements ISmsSender {
     if (!username || !password) throw new SmsError("EtechKeys bearer credentials are not configured", 503, "etechkeys");
 
     const response = await this.post<{ token?: string; user?: unknown; error?: string }>(
-      `${baseUrl}/api/login`,
+      `${baseUrl}/api/v1/login`,
       { username, password },
     );
     if (!response.token) {

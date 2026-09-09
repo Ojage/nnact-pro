@@ -4,6 +4,18 @@
  * fallbacks. Values are never returned to clients; they are read server-side
  * by the provider.
  */
+
+/**
+ * The provider appends versioned endpoints (e.g. `/api/v1/send-sms`) to the
+ * base URL, so operators may configure either the bare host
+ * (`https://v1.api.etech-keys.com`) or the versioned prefix
+ * (`https://v1.api.etech-keys.com/api/v1`). Both must behave identically:
+ * fold any trailing `/api/v1` into a single canonical base.
+ */
+export function normalizeEtechKeysBaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "").replace(/\/api\/v1$/, "");
+}
+
 export interface EtechKeysConfig {
   baseUrl: string;
   legacyBaseUrl: string;
@@ -31,7 +43,7 @@ export interface EtechKeysSettingsRow {
 
 export function defaultEtechKeysConfig(): EtechKeysConfig {
   return {
-    baseUrl: process.env.ETECH_KEYS_BASE_URL?.trim() || "https://v1.api.etech-keys.com",
+    baseUrl: normalizeEtechKeysBaseUrl(process.env.ETECH_KEYS_BASE_URL?.trim() || "https://v1.api.etech-keys.com"),
     legacyBaseUrl: process.env.ETECH_KEYS_LEGACY_BASE_URL?.trim() || "https://sms.etech-keys.com",
     username: process.env.ETECH_KEYS_LOGIN?.trim() || undefined,
     password: process.env.ETECH_KEYS_PASSWORD || undefined,
@@ -43,7 +55,7 @@ export function defaultEtechKeysConfig(): EtechKeysConfig {
 
 export function configFromRow(row: EtechKeysSettingsRow): EtechKeysConfig {
   return {
-    baseUrl: row.baseUrl,
+    baseUrl: normalizeEtechKeysBaseUrl(row.baseUrl),
     legacyBaseUrl: row.legacyBaseUrl,
     username: row.username ?? undefined,
     password: row.password ?? undefined,
