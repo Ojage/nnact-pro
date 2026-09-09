@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { eq, and, sql, count } from "drizzle-orm";
+import { eq, and, ne, sql, count } from "drizzle-orm";
 import { db, users } from "@nnact/db";
 import { buildTeamMemberDefaultPassword } from "@nnact/shared";
 import { hashPassword } from "../auth.js";
+import { normalizePhone } from "../sms/phone.js";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
 import { guardTeamChange, guardTeamCreate, type TeamChange, type UserRole } from "../team-safeguards.js";
@@ -11,7 +12,9 @@ import type { JwtClaims } from "../auth.js";
 import type { CreateTeamMemberResponseDTO, UserDTO } from "@nnact/shared";
 
 const patchUserSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
+  name: z.string().trim().min(1).max(200).optional(),
+  email: z.string().trim().email().max(320).optional(),
+  phone: z.string().trim().min(7).max(20).optional().nullable(),
   role: z.enum(["owner", "dispatcher", "technician"]).optional(),
   active: z.boolean().optional(),
 });
@@ -27,6 +30,7 @@ function toUserDto(row: {
   orgId: string;
   email: string;
   name: string;
+  phone: string | null;
   role: string;
   active: boolean;
   createdAt: Date;
@@ -36,6 +40,7 @@ function toUserDto(row: {
     orgId: row.orgId,
     email: row.email,
     name: row.name,
+    phone: row.phone,
     role: row.role as UserDTO["role"],
     active: row.active,
     createdAt: row.createdAt.toISOString(),
@@ -51,6 +56,7 @@ export async function userRoutes(app: FastifyInstance) {
         orgId: users.orgId,
         email: users.email,
         name: users.name,
+        phone: users.phone,
         role: users.role,
         active: users.active,
         createdAt: users.createdAt,
@@ -97,6 +103,7 @@ export async function userRoutes(app: FastifyInstance) {
           orgId: users.orgId,
           email: users.email,
           name: users.name,
+          phone: users.phone,
           role: users.role,
           active: users.active,
           createdAt: users.createdAt,
@@ -129,6 +136,15 @@ export async function userRoutes(app: FastifyInstance) {
     const parsed = patchUserSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
+    const identityChange =
+      parsed.data.name !== undefined || parsed.data.email !== undefined || parsed.data.phone !== undefined;
+    if (identityChange && claims.role !== "owner") {
+      return reply.code(403).send({
+        error: "Only owners can edit team member details.",
+        hint: "Ask an owner to make this change.",
+      });
+    }
+
     const changes: TeamChange[] = [];
     if (parsed.data.role !== undefined) {
       changes.push({ kind: "role", targetRole: parsed.data.role as UserRole });
@@ -141,7 +157,7 @@ export async function userRoutes(app: FastifyInstance) {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${orgId}))`);
 
       const [target] = await tx
-        .select({ id: users.id, email: users.email, name: users.name, role: users.role, active: users.active })
+        .select({ id: users.id, email: users.email, name: users.name, phone: users.phone, role: users.role, active: users.active })
         .from(users)
         .where(and(eq(users.orgId, orgId), eq(users.id, id)))
         .limit(1);
@@ -166,12 +182,40 @@ export async function userRoutes(app: FastifyInstance) {
         if (!guard.ok) return { status: guard.code as 403 | 409, body: { error: guard.error, hint: guard.hint } };
       }
 
+      const setFields: Record<string, unknown> = {};
+      if (parsed.data.name !== undefined) setFields.name = parsed.data.name.trim();
+      if (parsed.data.email !== undefined) setFields.email = parsed.data.email.trim().toLowerCase();
+      if (parsed.data.role !== undefined) setFields.role = parsed.data.role;
+      if (parsed.data.active !== undefined) setFields.active = parsed.data.active;
+      if (parsed.data.phone !== undefined) {
+        const nextPhone = parsed.data.phone ? normalizePhone(parsed.data.phone) : null;
+        if (nextPhone !== (target.phone ?? null)) setFields.phoneVerifiedAt = null;
+        setFields.phone = nextPhone;
+      }
+
+      if (typeof setFields.email === "string" && (setFields.email as string) !== target.email) {
+        const existingEmail = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.email, setFields.email as string), ne(users.id, id)))
+          .limit(1);
+        if (existingEmail[0]) return { status: 409 as const, body: { error: "an account with this email already exists" } };
+      }
+      if (typeof setFields.phone === "string" && (setFields.phone as string) !== (target.phone ?? "")) {
+        const existingPhone = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.phone, setFields.phone as string), ne(users.id, id)))
+          .limit(1);
+        if (existingPhone[0]) return { status: 409 as const, body: { error: "an account with this phone number already exists" } };
+      }
+
       const [row] = await tx
         .update(users)
-        .set(parsed.data)
+        .set(setFields)
         .where(and(eq(users.orgId, orgId), eq(users.id, id)))
-        .returning({ id: users.id, email: users.email, name: users.name, role: users.role, active: users.active });
-      return { status: 200 as const, body: row };
+        .returning({ id: users.id, orgId: users.orgId, email: users.email, name: users.name, phone: users.phone, role: users.role, active: users.active, createdAt: users.createdAt });
+      return { status: 200 as const, body: toUserDto(row) };
     });
 
     return reply.code(result.status).send(result.body);

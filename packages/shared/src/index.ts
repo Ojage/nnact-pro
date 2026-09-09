@@ -90,6 +90,7 @@ export interface UserDTO {
   orgId: string;
   email: string;
   name: string;
+  phone: string | null;
   role: "owner" | "dispatcher" | "technician";
   active: boolean;
   createdAt: string;

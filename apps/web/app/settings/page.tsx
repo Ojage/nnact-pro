@@ -50,6 +50,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   role: string;
 }
 
@@ -1032,6 +1033,62 @@ function teamErrorMessage(err: unknown): string {
   }
 }
 
+/** Inline-editable text/tel/email cell that commits on blur or Enter. */
+function EditableField({
+  value,
+  onSave,
+  disabled,
+  type = "text",
+  placeholder,
+  className,
+}: {
+  value: string;
+  onSave: (next: string) => void;
+  disabled?: boolean;
+  type?: "text" | "email" | "tel";
+  placeholder?: string;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setDraft(value);
+  }, [value, focused]);
+
+  const commit = () => {
+    setFocused(false);
+    const next = draft.trim();
+    if (next !== value) onSave(next);
+  };
+
+  if (disabled) {
+    return (
+      <span className={className}>
+        <span className={value ? "text-fg" : "text-fg-dim"}>{value || "—"}</span>
+      </span>
+    );
+  }
+
+  return (
+    <Input
+      type={type}
+      value={draft}
+      placeholder={placeholder}
+      className={className}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") {
+          setDraft(value);
+          e.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 function TeamTab() {
   const [users, setUsers] = useState<User[]>([]);
   const [me, setMe] = useState<{ id: string; role: string } | null>(null);
@@ -1083,6 +1140,24 @@ function TeamTab() {
     try {
       await api.patchUser(id, { role });
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
+    } catch (err) {
+      setError(teamErrorMessage(err));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleUserPatch = async (
+    id: string,
+    patch: { name?: string; email?: string; phone?: string | null },
+  ) => {
+    setSavingId(id);
+    setNotice(null);
+    setError(null);
+    try {
+      const updated = await api.patchUser(id, patch);
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      setNotice("Team member updated.");
     } catch (err) {
       setError(teamErrorMessage(err));
     } finally {
@@ -1197,7 +1272,7 @@ function TeamTab() {
       <Card className="overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="w-24">Actions</TableHead></TableRow>
+            <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Phone</TableHead><TableHead>Role</TableHead><TableHead className="w-24">Actions</TableHead></TableRow>
           </TableHeader>
           <TableBody>
             {users.map((u) => {
@@ -1206,11 +1281,45 @@ function TeamTab() {
               const isSelf = u.id === me?.id;
               return (
                 <TableRow key={u.id}>
-                  <TableCell className="font-medium text-fg">
-                    {u.name}
+                  <TableCell className="font-medium">
+                    {isOwner ? (
+                      <EditableField
+                        value={u.name}
+                        onSave={(v) => handleUserPatch(u.id, { name: v })}
+                        placeholder="Full name"
+                        className="h-8 w-full min-w-40"
+                      />
+                    ) : (
+                      <span className="text-fg">{u.name}</span>
+                    )}
                     {isSelf ? <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">You</span> : null}
                   </TableCell>
-                  <TableCell className="text-fg-muted">{u.email}</TableCell>
+                  <TableCell>
+                    {isOwner ? (
+                      <EditableField
+                        type="email"
+                        value={u.email}
+                        onSave={(v) => handleUserPatch(u.id, { email: v })}
+                        placeholder="email@company.com"
+                        className="h-8 w-full min-w-48 text-fg-muted"
+                      />
+                    ) : (
+                      <span className="text-fg-muted">{u.email}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {isOwner ? (
+                      <EditableField
+                        type="tel"
+                        value={u.phone ?? ""}
+                        onSave={(v) => handleUserPatch(u.id, { phone: v || null })}
+                        placeholder="e.g. 651 385 746"
+                        className="h-8 w-full min-w-36 text-fg-muted"
+                      />
+                    ) : (
+                      <span className="text-fg-muted">{u.phone ?? "—"}</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <FormSelect
                       value={u.role}
