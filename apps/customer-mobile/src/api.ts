@@ -1,4 +1,5 @@
 import type { PortalSessionDTO, PublicBookingConfigDTO, PublicBookingResultDTO } from "@nnact/shared";
+import { apiErrorMessage } from "@nnact/shared";
 import { getApiUrl } from "./env";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -11,7 +12,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body}`);
+    throw new Error(apiErrorMessage(response.status, body));
   }
   return response.json() as Promise<T>;
 }

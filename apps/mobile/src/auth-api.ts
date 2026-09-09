@@ -1,4 +1,5 @@
 import type { StaffAuthResponseDTO, StaffSearchResponseDTO } from "@nnact/shared";
+import { apiErrorMessage } from "@nnact/shared";
 import type { StoredStaffSession } from "./auth-storage";
 import { getApiUrl } from "./env";
 
@@ -12,7 +13,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body}`);
+    throw new Error(apiErrorMessage(response.status, body));
   }
   return response.json() as Promise<T>;
 }
@@ -119,7 +120,7 @@ export async function staffFetch<T>(session: StoredStaffSession, path: string, i
   if (response.status === 401) throw new Error("session_expired");
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body}`);
+    throw new Error(apiErrorMessage(response.status, body));
   }
   return response.json() as Promise<T>;
 }

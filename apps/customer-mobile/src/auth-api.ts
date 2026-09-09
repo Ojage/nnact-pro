@@ -1,4 +1,5 @@
 import type { CustomerAuthResponseDTO, CustomerSearchResponseDTO, PortalSessionDTO } from "@nnact/shared";
+import { apiErrorMessage } from "@nnact/shared";
 import type { StoredCustomerSession } from "./auth-storage";
 import { getApiUrl, getDefaultOrgId } from "./env";
 
@@ -16,7 +17,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body}`);
+    throw new Error(apiErrorMessage(response.status, body));
   }
   return response.json() as Promise<T>;
 }
@@ -124,7 +125,7 @@ export async function customerAuthedRequest<T>(
   if (response.status === 401) throw new Error("session_expired");
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body}`);
+    throw new Error(apiErrorMessage(response.status, body));
   }
   return response.json() as Promise<T>;
 }

@@ -1,6 +1,7 @@
 import type { StoredStaffSession } from "./auth-storage";
 import { staffFetch } from "./auth-api";
 import { getApiUrl } from "./env";
+import { apiErrorMessage } from "@nnact/shared";
 
 export type DiagnosticSessionStatus =
   | "not_started"
@@ -188,7 +189,7 @@ export async function uploadJobPhoto(session: StoredStaffSession, jobId: string,
   if (response.status === 401) throw new Error("session_expired");
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body}`);
+    throw new Error(apiErrorMessage(response.status, body));
   }
   return response.json() as Promise<JobPhoto>;
 }
@@ -323,7 +324,7 @@ export async function uploadVoiceNote(
   if (response.status === 401) throw new Error("session_expired");
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}: ${body}`);
+    throw new Error(apiErrorMessage(response.status, body));
   }
   return response.json() as Promise<import("@nnact/shared").JobVoiceNoteDTO>;
 }
