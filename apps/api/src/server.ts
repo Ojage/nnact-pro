@@ -311,6 +311,7 @@ export function buildServer(
   app.register(photoRoutes, { prefix: withLegacy("/photos") });
   app.register(catalogRoutes, { prefix: withLegacy("/catalog") });
   app.register(newsletterAdminRoutes, { prefix: withLegacy("/newsletter") });
+  app.register(smsAdminRoutes, { prefix: withLegacy("") });
   app.register(contentRoutes, { prefix: withLegacy("/content") });
   app.register(connectionRoutes, { prefix: withLegacy("/connections") });
   app.register(publicContentRoutes, { prefix: withLegacy("/public/content") });

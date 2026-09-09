@@ -31,9 +31,19 @@ function fieldLabel(label: string, tip?: string) {
   );
 }
 
+const blankForm: FormState = {
+  baseUrl: "",
+  legacyBaseUrl: "",
+  username: "",
+  password: "",
+  apiKey: "",
+  senderId: "",
+  isActive: true,
+};
+
 export function SmsSettingsEditor() {
   const [row, setRow] = useState<SmsSettingsRow | null>(null);
-  const [form, setForm] = useState<FormState | null>(null);
+  const [form, setForm] = useState<FormState>(blankForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,12 +58,13 @@ export function SmsSettingsEditor() {
         if (cancelled) return;
         const current = dto.settings[0] ?? null;
         setRow(current);
-        setForm(currentToForm(current));
+        setForm(current ? currentToForm(current) : blankForm);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : "Could not load SMS settings.";
         setError(message.includes("403") ? "Only owners can manage SMS settings." : message);
+        setForm(blankForm);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -76,7 +87,7 @@ export function SmsSettingsEditor() {
   }
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setForm((prev) => (prev ? { ...prev, [key]: value } : { ...blankForm, [key]: value }));
   };
 
   async function save() {
