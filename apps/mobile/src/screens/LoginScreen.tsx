@@ -8,11 +8,17 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
 import { PasswordInput, BrandLogo, BackButton } from "@nnact/mobile-ui";
-import { NNACT_PRODUCT } from "@nnact/shared";
+import {
+  NNACT_PRODUCT,
+  cameroonCarrierLabel,
+  isValidCameroonMobile,
+  normalizePhone,
+} from "@nnact/shared";
 import { staffLogin, staffLoginWithPhone, staffRequestOtp, staffVerifyOtp } from "../auth-api";
 import type { StoredStaffSession } from "../auth-storage";
 import { Card, LoadingScreen, PrimaryButton, TextField } from "../components/ui";
@@ -22,6 +28,9 @@ import { formatNetworkError, getApiUrl } from "../env";
 import { fonts, radius, spacing, type Palette } from "../theme";
 
 const HERO_IMAGE = require("../../assets/photos/nnact-protech-app-hero.png");
+
+const OTP_DIGITS = 6;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 const HERO_RAMP_ALPHAS = [
   0.501, 0.491, 0.482, 0.474, 0.466, 0.463, 0.459, 0.453, 0.445, 0.437, 0.425,
@@ -70,18 +79,31 @@ export function LoginScreen({
   onSignedIn: (session: StoredStaffSession) => void;
 }) {
   const [mode, setMode] = useState<"password" | "otp">("password");
+  const [otpStage, setOtpStage] = useState<"phone" | "code">("phone");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [requestedPhone, setRequestedPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  const [digits, setDigits] = useState<string[]>(() => Array(OTP_DIGITS).fill(""));
   const [devCode, setDevCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const styles = createStyles(colors);
+  const otpRefs = useRef<Array<TextInput | null>>([]);
   const { height: windowHeight } = useWindowDimensions();
   const heroHeight = clamp(Math.round(windowHeight * 0.42), 300, 340);
   const kenBurns = useRef(new Animated.Value(0)).current;
+
+  const isPhoneValid = isValidCameroonMobile(phone);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setInterval(() => setResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(timer);
+  }, [resendIn > 0]);
 
   useEffect(() => {
     const phase = (toValue: number) =>
@@ -101,16 +123,25 @@ export function LoginScreen({
   const heroTranslateY = kenBurns.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 0, -6] });
 
   async function sendCode() {
-    if (!phone.trim()) {
-      setError("Enter your phone number first.");
+    if (!isPhoneValid) {
+      setError("Enter a valid MTN, Orange, or Camtel number.");
       return;
     }
     setSendingCode(true);
     setError(null);
     try {
-      const result = await staffRequestOtp(phone.trim());
+      const target = normalizePhone(phone);
+      const result = await staffRequestOtp(target);
       if (result.devCode) setDevCode(result.devCode);
-      if (!result.sent) setError("Could not send a code right now. Try again in a minute.");
+      if (!result.sent) {
+        setError("Could not send a code right now. Try again in a minute.");
+        return;
+      }
+      setRequestedPhone(target);
+      setDigits(Array(OTP_DIGITS).fill(""));
+      setOtpStage("code");
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+      setTimeout(() => otpRefs.current[0]?.focus(), 150);
     } catch (err) {
       setError(formatNetworkError(err, getApiUrl()));
     } finally {
@@ -118,13 +149,58 @@ export function LoginScreen({
     }
   }
 
+  function handleOtpChange(index: number, text: string) {
+    const cleaned = text.replace(/\D+/g, "");
+    if (!cleaned) {
+      setDigits((d) => {
+        const next = [...d];
+        next[index] = "";
+        return next;
+      });
+      if (index > 0) otpRefs.current[index - 1]?.focus();
+      return;
+    }
+    const next = [...digits];
+    let caret = index;
+    for (const char of cleaned) {
+      if (caret >= OTP_DIGITS) break;
+      next[caret] = char;
+      caret += 1;
+    }
+    setDigits(next);
+    if (cleaned.length > 1 || caret < OTP_DIGITS) {
+      otpRefs.current[Math.min(caret, OTP_DIGITS - 1)]?.focus();
+    } else {
+      void verifyCode(next.join(""));
+    }
+  }
+
+  async function verifyCode(code: string) {
+    if (verifying || code.length !== OTP_DIGITS) return;
+    setVerifying(true);
+    setError(null);
+    try {
+      onSignedIn(await staffVerifyOtp(requestedPhone, code));
+    } catch (err) {
+      setError(formatNetworkError(err, getApiUrl()));
+      setDigits(Array(OTP_DIGITS).fill(""));
+      otpRefs.current[0]?.focus();
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  function resetOtp() {
+    setDigits(Array(OTP_DIGITS).fill(""));
+    setOtpStage("phone");
+    setRequestedPhone("");
+  }
+
   async function submit() {
     setSubmitting(true);
     setError(null);
     try {
-      if (mode === "otp") {
-        onSignedIn(await staffVerifyOtp(phone.trim(), code.trim()));
-      } else if (email.includes("@")) {
+      if (email.includes("@")) {
         onSignedIn(await staffLogin(email.trim(), password));
       } else if (email.trim()) {
         onSignedIn(await staffLoginWithPhone(email.trim(), password));
@@ -190,6 +266,7 @@ export function LoginScreen({
                   onPress={() => {
                     setMode(tab);
                     setError(null);
+                    if (tab === "otp") setOtpStage("phone");
                   }}
                   style={[styles.modeTab, mode === tab && styles.modeTabActive]}
                 >
@@ -201,43 +278,89 @@ export function LoginScreen({
             </View>
 
             {mode === "otp" ? (
-              <>
-                <TextField
-                  colors={colors}
-                  label="Phone number"
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="6XX XX XX XX"
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
-                />
-                {devCode ? (
-                  <Text style={[styles.devHint, { color: colors.success }]}>
-                    Dev code: {devCode} (SMS provider not configured)
+              otpStage === "phone" ? (
+                <>
+                  <TextField
+                    colors={colors}
+                    label="Phone number"
+                    value={phone}
+                    onChangeText={setPhone}
+                    placeholder="6XX XX XX XX"
+                    keyboardType="phone-pad"
+                    autoComplete="tel"
+                  />
+                  <Text style={styles.phoneHint}>
+                    {phone.trim()
+                      ? isPhoneValid
+                        ? `${cameroonCarrierLabel(phone)} · we'll text you a 6-digit code`
+                        : "Enter a valid MTN, Orange, or Camtel number."
+                      : "We'll text you a 6-digit sign-in code."}
                   </Text>
-                ) : null}
-                <View style={styles.codeRow}>
-                  <View style={styles.codeField}>
-                    <TextField
-                      colors={colors}
-                      label="6-digit code"
-                      value={code}
-                      onChangeText={setCode}
-                      placeholder="123456"
-                      keyboardType="number-pad"
-                    />
-                  </View>
-                  <Pressable
+                  <PrimaryButton
+                    colors={colors}
+                    label={sendingCode ? "Requesting…" : "Request Short Code"}
                     onPress={() => void sendCode()}
-                    disabled={sendingCode || !phone.trim()}
-                    style={[styles.sendCodeButton, { borderColor: colors.accent }]}
-                  >
-                    <Text style={[styles.sendCodeText, { color: colors.accent }]}>
-                      {sendingCode ? "Sending…" : "Send code"}
+                    disabled={!isPhoneValid}
+                    loading={sendingCode}
+                    variant="accent"
+                    size="md"
+                  />
+                  {error ? <Text style={styles.formError}>{error}</Text> : null}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.codeTitle}>Enter the 6-digit code</Text>
+                  <Text style={styles.codeSub}>Sent to {requestedPhone}</Text>
+                  <View style={styles.otpRow}>
+                    {digits.map((digit, index) => (
+                      <TextInput
+                        key={index}
+                        ref={(el) => {
+                          otpRefs.current[index] = el;
+                        }}
+                        value={digit}
+                        onChangeText={(text) => handleOtpChange(index, text)}
+                        onKeyPress={({ nativeEvent }) => {
+                          if (nativeEvent.key === "Backspace" && !digit && index > 0) {
+                            otpRefs.current[index - 1]?.focus();
+                          }
+                        }}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                        editable={!verifying}
+                        selectTextOnFocus
+                        selectionColor={colors.accent}
+                        placeholderTextColor={colors.dimForeground}
+                        style={[styles.otpBox, digit ? styles.otpBoxFilled : null, verifying && styles.otpBoxDim]}
+                      />
+                    ))}
+                  </View>
+                  {devCode ? (
+                    <Text style={[styles.devHint, { color: colors.success }]}>
+                      Dev code: {devCode} (SMS provider not configured)
                     </Text>
-                  </Pressable>
-                </View>
-              </>
+                  ) : null}
+                  <View style={styles.otpMeta}>
+                    <Pressable onPress={resetOtp} hitSlop={8}>
+                      <Text style={[styles.otpLink, { color: colors.dimForeground }]}>Change number</Text>
+                    </Pressable>
+                    <Pressable onPress={() => void sendCode()} disabled={resendIn > 0 || sendingCode} hitSlop={8}>
+                      <Text
+                        style={[
+                          styles.otpLink,
+                          { color: resendIn > 0 || sendingCode ? colors.dimForeground : colors.accent },
+                        ]}
+                      >
+                        {resendIn > 0 ? `Resend code in ${resendIn}s` : sendingCode ? "Sending…" : "Resend code"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  {verifying ? (
+                    <Text style={[styles.codeSub, { color: colors.accent }]}>Signing you in…</Text>
+                  ) : null}
+                  {error ? <Text style={styles.formError}>{error}</Text> : null}
+                </>
+              )
             ) : (
               <>
                 <TextField
@@ -265,14 +388,16 @@ export function LoginScreen({
             )}
             {error ? <Text style={[styles.formError, { color: colors.danger }]}>{error}</Text> : null}
           </Card>
-          <PrimaryButton
-            colors={colors}
-            label={mode === "otp" ? "Sign in with code" : "Sign in"}
-            onPress={() => void submit()}
-            disabled={submitting}
-            loading={submitting}
-            variant="accent"
-          />
+          {mode === "password" ? (
+            <PrimaryButton
+              colors={colors}
+              label="Sign in"
+              onPress={() => void submit()}
+              disabled={submitting}
+              loading={submitting}
+              variant="accent"
+            />
+          ) : null}
           {onBack ? <BackButton colors={colors} onPress={onBack} variant="surface" /> : null}
         </View>
 
@@ -403,27 +528,61 @@ const createStyles = (colors: Palette) =>
     modeTabTextActive: {
       color: colors.accent,
     },
-    codeRow: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      gap: spacing.sm,
-    },
-    codeField: { flex: 1 },
-    sendCodeButton: {
-      borderWidth: 1,
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      marginBottom: 2,
-    },
-    sendCodeText: {
-      fontSize: 13,
-      fontFamily: fonts.semibold,
-    },
     devHint: {
       fontSize: 12,
       fontFamily: fonts.regular,
       marginTop: 4,
+    },
+    phoneHint: {
+      fontSize: 12,
+      fontFamily: fonts.regular,
+      lineHeight: 17,
+      marginTop: 2,
+      color: colors.dimForeground,
+    },
+    codeTitle: {
+      fontSize: 15,
+      fontFamily: fonts.semibold,
+      color: colors.foreground,
+    },
+    codeSub: {
+      fontSize: 12,
+      fontFamily: fonts.regular,
+      color: colors.dimForeground,
+      marginTop: 2,
+    },
+    otpRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    otpBox: {
+      flex: 1,
+      height: 54,
+      borderWidth: 1.5,
+      borderColor: colors.borderLight,
+      borderRadius: radius.md,
+      backgroundColor: colors.surfaceElevated,
+      textAlign: "center",
+      fontSize: 20,
+      fontFamily: fonts.semibold,
+      color: colors.foreground,
+      paddingVertical: 0,
+    },
+    otpBoxFilled: {
+      borderColor: colors.accent,
+    },
+    otpBoxDim: {
+      opacity: 0.4,
+    },
+    otpMeta: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: spacing.sm,
+    },
+    otpLink: {
+      fontSize: 13,
+      fontFamily: fonts.semibold,
     },
     formError: { fontSize: 13, marginTop: 4, fontFamily: fonts.regular },
     carouselHeading: {
