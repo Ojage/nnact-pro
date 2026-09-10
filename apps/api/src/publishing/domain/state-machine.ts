@@ -14,6 +14,7 @@ export const PUBLICATION_TRANSITIONS: ValidTransition[] = [
   { from: ["QUEUED", "PUBLISHING", "SCHEDULED", "READY", "FAILED"], to: "FAILED" },
   { from: ["DRAFT", "READY", "SCHEDULED", "QUEUED", "FAILED"], to: "CANCELLED" },
   { from: ["DRAFT"], to: "READY" },
+  { from: ["FAILED"], to: "READY" },
 ];
 
 const ALLOWED: Record<ChannelPublicationStatus, Set<ChannelPublicationStatus>> =
