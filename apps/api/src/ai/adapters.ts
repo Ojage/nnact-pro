@@ -87,7 +87,7 @@ class OpenAiImageAdapter implements ImageProviderPort {
 
   async generateImage(request: ImageGenerationRequest, config: DecryptedProviderConfig): Promise<ImageGenerationResult> {
     const base = (config.baseUrl ?? "https://api.openai.com").replace(/\/$/, "");
-    const model = config.defaultImageModel ?? "gpt-image-1";
+    const model = config.defaultImageModel?.trim() || "gpt-image-1";
     const started = Date.now();
     const response = await postJson(`${base}/v1/images/generations`, {
       headers: { authorization: `Bearer ${config.apiKey}` },

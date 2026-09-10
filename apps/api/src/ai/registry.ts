@@ -60,7 +60,7 @@ export class AiProviderRegistry {
       return { result, attempt: { provider, ok: true }, config };
     } catch (error) {
       const message = (error as Error).message;
-      await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", message);
+      await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", `text: ${message}`);
       return { result: null, attempt: { provider, ok: false, error: message }, config };
     }
   }
@@ -98,7 +98,7 @@ export class AiProviderRegistry {
       return probeResult;
     }
     const probeResult = await this.factory(provider).probe(config);
-    await this.deps.configStore.setStatus(orgId, provider, probeResult.status, probeResult.lastError);
+    await this.deps.configStore.setStatus(orgId, provider, probeResult.status, probeResult.lastError ? `probe: ${probeResult.lastError}` : null);
     if (probeResult.status === "CONNECTED") {
       await this.deps.configStore.setStatus(orgId, provider, "CONNECTED", null);
     }
@@ -142,7 +142,7 @@ export class AiProviderRegistry {
       await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "text", provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, latencyMs: result.latencyMs, costCents: 0 });
       return { result };
     } catch (error) {
-      await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", (error as Error).message);
+      await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", `imageBrief: ${(error as Error).message}`);
       return null;
     }
   }
@@ -157,7 +157,7 @@ export class AiProviderRegistry {
       await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "image", provider, model: result.model, inputTokens: 0, outputTokens: 0, imageCount: 1, latencyMs: result.latencyMs, costCents: 0 });
       return result;
     } catch (error) {
-      await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", (error as Error).message);
+      await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", `image: ${(error as Error).message}`);
       return null;
     }
   }
@@ -170,7 +170,7 @@ export class AiProviderRegistry {
       await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "vision", provider: resolved.provider, model: result.model, inputTokens: 0, outputTokens: 0, latencyMs: result.latencyMs, costCents: 0 });
       return result;
     } catch (error) {
-      await this.deps.configStore.setStatus(orgId, resolved.provider, "DEGRADED", (error as Error).message);
+      await this.deps.configStore.setStatus(orgId, resolved.provider, "DEGRADED", `vision: ${(error as Error).message}`);
       return null;
     }
   }

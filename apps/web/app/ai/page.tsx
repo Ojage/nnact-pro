@@ -55,6 +55,7 @@ export default function AiPage() {
 
   const [form, setForm] = useState<AiAutomationSettingsDTO | null>(null);
   const [keys, setKeys] = useState<Record<string, string>>({});
+  const [models, setModels] = useState<Record<string, { text: string; image: string }>>({});
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const settings: AiAutomationSettingsDTO | null = form ?? settingsQ.data ?? null;
@@ -79,8 +80,15 @@ export default function AiPage() {
 
   const handleKey = async (provider: AiProviderId, apiKey: string) => {
     setKeys((k) => ({ ...k, [provider]: apiKey }));
+    const selected = providers.find((p) => p.provider === provider);
+    const current = models[provider];
+    const textModel = (current !== undefined ? current.text : selected?.defaultTextModel) ?? "";
+    const imageModel = (current !== undefined ? current.image : selected?.defaultImageModel) ?? "";
     try {
-      await saveProvider({ provider, body: { apiKey } }).unwrap();
+      await saveProvider({
+        provider,
+        body: { apiKey, defaultTextModel: textModel.trim() || null, defaultImageModel: imageModel.trim() || null },
+      }).unwrap();
       setMessage({ kind: "ok", text: `${PROVIDER_NAMES[provider]} key saved (stored encrypted).` });
       setKeys((k) => ({ ...k, [provider]: "" }));
     } catch (err) {
@@ -268,6 +276,10 @@ export default function AiPage() {
                   <div className="flex items-center gap-2">
                     <Input type="password" placeholder="API key (saved encrypted)" value={keys[provider] ?? ""} onChange={(e) => setKeys((k) => ({ ...k, [provider]: e.target.value }))} />
                     <Button size="sm" disabled={!keys[provider]} onClick={() => void handleKey(provider, keys[provider] ?? "")}>Save key</Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input size={1} className="h-8 text-xs" placeholder="Text model (e.g. gpt-4o)" value={models[provider] !== undefined ? models[provider].text : (cfg?.defaultTextModel ?? "")} onChange={(e) => setModels((m) => ({ ...m, [provider]: { text: e.target.value, image: m[provider] !== undefined ? m[provider].image : (cfg?.defaultImageModel ?? "") } }))} />
+                    <Input size={1} className="h-8 text-xs" placeholder="Image model (e.g. gpt-image-1)" value={models[provider] !== undefined ? models[provider].image : (cfg?.defaultImageModel ?? "")} onChange={(e) => setModels((m) => ({ ...m, [provider]: { image: e.target.value, text: m[provider] !== undefined ? m[provider].text : (cfg?.defaultTextModel ?? "") } }))} />
                   </div>
                   {cfg?.lastError && <p className="text-xs text-red">{cfg.lastError}</p>}
                   <p className="text-xs text-fg-muted">Models: {cfg?.defaultTextModel ?? "default"} · timeout {cfg?.timeoutMs ?? 30000}ms</p>
