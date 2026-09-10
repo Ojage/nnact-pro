@@ -44,6 +44,7 @@ export const NNACT_BLOCK_TYPES = [
   "nnactBeforeAfter",
   "nnactProjectHighlight",
   "nnactTestimonial",
+  "nnactUploadedImage",
 ] as const;
 export type NnactBlockType = (typeof NNACT_BLOCK_TYPES)[number];
 
@@ -96,6 +97,55 @@ export interface NnactTestimonialProps {
   customerDisplayName?: string | null;
   company?: string | null;
   serviceType?: string | null;
+}
+
+/** Inline uploaded image; `url` is the ContentMedia id (UUID). Resolved
+ * server-side against approved-for-marketing media only. */
+export interface NnactUploadedImageProps {
+  url: string;
+  altText?: string | null;
+  caption?: string | null;
+}
+
+// ── Media reference helpers ────────────────────────────────────────────────
+// Authoring blocks may store uploaded media either as a `{ mediaId }` object
+// (older custom-block shape) or as a UUID string (BlockNote prop schemas only
+// support primitives). These helpers normalize both forms so the transformers
+// and media collectors behave identically.
+
+const MEDIA_ID_RE = /^[0-9a-f-]{36}$/i;
+
+export function mediaIdFromString(value: unknown): string | null {
+  return typeof value === "string" && MEDIA_ID_RE.test(value.trim()) ? value.trim() : null;
+}
+
+export function mediaIdListFromProp(value: unknown, listString?: unknown): string[] {
+  const ids = new Set<string>();
+  if (typeof listString === "string" && listString.trim()) {
+    for (const part of listString.split(",")) {
+      const id = mediaIdFromString(part);
+      if (id) ids.add(id);
+    }
+  }
+  for (const part of Array.isArray(value) ? (value as unknown[]) : []) {
+    const id =
+      typeof part === "string"
+        ? mediaIdFromString(part)
+        : part && typeof part === "object"
+          ? mediaIdFromString((part as { mediaId?: unknown }).mediaId)
+          : null;
+    if (id) ids.add(id);
+  }
+  return [...ids];
+}
+
+export function mediaRefFromValue(value: unknown, idString?: unknown): { mediaId: string } | null {
+  if (value && typeof value === "object") {
+    const id = mediaIdFromString((value as { mediaId?: unknown }).mediaId);
+    if (id) return { mediaId: id };
+  }
+  const id = mediaIdFromString(idString);
+  return id ? { mediaId: id } : null;
 }
 
 // ── Text helpers ──────────────────────────────────────────────────────────
@@ -255,13 +305,22 @@ function appendBlockPlain(block: BodyBlock, lines: string[], depth: number): voi
       break;
     }
     case "nnactImageGallery": {
-      const p = props as unknown as NnactImageGalleryProps;
-      if (p.images?.length) lines.push(`[gallery: ${p.images.length} images]`);
+      const p = props as unknown as NnactImageGalleryProps & { imageUrls?: string };
+      const count = mediaIdListFromProp(p.images, p.imageUrls).length;
+      if (count) lines.push(`[gallery: ${count} images]`);
       break;
     }
     case "nnactBeforeAfter": {
-      const p = props as unknown as NnactBeforeAfterProps;
-      lines.push(`Before / After${p.caption ? `: ${p.caption}` : ""}`);
+      const p = props as unknown as NnactBeforeAfterProps & { beforeUrl?: string; afterUrl?: string };
+      if (mediaRefFromValue(p.before, p.beforeUrl) || mediaRefFromValue(p.after, p.afterUrl)) {
+        lines.push(`Before / After${p.caption ? `: ${p.caption}` : ""}`);
+      }
+      break;
+    }
+    case "nnactUploadedImage": {
+      const p = props as unknown as NnactUploadedImageProps;
+      const caption = p.caption ?? p.altText;
+      lines.push(caption ? `[image] ${caption}` : "[image]");
       break;
     }
     case "nnactProjectHighlight": {
@@ -421,24 +480,37 @@ function blockToHtml(block: BodyBlock, opts: HtmlRenderOptions): string {
       return `<figure class="nnact-youtube"><div class="video-wrapper"><iframe src="https://www.youtube-nocookie.com/embed/${escapeHtml(id)}" title="${escapeHtml(p.caption as string) ?? "YouTube video"}" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>${caption}</figure>`;
     }
     case "nnactImageGallery": {
-      const p = props as unknown as NnactImageGalleryProps;
-      const images = p.images ?? [];
-      const items = images
-        .map((img) => {
-          const url = opts.resolveMedia?.(img.mediaId);
+      const p = props as unknown as NnactImageGalleryProps & { imageUrls?: string };
+      const ids = mediaIdListFromProp(p.images, p.imageUrls);
+      const layout = p.layout ? ` nnact-gallery--${escapeHtml((p.layout as string).toLowerCase())}` : "";
+      const items = ids
+        .map((id) => {
+          const url = opts.resolveMedia?.(id);
           if (!url) return "";
-          return `<img src="${escapeHtml(url)}" alt="${escapeHtml(img.altText ?? "")}" loading="lazy" />`;
+          return `<img src="${escapeHtml(url)}" alt="" loading="lazy" />`;
         })
-        .filter(Boolean)
         .join("");
-      return `<div class="nnact-gallery${p.layout ? ` nnact-gallery--${escapeHtml((p.layout as string).toLowerCase())}` : ""}">${items}</div>`;
+      const inner = items || '<div class="nnact-gallery-empty">Image gallery</div>';
+      return `<div class="nnact-gallery${layout}">${inner}</div>`;
     }
     case "nnactBeforeAfter": {
-      const p = props as unknown as NnactBeforeAfterProps;
-      const before = p.before?.mediaId ? opts.resolveMedia?.(p.before.mediaId) : null;
-      const after = p.after?.mediaId ? opts.resolveMedia?.(p.after.mediaId) : null;
+      const p = props as unknown as NnactBeforeAfterProps & { beforeUrl?: string; afterUrl?: string };
+      const beforeRef = mediaRefFromValue(p.before, p.beforeUrl);
+      const afterRef = mediaRefFromValue(p.after, p.afterUrl);
+      const beforeUrl = beforeRef ? opts.resolveMedia?.(beforeRef.mediaId) : null;
+      const afterUrl = afterRef ? opts.resolveMedia?.(afterRef.mediaId) : null;
       const caption = p.caption ? `<figcaption>${escapeHtml(String(p.caption))}</figcaption>` : "";
-      return `<figure class="nnact-before-after"><div class="ba-columns">${before ? `<div class="ba-before"><img src="${escapeHtml(before)}" alt="${escapeHtml(p.before?.altText ?? "Before")}" loading="lazy" /></div>` : ""}${after ? `<div class="ba-after"><img src="${escapeHtml(after)}" alt="${escapeHtml(p.after?.altText ?? "After")}" loading="lazy" /></div>` : ""}</div>${caption}</figure>`;
+      return `<figure class="nnact-before-after"><div class="ba-columns">${beforeUrl ? `<div class="ba-before"><img src="${escapeHtml(beforeUrl)}" alt="${escapeHtml(p.before?.altText ?? "Before")}" loading="lazy" /></div>` : ""}${afterUrl ? `<div class="ba-after"><img src="${escapeHtml(afterUrl)}" alt="${escapeHtml(p.after?.altText ?? "After")}" loading="lazy" /></div>` : ""}</div>${caption}</figure>`;
+    }
+    case "nnactUploadedImage": {
+      const p = props as unknown as NnactUploadedImageProps;
+      const id = mediaIdFromString(p.url);
+      if (!id) return "";
+      const url = opts.resolveMedia?.(id);
+      if (!url) return "";
+      const alt = p.altText ?? "";
+      const caption = p.caption ?? "";
+      return `<figure class="nnact-uploaded-image"><img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy" />${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ""}</figure>`;
     }
     case "nnactProjectHighlight": {
       const p = props as unknown as NnactProjectHighlightProps;
@@ -576,8 +648,10 @@ function appendBlockMarkdown(block: BodyBlock, lines: string[], depth: number): 
       break;
     }
     case "nnactBeforeAfter": {
-      const p = props as unknown as NnactBeforeAfterProps;
-      lines.push(`**Before / After**${p.caption ? ` — ${inlineToMarkdown(p.caption)}` : ""}`);
+      const p = props as unknown as NnactBeforeAfterProps & { beforeUrl?: string; afterUrl?: string };
+      if (mediaRefFromValue(p.before, p.beforeUrl) || mediaRefFromValue(p.after, p.afterUrl)) {
+        lines.push(`**Before / After**${p.caption ? ` — ${inlineToMarkdown(p.caption)}` : ""}`);
+      }
       break;
     }
     case "nnactProjectHighlight": {
@@ -593,8 +667,18 @@ function appendBlockMarkdown(block: BodyBlock, lines: string[], depth: number): 
       break;
     }
     case "nnactImageGallery": {
-      const p = props as unknown as NnactImageGalleryProps;
-      if (p.images?.length) lines.push(`*[Image gallery: ${p.images.length} images]*`);
+      const p = props as unknown as NnactImageGalleryProps & { imageUrls?: string };
+      const count = mediaIdListFromProp(p.images, p.imageUrls).length;
+      if (count) lines.push(`*[Image gallery: ${count} images]*`);
+      break;
+    }
+    case "nnactUploadedImage": {
+      const p = props as unknown as NnactUploadedImageProps;
+      const id = mediaIdFromString(p.url);
+      if (id) {
+        const alt = (p.altText ?? p.caption ?? "image").replace(/"/g, '\\"');
+        lines.push(`![${alt}](/api/v1/public/media/${id})`);
+      }
       break;
     }
     default: {
@@ -632,10 +716,16 @@ export function bodyDocumentToChannelPayload(
   // Count media-bearing blocks.
   let mediaCount = 0;
   for (const block of document ?? []) {
-    if (["image", "video"].includes(block.type)) mediaCount += 1;
+    if (["image", "video", "nnactUploadedImage"].includes(block.type)) mediaCount += 1;
     const props = (block.props ?? {}) as Record<string, unknown>;
-    if (block.type === "nnactImageGallery") mediaCount += ((props.images as { mediaId: string }[]) ?? []).length;
-    if (block.type === "nnactBeforeAfter") mediaCount += ((props.before as { mediaId: string }) || (props.after as { mediaId: string })) ? 1 : 0;
+    if (block.type === "nnactImageGallery") {
+      const p = props as unknown as NnactImageGalleryProps & { imageUrls?: string };
+      mediaCount += mediaIdListFromProp(p.images, p.imageUrls).length;
+    }
+    if (block.type === "nnactBeforeAfter") {
+      const p = props as unknown as NnactBeforeAfterProps & { beforeUrl?: string; afterUrl?: string };
+      if (mediaRefFromValue(p.before, p.beforeUrl) || mediaRefFromValue(p.after, p.afterUrl)) mediaCount += 1;
+    }
     if (block.type === "nnactProjectHighlight" && (props.media as { mediaId: string } | undefined)?.mediaId) mediaCount += 1;
   }
   return { text: truncated, excerpt: null, mediaCount };

@@ -58,6 +58,8 @@ export interface CustomerDTO {
 
 export interface JobDTO {
   id: string;
+  /** Human-readable per-org work order number (e.g. "JOB-1001"). */
+  number?: string | null;
   customerId: string;
   title: string;
   description?: string | null;

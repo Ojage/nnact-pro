@@ -21,10 +21,14 @@ const OFFICE_WRITE_PREFIXES = [
   "/api/recurring",
   "/api/reviews",
   "/api/content",
+  "/api/equipment",
 ];
 
 export function requiredRolesForRequest(method: string, rawUrl: string): UserRole[] | null {
-  const path = rawUrl.split("?")[0] ?? rawUrl;
+  const rawPath = rawUrl.split("?")[0] ?? rawUrl;
+  // Normalize versioned prefixes so role guards apply identically to the
+  // preferred /api/v1/* paths (previously they only matched legacy /api/*).
+  const path = rawPath.replace(/^\/api\/v\d+/i, "/api");
   if (path === "/api/operations" || path.startsWith("/api/operations/")) return ["owner"];
   if (["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase())) return null;
 

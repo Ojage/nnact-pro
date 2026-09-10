@@ -154,6 +154,8 @@ export const businessSettingsSchema = z.object({
     invoiceNextNumber: z.number().int().min(1).max(999_999_999),
     estimatePrefix: z.string().trim().min(1).max(12).regex(/^[A-Za-z0-9-]+$/),
     estimateNextNumber: z.number().int().min(1).max(999_999_999),
+    jobPrefix: z.string().trim().min(1).max(12).regex(/^[A-Za-z0-9-]+$/).optional().default("JOB"),
+    jobNextNumber: z.number().int().min(1).max(999_999_999).optional().default(1000),
   }).default(DEFAULT_BUSINESS_SETTINGS.numbering),
   portal: z.object({
     enabled: z.boolean(),

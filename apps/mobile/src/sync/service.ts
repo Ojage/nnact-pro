@@ -1,5 +1,22 @@
 import * as SQLite from "expo-sqlite";
 
+const REQUEST_TIMEOUT_MS = 12_000;
+
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("network request failed");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export interface SyncServiceOptions {
   apiUrl: string;
   orgId: string;
@@ -59,6 +76,26 @@ function makeId(): string {
   });
 }
 
+const SCHEMA_SQL = `
+    PRAGMA journal_mode = WAL;
+    CREATE TABLE IF NOT EXISTS field_packages (
+      job_id TEXT PRIMARY KEY NOT NULL,
+      payload_json TEXT NOT NULL,
+      workflow_version TEXT,
+      support_state TEXT NOT NULL,
+      download_ready INTEGER NOT NULL DEFAULT 0,
+      cached_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS diagnostic_outbox (
+      op_id TEXT PRIMARY KEY NOT NULL,
+      kind TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT NOT NULL
+    );
+  `;
+
 export class SyncService {
   private databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -72,38 +109,41 @@ export class SyncService {
     };
   }
 
+  private async openDatabase(): Promise<SQLite.SQLiteDatabase> {
+    const database = await SQLite.openDatabaseAsync("nnactpro-field.db");
+    try {
+      await database.execAsync(SCHEMA_SQL);
+    } catch (error) {
+      // A failed schema bootstrap can leave the native handle unusable
+      // (e.g. NullPointerException from a stale connection). Drop it and
+      // let the next attempt open a fresh connection.
+      try {
+        await database.closeAsync();
+      } catch {
+        // ignore close failures — the handle is already broken
+      }
+      throw error;
+    }
+    return database;
+  }
+
   private async database(): Promise<SQLite.SQLiteDatabase> {
     if (!this.databasePromise) {
-      this.databasePromise = SQLite.openDatabaseAsync("nnactpro-field.db").then(
-        async (database) => {
-          await database.execAsync(`
-            PRAGMA journal_mode = WAL;
-            CREATE TABLE IF NOT EXISTS field_packages (
-              job_id TEXT PRIMARY KEY NOT NULL,
-              payload_json TEXT NOT NULL,
-              workflow_version TEXT,
-              support_state TEXT NOT NULL,
-              download_ready INTEGER NOT NULL DEFAULT 0,
-              cached_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS diagnostic_outbox (
-              op_id TEXT PRIMARY KEY NOT NULL,
-              kind TEXT NOT NULL,
-              payload_json TEXT NOT NULL,
-              attempts INTEGER NOT NULL DEFAULT 0,
-              last_error TEXT,
-              created_at TEXT NOT NULL
-            );
-          `);
-          return database;
-        },
-      );
+      this.databasePromise = this.openDatabase().catch((error) => {
+        this.databasePromise = null;
+        throw error;
+      });
     }
-    return this.databasePromise;
+    try {
+      return await this.databasePromise;
+    } catch (error) {
+      this.databasePromise = null;
+      throw error;
+    }
   }
 
   async downloadPackage(jobId: string): Promise<FieldPackage> {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${this.opts.apiUrl}/api/diagnostics/field-package/${jobId}`,
       { headers: this.headers() },
     );
@@ -167,6 +207,22 @@ export class SyncService {
       "SELECT COUNT(*) AS count FROM diagnostic_outbox",
     );
     return row?.count ?? 0;
+  }
+
+  async countCachedPackages(): Promise<number> {
+    const database = await this.database();
+    const row = await database.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM field_packages",
+    );
+    return row?.count ?? 0;
+  }
+
+  async storedBytes(): Promise<number> {
+    const database = await this.database();
+    const row = await database.getFirstAsync<{ total: number | null }>(
+      "SELECT SUM(LENGTH(payload_json)) AS total FROM field_packages",
+    );
+    return row?.total ?? 0;
   }
 
   async queueOperation(operation: OfflineOperation): Promise<void> {
@@ -259,7 +315,7 @@ export class SyncService {
       }
     });
 
-    const response = await fetch(`${this.opts.apiUrl}/api/diagnostics/offline-batch`, {
+    const response = await fetchWithTimeout(`${this.opts.apiUrl}/api/diagnostics/offline-batch`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ ops: operations }),
@@ -313,8 +369,8 @@ export class SyncService {
     const flush = await this.flushOutbox().catch(() => ({ flushed: 0, failed: queuedBeforeFlush }));
 
     const [appointmentsResponse, sessionsResponse] = await Promise.all([
-      fetch(`${this.opts.apiUrl}/api/appointments`, { headers: this.headers() }),
-      fetch(`${this.opts.apiUrl}/api/diagnostics/sessions`, { headers: this.headers() }),
+      fetchWithTimeout(`${this.opts.apiUrl}/api/appointments`, { headers: this.headers() }),
+      fetchWithTimeout(`${this.opts.apiUrl}/api/diagnostics/sessions`, { headers: this.headers() }),
     ]);
     if (!appointmentsResponse.ok) {
       throw new Error(`appointment package discovery failed: ${appointmentsResponse.status}`);

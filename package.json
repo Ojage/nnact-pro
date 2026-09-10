@@ -50,6 +50,18 @@
     },
     "patchedDependencies": {
       "brace-expansion@5.0.9": "patches/brace-expansion@5.0.9.patch"
+    },
+    "packageExtensions": {
+      "@expo/metro-config@0.19.12": {
+        "dependencies": {
+          "metro": "0.81.5",
+          "metro-cache": "0.81.5",
+          "metro-cache-key": "0.81.5",
+          "metro-source-map": "0.81.5",
+          "metro-transform-plugins": "0.81.5",
+          "metro-transform-worker": "0.81.5"
+        }
+      }
     }
   },
   "engines": {

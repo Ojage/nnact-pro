@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
-import { PasswordInput, getPasswordStrength } from "@nnact/mobile-ui";
+import { BackButton, PasswordInput, getPasswordStrength } from "@nnact/mobile-ui";
 import { PASSWORD_MIN_LENGTH, validatePasswordStrength } from "@nnact/shared";
 import { staffChangePassword } from "../auth-api";
 import type { StoredStaffSession } from "../auth-storage";
@@ -12,10 +12,12 @@ export function ChangePasswordScreen({
   colors,
   session,
   onComplete,
+  onBack,
 }: {
   colors: Palette;
   session: StoredStaffSession;
   onComplete: (next: StoredStaffSession) => void;
+  onBack?: () => void;
 }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -44,9 +46,12 @@ export function ChangePasswordScreen({
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Set your password</Text>
+        {onBack ? <BackButton colors={colors} onPress={onBack} variant="surface" style={styles.back} /> : null}
+        <Text style={styles.title}>{onBack ? "Change password" : "Set your password"}</Text>
         <Text style={styles.subtitle}>
-          Your owner shared a temporary password. Choose a new one before using the field app.
+          {onBack
+            ? "Choose a new password to secure your NNACT Pro sign-in. It will take effect immediately."
+            : "Your owner shared a temporary password. Choose a new one before using the field app."}
         </Text>
         <Card colors={colors} elevated>
           <PasswordInput
@@ -86,6 +91,7 @@ export function ChangePasswordScreen({
 const createStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: spacing.lg, paddingTop: spacing.xl },
+    back: { alignSelf: "flex-start", marginBottom: spacing.md },
     title: { color: colors.foreground, fontSize: 24, fontFamily: fonts.extraBold, marginBottom: spacing.sm },
     subtitle: { color: colors.mutedForeground, fontSize: 14, marginBottom: spacing.lg, fontFamily: fonts.regular },
     hint: { color: colors.mutedForeground, fontSize: 12, marginTop: spacing.xs, fontFamily: fonts.regular },

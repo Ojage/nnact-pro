@@ -129,6 +129,8 @@ export interface NumberingSettings {
   invoiceNextNumber: number;
   estimatePrefix: string;
   estimateNextNumber: number;
+  jobPrefix: string;
+  jobNextNumber: number;
 }
 
 export interface PortalSettings {
@@ -228,6 +230,8 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
     invoiceNextNumber: 1000,
     estimatePrefix: "EST",
     estimateNextNumber: 1000,
+    jobPrefix: "JOB",
+    jobNextNumber: 1000,
   },
   portal: {
     enabled: true,

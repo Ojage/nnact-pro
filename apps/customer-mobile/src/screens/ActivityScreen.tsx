@@ -26,6 +26,23 @@ import type { AppSearchFonts } from "@nnact/mobile-ui";
 
 type ActivityTab = "overview" | "estimates" | "billing" | "history";
 
+async function withFreshSession<T>(
+  session: StoredCustomerSession,
+  persistSession: (session: StoredCustomerSession) => void,
+  run: (session: StoredCustomerSession) => Promise<T>,
+): Promise<T> {
+  try {
+    return await run(session);
+  } catch (err) {
+    if (err instanceof Error && err.message === "session_expired") {
+      const next = await customerRefresh(session.refreshToken);
+      persistSession(next);
+      return await run(next);
+    }
+    throw err;
+  }
+}
+
 function EstimateCard({
   colors,
   estimate,
@@ -150,25 +167,16 @@ export function ActivityScreen({
   const load = useCallback(async () => {
     try {
       setError(null);
-      try {
-        const data = await customerWorkspace(account.session, account.orgId);
-        setSession(data);
-        onSessionLoaded?.({
-          estimates: data.estimates.length,
-          balance: data.balance.invoices.length
-            ? formatMoney(data.balance.invoices.reduce((sum, inv) => sum + inv.remaining, 0))
-            : null,
-        });
-      } catch (err) {
-        if (err instanceof Error && err.message === "session_expired") {
-          const next = await customerRefresh(account.session.refreshToken);
-          account.onSession(next);
-          const data = await customerWorkspace(next, account.orgId);
-          setSession(data);
-          return;
-        }
-        throw err;
-      }
+      const data = await withFreshSession(account.session, account.onSession, (s) =>
+        customerWorkspace(s, account.orgId),
+      );
+      setSession(data);
+      onSessionLoaded?.({
+        estimates: data.estimates.length,
+        balance: data.balance.invoices.length
+          ? formatMoney(data.balance.invoices.reduce((sum, inv) => sum + inv.remaining, 0))
+          : null,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message.replace(/^\d+:\s*/, "") : "Unable to load your activity");
       setSession(null);
@@ -195,23 +203,14 @@ export function ActivityScreen({
     return items;
   }, [session]);
 
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : "overview";
+
   async function pay(invoiceId: string) {
     try {
-      let current = account.session;
-      try {
-        const { url } = await customerCheckout(current, account.orgId, invoiceId);
-        await Linking.openURL(url);
-        return;
-      } catch (err) {
-        if (err instanceof Error && err.message === "session_expired") {
-          current = await customerRefresh(current.refreshToken);
-          account.onSession(current);
-          const { url } = await customerCheckout(current, account.orgId, invoiceId);
-          await Linking.openURL(url);
-          return;
-        }
-        throw err;
-      }
+      const { url } = await withFreshSession(account.session, account.onSession, (s) =>
+        customerCheckout(s, account.orgId, invoiceId),
+      );
+      await Linking.openURL(url);
     } catch (err) {
       setError(err instanceof Error ? err.message.replace(/^\d+:\s*/, "") : "Checkout failed");
     }
@@ -224,7 +223,7 @@ export function ActivityScreen({
       <ScrollView style={styles.scroll} contentContainerStyle={styles.emptyContent}>
         <EmptyState
           colors={colors}
-          icon=""
+          icon="cloud-offline-outline"
           title="Activity unavailable"
           description={error ?? "We could not load your estimates and invoices. Pull to refresh or try again later."}
         />
@@ -259,10 +258,10 @@ export function ActivityScreen({
 
       {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
-      <SegmentedTabs colors={colors} tabs={tabs} active={tab} onChange={(id) => setTab(id as ActivityTab)} />
+      <SegmentedTabs colors={colors} tabs={tabs} active={activeTab} onChange={(id) => setTab(id as ActivityTab)} />
 
       <View style={styles.section}>
-        {tab === "overview" ? (
+        {activeTab === "overview" ? (
           <>
             <View style={styles.statsRow}>
               <StatCard
@@ -304,9 +303,9 @@ export function ActivityScreen({
           </>
         ) : null}
 
-        {tab === "estimates" && session.views.includes("estimates") ? (
+        {activeTab === "estimates" && session.views.includes("estimates") ? (
           session.estimates.length === 0 ? (
-            <EmptyState colors={colors} icon="" title="All caught up" description="No estimates waiting for your approval." />
+            <EmptyState colors={colors} icon="checkmark-done-outline" title="All caught up" description="No estimates waiting for your approval." />
           ) : (
             session.estimates.map((estimate) => (
               <EstimateCard
@@ -315,44 +314,26 @@ export function ActivityScreen({
                 estimate={estimate}
                 customerName={session.customer.name}
                 onChanged={() => void load()}
-                onApprove={async (body) => {
-                  let current = account.session;
-                  try {
-                    await customerApproveEstimate(current, account.orgId, estimate.id, body);
-                  } catch (err) {
-                    if (err instanceof Error && err.message === "session_expired") {
-                      current = await customerRefresh(current.refreshToken);
-                      account.onSession(current);
-                      await customerApproveEstimate(current, account.orgId, estimate.id, body);
-                      return;
-                    }
-                    throw err;
-                  }
-                }}
-                onDecline={async () => {
-                  let current = account.session;
-                  try {
-                    await customerDeclineEstimate(current, account.orgId, estimate.id);
-                  } catch (err) {
-                    if (err instanceof Error && err.message === "session_expired") {
-                      current = await customerRefresh(current.refreshToken);
-                      account.onSession(current);
-                      await customerDeclineEstimate(current, account.orgId, estimate.id);
-                      return;
-                    }
-                    throw err;
-                  }
-                }}
+onApprove={async (body) => {
+                    await withFreshSession(account.session, account.onSession, (s) =>
+                      customerApproveEstimate(s, account.orgId, estimate.id, body),
+                    );
+                  }}
+                  onDecline={async () => {
+                    await withFreshSession(account.session, account.onSession, (s) =>
+                      customerDeclineEstimate(s, account.orgId, estimate.id),
+                    );
+                  }}
               />
             ))
           )
         ) : null}
 
-        {tab === "billing" ? (
+        {activeTab === "billing" ? (
           <>
             {session.views.includes("balance") ? (
               session.balance.invoices.length === 0 ? (
-                <EmptyState colors={colors} icon="" title="No balance due" description="You're all paid up. Thank you!" />
+                <EmptyState colors={colors} icon="wallet-outline" title="No balance due" description="You're all paid up. Thank you!" />
               ) : (
                 session.balance.invoices.map((invoice) => (
                   <Card key={invoice.id} colors={colors} elevated>
@@ -391,13 +372,13 @@ export function ActivityScreen({
           </>
         ) : null}
 
-        {tab === "history" ? (
+        {activeTab === "history" ? (
           <>
             {session.views.includes("service_plans") ? (
               <>
                 <Text style={styles.sectionLabel}>Maintenance plans</Text>
                 {session.servicePlans.length === 0 ? (
-                  <EmptyState colors={colors} icon="" title="No active plan" description="Ask NNACT about preventive maintenance contracts." />
+                  <EmptyState colors={colors} icon="shield-checkmark-outline" title="No active plan" description="Ask NNACT about preventive maintenance contracts." />
                 ) : (
                   session.servicePlans.map((plan) => (
                     <Card key={plan.id} colors={colors} elevated>
@@ -416,7 +397,7 @@ export function ActivityScreen({
               <>
                 <Text style={styles.sectionLabel}>Service visits</Text>
                 {session.serviceHistory.length === 0 ? (
-                  <EmptyState colors={colors} icon="" title="No visits yet" description="Your completed service visits will appear here." />
+                  <EmptyState colors={colors} icon="calendar-outline" title="No visits yet" description="Your completed service visits will appear here." />
                 ) : (
                   session.serviceHistory.map((job) => (
                     <Card key={job.id} colors={colors}>

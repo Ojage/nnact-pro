@@ -18,6 +18,20 @@ test("owner-only and office write routes are classified explicitly", () => {
   assert.equal(requiredRolesForRequest("PATCH", "/api/jobs/job-1"), null);
 });
 
+test("versioned /api/v1 paths get the same role guards as the legacy /api base", () => {
+  assert.deepEqual(requiredRolesForRequest("PATCH", "/api/v1/users/user-1"), ["owner"]);
+  assert.deepEqual(requiredRolesForRequest("PATCH", "/api/v1/org/me"), ["owner"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/v1/operations/backups"), ["owner"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/v1/jobs"), ["owner", "dispatcher"]);
+  assert.deepEqual(requiredRolesForRequest("PATCH", "/api/v1/equipment/equip-1"), ["owner", "dispatcher"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/v1/customers"), ["owner", "dispatcher"]);
+  assert.equal(requiredRolesForRequest("GET", "/api/v1/jobs"), null);
+  assert.equal(
+    requiredRolesForRequest("PATCH", "/api/v1/jobs/job-1?foo=bar"),
+    null,
+  );
+});
+
 test("technician job patches are status-only and limited to field transitions", () => {
   assert.equal(technicianJobPatchAllowed({ status: "in_progress" }), true);
   assert.equal(technicianJobPatchAllowed({ status: "completed" }), true);

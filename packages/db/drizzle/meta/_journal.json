@@ -232,6 +232,13 @@
       "when": 1790000001100,
       "tag": "0034_common_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1790000001300,
+      "tag": "0035_white_living_lightning",
+      "breakpoints": true
     }
   ]
 }

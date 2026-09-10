@@ -185,6 +185,9 @@ export function LoginScreen({
                     if (tab === "otp") setOtpStage("phone");
                   }}
                   style={[styles.modeTab, mode === tab && styles.modeTabActive]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: mode === tab }}
+                  accessibilityLabel={tab === "password" ? "Sign in with password" : "Sign in with code"}
                 >
                   <Text style={[styles.modeTabText, mode === tab && styles.modeTabTextActive]}>
                     {tab === "password" ? "Password" : "Code (OTP)"}
@@ -247,6 +250,7 @@ export function LoginScreen({
                         selectTextOnFocus
                         selectionColor={colors.accent}
                         placeholderTextColor={colors.dimForeground}
+                        accessibilityLabel={`Digit ${index + 1} of ${OTP_DIGITS}`}
                         style={[styles.otpBox, digit ? styles.otpBoxFilled : null, verifying && styles.otpBoxDim]}
                       />
                     ))}
@@ -257,10 +261,15 @@ export function LoginScreen({
                     </Text>
                   ) : null}
                   <View style={styles.otpMeta}>
-                    <Pressable onPress={resetOtp} hitSlop={8}>
+                    <Pressable onPress={resetOtp} hitSlop={8} accessibilityRole="button">
                       <Text style={[styles.otpLink, { color: colors.dimForeground }]}>Change number</Text>
                     </Pressable>
-                    <Pressable onPress={() => void sendCode()} disabled={resendIn > 0 || sendingCode} hitSlop={8}>
+                    <Pressable
+                      onPress={() => void sendCode()}
+                      disabled={resendIn > 0 || sendingCode}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                    >
                       <Text
                         style={[
                           styles.otpLink,

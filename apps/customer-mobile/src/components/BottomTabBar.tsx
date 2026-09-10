@@ -36,7 +36,18 @@ export function BottomTabBar({
         const isActive = active === tab.id;
         const badge = tab.id === "activity" && activityBadge ? activityBadge : 0;
         return (
-          <TouchableOpacity key={tab.id} style={styles.tab} onPress={() => onChange(tab.id)} activeOpacity={0.75}>
+          <TouchableOpacity
+            key={tab.id}
+            style={styles.tab}
+            onPress={() => onChange(tab.id)}
+            activeOpacity={0.75}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={tab.label}
+            accessibilityHint={
+              badge > 0 ? `${badge > 9 ? "9+" : badge} pending items` : undefined
+            }
+          >
             <View style={styles.iconWrap}>
               <Ionicons
                 name={isActive ? tab.iconActive : tab.icon}

@@ -3,19 +3,33 @@ import { apiErrorMessage } from "@nnact/shared";
 import type { StoredStaffSession } from "./auth-storage";
 import { getApiUrl } from "./env";
 
+const FETCH_TIMEOUT_MS = 12_000;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(apiErrorMessage(response.status, body));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${getApiUrl()}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(apiErrorMessage(response.status, body));
+    }
+    return response.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("network request failed");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return response.json() as Promise<T>;
 }
 
 export async function staffLogin(email: string, password: string): Promise<StoredStaffSession> {
@@ -109,20 +123,32 @@ export async function staffLogout(refreshToken: string) {
 }
 
 export async function staffFetch<T>(session: StoredStaffSession, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      authorization: `Bearer ${session.accessToken}`,
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (response.status === 401) throw new Error("session_expired");
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(apiErrorMessage(response.status, body));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${getApiUrl()}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+        ...(init?.headers ?? {}),
+      },
+      signal: controller.signal,
+    });
+    if (response.status === 401) throw new Error("session_expired");
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(apiErrorMessage(response.status, body));
+    }
+    return response.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("network request failed");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return response.json() as Promise<T>;
 }
 
 export async function staffSearch(session: StoredStaffSession, query: string) {

@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, max, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
@@ -9,7 +9,9 @@ import type {
   SyncOpTable,
   SyncErrorKind,
 } from "@nnact/shared";
+import { mergeBusinessSettings, type JobStatus } from "@nnact/shared";
 import type { UserRole } from "../operational-authorization.js";
+import { jobNumber, nextJobStatus } from "../job-lifecycle.js";
 
 type Db = NodePgDatabase<typeof dbSchema>;
 type Tx = any;
@@ -46,6 +48,7 @@ const JobCreate = z.object({
   scheduledAt: z.string().datetime().nullable().optional(),
   total: z.number().int().min(0).default(0),
   laborCostCents: z.number().int().min(0).default(0),
+  cancelReason: z.string().trim().min(1).max(500).optional(),
 }).strict();
 
 const LineItemCreate = z.object({
@@ -196,6 +199,53 @@ async function technicianCanApply(
   return "technician is not permitted to sync this table";
 }
 
+/**
+ * Create a synced job under an advisory lock, allocating the next per-org
+ * work-order number and recording the initial status history row.
+ */
+async function createJobWithNumber(
+  tx: Tx,
+  orgId: string,
+  entityId: string,
+  actor: SyncActor,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'job-number:' + orgId}))`);
+  const [{ maxNum }] = await tx
+    .select({ maxNum: max(dbSchema.jobs.number) })
+    .from(dbSchema.jobs)
+    .where(eq(dbSchema.jobs.orgId, orgId));
+  const [org] = await tx
+    .select({ businessSettings: dbSchema.orgs.businessSettings })
+    .from(dbSchema.orgs)
+    .where(eq(dbSchema.orgs.id, orgId))
+    .limit(1);
+  const settings = mergeBusinessSettings(org?.businessSettings);
+  const parsed = typeof maxNum === "string" ? Number(maxNum.match(/(\d+)\s*$/)?.[1]) : NaN;
+  const highest = Number.isFinite(parsed) ? parsed : settings.numbering.jobNextNumber - 1;
+  const next = Math.max(highest + 1, settings.numbering.jobNextNumber);
+  const number = jobNumber(
+    next - settings.numbering.jobNextNumber,
+    settings.numbering.jobPrefix,
+    settings.numbering.jobNextNumber,
+  );
+  await tx
+    .insert(dbSchema.jobs)
+    .values({ id: entityId, orgId, number, ...payload })
+    .execute();
+  await tx
+    .insert(dbSchema.jobStatusHistory)
+    .values({
+      orgId,
+      jobId: entityId,
+      fromStatus: null,
+      toStatus: (payload.status as string | undefined) ?? "lead",
+      changedBy: actor.userId,
+      reason: "job created",
+    })
+    .execute();
+}
+
 export async function applyOps(
   db: Db,
   orgId: string,
@@ -240,6 +290,10 @@ async function applyOne(
       return err(op.opId, "validation", `payload parse: ${parsed.error.issues[0]?.message ?? "invalid"}`);
     }
     await validateReferences(database, orgId, op.table, parsed.data as Record<string, unknown>);
+    if (op.table === "jobs") {
+      await createJobWithNumber(database, orgId, op.entityId, actor, parsed.data as Record<string, unknown>);
+      return { opId: op.opId, ok: true };
+    }
     await database
       .insert(table)
       .values({ id: op.entityId, orgId, ...(parsed.data as Record<string, unknown>) })
@@ -255,9 +309,9 @@ async function applyOne(
   }
 
   const { rows } = await database.execute(
-    sql`SELECT version FROM ${sql.identifier(op.table)} WHERE id = ${op.entityId} AND org_id = ${orgId} LIMIT 1`,
+    sql`SELECT version, status FROM ${sql.identifier(op.table)} WHERE id = ${op.entityId} AND org_id = ${orgId} LIMIT 1`,
   );
-  const current = rows[0] as { version?: number } | undefined;
+  const current = rows[0] as { version?: number; status?: string } | undefined;
   if (!current) return err(op.opId, "validation", "not found in this organization");
   if (Number(current.version) !== op.baseVersion) {
     return conflict(op.opId, Number(current.version));
@@ -269,6 +323,16 @@ async function applyOne(
       return err(op.opId, "validation", `payload parse: ${parsed.error.issues[0]?.message ?? "invalid"}`);
     }
     await validateReferences(database, orgId, op.table, parsed.data as Record<string, unknown>);
+
+    // Lifecycle: enforce the transition matrix for every role (not just
+    // technicians) so the offline sync path cannot bypass the state machine.
+    if (op.table === "jobs" && parsed.data.status !== undefined) {
+      const next = parsed.data.status as string;
+      if (next !== current.status && !nextJobStatus(current.status as JobStatus, next as JobStatus, actor.role)) {
+        return err(op.opId, "validation", "invalid job status transition");
+      }
+    }
+
     const returned = await database
       .update(table)
       .set(parsed.data as Record<string, unknown>)
@@ -289,6 +353,21 @@ async function applyOne(
         ? conflict(op.opId, Number(latest.version))
         : err(op.opId, "validation", "not found in this organization");
     }
+
+    if (op.table === "jobs" && parsed.data.status !== undefined) {
+      await database
+        .insert(dbSchema.jobStatusHistory)
+        .values({
+          orgId,
+          jobId: op.entityId,
+          fromStatus: current.status ?? null,
+          toStatus: parsed.data.status as string,
+          changedBy: actor.userId,
+          reason: (parsed.data.cancelReason as string | undefined) ?? null,
+        })
+        .execute();
+    }
+
     return { opId: op.opId, ok: true };
   }
 

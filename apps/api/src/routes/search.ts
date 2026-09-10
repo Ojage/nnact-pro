@@ -41,9 +41,14 @@ export async function searchRoutes(app: FastifyInstance) {
     const [jobResults, customerResults, invoiceResults, estimateResults, appointmentResults, equipmentResults, repairBrain] =
       await Promise.all([
         db
-          .select({ id: jobs.id, title: jobs.title, status: jobs.status })
+          .select({ id: jobs.id, title: jobs.title, number: jobs.number, status: jobs.status })
           .from(jobs)
-          .where(and(eq(jobs.orgId, orgId), ilike(jobs.title, term)))
+          .where(
+            and(
+              eq(jobs.orgId, orgId),
+              or(ilike(jobs.title, term), ilike(jobs.number, term)),
+            ),
+          )
           .limit(6),
         db
           .select({

@@ -26,7 +26,7 @@ import {
   StatCard,
 } from "../components/ui";
 import type { Appointment, DiagnosticListItem } from "../hooks/useFieldData";
-import { humanize, statusColor } from "../hooks/useFieldData";
+import { humanize, statusColor, jobStatusTone, jobStatusToneBg } from "../hooks/useFieldData";
 import { listJobPhotos, listJobVoiceNotes, uploadJobPhoto, jobPhotoFileUrl, type JobPhoto } from "../field-api";
 import type { JobVoiceNoteDTO } from "@nnact/shared";
 import { VoiceNoteRecorder } from "../components/VoiceNoteRecorder";
@@ -39,6 +39,17 @@ interface LineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+}
+
+interface StatusHistoryRow {
+  id: string;
+  orgId: string;
+  jobId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  changedBy: string | null;
+  reason: string | null;
+  createdAt: string;
 }
 
 async function fetchWithRefresh<T>(
@@ -90,6 +101,7 @@ export function JobDetailScreen({
   const [customer, setCustomer] = useState<CustomerDTO | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [activities, setActivities] = useState<ActivityDTO[]>([]);
+  const [history, setHistory] = useState<StatusHistoryRow[]>([]);
   const [diagnostics, setDiagnostics] = useState<DiagnosticListItem[]>([]);
   const [loading, setLoading] = useState(!initialJob);
   const [refreshing, setRefreshing] = useState(false);
@@ -127,17 +139,19 @@ export function JobDetailScreen({
       if (!isRefresh) setLoading(true);
       setError(null);
       try {
-        const [jobRow, lineItemRows, activityRows, diagnosticRows, photoRows, voiceRows] = await Promise.all([
+        const [jobRow, lineItemRows, activityRows, diagnosticRows, photoRows, voiceRows, historyRows] = await Promise.all([
           fetchWithRefresh<JobDTO>(session, `/api/jobs/${jobId}`, onSession),
           fetchWithRefresh<LineItem[]>(session, `/api/jobs/${jobId}/line-items`, onSession),
           fetchWithRefresh<ActivityDTO[]>(session, `/api/activities?jobId=${jobId}&limit=50`, onSession),
           fetchWithRefresh<DiagnosticListItem[]>(session, `/api/diagnostics/sessions?jobId=${jobId}`, onSession),
           listJobPhotos(session, jobId).catch(() => []),
           listJobVoiceNotes(session, jobId).catch(() => []),
+          fetchWithRefresh<StatusHistoryRow[]>(session, `/api/jobs/${jobId}/history`, onSession).catch(() => []),
         ]);
         setJob(jobRow);
         setLineItems(lineItemRows);
         setActivities(activityRows);
+        setHistory(historyRows);
         setDiagnostics(diagnosticRows);
         setPhotos(photoRows);
         setVoiceNotes(voiceRows);
@@ -297,12 +311,20 @@ export function JobDetailScreen({
 
         <HeroBanner
           colors={colors}
-          eyebrow="Work order"
+          eyebrow={job.number ?? "Work order"}
           title={job.title}
           subtitle={customer?.name ?? "Customer details loading…"}
         >
-          <View style={[styles.statusPill, { borderColor: statusColor(job.status, colors) }]}>
-            <Text style={[styles.statusPillText, { color: statusColor(job.status, colors) }]}>
+          <View
+            style={[
+              styles.statusPill,
+              {
+                backgroundColor: jobStatusToneBg(job.status, colors),
+                borderColor: jobStatusTone(job.status, colors),
+              },
+            ]}
+          >
+            <Text style={[styles.statusPillText, { color: jobStatusTone(job.status, colors) }]}>
               {humanize(job.status)}
             </Text>
           </View>
@@ -340,23 +362,6 @@ export function JobDetailScreen({
         </View>
 
         <View style={styles.actions}>
-          {job.status === "scheduled" ? (
-            <PrimaryButton
-              colors={colors}
-              label="Start job"
-              onPress={() => void updateStatus("in_progress")}
-              loading={statusUpdating}
-            />
-          ) : null}
-          {job.status === "in_progress" ? (
-            <PrimaryButton
-              colors={colors}
-              label="Mark completed"
-              onPress={() => void updateStatus("completed")}
-              loading={statusUpdating}
-              variant="accent"
-            />
-          ) : null}
           <PrimaryButton
             colors={colors}
             label={primaryDiagnostic ? "Open diagnostic" : "Start diagnostic"}
@@ -405,8 +410,8 @@ export function JobDetailScreen({
                 </Text>
               </View>
               <View style={styles.metaCell}>
-                <Text style={styles.metaLabel}>Job ID</Text>
-                <Text style={styles.metaValueMono}>{job.id.slice(0, 8)}…</Text>
+                <Text style={styles.metaLabel}>Work order</Text>
+                <Text style={styles.metaValueMono}>{job.number ?? "—"}</Text>
               </View>
             </View>
           </Card>
@@ -609,6 +614,35 @@ export function JobDetailScreen({
           )}
         </View>
 
+        <SectionHeader colors={colors} title="Status history" />
+        <View style={styles.section}>
+          {history.length === 0 ? (
+            <Text style={styles.mutedText}>No status changes recorded yet.</Text>
+          ) : (
+            history.map((entry) => (
+              <View key={entry.id} style={styles.historyRow}>
+                <View style={[styles.historyDot, { backgroundColor: jobStatusTone(entry.toStatus, colors) }]} />
+                <View style={styles.flexOne}>
+                  <Text style={styles.historyTitle}>
+                    {entry.fromStatus
+                      ? `${humanize(entry.fromStatus)} → ${humanize(entry.toStatus)}`
+                      : `Created as ${humanize(entry.toStatus)}`}
+                  </Text>
+                  {entry.reason ? <Text style={styles.historyReason}>{entry.reason}</Text> : null}
+                  <Text style={styles.historyTime}>
+                    {new Date(entry.createdAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
         <SectionHeader colors={colors} title="Activity" />
         <View style={styles.section}>
           {activities.length === 0 ? (
@@ -635,6 +669,27 @@ export function JobDetailScreen({
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      {job.status === "scheduled" || job.status === "in_progress" ? (
+        <View style={styles.bottomBar}>
+          {job.status === "scheduled" ? (
+            <PrimaryButton
+              colors={colors}
+              label="Start job"
+              onPress={() => void updateStatus("in_progress")}
+              loading={statusUpdating}
+            />
+          ) : (
+            <PrimaryButton
+              colors={colors}
+              label="Mark completed"
+              onPress={() => void updateStatus("completed")}
+              loading={statusUpdating}
+              variant="accent"
+            />
+          )}
+        </View>
+      ) : null}
 
       <Modal
         visible={viewerPhoto !== null}
@@ -807,5 +862,23 @@ const createStyles = (colors: Palette) =>
       borderRadius: 5,
       backgroundColor: colors.primary,
       marginTop: 5,
+    },
+    historyRow: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.md },
+    historyDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginTop: 5,
+    },
+    historyTitle: { color: colors.foreground, fontSize: 14, fontFamily: fonts.semibold },
+    historyReason: { color: colors.mutedForeground, fontSize: 13, marginTop: 2, fontFamily: fonts.regular },
+    historyTime: { color: colors.dimForeground, fontSize: 11, marginTop: 2, fontFamily: fonts.regular },
+    bottomBar: {
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight,
+      backgroundColor: colors.surface,
     },
   });

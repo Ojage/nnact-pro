@@ -68,6 +68,21 @@ function buildFakeDb(currentVersion: Map<string, number> = new Map()) {
   // `returning({ v: table.version })` returning a 1-row array, mirroring
   // Drizzle's real behavior under the BEFORE UPDATE trigger.
   const tx: any = {
+    // Both job-number allocation reads are faked: max(jobs.number) -> null so
+    // the default (JOB-1000) is used, and orgs.businessSettings -> null so the
+    // default numbering config wins. `.where()` is awaitable AND exposes a
+    // `.limit()` for the sender's settings query.
+    select: (_fields: unknown) => ({
+      from: (_t: unknown) => ({
+        where: () => {
+          const thenable: any = {
+            limit: async () => [{ businessSettings: null }],
+          };
+          thenable.then = (resolve: (v: unknown) => void) => resolve([{ maxNum: null }]);
+          return thenable;
+        },
+      }),
+    }),
     insert: (_t: unknown) => {
       calls.push({ kind: "insert" });
       return {

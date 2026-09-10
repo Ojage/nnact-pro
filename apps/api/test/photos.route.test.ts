@@ -28,6 +28,12 @@ const mockListJobPhotos = mock.fn();
 const mockSaveOrgLogo = mock.fn();
 const mockGetOrgLogo = mock.fn();
 const mockDeleteOrgLogo = mock.fn();
+const mockSaveOrgSignature = mock.fn();
+const mockGetOrgSignature = mock.fn();
+const mockDeleteOrgSignature = mock.fn();
+const mockSaveOrgStamp = mock.fn();
+const mockGetOrgStamp = mock.fn();
+const mockDeleteOrgStamp = mock.fn();
 
 mock.module("../src/uploads.js", {
   namedExports: {
@@ -37,6 +43,20 @@ mock.module("../src/uploads.js", {
     saveOrgLogo: mockSaveOrgLogo,
     getOrgLogo: mockGetOrgLogo,
     deleteOrgLogo: mockDeleteOrgLogo,
+    saveOrgSignature: mockSaveOrgSignature,
+    getOrgSignature: mockGetOrgSignature,
+    deleteOrgSignature: mockDeleteOrgSignature,
+    saveOrgStamp: mockSaveOrgStamp,
+    getOrgStamp: mockGetOrgStamp,
+    deleteOrgStamp: mockDeleteOrgStamp,
+  },
+});
+
+const mockCanAccessJob = mock.fn(async () => true);
+
+mock.module("../src/job-access.js", {
+  namedExports: {
+    canAccessJob: mockCanAccessJob,
   },
 });
 
@@ -126,6 +146,32 @@ test("POST /upload/:jobId — upload creates a photo record", async () => {
   await app.close();
 });
 
+test("POST /upload/:jobId — 403 when the user cannot access the job", async () => {
+  mockCanAccessJob.mock.mockImplementation(async () => false);
+
+  const callsBefore = mockSavePhoto.mock.calls.length;
+  const app = buildServer();
+  const boundary = "----TestBoundaryDenied42";
+  const body = multipartBody(boundary, "photo.jpg", "image/jpeg", "fake-image-content");
+
+  const res = await app.inject({
+    method: "POST",
+    url: "/api/photos/upload/job-1",
+    headers: {
+      "content-type": `multipart/form-data; boundary=${boundary}`,
+      "x-org-id": "org-1",
+    },
+    body,
+  });
+
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), { error: "job not accessible to this user" });
+
+  // The guard is the last line of defense: no photo record is written.
+  assert.equal(mockSavePhoto.mock.calls.length, callsBefore);
+  await app.close();
+});
+
 test("GET /:photoId/file — returns photo file with correct content-type", async () => {
   mockGetPhotoFile.mock.mockImplementation(async () => ({
     record: fakePhoto,
@@ -133,11 +179,13 @@ test("GET /:photoId/file — returns photo file with correct content-type", asyn
   }));
 
   const app = buildServer();
+  await app.ready();
+  const auth = { authorization: `Bearer ${app.jwt.sign({ userId: "test-owner", orgId: "org-1", role: "owner" })}` };
 
   const res = await app.inject({
     method: "GET",
     url: "/api/photos/test-photo-id/file",
-    headers: { "x-org-id": "org-1" },
+    headers: { "x-org-id": "org-1", ...auth },
   });
 
   assert.equal(res.statusCode, 200);
@@ -151,11 +199,13 @@ test("GET /:photoId/file — 404 for non-existent photo", async () => {
   mockGetPhotoFile.mock.mockImplementation(async () => null);
 
   const app = buildServer();
+  await app.ready();
+  const auth = { authorization: `Bearer ${app.jwt.sign({ userId: "test-owner", orgId: "org-1", role: "owner" })}` };
 
   const res = await app.inject({
     method: "GET",
     url: "/api/photos/nonexistent/file",
-    headers: { "x-org-id": "org-1" },
+    headers: { "x-org-id": "org-1", ...auth },
   });
 
   assert.equal(res.statusCode, 404);
@@ -173,11 +223,13 @@ test("GET /job/:jobId — lists photos for a job", async () => {
   mockListJobPhotos.mock.mockImplementation(async () => photos);
 
   const app = buildServer();
+  await app.ready();
+  const auth = { authorization: `Bearer ${app.jwt.sign({ userId: "test-owner", orgId: "org-1", role: "owner" })}` };
 
   const res = await app.inject({
     method: "GET",
     url: "/api/photos/job/job-1",
-    headers: { "x-org-id": "org-1" },
+    headers: { "x-org-id": "org-1", ...auth },
   });
 
   assert.equal(res.statusCode, 200);

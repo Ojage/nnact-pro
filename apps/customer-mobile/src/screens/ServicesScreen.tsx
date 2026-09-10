@@ -4,7 +4,7 @@ import { Card, FeatureCard, HeroBanner, PrimaryButton, SectionHeader } from "../
 import type { AppSearchFonts } from "@nnact/mobile-ui";
 import { fonts, spacing, type Palette } from "../theme";
 
-const DIVISION_COLORS = ["#e8f1fc", "#fef8e7", "#f0fdf4"];
+const DIVISION_TINTS = (colors: Palette) => [colors.primaryAlpha, colors.warningAlpha, colors.successAlpha];
 
 export function ServicesScreen({
   colors,
@@ -38,7 +38,7 @@ export function ServicesScreen({
         {NNACT_COMPANY.divisions.map((division, i) => (
           <Card key={division.name} colors={colors} elevated>
             <View style={styles.divisionHeader}>
-              <View style={[styles.divisionIcon, { backgroundColor: DIVISION_COLORS[i] ?? colors.primaryMuted }]}>
+              <View style={[styles.divisionIcon, { backgroundColor: DIVISION_TINTS(colors)[i] ?? colors.primaryMuted }]}>
                 <Text style={styles.divisionIconText}>{String(i + 1)}</Text>
               </View>
               <View style={styles.divisionMeta}>

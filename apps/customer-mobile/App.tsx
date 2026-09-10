@@ -13,7 +13,7 @@ import {
 } from "@nnact/mobile-ui";
 import { buildGoogleMapsDirectionsUrl, type MobileSearchResultItem } from "@nnact/shared";
 import { useTheme } from "./src/theme";
-import { EmptyState, LoadingOverlay } from "./src/components/ui";
+import { EmptyState, LoadingOverlay, LoadingScreen } from "./src/components/ui";
 import {
   clearCustomerSession,
   loadCustomerSession,
@@ -166,7 +166,7 @@ export default function App() {
     searchFonts,
   };
 
-  if (booting) return null;
+  if (booting) return <LoadingScreen colors={colors} message="Loading NNACT…" />;
 
   if (overlay === "login") {
     return (
@@ -295,7 +295,7 @@ export default function App() {
             <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center" }}>
               <EmptyState
                 colors={colors}
-                icon=""
+                icon="business-outline"
                 title="No workspace yet"
                 description="Your account is not linked to a service provider. Contact NNACT support if you expected to see estimates or invoices here."
               />

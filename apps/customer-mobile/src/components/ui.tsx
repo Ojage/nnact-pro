@@ -92,7 +92,7 @@ export function SectionHeader({
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {action && onAction ? (
-        <TouchableOpacity onPress={onAction} activeOpacity={0.7}>
+        <TouchableOpacity onPress={onAction} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={action}>
           <Text style={styles.sectionAction}>{action}</Text>
         </TouchableOpacity>
       ) : null}
@@ -120,14 +120,30 @@ export function PrimaryButton({
   fullWidth?: boolean;
 }) {
   const styles = createStyles(colors);
-  // All variants adopt the sign-in button's look: yellow fill, navy label,
-  // pill radius, medium height. Only `danger` differs (solid red fill) because
-  // it always marks a destructive action.
-  const destructive = variant === "danger";
-  const variantStyle = destructive ? styles.btnDanger : styles.btnPrimary;
-  const textStyle = destructive ? styles.btnDangerText : styles.btnPrimaryText;
-  const spinnerColor = destructive ? colors.onEmphasis : colors.primaryDark;
-  const sizeStyle = styles.btnMd;
+  const variantStyle =
+    variant === "secondary"
+      ? styles.btnSecondary
+      : variant === "danger"
+        ? styles.btnDanger
+        : variant === "ghost"
+          ? styles.btnGhost
+          : styles.btnPrimary;
+  const textStyle =
+    variant === "danger"
+      ? styles.btnDangerText
+      : variant === "ghost"
+        ? styles.btnGhostText
+        : variant === "secondary"
+          ? styles.btnSecondaryText
+          : styles.btnPrimaryText;
+  const spinnerColor =
+    variant === "danger"
+      ? colors.onEmphasis
+      : variant === "ghost" || variant === "secondary"
+        ? colors.foreground
+        : colors.primaryDark;
+  const sizeStyle = size === "sm" ? styles.btnSm : size === "lg" ? styles.btnLg : styles.btnMd;
+  const textSizeStyle = size === "sm" ? styles.btnTextSm : size === "lg" ? styles.btnTextLg : styles.btnTextMd;
   const isDisabled = disabled || loading;
 
   return (
@@ -135,12 +151,15 @@ export function PrimaryButton({
       disabled={isDisabled}
       onPress={onPress}
       activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      accessibilityLabel={loading ? `${label}…` : label}
       style={[variantStyle, sizeStyle, fullWidth && styles.btnFull, isDisabled && styles.btnDisabled]}
     >
       {loading ? (
         <ActivityIndicator color={spinnerColor} size="small" />
       ) : (
-        <Text style={textStyle}>{label}</Text>
+        <Text style={[textStyle, textSizeStyle]}>{label}</Text>
       )}
     </TouchableOpacity>
   );
@@ -337,7 +356,13 @@ export function Chip({
   );
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityState={{ selected: Boolean(selected) }}
+        accessibilityLabel={label}
+      >
         {chip}
       </TouchableOpacity>
     );
@@ -411,6 +436,9 @@ export function SegmentedTabs({
           onPress={() => onChange(tab.id)}
           style={[styles.tab, active === tab.id && styles.tabActive]}
           activeOpacity={0.8}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: active === tab.id }}
+          accessibilityLabel={tab.label}
         >
           <Text style={[styles.tabText, active === tab.id && styles.tabTextActive]}>{tab.label}</Text>
         </TouchableOpacity>
@@ -426,14 +454,18 @@ export function EmptyState({
   description,
 }: {
   colors: Palette;
-  icon?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
   title: string;
   description: string;
 }) {
   const styles = createStyles(colors);
   return (
     <View style={styles.empty}>
-      {icon ? <Text style={styles.emptyIcon}>{icon}</Text> : null}
+      {icon ? (
+        <View style={styles.emptyIconWrap}>
+          <Ionicons name={icon} size={34} color={colors.dimForeground} />
+        </View>
+      ) : null}
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyDesc}>{description}</Text>
     </View>
@@ -531,6 +563,9 @@ const createStyles = (colors: Palette) =>
     btnSm: { paddingVertical: 8, paddingHorizontal: 14 },
     btnMd: { paddingVertical: 13, paddingHorizontal: 20 },
     btnLg: { paddingVertical: 16, paddingHorizontal: 24 },
+    btnTextSm: { fontSize: 13 },
+    btnTextMd: { fontSize: 15 },
+    btnTextLg: { fontSize: 17 },
     btnFull: { alignSelf: "stretch" },
     btnDisabled: { opacity: 0.5 },
     card: {
@@ -628,7 +663,7 @@ const createStyles = (colors: Palette) =>
     tabText: { color: colors.mutedForeground, fontSize: 14, fontFamily: fonts.semibold },
     tabTextActive: { color: colors.onEmphasis },
     empty: { alignItems: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
-    emptyIcon: { fontSize: 40, marginBottom: spacing.md },
+    emptyIconWrap: { marginBottom: spacing.md },
     emptyTitle: { color: colors.foreground, fontSize: 16, fontFamily: fonts.bold, textAlign: "center" },
     emptyDesc: { color: colors.mutedForeground, fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: spacing.sm, fontFamily: fonts.regular },
     loadingScreen: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, backgroundColor: colors.background },

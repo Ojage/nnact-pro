@@ -177,6 +177,8 @@ export const jobs = pgTable(
     assignedTo: uuid("assigned_to").references(() => users.id, {
       onDelete: "set null",
     }),
+    /** Human-readable per-organization work order number (e.g. JOB-1001). Generated server-side. */
+    number: text("number"),
     title: text("title").notNull(),
     description: text("description"),
     status: jobStatus("status").default("lead").notNull(),
@@ -199,6 +201,32 @@ export const jobs = pgTable(
     orgStatus: index("jobs_org_status_idx").on(t.orgId, t.status),
     sched: index("jobs_scheduled_idx").on(t.scheduledAt),
     tracking: uniqueIndex("jobs_tracking_hash_idx").on(t.trackingTokenHash),
+    orgNumber: uniqueIndex("jobs_org_number_idx").on(t.orgId, t.number),
+  }),
+);
+
+/**
+ * Immutable job-status timeline. One row per transition (including creation).
+ * Drives the audit trail and renders the full lifecycle on the device.
+ */
+export const jobStatusHistory = pgTable(
+  "job_status_history",
+  {
+    id: id(),
+    orgId: orgId(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    fromStatus: jobStatus("from_status"),
+    toStatus: jobStatus("to_status").notNull(),
+    changedBy: uuid("changed_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reason: text("reason"),
+    createdAt: ts(),
+  },
+  (t) => ({
+    jobTimeline: index("job_status_history_job_idx").on(t.orgId, t.jobId, t.createdAt),
   }),
 );
 

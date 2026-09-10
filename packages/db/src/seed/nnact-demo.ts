@@ -1,6 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import {
   appointments,
+  contentCategories,
+  contentTags,
   customerAccountLinks,
   customerAccounts,
   customers,
@@ -161,6 +163,33 @@ export async function seedNnactDemo(): Promise<void> {
             passwordHash: demoPasswordHash(NNACT_DEMO_PASSWORD, staff.email),
           },
         });
+    }
+
+    // Content Studio starter taxonomy so category/tag pickers aren't empty in
+    // a fresh workspace. Idempotent by (orgId, slug); safe to extend over time.
+    const CONTENT_STARTER_CATEGORIES = [
+      { name: "Home Maintenance", slug: "home-maintenance", description: "Seasonal and preventive care guides" },
+      { name: "Appliance Care", slug: "appliance-care", description: "Care, repair and longevity tips for appliances" },
+      { name: "Field Stories", slug: "field-stories", description: "Real jobs from our technicians" },
+      { name: "Safety", slug: "safety", description: "Safety notices and guidance" },
+      { name: "Tips & How-to", slug: "tips-how-to", description: "Quick practical advice" },
+      { name: "Company News", slug: "company-news", description: "Updates from NNACT" },
+    ];
+    for (const row of CONTENT_STARTER_CATEGORIES) {
+      await tx
+        .insert(contentCategories)
+        .values({ orgId: NNACT_ORG_ID, name: row.name, slug: row.slug, description: row.description })
+        .onConflictDoNothing({ target: [contentCategories.orgId, contentCategories.slug] });
+    }
+
+    const CONTENT_STARTER_TAGS = [
+      "tips", "how-to", "seasonal", "safety", "energy-saving", "proactive", "repair", "installation",
+    ];
+    for (const name of CONTENT_STARTER_TAGS) {
+      await tx
+        .insert(contentTags)
+        .values({ orgId: NNACT_ORG_ID, name, slug: name.replace(/\s+/g, "-") })
+        .onConflictDoNothing({ target: [contentTags.orgId, contentTags.slug] });
     }
 
     for (const [index, row] of RESIDENTIAL_CUSTOMERS.entries()) {

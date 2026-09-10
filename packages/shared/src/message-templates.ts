@@ -114,7 +114,7 @@ export function messageTemplateSampleVariables(kind: MessageTemplateKind, compan
   const common = { companyName, customerName: "Jordan Lee" };
   switch (kind) {
     case "invoice":
-      return { ...common, invoiceNumber: "INV-1005", invoiceTotal: "$522.00", balance: "$443.00", dueDate: "Sep 1, 2026" };
+    return { ...common, invoiceNumber: "INV-1005", invoiceTotal: "$522.00", balance: "$443.00", dueDate: "Sep 1, 2026" };
     case "estimate":
       return { ...common, estimateNumber: "EST-1005", estimateTotal: "$200.00", optionCount: "3", optionLabels: "Good, Better, Best", expiresAt: "Sep 10, 2026" };
     case "portal_link":

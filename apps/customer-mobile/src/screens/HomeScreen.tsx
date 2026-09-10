@@ -101,7 +101,6 @@ const createStyles = (colors: Palette) =>
   StyleSheet.create({
     scroll: { flex: 1, backgroundColor: colors.background },
     content: { paddingBottom: spacing.lg },
-    heroActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.lg },
     statsRow: {
       flexDirection: "row",
       gap: spacing.sm,

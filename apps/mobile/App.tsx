@@ -57,6 +57,7 @@ function FieldApp({
   } | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
   const [rbBrowse, setRbBrowse] = useState<"browser" | "search" | null>(null);
   const [rbBrowseVisible, setRbBrowseVisible] = useState(false);
   const [rbModelId, setRbModelId] = useState<string | null>(null);
@@ -69,7 +70,7 @@ function FieldApp({
   const field = useFieldData(session, onSession);
 
   const overlayActive = Boolean(
-    showNotifications || selectedSessionId || startDiagnostic || selectedJobId || rbBrowse || rbModelId,
+    showNotifications || changePasswordVisible || selectedSessionId || startDiagnostic || selectedJobId || rbBrowse || rbModelId,
   );
 
   useEffect(() => {
@@ -128,6 +129,14 @@ function FieldApp({
 
   function closeNotifications() {
     setNotificationsVisible(false);
+  }
+
+  function openChangePassword() {
+    setChangePasswordVisible(true);
+  }
+
+  function closeChangePassword() {
+    setChangePasswordVisible(false);
   }
 
   function openRepairBrain(mode: "browser" | "search") {
@@ -238,9 +247,14 @@ function FieldApp({
             jobs={field.jobs}
             unreadNotifications={field.unreadNotifications}
             onRefresh={field.refresh}
+            onSyncNow={() => void field.refresh()}
             onOpenDiagnostics={() => setTab("diagnostics")}
             onOpenJobs={() => setTab("jobs")}
             onOpenJob={openJob}
+            onOpenDiagnosticSession={openSession}
+            onOpenRepairBrain={() => openRepairBrain("browser")}
+            onOpenRepairBrainSearch={() => openRepairBrain("search")}
+            onOpenNotifications={openNotifications}
             {...searchProps}
           />
         ) : null}
@@ -268,10 +282,15 @@ function FieldApp({
             offline={field.offline}
             lastSync={field.lastSync}
             queuedWrites={field.queuedWrites}
+            unreadNotifications={field.unreadNotifications}
+            refreshing={field.refreshing}
+            error={field.error}
+            onRefresh={() => void field.refresh()}
+            getSyncService={field.getSyncService}
+            onOpenNotifications={openNotifications}
+            onOpenChangePassword={openChangePassword}
             onSignOut={onSignOut}
             signingOut={signingOut}
-            onOpenNotifications={openNotifications}
-            {...searchProps}
           />
         ) : null}
       </TabTransition>
@@ -297,6 +316,25 @@ function FieldApp({
               closeNotifications();
             }}
             {...searchProps}
+          />
+        </AnimatedScreen>
+      ) : null}
+
+      {changePasswordVisible ? (
+        <AnimatedScreen
+          visible={changePasswordVisible}
+          onDismiss={closeChangePassword}
+          onExited={() => setChangePasswordVisible(false)}
+        >
+          <ChangePasswordScreen
+            colors={colors}
+            session={session}
+            onComplete={async (next) => {
+              await saveStaffSession(next);
+              onSession(next);
+              closeChangePassword();
+            }}
+            onBack={closeChangePassword}
           />
         </AnimatedScreen>
       ) : null}
@@ -459,6 +497,10 @@ export default function App() {
 
   const searchPlaceholder = session ? "Search jobs & diagnostics" : "Search field tools";
 
+  const handleSessionChange = useCallback((next: StoredStaffSession) => {
+    void saveStaffSession(next).then(() => setSession(next));
+  }, []);
+
   useEffect(() => {
     void loadStaffSession().then(async (stored) => {
       if (!stored) {
@@ -592,7 +634,7 @@ export default function App() {
   return (
     <FieldApp
       session={session}
-      onSession={(next) => void saveStaffSession(next).then(() => setSession(next))}
+      onSession={handleSessionChange}
       onSignOut={signOut}
       signingOut={signingOut}
       searchOpen={searchOpen}

@@ -161,6 +161,18 @@ for (const required of [
 if (envExample.includes("STRIPE_SECRET_KEY=sk_live_")) fail(".env.example contains a live Stripe key");
 else pass("environment template documents production security settings without live payment secrets");
 
+const prodEnvFile = "infra/production.env.example";
+const prodEnvExample = existsSync(resolve(root, prodEnvFile)) ? readFileSync(resolve(root, prodEnvFile), "utf8") : "";
+if (!prodEnvExample.includes("PUBLIC_WEB_URL=https://")) {
+  fail(`${prodEnvFile} must document PUBLIC_WEB_URL as an HTTPS origin (e.g. https://pro.nnact.com)`);
+}
+if (/PUBLIC_WEB_URL=https?:\/\/localhost/.test(prodEnvExample)) {
+  fail(`${prodEnvFile} PUBLIC_WEB_URL must not be a localhost origin`);
+}
+if (/PUBLIC_WEB_URL=https:\/\//.test(prodEnvExample) && !/PUBLIC_WEB_URL=https?:\/\/localhost/.test(prodEnvExample)) {
+  pass(`${prodEnvFile} documents a non-localhost HTTPS PUBLIC_WEB_URL`);
+}
+
 try {
   const rootPackage = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
   for (const script of ["release:safety", "lock:prepare", "install:verified"]) {

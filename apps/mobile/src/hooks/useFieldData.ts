@@ -91,27 +91,33 @@ export function useFieldData(session: StoredStaffSession, onSession: (next: Stor
   const [queuedWrites, setQueuedWrites] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const syncRef = useRef<SyncService | null>(null);
+  const refreshingRef = useRef(false);
 
   const loadCached = useCallback(async (): Promise<boolean> => {
-    const packages = await syncRef.current?.listCachedPackages();
-    if (!packages?.length) return false;
+    try {
+      const packages = await syncRef.current?.listCachedPackages();
+      if (!packages?.length) return false;
 
-    setJobs(packages.map((item) => item.job as unknown as JobDTO));
-    setAppointments(
-      packages.flatMap((item) => {
-        const appointment = packageToAppointment(item);
-        return appointment ? [appointment] : [];
-      }),
-    );
-    setDiagnostics(
-      packages.flatMap((item) => {
-        const diagnostic = packageToDiagnostic(item);
-        return diagnostic ? [diagnostic] : [];
-      }),
-    );
-    setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
-    setOffline(true);
-    return true;
+      setJobs(packages.map((item) => item.job as unknown as JobDTO));
+      setAppointments(
+        packages.flatMap((item) => {
+          const appointment = packageToAppointment(item);
+          return appointment ? [appointment] : [];
+        }),
+      );
+      setDiagnostics(
+        packages.flatMap((item) => {
+          const diagnostic = packageToDiagnostic(item);
+          return diagnostic ? [diagnostic] : [];
+        }),
+      );
+      setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
+      setOffline(true);
+      return true;
+    } catch {
+      // Local cache unavailable (e.g. database error) — treat as no cache.
+      return false;
+    }
   }, []);
 
   const load = useCallback(async () => {
@@ -144,26 +150,47 @@ export function useFieldData(session: StoredStaffSession, onSession: (next: Stor
     }
   }, [loadCached, onSession, session]);
 
-  useEffect(() => {
-    const service = new SyncService({ apiUrl: getApiUrl(), orgId: session.orgId, token: session.accessToken });
-    syncRef.current = service;
-    void load();
-
-    const synchronize = async () => {
+  const refresh = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (refreshingRef.current) return;
+      refreshingRef.current = true;
+      if (!options?.silent) setRefreshing(true);
       try {
-        const result = await service.pull();
-        setLastSync(new Date().toLocaleTimeString());
-        setQueuedWrites(Math.max(0, result.queuedBeforeFlush - result.flushed));
+        const service = syncRef.current;
+        if (service) {
+          const result = await service.pull();
+          setLastSync(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+          setQueuedWrites(Math.max(0, (result?.queuedBeforeFlush ?? 0) - (result?.flushed ?? 0)));
+        }
         await load();
       } catch {
         await loadCached();
+      } finally {
+        refreshingRef.current = false;
+        if (!options?.silent) setRefreshing(false);
       }
-    };
+    },
+    [load, loadCached],
+  );
 
-    void synchronize();
-    const interval = setInterval(() => void synchronize(), 10_000);
-    return () => clearInterval(interval);
-  }, [load, loadCached, session.accessToken, session.orgId]);
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
+  useEffect(() => {
+    const service = new SyncService({ apiUrl: getApiUrl(), orgId: session.orgId, token: session.accessToken });
+    syncRef.current = service;
+    void loadRef.current();
+    void refreshRef.current({ silent: true });
+
+    const interval = setInterval(() => void refreshRef.current({ silent: true }), 60_000);
+    return () => {
+      clearInterval(interval);
+      syncRef.current = null;
+    };
+  }, [session.accessToken, session.orgId]);
 
   const now = new Date();
   const todayStart = useMemo(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()), [now.getDate(), now.getFullYear(), now.getMonth()]);
@@ -198,11 +225,6 @@ export function useFieldData(session: StoredStaffSession, onSession: (next: Stor
     ? diagnostics.find((item) => item.session.jobId === nextAppointment.jobId)
     : null;
 
-  const refresh = useCallback(() => {
-    setRefreshing(true);
-    void load();
-  }, [load]);
-
   const getSyncService = useCallback(() => syncRef.current, []);
 
   return {
@@ -235,4 +257,40 @@ export function statusColor(status: string, colors: { danger: string; success: s
   if (["diagnosed", "completed"].includes(status)) return colors.success;
   if (["testing", "workflow_ready"].includes(status)) return colors.focus;
   return colors.warning;
+}
+
+/**
+ * Accent color for a job lifecycle status. Mirrors the dashboard mapping:
+ * in_progress -> warning (active), completed -> success, canceled -> danger,
+ * lead -> muted, everything else (scheduled) -> primary.
+ */
+export function jobStatusTone(status: string, colors: { danger: string; success: string; warning: string; primary: string; dimForeground: string }): string {
+  switch (status) {
+    case "in_progress":
+      return colors.warning;
+    case "completed":
+      return colors.success;
+    case "canceled":
+      return colors.danger;
+    case "lead":
+      return colors.dimForeground;
+    default:
+      return colors.primary;
+  }
+}
+
+/** Soft tinted background that pairs with {@link jobStatusTone}. */
+export function jobStatusToneBg(status: string, colors: { dangerAlpha: string; successAlpha: string; warningAlpha: string; primaryAlpha: string; surfaceMuted: string }): string {
+  switch (status) {
+    case "in_progress":
+      return colors.warningAlpha;
+    case "completed":
+      return colors.successAlpha;
+    case "canceled":
+      return colors.dangerAlpha;
+    case "lead":
+      return colors.surfaceMuted;
+    default:
+      return colors.primaryAlpha;
+  }
 }

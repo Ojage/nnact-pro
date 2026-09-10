@@ -103,6 +103,7 @@ export async function saveContentMedia(
     const [record] = await db
       .insert(contentMedia)
       .values({
+        id: mediaId,
         orgId: input.orgId,
         storageKey,
         contentType: detected.mime,
@@ -127,7 +128,7 @@ export async function getContentMediaFile(mediaId: string, orgId: string): Promi
     .limit(1);
   if (!record) return null;
   try {
-    const buffer = await readFile(join(uploadDir(), "content", orgId, mediaId));
+    const buffer = await readFile(join(uploadDir(), record.storageKey));
     return { record, buffer };
   } catch {
     throw httpError(500, "internal storage error");
@@ -139,7 +140,7 @@ export async function getPublicMediaFile(mediaId: string): Promise<{ record: typ
   const [record] = await db.select().from(contentMedia).where(eq(contentMedia.id, mediaId)).limit(1);
   if (!record) return null;
   try {
-    const buffer = await readFile(join(uploadDir(), "content", record.orgId, mediaId));
+    const buffer = await readFile(join(uploadDir(), record.storageKey));
     return { record, buffer };
   } catch {
     throw httpError(500, "internal storage error");

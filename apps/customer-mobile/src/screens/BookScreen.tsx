@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { BackButton } from "@nnact/mobile-ui";
 import type { PublicBookingConfigDTO, PublicBookingResultDTO } from "@nnact/shared";
 import { customerApi } from "../api";
 import { getDefaultOrgId } from "../env";
-import { Chip, HeroBanner, LoadingScreen, PrimaryButton, TextField } from "../components/ui";
+import { Chip, EmptyState, HeroBanner, LoadingScreen, PrimaryButton, TextField } from "../components/ui";
 import { fonts, spacing, type Palette } from "../theme";
 
 const DEFAULT_ORG_ID = getDefaultOrgId() || undefined;
@@ -38,22 +38,27 @@ export function BookScreen({
 
   const styles = createStyles(colors);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const booking = await customerApi.bookingConfig(DEFAULT_ORG_ID);
-        setConfig(booking);
-        const matchedCategory = initialCategory
-          ? booking.serviceCategories.find((c) => c.label === initialCategory || c.id === initialCategory)
-          : booking.serviceCategories[0];
-        setCategoryId(matchedCategory?.id ?? booking.serviceCategories[0]?.id ?? "");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Booking unavailable");
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadConfig = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const booking = await customerApi.bookingConfig(DEFAULT_ORG_ID);
+      setConfig(booking);
+      const matchedCategory = initialCategory
+        ? booking.serviceCategories.find((c) => c.label === initialCategory || c.id === initialCategory)
+        : booking.serviceCategories[0];
+      setCategoryId(matchedCategory?.id ?? booking.serviceCategories[0]?.id ?? "");
+    } catch (err) {
+      setConfig(null);
+      setError(err instanceof Error ? err.message : "Booking unavailable");
+    } finally {
+      setLoading(false);
+    }
   }, [initialCategory]);
+
+  useEffect(() => {
+    void loadConfig();
+  }, [loadConfig]);
 
   const services = useMemo(() => {
     if (!config) return [] as string[];
@@ -96,6 +101,26 @@ export function BookScreen({
         </View>
         <LoadingScreen colors={colors} message="Loading services…" />
       </View>
+    );
+  }
+
+  if (!config && error) {
+    return (
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.errorContent}>
+        <View style={styles.topBarInset}>
+          <BackButton colors={colors} onPress={onBack} variant="surface" />
+        </View>
+        <EmptyState
+          colors={colors}
+          icon="cloud-offline-outline"
+          title="Couldn't load services"
+          description={error}
+        />
+        <View style={styles.errorAction}>
+          <PrimaryButton colors={colors} label="Try again" onPress={() => void loadConfig()} variant="secondary" />
+          <PrimaryButton colors={colors} label="Back to home" onPress={onBack} variant="ghost" />
+        </View>
+      </ScrollView>
     );
   }
 
@@ -257,6 +282,8 @@ const createStyles = (colors: Palette) =>
     loadingRoot: { flex: 1, backgroundColor: colors.background },
     topBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
     topBarInset: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, marginBottom: spacing.sm },
+    errorContent: { flexGrow: 1, justifyContent: "center" },
+    errorAction: { paddingHorizontal: spacing.lg, gap: spacing.sm },
     stepper: { flexDirection: "row", justifyContent: "center", gap: spacing.lg, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg },
     stepItem: { alignItems: "center", gap: 4 },
     stepDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.borderLight, alignItems: "center", justifyContent: "center" },

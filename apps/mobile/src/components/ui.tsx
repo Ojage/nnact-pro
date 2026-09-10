@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type ImageSourcePropType,
   type TextInputProps,
   type ViewStyle,
 } from "react-native";
@@ -24,6 +26,8 @@ export function HeroBanner({
   searchPlaceholder,
   onSearchPress,
   searchFonts,
+  photo,
+  back,
 }: {
   colors: Palette;
   eyebrow?: string;
@@ -33,9 +37,38 @@ export function HeroBanner({
   searchPlaceholder?: string;
   onSearchPress?: () => void;
   searchFonts?: AppSearchFonts;
+  photo?: ImageSourcePropType;
+  back?: { onPress: () => void };
 }) {
   const styles = createStyles(colors);
   const showSearch = Boolean(searchPlaceholder && onSearchPress && searchFonts);
+
+  if (photo) {
+    // Photo variant: the supplied image sits over the brand blue with the
+    // tinted shade treatment (mirrors the Today hero), then content on top.
+    return (
+      <View style={[styles.heroPhotoWrap, showSearch && styles.heroPhotoWrapSearch]}>
+        <Image source={photo} style={styles.heroPhotoImage} resizeMode="cover" accessibilityIgnoresInvertColors />
+        <PhotoHeroShades styles={styles} />
+        {back ? (
+          <View style={styles.heroPhotoBack}>
+            <BackButton colors={colors} onPress={back.onPress} variant="hero" />
+          </View>
+        ) : null}
+        <View style={styles.heroPhotoContent}>
+          {eyebrow ? <Text style={styles.heroPhotoEyebrow}>{eyebrow}</Text> : null}
+          <Text style={styles.heroPhotoTitle}>{title}</Text>
+          {subtitle ? <Text style={styles.heroPhotoSubtitle}>{subtitle}</Text> : null}
+          {children}
+          {showSearch ? (
+            <View style={styles.heroPhotoSearchWrap}>
+              <HeroSearchTrigger fonts={searchFonts!} placeholder={searchPlaceholder!} onPress={onSearchPress!} />
+            </View>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.hero, showSearch && styles.heroWithSearch]}>
@@ -46,6 +79,51 @@ export function HeroBanner({
       {showSearch ? (
         <HeroSearchTrigger fonts={searchFonts!} placeholder={searchPlaceholder!} onPress={onSearchPress!} />
       ) : null}
+    </View>
+  );
+}
+
+function PhotoHeroShades({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  const leftStrips = useMemo(() => {
+    const n = 40;
+    return Array.from({ length: n }, (_, i) => {
+      const t = i / (n - 1);
+      const alpha = 0.6 * Math.pow(1 - t, 1.6);
+      return { backgroundColor: `rgba(30, 64, 175, ${alpha.toFixed(3)})` };
+    });
+  }, []);
+  const bottomStrips = useMemo(() => {
+    const n = 8;
+    return Array.from({ length: n }, (_, i) => {
+      const alpha = 0.28 * ((i + 1) / n);
+      return { backgroundColor: `rgba(15, 60, 150, ${alpha.toFixed(3)})` };
+    });
+  }, []);
+  const topStrips = useMemo(() => {
+    const n = 6;
+    return Array.from({ length: n }, (_, i) => {
+      const alpha = 0.22 * ((n - i) / n);
+      return { backgroundColor: `rgba(15, 60, 150, ${alpha.toFixed(3)})` };
+    });
+  }, []);
+
+  return (
+    <View style={styles.heroTint} pointerEvents="none">
+      <View style={styles.heroLeftGradient} pointerEvents="none">
+        {leftStrips.map((strip, i) => (
+          <View key={i} style={[styles.heroStrip, strip]} />
+        ))}
+      </View>
+      <View style={styles.heroBottomGradient} pointerEvents="none">
+        {bottomStrips.map((strip, i) => (
+          <View key={i} style={[styles.heroBottomStrip, strip]} />
+        ))}
+      </View>
+      <View style={styles.heroTopGradient} pointerEvents="none">
+        {topStrips.map((strip, i) => (
+          <View key={i} style={[styles.heroBottomStrip, strip]} />
+        ))}
+      </View>
     </View>
   );
 }
@@ -431,7 +509,7 @@ export function EmptyState({
   const styles = createStyles(colors);
   return (
     <View style={styles.empty}>
-      {icon ? <Text style={styles.emptyIcon}>{icon}</Text> : null}
+      {icon ? <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={44} color={colors.dimForeground} /> : null}
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyDesc}>{description}</Text>
     </View>
@@ -466,6 +544,101 @@ const createStyles = (colors: Palette) =>
     heroWithSearch: {
       paddingBottom: spacing.lg,
     },
+    heroPhotoWrap: {
+      width: "100%",
+      height: 280,
+      overflow: "hidden",
+      backgroundColor: colors.primary,
+      marginBottom: spacing.lg,
+    },
+    heroPhotoWrapSearch: {
+      height: 320,
+    },
+    heroPhotoImage: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+    },
+    heroPhotoContent: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      paddingTop: Platform.OS === "ios" ? 44 : 42,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.md,
+      justifyContent: "flex-end",
+    },
+    heroPhotoEyebrow: {
+      color: colors.accent,
+      fontSize: 11,
+      fontFamily: fonts.bold,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: spacing.xs,
+    },
+    heroPhotoTitle: {
+      color: colors.onEmphasis,
+      fontSize: 28,
+      fontFamily: fonts.extraBold,
+      letterSpacing: -0.5,
+      lineHeight: 34,
+    },
+    heroPhotoSubtitle: {
+      color: "rgba(255,255,255,0.85)",
+      fontSize: 15,
+      fontFamily: fonts.regular,
+      lineHeight: 22,
+      marginTop: spacing.sm,
+    },
+    heroPhotoSearchWrap: { marginTop: spacing.md },
+    heroPhotoBack: {
+      position: "absolute",
+      top: Platform.OS === "ios" ? 50 : 46,
+      left: spacing.lg,
+      zIndex: 2,
+    },
+    heroTint: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    },
+    heroLeftGradient: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      width: "70%",
+      flexDirection: "row",
+      overflow: "hidden",
+    },
+    heroStrip: { flex: 1, alignSelf: "stretch" },
+    heroBottomGradient: {
+      position: "absolute",
+      right: 0,
+      bottom: 0,
+      left: 0,
+      height: 90,
+      flexDirection: "row",
+      overflow: "hidden",
+    },
+    heroTopGradient: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      left: 0,
+      height: 60,
+      flexDirection: "row",
+      overflow: "hidden",
+    },
+    heroBottomStrip: { flex: 1, alignSelf: "stretch" },
     heroEyebrow: {
       color: colors.accent,
       fontSize: 11,

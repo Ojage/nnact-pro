@@ -37,6 +37,17 @@ export function mediaIdsFromDocument(document: BodyDocument | null): string[] {
       if (props.url && typeof props.url === "string" && /^[0-9a-f-]{36}$/i.test(props.url)) {
         ids.add(props.url);
       }
+      // Primitive string media refs (BlockNote prop schemas are primitive-only).
+      if (props.imageUrls && typeof props.imageUrls === "string") {
+        for (const part of (props.imageUrls as string).split(",")) {
+          const id = part.trim();
+          if (/^[0-9a-f-]{36}$/i.test(id)) ids.add(id);
+        }
+      }
+      for (const key of ["beforeUrl", "afterUrl"] as const) {
+        const id = props[key];
+        if (typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)) ids.add(id);
+      }
       const refs: unknown[] = [];
       if (props.images && Array.isArray(props.images)) refs.push(...(props.images as unknown[]));
       if (props.media) refs.push(props.media);

@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import multipart from "@fastify/multipart";
 import { resolveOrgId } from "./org.js";
 import { savePhoto, getPhotoFile, listJobPhotos } from "../uploads.js";
+import { canAccessJob } from "../job-access.js";
+import { verifiedClaims } from "../operational-authorization.js";
 import { resolveOrgIdWithQueryToken, verifiedClaimsForQueryToken } from "../query-token.js";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
 
@@ -45,7 +47,15 @@ export async function photoRoutes(app: FastifyInstance) {
     { preHandler: uploadRateLimit },
     async (req, reply) => {
       const orgId = await resolveOrgId(req);
+      const claims = await verifiedClaims(req, reply);
+      if (!claims || reply.sent) return;
       const { jobId } = req.params;
+
+      // Technicians may only attach evidence to jobs assigned to them; office
+      // roles still require the job to exist inside the org.
+      if (!(await canAccessJob(orgId, jobId, claims.role, claims.userId))) {
+        return reply.code(403).send({ error: "job not accessible to this user" });
+      }
 
       try {
         const file = await req.file();
