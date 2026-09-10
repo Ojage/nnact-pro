@@ -379,11 +379,17 @@ class FakeVisionAdapter implements VisionProviderPort {
 }
 
 // ── Adapter factory ────────────────────────────────────────────────────────
+export function probeHeadersFor(provider: AiProviderId, apiKey: string): Record<string, string> {
+  return provider === "CLAUDE"
+    ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
+    : { authorization: `Bearer ${apiKey}` };
+}
+
 function probeViaModels(config: DecryptedProviderConfig, provider: AiProviderId, baseEnv: string): Promise<AiProviderProbeResult> {
   const started = Date.now();
   const base = (config.baseUrl ?? baseEnv).replace(/\/$/, "");
   return getJson(`${base}/v1/models`, {
-    headers: { authorization: `Bearer ${config.apiKey}` },
+    headers: probeHeadersFor(provider, config.apiKey),
     timeoutMs: config.timeoutMs,
   })
     .then((r) => {

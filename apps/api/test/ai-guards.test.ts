@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { HybridQualityAssessor } from "../src/ai/quality.js";
 import { AiProviderRegistry } from "../src/ai/registry.js";
-import { fakeAiFactory } from "../src/ai/adapters.js";
+import { fakeAiFactory, probeHeadersFor } from "../src/ai/adapters.js";
 import type { DecryptedProviderConfig } from "../src/ai/domain.js";
 import type { BusinessContext } from "../src/ai/context.js";
 
@@ -77,4 +77,10 @@ test("fake adapter contract: image + vision", async () => {
   assert.match(image!.contentType, /^image\/png$/);
   const vision = await factory.vision().analyzeImage({ prompt: "any", images: [{ mediaType: "image/png", dataBase64: "aGVsbG8=" }] }, cfg);
   assert.equal(vision.verdict, "PASS");
+});
+
+test("probe headers: Anthropic requires x-api-key + anthropic-version", () => {
+  assert.deepEqual(probeHeadersFor("CLAUDE", "secret"), { "x-api-key": "secret", "anthropic-version": "2023-06-01" });
+  assert.deepEqual(probeHeadersFor("OPENAI", "secret"), { authorization: "Bearer secret" });
+  assert.deepEqual(probeHeadersFor("GROK", "secret"), { authorization: "Bearer secret" });
 });
