@@ -286,7 +286,7 @@ export async function ensureTags(orgId: string, names: string[]): Promise<string
     const [row] = await db
       .insert(contentTags)
       .values({ orgId, name, slug })
-      .onConflictDoUpdate({ target: [contentTags.orgId, contentTags.slug], set: {} })
+      .onConflictDoUpdate({ target: [contentTags.orgId, contentTags.slug], set: { name } })
       .returning({ id: contentTags.id });
     out.push(row.id);
   }
