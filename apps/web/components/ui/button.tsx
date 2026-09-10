@@ -99,10 +99,16 @@ const Button = React.forwardRef<
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? (
-        <Loader2 className="animate-spin" data-testid="button-spinner" aria-hidden="true" />
-      ) : null}
-      {children}
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {loading ? (
+            <Loader2 className="animate-spin" data-testid="button-spinner" aria-hidden="true" />
+          ) : null}
+          {children}
+        </>
+      )}
     </Comp>
   );
 });
