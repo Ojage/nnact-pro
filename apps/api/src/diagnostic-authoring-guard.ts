@@ -3,7 +3,8 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 const AUTHORING_PATHS = [
   /^\/api\/diagnostics\/workflows(?:\/[^/]+\/steps)?$/,
   /^\/api\/diagnostics\/workflows\/[^/]+\/publish$/,
-  /^\/api\/diagnostics\/steps\/[^/]+\/routes$/,
+  /^\/api\/diagnostics\/workflows\/[^/]+\/?$/,
+  /^\/api\/diagnostics\/steps\/[^/]+\/?(?:routes(?:\/[^/]+)?)?$/,
 ];
 
 function isProtectedAuthoringRequest(req: FastifyRequest): boolean {

@@ -210,7 +210,55 @@ export interface DiagnosticOutput {
   };
 }
 
+export interface MetaOption {
+  value: string;
+  label: string;
+}
+
+export interface DiagnosticStepTemplate {
+  key: string;
+  name: string;
+  description: string;
+  stepType: "check" | "decision" | "reference" | "stop";
+  mode: "field" | "guided" | "both";
+  meterMode?: string;
+  powerState?: string;
+  operatingCondition?: string;
+  point1Label?: string;
+  point2Label?: string;
+  connector?: string;
+  pin?: string;
+  unit?: string;
+  expectedText?: string;
+  passInterpretation?: string;
+  failInterpretation?: string;
+  accessibilityNote?: string;
+}
+
+export interface DiagnosticMeta {
+  productTypes: MetaOption[];
+  routeKinds: MetaOption[];
+  meterModes: MetaOption[];
+  powerStates: MetaOption[];
+  operatingConditions: MetaOption[];
+  units: MetaOption[];
+  stepTemplates: DiagnosticStepTemplate[];
+}
+
+export interface ReadinessIssue {
+  step: string;
+  message: string;
+}
+
+export interface ReadinessReport {
+  publishable: boolean;
+  issues: ReadinessIssue[];
+}
+
+export const CUSTOM_VALUE = "__custom__";
+
 export const diagnosticsApi = {
+  meta: () => diagnosticRequest<DiagnosticMeta>("/api/diagnostics/meta"),
   overview: () => diagnosticRequest<DiagnosticOverview>("/api/diagnostics/overview"),
   coverage: () => diagnosticRequest<CoverageResponse>("/api/diagnostics/coverage"),
   workflows: () => diagnosticRequest<DiagnosticWorkflow[]>("/api/diagnostics/workflows"),
@@ -218,6 +266,22 @@ export const diagnosticsApi = {
     diagnosticRequest<{ workflow: DiagnosticWorkflow; steps: DiagnosticStep[] }>(
       `/api/diagnostics/workflows/${id}`,
     ),
+  readiness: (workflowId: string) =>
+    diagnosticRequest<ReadinessReport>(`/api/diagnostics/workflows/${workflowId}/readiness`),
+  updateWorkflow: (id: string, body: Partial<{
+    name: string;
+    productType: string;
+    productTypeLabel?: string;
+    make?: string | null;
+    modelFamily?: string | null;
+    sourceRevision?: string | null;
+    limitations?: string[];
+    applicability?: { models?: string[]; excludedModels?: string[]; notes?: string[] };
+  }>) =>
+    diagnosticRequest<DiagnosticWorkflow>(`/api/diagnostics/workflows/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   createWorkflow: (body: {
     name: string;
     productType: string;
@@ -267,11 +331,47 @@ export const diagnosticsApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  updateStep: (
+    id: string,
+    body: Partial<{
+      publicLabel: string;
+      sequence: number;
+      mode?: "field" | "guided" | "both";
+      stepType?: "check" | "decision" | "reference" | "stop";
+      purpose?: string;
+      safetyState?: string;
+      powerState?: string;
+      operatingCondition?: string;
+      meterMode?: string;
+      point1Label?: string;
+      point1Endpoint?: string;
+      point2Label?: string;
+      point2Endpoint?: string;
+      connector?: string;
+      pin?: string;
+      wireColor?: string;
+      expectedText?: string;
+      unit?: string;
+      passInterpretation?: string;
+      failInterpretation?: string;
+      branchRules?: Record<string, unknown>;
+      sourceRefs?: Array<Record<string, unknown>>;
+      accessibilityNote?: string;
+      validationStatus?: string;
+    }>,
+  ) =>
+    diagnosticRequest<DiagnosticStep>(`/api/diagnostics/steps/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteStep: (id: string) =>
+    diagnosticRequest<void>(`/api/diagnostics/steps/${id}`, { method: "DELETE" }),
   addRoute: (
     stepId: string,
     body: {
       label: string;
       routeKind: string;
+      routeKindLabel?: string;
       endpoint1?: string;
       endpoint2?: string;
       segmentIds?: string[];
@@ -285,6 +385,31 @@ export const diagnosticsApi = {
     diagnosticRequest<TraceRoute>(`/api/diagnostics/steps/${stepId}/routes`, {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+  updateRoute: (
+    stepId: string,
+    routeId: string,
+    body: Partial<{
+      label: string;
+      routeKind: string;
+      routeKindLabel?: string;
+      endpoint1?: string;
+      endpoint2?: string;
+      segmentIds?: string[];
+      continuityValid?: boolean;
+      disconnectedIslands?: number;
+      unintendedBranches?: number;
+      visualAuditStatus?: string;
+      validationNotes?: string;
+    }>,
+  ) =>
+    diagnosticRequest<TraceRoute>(`/api/diagnostics/steps/${stepId}/routes/${routeId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteRoute: (stepId: string, routeId: string) =>
+    diagnosticRequest<void>(`/api/diagnostics/steps/${stepId}/routes/${routeId}`, {
+      method: "DELETE",
     }),
   publishWorkflow: (workflowId: string) =>
     diagnosticRequest<DiagnosticWorkflow>(`/api/diagnostics/workflows/${workflowId}/publish`, {

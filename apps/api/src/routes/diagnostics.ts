@@ -21,10 +21,36 @@ import {
   type DiagnosticSessionStatus,
 } from "../diagnostics.js";
 import { resolveOrgId } from "./org.js";
+import {
+  CUSTOM_VALUE,
+  METER_MODES,
+  OPERATING_CONDITIONS,
+  POWER_STATES,
+  PRODUCT_TYPES,
+  ROUTE_KINDS,
+  STEP_TEMPLATES,
+  UNITS,
+} from "../diagnostic-meta.js";
+
+export const workflowProductTypes = PRODUCT_TYPES;
+export const workflowRouteKinds = ROUTE_KINDS;
+
+function resolveProductType(value: string | undefined, custom: string | undefined) {
+  if (!value) return undefined;
+  if (value === CUSTOM_VALUE) return custom?.trim() || undefined;
+  return PRODUCT_TYPES.some((option) => option.value === value) ? value : undefined;
+}
+
+function resolveRouteKind(value: string | undefined, custom: string | undefined) {
+  if (!value) return undefined;
+  if (value === CUSTOM_VALUE) return custom?.trim() || undefined;
+  return ROUTE_KINDS.some((option) => option.value === value) ? value : undefined;
+}
 
 const workflowCreateSchema = z.object({
   name: z.string().min(1),
   productType: z.string().min(1),
+  productTypeLabel: z.string().optional(),
   make: z.string().optional(),
   modelFamily: z.string().optional(),
   sourceRevision: z.string().optional(),
@@ -54,6 +80,8 @@ const workflowCreateSchema = z.object({
   limitations: z.array(z.string()).optional(),
 });
 
+const workflowPatchSchema = workflowCreateSchema.partial();
+
 const stepCreateSchema = z.object({
   stepKey: z.string().min(1),
   publicLabel: z.string().min(1),
@@ -79,21 +107,28 @@ const stepCreateSchema = z.object({
   branchRules: z.record(z.unknown()).optional(),
   sourceRefs: z.array(z.record(z.unknown())).optional(),
   accessibilityNote: z.string().optional(),
-  validationStatus: z.string().optional(),
+  validationStatus: z.enum(["unreviewed", "validated"]).optional(),
 });
+
+const stepPatchSchema = stepCreateSchema
+  .omit({ stepKey: true })
+  .partial()
 
 const routeCreateSchema = z.object({
   label: z.string().min(1),
   routeKind: z.string().min(1),
+  routeKindLabel: z.string().optional(),
   endpoint1: z.string().optional(),
   endpoint2: z.string().optional(),
   segmentIds: z.array(z.string()).optional(),
   continuityValid: z.boolean().optional(),
   disconnectedIslands: z.number().int().nonnegative().optional(),
   unintendedBranches: z.number().int().nonnegative().optional(),
-  visualAuditStatus: z.string().optional(),
+  visualAuditStatus: z.enum(["pending", "passed", "failed"]).optional(),
   validationNotes: z.string().optional(),
 });
+
+const routePatchSchema = routeCreateSchema.partial();
 
 const linkSchema = z.object({
   jobId: z.string().uuid(),
@@ -197,7 +232,61 @@ async function getWorkflowBundle(orgId: string, workflowId: string) {
   };
 }
 
+interface WorkflowIssue {
+  step: string;
+  message: string;
+}
+
+function collectWorkflowIssues(bundle: NonNullable<Awaited<ReturnType<typeof getWorkflowBundle>>>): WorkflowIssue[] {
+  const errors: WorkflowIssue[] = [];
+  for (const step of bundle.steps) {
+    for (const error of validatePublishableStep({
+      publicLabel: step.publicLabel,
+      stepType: step.stepType,
+      meterMode: step.meterMode,
+      point1Label: step.point1Label,
+      point2Label: step.point2Label,
+      operatingCondition: step.operatingCondition,
+      expectedText: step.expectedText,
+      validationStatus: step.validationStatus,
+    })) {
+      errors.push({ step: step.publicLabel, message: error });
+    }
+
+    if (step.stepType === "check") {
+      if (step.routes.length === 0) errors.push({ step: step.publicLabel, message: "validated trace route is required" });
+      for (const route of step.routes) {
+        if (!route.continuityValid) errors.push({ step: step.publicLabel, message: "route continuity failed" });
+        if (route.disconnectedIslands > 0) errors.push({ step: step.publicLabel, message: "disconnected islands detected" });
+        if (route.unintendedBranches > 0) errors.push({ step: step.publicLabel, message: "unintended branches detected" });
+        if (route.visualAuditStatus !== "passed") {
+          errors.push({ step: step.publicLabel, message: "visual trace audit has not passed" });
+        }
+      }
+    }
+  }
+  return errors;
+}
+
 export async function diagnosticRoutes(app: FastifyInstance) {
+  app.get("/meta", async () => ({
+    productTypes: PRODUCT_TYPES,
+    routeKinds: ROUTE_KINDS,
+    meterModes: METER_MODES,
+    powerStates: POWER_STATES,
+    operatingConditions: OPERATING_CONDITIONS,
+    units: UNITS,
+    stepTemplates: STEP_TEMPLATES,
+  }));
+
+  app.get("/workflows/:id/readiness", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const bundle = await getWorkflowBundle(orgId, id);
+    if (!bundle) return reply.code(404).send({ error: "workflow not found" });
+    const issues = collectWorkflowIssues(bundle);
+    return { publishable: issues.length === 0, issues };
+  });
   app.get("/overview", async (req) => {
     const orgId = await resolveOrgId(req);
     const [sessions, workflows, corrections] = await Promise.all([
@@ -275,11 +364,46 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const parsed = workflowCreateSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const productType = resolveProductType(parsed.data.productType, parsed.data.productTypeLabel);
+    if (!productType) return reply.code(400).send({ error: "known product type or a custom productTypeLabel is required" });
+
+    const { productTypeLabel: _label, ...rest } = parsed.data;
     const [row] = await db
       .insert(diagnosticWorkflows)
-      .values({ orgId, ...parsed.data })
+      .values({ orgId, ...rest, productType })
       .returning();
     return reply.code(201).send(row);
+  });
+
+  app.patch("/workflows/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const parsed = workflowPatchSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const exists = await db
+      .select({ id: diagnosticWorkflows.id })
+      .from(diagnosticWorkflows)
+      .where(and(eq(diagnosticWorkflows.orgId, orgId), eq(diagnosticWorkflows.id, id)));
+    if (exists.length === 0) return reply.code(404).send({ error: "workflow not found" });
+
+    const { productType, productTypeLabel } = parsed.data;
+    let resolvedProductType: string | undefined;
+    if (productType !== undefined) {
+      resolvedProductType = resolveProductType(productType, productTypeLabel);
+      if (!resolvedProductType) {
+        return reply.code(400).send({ error: "known product type or a custom productTypeLabel is required" });
+      }
+    }
+    const { productTypeLabel: _label, ...rest } = parsed.data;
+
+    const [row] = await db
+      .update(diagnosticWorkflows)
+      .set({ ...rest, ...(resolvedProductType ? { productType: resolvedProductType } : {}), updatedAt: new Date() })
+      .where(and(eq(diagnosticWorkflows.orgId, orgId), eq(diagnosticWorkflows.id, id)))
+      .returning();
+    return row;
   });
 
   app.get("/workflows/:id", async (req, reply) => {
@@ -296,6 +420,14 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     const parsed = stepCreateSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
+    if (parsed.data.stepKey) {
+      const [existing] = await db
+        .select({ id: diagnosticSteps.id })
+        .from(diagnosticSteps)
+        .where(and(eq(diagnosticSteps.orgId, orgId), eq(diagnosticSteps.workflowId, workflowId), eq(diagnosticSteps.stepKey, parsed.data.stepKey)));
+      if (existing) return reply.code(409).send({ error: `step key "${parsed.data.stepKey}" already exists in this workflow` });
+    }
+
     const [workflow] = await db
       .select({ id: diagnosticWorkflows.id })
       .from(diagnosticWorkflows)
@@ -309,11 +441,45 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     return reply.code(201).send(row);
   });
 
+  app.patch("/steps/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const parsed = stepPatchSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const [existing] = await db
+      .select({ id: diagnosticSteps.id })
+      .from(diagnosticSteps)
+      .where(and(eq(diagnosticSteps.orgId, orgId), eq(diagnosticSteps.id, id)));
+    if (!existing) return reply.code(404).send({ error: "step not found" });
+
+    const [row] = await db
+      .update(diagnosticSteps)
+      .set({ ...parsed.data, updatedAt: new Date() })
+      .where(and(eq(diagnosticSteps.orgId, orgId), eq(diagnosticSteps.id, id)))
+      .returning();
+    return row;
+  });
+
+  app.delete("/steps/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const deleted = await db
+      .delete(diagnosticSteps)
+      .where(and(eq(diagnosticSteps.orgId, orgId), eq(diagnosticSteps.id, id)))
+      .returning({ id: diagnosticSteps.id });
+    if (deleted.length === 0) return reply.code(404).send({ error: "step not found" });
+    return reply.code(204).send();
+  });
+
   app.post("/steps/:stepId/routes", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const { stepId } = req.params as { stepId: string };
     const parsed = routeCreateSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const routeKind = resolveRouteKind(parsed.data.routeKind, parsed.data.routeKindLabel);
+    if (!routeKind) return reply.code(400).send({ error: "known route kind or a custom routeKindLabel is required" });
 
     const [step] = await db
       .select({ id: diagnosticSteps.id })
@@ -321,11 +487,53 @@ export async function diagnosticRoutes(app: FastifyInstance) {
       .where(and(eq(diagnosticSteps.orgId, orgId), eq(diagnosticSteps.id, stepId)));
     if (!step) return reply.code(404).send({ error: "step not found" });
 
+    const { routeKindLabel: _label, ...rest } = parsed.data;
     const [row] = await db
       .insert(traceRoutes)
-      .values({ orgId, stepId, ...parsed.data })
+      .values({ orgId, stepId, ...rest, routeKind })
       .returning();
     return reply.code(201).send(row);
+  });
+
+  app.patch("/steps/:stepId/routes/:routeId", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { stepId, routeId } = req.params as { stepId: string; routeId: string };
+    const parsed = routePatchSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const [existing] = await db
+      .select({ id: traceRoutes.id })
+      .from(traceRoutes)
+      .where(and(eq(traceRoutes.orgId, orgId), eq(traceRoutes.stepId, stepId), eq(traceRoutes.id, routeId)));
+    if (!existing) return reply.code(404).send({ error: "route not found" });
+
+    const { routeKind, routeKindLabel } = parsed.data;
+    let resolvedRouteKind: string | undefined;
+    if (routeKind !== undefined) {
+      resolvedRouteKind = resolveRouteKind(routeKind, routeKindLabel);
+      if (!resolvedRouteKind) {
+        return reply.code(400).send({ error: "known route kind or a custom routeKindLabel is required" });
+      }
+    }
+    const { routeKindLabel: _label, ...rest } = parsed.data;
+
+    const [row] = await db
+      .update(traceRoutes)
+      .set({ ...rest, ...(resolvedRouteKind ? { routeKind: resolvedRouteKind } : {}) })
+      .where(and(eq(traceRoutes.orgId, orgId), eq(traceRoutes.stepId, stepId), eq(traceRoutes.id, routeId)))
+      .returning();
+    return row;
+  });
+
+  app.delete("/steps/:stepId/routes/:routeId", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { stepId, routeId } = req.params as { stepId: string; routeId: string };
+    const deleted = await db
+      .delete(traceRoutes)
+      .where(and(eq(traceRoutes.orgId, orgId), eq(traceRoutes.stepId, stepId), eq(traceRoutes.id, routeId)))
+      .returning({ id: traceRoutes.id });
+    if (deleted.length === 0) return reply.code(404).send({ error: "route not found" });
+    return reply.code(204).send();
   });
 
   app.post("/workflows/:id/publish", async (req, reply) => {
@@ -334,34 +542,7 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     const bundle = await getWorkflowBundle(orgId, id);
     if (!bundle) return reply.code(404).send({ error: "workflow not found" });
 
-    const errors: string[] = [];
-    for (const step of bundle.steps) {
-      for (const error of validatePublishableStep({
-        publicLabel: step.publicLabel,
-        stepType: step.stepType,
-        meterMode: step.meterMode,
-        point1Label: step.point1Label,
-        point2Label: step.point2Label,
-        operatingCondition: step.operatingCondition,
-        expectedText: step.expectedText,
-        validationStatus: step.validationStatus,
-      })) {
-        errors.push(`${step.publicLabel}: ${error}`);
-      }
-
-      if (step.stepType === "check") {
-        if (step.routes.length === 0) errors.push(`${step.publicLabel}: validated trace route is required`);
-        for (const route of step.routes) {
-          if (!route.continuityValid) errors.push(`${step.publicLabel}: route continuity failed`);
-          if (route.disconnectedIslands > 0) errors.push(`${step.publicLabel}: disconnected islands detected`);
-          if (route.unintendedBranches > 0) errors.push(`${step.publicLabel}: unintended branches detected`);
-          if (route.visualAuditStatus !== "passed") {
-            errors.push(`${step.publicLabel}: visual trace audit has not passed`);
-          }
-        }
-      }
-    }
-
+    const errors = collectWorkflowIssues(bundle);
     if (errors.length) return reply.code(409).send({ error: "workflow is not publishable", details: errors });
 
     const [row] = await db
