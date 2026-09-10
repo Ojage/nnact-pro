@@ -178,9 +178,6 @@ export default function ContentEditorPage() {
             {item.status === "PUBLISHED" && (
               <Button variant="danger" loading={unpublishing} onClick={handleUnpublish}>Unpublish + Archive</Button>
             )}
-            {item.status === "DRAFT" && (
-              <Button variant="secondary" onClick={async () => submitReview(id).unwrap()}>Submit for Review</Button>
-            )}
             {item.status === "IN_REVIEW" && (
               <>
                 <Button variant="secondary" onClick={async () => reject(id).unwrap()}>Reject</Button>

@@ -4,7 +4,7 @@
 import type { ContentStatus } from "@nnact/shared";
 
 const TRANSITIONS: Record<ContentStatus, ContentStatus[]> = {
-  DRAFT: ["IN_REVIEW", "ARCHIVED"],
+  DRAFT: ["IN_REVIEW", "PUBLISHING", "ARCHIVED"],
   IN_REVIEW: ["APPROVED", "REJECTED", "DRAFT"],
   APPROVED: ["SCHEDULED", "PUBLISHING", "PUBLISHED", "IN_REVIEW", "DRAFT"],
   SCHEDULED: ["PUBLISHING", "PUBLISHED", "DRAFT", "ARCHIVED"],
@@ -26,6 +26,6 @@ export function canTransitionContent(from: ContentStatus, to: ContentTransitionT
 
 export function assertContentTransition(from: ContentStatus, to: ContentTransitionTarget): void {
   if (!canTransitionContent(from, to)) {
-    throw new Error(`Invalid content status transition: ${from} -> ${to}`);
+    throw Object.assign(new Error(`Cannot transition content from ${from} to ${to}`), { statusCode: 400 });
   }
 }
