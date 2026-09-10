@@ -56,12 +56,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers as Record<string, string> | undefined),
     };
 
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("NNPtoken");
-      if (token) headers.authorization = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${BASE}${path}`, { ...init, headers });
+    const response = await fetch(`${BASE}${path}`, { ...init, credentials: "include", headers });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(formatDispatchApiError(response.status, response.statusText, body));

@@ -4,13 +4,10 @@ async function diagnosticRequest<T>(path: string, init?: RequestInit): Promise<T
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> | undefined),
   };
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("NNPtoken");
-    if (token) headers.authorization = `Bearer ${token}`;
-  }
 
   const response = await fetch(`${BASE}${path}`, {
     ...init,
+    credentials: "include",
     headers: { "content-type": "application/json", ...headers },
     cache: "no-store",
   });
