@@ -237,13 +237,19 @@ export class PublicationWorker {
   }
 
   private async maybeFinalizeContent(orgId: string, contentId: string): Promise<void> {
-    // If every enabled publication is PUBLISHED, mark content PUBLISHED.
+    // Publish the content publicly once the website (the canonical public
+    // channel) is live, or when every enabled channel has succeeded. A failure
+    // on another channel (e.g. a rejected LinkedIn post) must not hide an
+    // article that is already on the public blog.
     const pubs = await db
       .select()
       .from(channelPublications)
       .where(and(eq(channelPublications.orgId, orgId), eq(channelPublications.contentId, contentId)));
-    const nonDraft = pubs.filter((p) => p.status !== "CANCELLED" && p.status !== "DRAFT");
-    if (nonDraft.length > 0 && nonDraft.every((p) => p.status === "PUBLISHED")) {
+    const active = pubs.filter((p) => p.status !== "CANCELLED" && p.status !== "DRAFT");
+    if (active.length === 0) return;
+    const websitePublished = active.some((p) => p.channel === "WEBSITE" && p.status === "PUBLISHED");
+    const allPublished = active.every((p) => p.status === "PUBLISHED");
+    if (websitePublished || allPublished) {
       await db.update(contentItems).set({ status: "PUBLISHED", publishedAt: new Date(), updatedAt: new Date() }).where(eq(contentItems.id, contentId));
     }
   }
