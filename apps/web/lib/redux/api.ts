@@ -1019,18 +1019,18 @@ export const apiSlice = createApi({
       providesTags: ["Connection"],
     }),
     oauthConnectionStart: builder.mutation<{ url: string; state: string }, PublishingChannel>({
-      query: (channel) => ({ url: `/api/connections/${channel}/oauth/start`, method: "POST" }),
+      query: (channel) => ({ url: `/api/connections/${channel}/oauth/start`, method: "POST", body: {} }),
     }),
     oauthConnectionCallback: builder.mutation<{ channel: string; status: string }, { channel: PublishingChannel; code: string; state: string }>({
       query: ({ channel, code, state }) => ({ url: `/api/connections/${channel}/oauth/callback`, method: "POST", body: { code, state } }),
       invalidatesTags: ["Connection"],
     }),
     disconnectConnection: builder.mutation<{ channel: string; status: string }, PublishingChannel>({
-      query: (channel) => ({ url: `/api/connections/${channel}/disconnect`, method: "POST" }),
+      query: (channel) => ({ url: `/api/connections/${channel}/disconnect`, method: "POST", body: {} }),
       invalidatesTags: ["Connection"],
     }),
     validateConnection: builder.mutation<{ valid: boolean; accountName?: string | null; accountId?: string | null; errorCode?: string | null; errorMessage?: string | null }, PublishingChannel>({
-      query: (channel) => ({ url: `/api/connections/${channel}/validate`, method: "POST" }),
+      query: (channel) => ({ url: `/api/connections/${channel}/validate`, method: "POST", body: {} }),
       invalidatesTags: ["Connection"],
     }),
   }),

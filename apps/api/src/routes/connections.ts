@@ -63,20 +63,31 @@ export async function connectionRoutes(app: FastifyInstance) {
   app.get("/", async (req) => {
     const orgId = await resolveOrgId(req);
     const rows = await db.select().from(publishingConnections).where(eq(publishingConnections.orgId, orgId));
-    return {
-      channels: registry.channels(),
-      connections: rows.map((r) => ({
-        id: r.id,
-        channel: r.channel,
-        status: r.status,
-        accountName: r.accountName,
-        accountId: r.accountId,
-        lastValidatedAt: r.lastValidatedAt,
-        lastError: r.lastError,
-        metadata: r.metadata,
-        capabilities: registry.get(r.channel).capabilities,
-      })),
-    };
+    const connections = rows.map((r) => ({
+      id: r.id,
+      channel: r.channel,
+      status: r.status,
+      accountName: r.accountName,
+      accountId: r.accountId,
+      lastValidatedAt: r.lastValidatedAt,
+      lastError: r.lastError,
+      metadata: r.metadata,
+      capabilities: registry.get(r.channel).capabilities,
+    }));
+    if (!connections.some((c) => c.channel === "WEBSITE")) {
+      connections.push({
+        id: "",
+        channel: "WEBSITE" as const,
+        status: "CONNECTED" as const,
+        accountName: process.env.PUBLIC_WEB_URL ?? "NNACT Website",
+        accountId: null,
+        lastValidatedAt: null,
+        lastError: null,
+        metadata: {},
+        capabilities: registry.get("WEBSITE").capabilities,
+      });
+    }
+    return { channels: registry.channels(), connections };
   });
 
   app.post<{ Params: { channel: string } }>("/:channel/oauth/start", async (req, reply) => {
