@@ -96,6 +96,26 @@ export class FacebookPublishingAdapter implements PublishingProviderPort {
     };
   }
 
+  async update(request: PublishRequest & { providerPublicationId: string }): Promise<PublishResult> {
+    const { token, pageId } = await this.auth(request.organizationId);
+    const message = [request.body ?? request.caption ?? "", ...(request.hashtags ?? [])].join(" ");
+    const res = await providerFetch(`${this.baseUrl}/${request.providerPublicationId}`, {
+      method: "POST",
+      body: new URLSearchParams({ access_token: token, message }).toString(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (res.status >= 400) {
+      throw new ProviderError(this.mapError(res.status, res.body, request.providerPublicationId));
+    }
+    const id = (res.body as { id?: string })?.id ?? request.providerPublicationId;
+    return {
+      providerPublicationId: id,
+      externalUrl: `https://www.facebook.com/${pageId}/posts/${id}`,
+      publishedAt: new Date(),
+      providerStatus: "PUBLISHED",
+    };
+  }
+
   async deleteOrUnpublish(orgId: string, providerPublicationId: string): Promise<void> {
     const { token } = await this.auth(orgId);
     const res = await providerFetch(`${this.baseUrl}/${providerPublicationId}?access_token=${token}`, { method: "DELETE" });

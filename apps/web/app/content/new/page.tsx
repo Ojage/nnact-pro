@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   explainRtkError,
   useCreateContentItemMutation,
+  usePatchContentItemMutation,
   useContentCategoriesQuery,
   useContentTagsQuery,
+  useCreateContentCategoryMutation,
+  useUploadContentMediaMutation,
 } from "@/lib/redux/api";
+import { mediaUrl } from "@/lib/media-url";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -17,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MultiSelect } from "@/components/ui/multi-select";
 import { BlockNoteEditorComponent } from "@/components/content-editor/block-note-editor";
 import type { BodyDocument } from "@nnact/shared";
+import { Plus, Check } from "lucide-react";
 
 const TYPES = [
   { value: "ARTICLE", label: "Article" },
@@ -32,8 +37,11 @@ const TYPES = [
 export default function NewContentPage() {
   const router = useRouter();
   const [createContent, { isLoading }] = useCreateContentItemMutation();
+  const [patchContent] = usePatchContentItemMutation();
+  const [uploadMedia, { isLoading: uploading }] = useUploadContentMediaMutation();
   const { data: categories } = useContentCategoriesQuery();
   const { data: tags } = useContentTagsQuery();
+  const [createCategory, { isLoading: creatingCategory }] = useCreateContentCategoryMutation();
 
   const [type, setType] = useState("ARTICLE");
   const [title, setTitle] = useState("");
@@ -42,7 +50,48 @@ export default function NewContentPage() {
   const [categoryId, setCategoryId] = useState("");
   const [visibility, setVisibility] = useState("PUBLIC");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [featuredMediaId, setFeaturedMediaId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [categoryDraftOpen, setCategoryDraftOpen] = useState(false);
+  const [categoryDraft, setCategoryDraft] = useState("");
+
+  const handleUploadImages = useCallback(
+    async (files: File[]): Promise<string[]> => {
+      const ids: string[] = [];
+      for (const file of files) {
+        try {
+          const created = await uploadMedia(file).unwrap();
+          ids.push(created.id);
+        } catch (err) {
+          console.error("image upload failed", err);
+        }
+      }
+      return ids;
+    },
+    [uploadMedia],
+  );
+
+  const uploadCover = async (file: File) => {
+    try {
+      const created = await uploadMedia(file).unwrap();
+      setFeaturedMediaId(created.id);
+    } catch (err) {
+      setError(explainRtkError(err, "Cover upload failed"));
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    const name = categoryDraft.trim();
+    if (!name) return;
+    try {
+      const created = await createCategory({ name }).unwrap();
+      setCategoryId(created.id);
+      setCategoryDraft("");
+      setCategoryDraftOpen(false);
+    } catch (err) {
+      setError(explainRtkError(err, "Failed to create category"));
+    }
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -60,6 +109,9 @@ export default function NewContentPage() {
         visibility,
         tagNames: selectedTags,
       }).unwrap();
+      if (featuredMediaId) {
+        await patchContent({ id: created.id, data: { featuredMediaId } }).unwrap();
+      }
       router.push(`/content/${created.id}`);
     } catch (err) {
       setError(explainRtkError(err, "Failed to create content. Check permissions and try again."));
@@ -83,6 +135,7 @@ export default function NewContentPage() {
                 <Label>Body Content</Label>
                 <BlockNoteEditorComponent
                   onChange={(doc) => setDocument(doc)}
+                  onUploadImages={handleUploadImages}
                   placeholder="Start writing, or type / for blocks…"
                 />
               </div>
@@ -106,12 +159,51 @@ export default function NewContentPage() {
 
               <div className="grid gap-2">
                 <Label>Category</Label>
-                <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger><SelectValue placeholder="Optional category" /></SelectTrigger>
-                  <SelectContent>
-                    {(categories ?? []).map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
+                {categoryDraftOpen ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={categoryDraft}
+                      onChange={(e) => setCategoryDraft(e.target.value)}
+                      placeholder="New category name"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void handleCreateCategory();
+                        if (e.key === "Escape") setCategoryDraftOpen(false);
+                      }}
+                    />
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={!categoryDraft.trim() || creatingCategory}
+                      onClick={() => void handleCreateCategory()}
+                      title="Create category"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Select value={categoryId} onValueChange={setCategoryId}>
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="Optional category" /></SelectTrigger>
+                      <SelectContent>
+                        {(categories ?? []).length === 0 && (
+                          <div className="px-2 py-1.5 text-sm text-fg-muted">No categories yet — add one</div>
+                        )}
+                        {(categories ?? []).map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => setCategoryDraftOpen(true)}
+                      title="New category"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-2">
@@ -120,8 +212,48 @@ export default function NewContentPage() {
                   options={(tags ?? []).map((t) => ({ label: t.name, value: t.name }))}
                   selected={selectedTags}
                   onChange={setSelectedTags}
-                  placeholder="Select tags"
+                  placeholder={(tags ?? []).length === 0 ? "Type to create a tag…" : "Select tags"}
+                  allowCreate
+                  onCreate={(value) => {
+                    setSelectedTags((prev) => (prev.includes(value) ? prev : [...prev, value]));
+                  }}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Featured image (optional)</Label>
+                {featuredMediaId ? (
+                  <div className="relative overflow-hidden rounded-lg border border-border">
+                    <img src={mediaUrl(featuredMediaId) ?? ""} alt="" className="aspect-video w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setFeaturedMediaId(null)}
+                      className="absolute right-1.5 top-1.5 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-fg border border-border"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-border text-xs text-fg-muted">
+                    No cover yet
+                  </div>
+                )}
+                <label className="relative inline-flex">
+                  <Button variant="outline" size="sm" asChild>
+                    <span>{uploading ? "Uploading…" : "Upload cover"}</span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void uploadCover(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
               </div>
 
               <div className="grid gap-2">

@@ -54,7 +54,7 @@ export class PublicationWorker {
         continue;
       }
       try {
-        const ok = await this.executePublication(row.orgId, row.publicationId, pub.channel, now);
+        const ok = await this.executePublication(row.orgId, row.publicationId, row.eventType, pub.channel, now);
         if (ok) succeeded++;
         else failed++;
         await markOutboxProcessed(row.orgId, row.id);
@@ -101,7 +101,7 @@ export class PublicationWorker {
     return row ?? null;
   }
 
-  private async executePublication(orgId: string, publicationId: string, channel: PublishingChannel, now: Date): Promise<boolean> {
+  private async executePublication(orgId: string, publicationId: string, eventType: string, channel: PublishingChannel, now: Date): Promise<boolean> {
     const provider = this.deps.registry.get(channel);
     const [pubRow] = await db
       .select()
@@ -134,7 +134,10 @@ export class PublicationWorker {
     while (true) {
       const started = new Date();
       try {
-        const result = await provider.publish(request);
+        const result =
+          eventType === "update" && provider.update
+            ? await provider.update({ ...request, providerPublicationId: pubRow.providerPublicationId ?? request.publicationId })
+            : await provider.publish(request);
         await this.repo.recordAttempt({
           orgId, publicationId, attemptNumber: attempt + 1, startedAt: started, completedAt: new Date(),
           providerStatus: result.providerStatus, retryable: false, providerRequestId: result.providerPublicationId,

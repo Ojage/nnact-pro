@@ -109,6 +109,13 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
     };
   }
 
+  // LinkedIn has no post-editing endpoint, so an update mirrors the common
+  // pattern: remove the stale post and create a fresh one (new id, new URL).
+  async update(request: PublishRequest & { providerPublicationId: string }): Promise<PublishResult> {
+    await this.deleteOrUnpublish(request.organizationId, request.providerPublicationId);
+    return this.publish(request);
+  }
+
   async deleteOrUnpublish(orgId: string, providerPublicationId: string): Promise<void> {
     const token = await this.auth(orgId);
     const res = await providerFetch(`${this.baseUrl}/rest/posts/${providerPublicationId}`, {

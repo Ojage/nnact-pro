@@ -84,11 +84,28 @@ export class PublishContentUseCase {
 
       for (const pub of created) {
         if (pub.status === "DRAFT" || pub.status === "SCHEDULED") continue;
+
+        // Re-publishing an already-published piece is an "update": keep the same
+        // external post and push new content to it. Skip anything already queued
+        // or in flight so double-clicks can't fan out duplicate events.
+        const [pending] = await tx
+          .select({ id: publicationOutbox.id })
+          .from(publicationOutbox)
+          .where(and(eq(publicationOutbox.publicationId, pub.id), eq(publicationOutbox.status, "pending")))
+          .limit(1);
+        if (pending) continue;
+
+        const isUpdate = pub.status === "PUBLISHED" && content.status === "PUBLISHED";
         await tx.insert(publicationOutbox).values({
           orgId: input.orgId,
           publicationId: pub.id,
-          eventType: "publish",
-          payload: { contentId: input.contentId, channel: pub.channel, revision: content.revision },
+          eventType: isUpdate ? "update" : "publish",
+          payload: {
+            contentId: input.contentId,
+            channel: pub.channel,
+            revision: content.revision,
+            ...(isUpdate && pub.providerPublicationId ? { providerPublicationId: pub.providerPublicationId } : {}),
+          },
           status: "pending",
           nextAttemptAt: new Date(),
         });

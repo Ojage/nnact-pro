@@ -61,6 +61,17 @@ export class FakePublishingProvider implements PublishingProviderPort {
     };
   }
 
+  async update(request: PublishRequest & { providerPublicationId: string }): Promise<PublishResult> {
+    await new Promise((r) => setTimeout(r, 60));
+    return {
+      providerPublicationId: request.providerPublicationId,
+      externalUrl: `https://simulated.local/${this.channel.toLowerCase()}/${request.publicationId}/u`,
+      publishedAt: new Date(),
+      providerStatus: "PUBLISHED",
+      rawMetadata: { simulated: true, channel: this.channel, update: true },
+    };
+  }
+
   async deleteOrUnpublish(): Promise<void> {
     return;
   }

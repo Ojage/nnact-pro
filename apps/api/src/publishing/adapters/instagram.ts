@@ -104,6 +104,23 @@ export class InstagramPublishingAdapter implements PublishingProviderPort {
     };
   }
 
+  async update(request: PublishRequest & { providerPublicationId: string }): Promise<PublishResult> {
+    const { token } = await this.auth(request.organizationId);
+    const caption = [request.caption ?? request.body ?? "", ...(request.hashtags ?? [])].join(" ").slice(0, this.capabilities.maxTextLength);
+    const res = await providerFetch(`${this.baseUrl}/v21.0/${request.providerPublicationId}`, {
+      method: "POST",
+      body: new URLSearchParams({ access_token: token, caption }).toString(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (res.status >= 400) throw new ProviderError(this.mapError(res.status, res.body, request.providerPublicationId));
+    return {
+      providerPublicationId: request.providerPublicationId,
+      externalUrl: `https://www.instagram.com/reel/${request.providerPublicationId}`,
+      publishedAt: new Date(),
+      providerStatus: "PUBLISHED",
+    };
+  }
+
   async deleteOrUnpublish(orgId: string, providerPublicationId: string): Promise<void> {
     const { token, igId } = await this.auth(orgId);
     const res = await providerFetch(`${this.baseUrl}/v21.0/${igId}/media?ids=${providerPublicationId}&access_token=${token}`, { method: "DELETE" });

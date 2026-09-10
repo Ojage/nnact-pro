@@ -1,6 +1,6 @@
 
 import * as React from "react"
-import { Check, ChevronsUpDown, X } from "lucide-react"
+import { Check, ChevronsUpDown, Plus, X } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "./button"
 import {
@@ -10,6 +10,7 @@ import {
     CommandInput,
     CommandItem,
     CommandList,
+    CommandSeparator,
 } from "./command"
 import {
     Popover,
@@ -17,6 +18,7 @@ import {
     PopoverTrigger,
 } from "./popover"
 import { Badge } from "./badge"
+import { useState } from "react"
 
 export type Option = {
     label: string
@@ -30,6 +32,8 @@ interface MultiSelectProps {
     placeholder?: string
     searchPlaceholder?: string
     className?: string
+    allowCreate?: boolean
+    onCreate?: (value: string) => void
 }
 
 export function MultiSelect({
@@ -39,11 +43,30 @@ export function MultiSelect({
     placeholder = "Select options...",
     searchPlaceholder = "Search...",
     className,
+    allowCreate = false,
+    onCreate,
 }: MultiSelectProps) {
-    const [open, setOpen] = React.useState(false)
+    const [open, setOpen] = useState(false)
+    const [search, setSearch] = useState("")
 
     const handleUnselect = (item: string) => {
         onChange(selected.filter((i) => i !== item))
+    }
+
+    const normalized = search.trim().toLowerCase()
+    const matches = options.filter(
+        (o) => o.label.toLowerCase().includes(normalized) || o.value.toLowerCase().includes(normalized),
+    )
+    const canCreate =
+        allowCreate &&
+        normalized.length > 0 &&
+        !options.some((o) => o.label.toLowerCase() === normalized || o.value.toLowerCase() === normalized)
+
+    const createValue = () => {
+        if (!canCreate || !onCreate) return
+        onCreate(search.trim())
+        setSearch("")
+        setOpen(true)
     }
 
     return (
@@ -77,36 +100,60 @@ export function MultiSelect({
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-full p-0" align="start">
-                <Command>
-                    <CommandInput placeholder={searchPlaceholder} />
+                <Command shouldFilter={false}>
+                    <CommandInput
+                        placeholder={searchPlaceholder}
+                        value={search}
+                        onValueChange={setSearch}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && canCreate) {
+                                e.preventDefault()
+                                createValue()
+                            }
+                        }}
+                    />
                     <CommandList>
-                        <CommandEmpty>No results found.</CommandEmpty>
-                        <CommandGroup className="max-h-64 overflow-auto">
-                            {options.map((option) => (
-                                <CommandItem
-                                    key={option.value}
-                                    value={option.label}
-                                    onSelect={() => {
-                                        onChange(
-                                            selected.includes(option.value)
-                                                ? selected.filter((item) => item !== option.value)
-                                                : [...selected, option.value]
-                                        )
-                                        setOpen(true)
-                                    }}
-                                >
-                                    <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4",
-                                            selected.includes(option.value)
-                                                ? "opacity-100"
-                                                : "opacity-0"
-                                        )}
-                                    />
-                                    {option.label}
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
+                        <CommandEmpty>
+                            {canCreate
+                                ? `Press Enter to create "${search.trim()}"`
+                                : "No results found."}
+                        </CommandEmpty>
+                        {matches.length > 0 && (
+                            <CommandGroup className="max-h-64 overflow-auto">
+                                {matches.map((option) => (
+                                    <CommandItem
+                                        key={option.value}
+                                        value={option.label}
+                                        onSelect={() => {
+                                            if (selected.includes(option.value)) handleUnselect(option.value)
+                                            else onChange([...selected, option.value])
+                                            setOpen(true)
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mr-2 h-4 w-4",
+                                                selected.includes(option.value)
+                                                    ? "opacity-100"
+                                                    : "opacity-0"
+                                            )}
+                                        />
+                                        {option.label}
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        )}
+                        {canCreate && (
+                            <>
+                                {matches.length > 0 && <CommandSeparator />}
+                                <CommandGroup>
+                                    <CommandItem value="__create__" onSelect={createValue}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Create "{search.trim()}"
+                                    </CommandItem>
+                                </CommandGroup>
+                            </>
+                        )}
                     </CommandList>
                 </Command>
             </PopoverContent>

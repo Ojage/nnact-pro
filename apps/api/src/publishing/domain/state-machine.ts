@@ -9,6 +9,7 @@ export const PUBLICATION_TRANSITIONS: ValidTransition[] = [
   { from: ["DRAFT", "READY", "FAILED", "SCHEDULED"], to: "SCHEDULED" },
   { from: ["DRAFT", "READY", "FAILED", "SCHEDULED", "QUEUED"], to: "QUEUED" },
   { from: ["QUEUED", "READY"], to: "PUBLISHING" },
+  { from: ["PUBLISHED"], to: "PUBLISHING" },
   { from: ["PUBLISHING"], to: "PUBLISHED" },
   { from: ["QUEUED", "PUBLISHING", "SCHEDULED", "READY", "FAILED"], to: "FAILED" },
   { from: ["DRAFT", "READY", "SCHEDULED", "QUEUED", "FAILED"], to: "CANCELLED" },

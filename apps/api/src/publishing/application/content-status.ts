@@ -9,7 +9,7 @@ const TRANSITIONS: Record<ContentStatus, ContentStatus[]> = {
   APPROVED: ["SCHEDULED", "PUBLISHING", "PUBLISHED", "IN_REVIEW", "DRAFT"],
   SCHEDULED: ["PUBLISHING", "PUBLISHED", "DRAFT", "ARCHIVED"],
   PUBLISHING: ["PUBLISHED", "FAILED_PUBLISH", "DRAFT"],
-  PUBLISHED: ["ARCHIVED", "DRAFT"],
+  PUBLISHED: ["ARCHIVED", "DRAFT", "PUBLISHING"],
   ARCHIVED: ["DRAFT"],
   REJECTED: ["DRAFT", "IN_REVIEW"],
 } as unknown as Record<ContentStatus, ContentStatus[]>;
