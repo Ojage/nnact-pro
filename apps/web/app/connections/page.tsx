@@ -110,7 +110,7 @@ export default function ConnectionsPage() {
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   {isSocial ? (
-                    !conn ? (
+                    !conn || conn.status === "DISCONNECTED" ? (
                       <Button onClick={() => handleConnect(channel)}>Connect</Button>
                     ) : (
                       <>
