@@ -16,6 +16,7 @@ export * from "./walkthroughs.js";
 export * from "./content.js";
 export * from "./content-document.js";
 export * from "./publishing.js";
+export * from "./ai.js";
 export * from "./phone.js";
 export * from "./api-error.js";
 

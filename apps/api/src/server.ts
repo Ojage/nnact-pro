@@ -35,6 +35,7 @@ import { pluginRoutes } from "./routes/plugins.js";
 import { pluginApiRoutes } from "./routes/plugin-api.js";
 import { servicePlanRoutes } from "./routes/service-plans.js";
 import { orgSettingsRoutes } from "./routes/org-settings.js";
+import { aiRoutes } from "./ai/index.js";
 import { operationRoutes } from "./routes/operations.js";
 import { diagnosticRoutes } from "./routes/diagnostics.js";
 import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
@@ -279,6 +280,7 @@ export function buildServer(
   app.register(pluginApiRoutes, { prefix: withVersion("/plugin") });
   app.register(servicePlanRoutes, { prefix: withVersion("/service-plans") });
   app.register(orgSettingsRoutes, { prefix: withVersion("/org") });
+  app.register(aiRoutes, { prefix: withVersion("/ai") });
   app.register(operationRoutes, {
     prefix: withVersion("/operations"),
     client:
@@ -338,6 +340,7 @@ export function buildServer(
   app.register(pluginApiRoutes, { prefix: withLegacy("/plugin") });
   app.register(servicePlanRoutes, { prefix: withLegacy("/service-plans") });
   app.register(orgSettingsRoutes, { prefix: withLegacy("/org") });
+  app.register(aiRoutes, { prefix: withLegacy("/ai") });
   app.register(operationRoutes, {
     prefix: withLegacy("/operations"),
     client:

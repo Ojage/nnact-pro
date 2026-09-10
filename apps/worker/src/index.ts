@@ -15,6 +15,8 @@ import { notify } from "./notify.ts";
 import { PublicationWorker } from "../../api/src/publishing/application/worker.ts";
 import { defaultRegistry } from "../../api/src/publishing/registry.ts";
 import { DbMediaProvider } from "../../api/src/publishing/infra/media.ts";
+import { createAutomationEngine } from "../../api/src/ai/engine.ts";
+import { aiContentAutomation } from "@nnact/db";
 
 const INTERVAL = Number(process.env.WORKER_INTERVAL_MS ?? 60_000);
 const STATUS_PORT = Number(process.env.WORKER_STATUS_PORT ?? 3020);
@@ -65,6 +67,20 @@ async function processPublications(now: Date) {
   }
 }
 
+async function runAiAutomation(now: Date) {
+  if (process.env.AI_AUTOMATION_ENABLED === "false") return;
+  const engine = createAutomationEngine();
+  const orgs = await db.select({ orgId: aiContentAutomation.orgId }).from(aiContentAutomation).where(eq(aiContentAutomation.enabled, true));
+  for (const { orgId } of orgs) {
+    try {
+      const { executedCount } = await engine.runDueSlots(orgId);
+      if (executedCount > 0) console.log(`[worker] ai automation: ${executedCount} slot(s) executed for ${orgId.slice(0, 8)}`);
+    } catch (e) {
+      console.error(`[worker] ai automation error for ${orgId.slice(0, 8)}: ${(e as Error).message}`);
+    }
+  }
+}
+
 async function tick() {
   const finish = drain.begin();
   if (!finish) return;
@@ -75,6 +91,7 @@ async function tick() {
     const r = await retryDueDeliveries(now);
     if (r.due > 0) console.log(`[worker] webhook retries: ${r.delivered} delivered, ${r.dead} dead of ${r.due} due`);
     await processPublications(now);
+    await runAiAutomation(now);
   } catch (e) {
     console.error(`[worker] tick error: ${(e as Error).message}`);
   } finally {

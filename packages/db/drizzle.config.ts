@@ -1,7 +1,7 @@
 import type { Config } from "drizzle-kit";
 
 export default {
-  schema: ["./src/schema.ts", "./src/service-plans.ts", "./src/diagnostics.ts", "./src/repair-brain.ts", "./src/content.ts"],
+  schema: ["./src/schema.ts", "./src/service-plans.ts", "./src/diagnostics.ts", "./src/repair-brain.ts", "./src/content.ts", "./src/ai.ts"],
   out: "./drizzle",
   dialect: "postgresql",
   extensionsFilters: ["postgis"],

@@ -10,6 +10,14 @@ import type {
   PublicationAttemptDTO,
   PublishingConnectionDTO,
   PublishingChannel,
+  AiAutomationSettingsDTO,
+  AiProviderConfigDTO,
+  AiProviderConfigWrite,
+  AiProviderId,
+  AiProviderStatus,
+  AiRunDTO,
+  AiRunState,
+  AiSlot,
 } from "@nnact/shared";
 import type {
   Estimate,
@@ -219,6 +227,7 @@ export const apiSlice = createApi({
     "Content",
     "Publication",
     "Connection",
+    "Ai",
   ],
   endpoints: (builder) => ({
     // ── Jobs ──
@@ -1041,6 +1050,52 @@ export const apiSlice = createApi({
       query: (channel) => ({ url: `/api/connections/${channel}/validate`, method: "POST", body: {} }),
       invalidatesTags: ["Connection"],
     }),
+
+    // ── AI automation ──
+    aiSettings: builder.query<AiAutomationSettingsDTO, void>({
+      query: () => "/api/ai/settings",
+      providesTags: ["Ai"],
+    }),
+    updateAiSettings: builder.mutation<AiAutomationSettingsDTO, Partial<AiAutomationSettingsDTO>>({
+      query: (body) => ({ url: "/api/ai/settings", method: "PUT", body }),
+      invalidatesTags: ["Ai"],
+    }),
+    aiProviders: builder.query<AiProviderConfigDTO[], void>({
+      query: () => "/api/ai/providers",
+      providesTags: ["Ai"],
+    }),
+    saveAiProvider: builder.mutation<AiProviderConfigDTO, { provider: AiProviderId; body: Partial<AiProviderConfigWrite> }>({
+      query: ({ provider, body }) => ({ url: `/api/ai/providers/${provider}`, method: "PUT", body }),
+      invalidatesTags: ["Ai"],
+    }),
+    probeAiProvider: builder.mutation<{ provider: AiProviderId; status: AiProviderStatus; lastError: string | null; latencyMs: number }, AiProviderId>({
+      query: (provider) => ({ url: `/api/ai/providers/${provider}/probe`, method: "POST", body: {} }),
+      invalidatesTags: ["Ai"],
+    }),
+    aiHealth: builder.query<Record<string, unknown>, void>({
+      query: () => "/api/ai/health",
+      providesTags: ["Ai"],
+    }),
+    aiRuns: builder.query<{ items: AiRunDTO[]; total: number }, { skip?: number; take?: number; state?: AiRunState }>({
+      query: (params) => ({ url: "/api/ai/runs", params: params as Record<string, unknown> }),
+      providesTags: ["Ai"],
+    }),
+    aiRun: builder.query<AiRunDTO, string>({
+      query: (id) => `/api/ai/runs/${id}`,
+      providesTags: ["Ai"],
+    }),
+    triggerAiRun: builder.mutation<{ runId: string; state: string }, { isoDate: string; slot: AiSlot }>({
+      query: (body) => ({ url: "/api/ai/trigger", method: "POST", body }),
+      invalidatesTags: ["Ai"],
+    }),
+    aiUsage: builder.query<Record<string, unknown>, void>({
+      query: () => "/api/ai/usage",
+      providesTags: ["Ai"],
+    }),
+    aiReserve: builder.query<Record<string, unknown>, void>({
+      query: () => "/api/ai/reserve",
+      providesTags: ["Ai"],
+    }),
   }),
 });
 
@@ -1195,6 +1250,17 @@ export const {
   useOauthConnectionCallbackMutation,
   useDisconnectConnectionMutation,
   useValidateConnectionMutation,
+  useAiSettingsQuery,
+  useUpdateAiSettingsMutation,
+  useAiProvidersQuery,
+  useSaveAiProviderMutation,
+  useProbeAiProviderMutation,
+  useAiHealthQuery,
+  useAiRunsQuery,
+  useAiRunQuery,
+  useTriggerAiRunMutation,
+  useAiUsageQuery,
+  useAiReserveQuery,
 } = apiSlice;
 
 /** Extract a readable message from an RTK Query / fetchBaseQuery error. */
