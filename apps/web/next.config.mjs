@@ -13,16 +13,17 @@ loadEnvConfig(repoRoot);
 const apiOrigin = new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003").origin;
 const developmentSockets = process.env.NODE_ENV === "production" ? "" : " ws://127.0.0.1:* ws://localhost:*";
 const developmentEval = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
+const cloudflareInsights = "https://static.cloudflareinsights.com";
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
-  `connect-src 'self' ${apiOrigin}${developmentSockets}`,
+  `connect-src 'self' ${apiOrigin} https://cloudflareinsights.com${developmentSockets}`,
   "font-src 'self' data:",
   "form-action 'self'",
   "frame-ancestors 'none'",
   `img-src 'self' data: blob: https: ${apiOrigin}`,
   "object-src 'none'",
-  `script-src 'self' 'unsafe-inline'${developmentEval}`,
+  `script-src 'self' 'unsafe-inline' ${cloudflareInsights}${developmentEval}`,
   "style-src 'self' 'unsafe-inline'",
 ].join("; ");
 
