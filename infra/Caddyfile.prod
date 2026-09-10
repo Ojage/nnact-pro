@@ -26,7 +26,7 @@
 {$NNPSITE_ADDRESS} {
 	import security_headers
 
-	handle /welcome* {
+handle /welcome* {
 		root * /srv/landing
 		try_files {path} /index.html
 		file_server
@@ -50,7 +50,7 @@
 {$NNPMARKETING_ADDRESS} {
 	import security_headers
 	root * /srv/marketing
-	try_files {path} /index.html
+	try_files {path}/index.html {path} /index.html
 	file_server
 	log {
 		output stdout
