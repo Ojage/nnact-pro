@@ -34,9 +34,9 @@ function oauthConfigFor(channel: PublishingChannel): OAuthConfig | null {
       return envOAuth(
         process.env.LINKEDIN_CLIENT_ID,
         process.env.LINKEDIN_CLIENT_SECRET,
-        "https://www.linkedin.com/oauth/v2/authorization",
-        "https://www.linkedin.com/oauth/v2/accessToken",
-        "w_member_social r_liteprofile r_emailaddress",
+"https://www.linkedin.com/oauth/v2/authorization",
+      "https://www.linkedin.com/oauth/v2/accessToken",
+      "w_member_social openid profile email",
       );
     case "FACEBOOK":
     case "INSTAGRAM":
