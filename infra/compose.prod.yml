@@ -64,6 +64,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:?Set comma-separated HTTPS web origins (e.g. https://pro.nnact.com)}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?Set the staff web origin, e.g. https://pro.nnact.com}
       PUBLIC_API_URL: ${PUBLIC_API_URL:?Set the public API origin, e.g. https://api.pro.nnact.com}
+      NNPMARKETING_ADDRESS: ${NNPMARKETING_ADDRESS:-}
+      PUBLIC_BLOG_URL: ${PUBLIC_BLOG_URL:-}
       LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
       LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
       META_APP_ID: ${META_APP_ID:-}
@@ -137,6 +139,8 @@ services:
       NNPMAINTENANCE_FILE: /var/lib/nnactpro-ops/state/maintenance.json
       WORKER_STATUS_PORT: 3020
       CONTENT_PUBLISHING_KEY: ${CONTENT_PUBLISHING_KEY:-}
+      NNPMARKETING_ADDRESS: ${NNPMARKETING_ADDRESS:-}
+      PUBLIC_BLOG_URL: ${PUBLIC_BLOG_URL:-}
     expose:
       - "3020"
     volumes:

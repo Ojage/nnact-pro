@@ -71,8 +71,27 @@ export async function resolveCredential(
   return store.get(orgId, channel);
 }
 
+/**
+ * Public article destination used by the Website channel for canonical URLs
+ * and publication links. The blog lives on the public marketing site, not the
+ * staff app, so the marketing apex wins in production:
+ *   PUBLIC_BLOG_URL → https://{NNPMARKETING_ADDRESS} (prod) → PUBLIC_WEB_URL
+ */
+export function publicSiteUrl(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env.PUBLIC_BLOG_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  const marketing = env.NNPMARKETING_ADDRESS?.trim();
+  if (marketing && env.NODE_ENV === "production") {
+    return `https://${marketing.replace(/^https?:\/\//, "").replace(/\/$/, "")}`;
+  }
+  const web = env.PUBLIC_WEB_URL?.trim();
+  if (web) return web.replace(/\/$/, "");
+  if (marketing) return `https://${marketing.replace(/^https?:\/\//, "").replace(/\/$/, "")}`;
+  throw new Error("public web/blog origin not configured: set PUBLIC_BLOG_URL, NNPMARKETING_ADDRESS, or PUBLIC_WEB_URL");
+}
+
 /** Default registry wired to the real connection store (env-backed). */
 export function defaultRegistry(): PublishingProviderRegistry {
   const credentialStore = connectionStoreFor(process.env);
-  return new PublishingProviderRegistry({ credentialStore, website: { websiteBaseUrl: process.env.PUBLIC_WEB_URL ?? "http://localhost:3000" } });
+  return new PublishingProviderRegistry({ credentialStore, website: { websiteBaseUrl: publicSiteUrl(process.env) } });
 }

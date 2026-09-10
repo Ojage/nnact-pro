@@ -9,6 +9,7 @@ import { channelPublications, contentItems, channelVariants, publicationOutbox }
 import type { PublishingChannel, PublishingProviderPort, PublishRequest } from "@nnact/shared";
 import { bodyDocumentToChannelPayload } from "@nnact/shared";
 import type { PublishingProviderRegistry } from "../registry.js";
+import { publicSiteUrl } from "../registry.js";
 import type { MediaProviderPort } from "../ports/index.js";
 import { DbPublicationRepository, claimDueOutbox, markOutboxProcessed, markOutboxFailed, transitionPublication } from "../infra/publication-repo.js";
 import { getContentItem } from "../infra/content-repo.js";
@@ -230,7 +231,7 @@ export class PublicationWorker {
   }
 
   private canonical(_orgId: string, _channel: PublishingChannel, slug: string): string {
-    const base = process.env.PUBLIC_WEB_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
+    const base = publicSiteUrl(process.env);
     // Website is the canonical destination for public articles.
     return `${base}/blog/${slug}`;
   }

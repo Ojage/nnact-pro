@@ -19,7 +19,8 @@ test("publication state machine allows scheduling and failure for retry", () => 
 
 test("publication state machine rejects invalid jumps", () => {
   assert.equal(canTransition("DRAFT", "PUBLISHED"), false);
-  assert.equal(canTransition("PUBLISHED", "PUBLISHING"), false);
+  // Republishing an already-published item is allowed (edit → republish).
+  assert.equal(canTransition("PUBLISHED", "PUBLISHING"), true);
   assert.equal(canTransition("CANCELLED", "PUBLISHING"), false);
   assert.throws(() => assertTransition("DRAFT", "PUBLISHED"), /Invalid publication state transition/);
 });
@@ -38,7 +39,7 @@ test("content state machine models the review -> approve -> publish lifecycle", 
 
 test("content state machine rejects publishing an unreviewed draft", () => {
   assert.equal(canTransitionContent("DRAFT", "PUBLISHED"), false);
-  assert.throws(() => assertContentTransition("DRAFT", "PUBLISHED"), /Invalid content status transition/);
+  assert.throws(() => assertContentTransition("DRAFT", "PUBLISHED"), /Cannot transition content/);
 });
 
 test("content state machine allows reject -> revise -> resubmit", () => {
