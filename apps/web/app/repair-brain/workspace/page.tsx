@@ -125,7 +125,8 @@ export default function ModelWorkspacePage() {
                       {active && <Check className="size-3.5 shrink-0 text-primary" aria-hidden />}
                     </span>
                     <span className="w-full truncate text-xs text-fg-muted">
-                      {c.subcategory || c.productFamily || c.description || `${c.template.sections.length} section template`}
+                      {c.subcategory || c.productFamily || c.description ||
+                        (c.template?.sections?.length ? `${c.template.sections.length} section template` : "Edit template")}
                     </span>
                   </button>
                 );

@@ -660,6 +660,7 @@ export const apiSlice = createApi({
     // ── Model Workspace / Knowledge Composer ──
     workspaceCategories: builder.query<EquipmentCategoryDTO[], void>({
       query: () => "/api/repair-brain/categories",
+      transformResponse: (res: { categories: EquipmentCategoryDTO[] }) => res.categories,
       providesTags: ["RepairBrain"],
     }),
     workspaceCategory: builder.query<EquipmentCategoryDTO & { sections: unknown[] }, string>({
@@ -672,14 +673,17 @@ export const apiSlice = createApi({
     }),
     workspaceSystems: builder.query<EquipmentSystemDTO[], string | undefined>({
       query: (categoryId) => `/api/repair-brain/systems${categoryId ? `?categoryId=${categoryId}` : ""}`,
+      transformResponse: (res: { systems: EquipmentSystemDTO[] }) => res.systems,
       providesTags: ["RepairBrain"],
     }),
     workspaceSubsystems: builder.query<EquipmentSubsystemDTO[], string | undefined>({
       query: (systemId) => `/api/repair-brain/subsystems${systemId ? `?systemId=${systemId}` : ""}`,
+      transformResponse: (res: { subsystems: EquipmentSubsystemDTO[] }) => res.subsystems,
       providesTags: ["RepairBrain"],
     }),
     workspaceComponents: builder.query<EquipmentComponentDTO[], string | undefined>({
       query: (subsystemId) => `/api/repair-brain/components${subsystemId ? `?subsystemId=${subsystemId}` : ""}`,
+      transformResponse: (res: { components: EquipmentComponentDTO[] }) => res.components,
       providesTags: ["RepairBrain"],
     }),
     workspaceErrorCodes: builder.query<EquipmentErrorCodeDTO[], { equipmentModelId?: string; categoryId?: string }>({
@@ -690,6 +694,7 @@ export const apiSlice = createApi({
         const suffix = qs.toString();
         return `/api/repair-brain/errors${suffix ? `?${suffix}` : ""}`;
       },
+      transformResponse: (res: { errorCodes: EquipmentErrorCodeDTO[] }) => res.errorCodes,
       providesTags: ["RepairBrain"],
     }),
     workspaceSequences: builder.query<OperatingSequenceDTO[], { equipmentModelId?: string; categoryId?: string }>({
@@ -700,6 +705,7 @@ export const apiSlice = createApi({
         const suffix = qs.toString();
         return `/api/repair-brain/sequences${suffix ? `?${suffix}` : ""}`;
       },
+      transformResponse: (res: { sequences: OperatingSequenceDTO[] }) => res.sequences,
       providesTags: ["RepairBrain"],
     }),
     workspaceServiceModes: builder.query<ServiceModeDTO[], { equipmentModelId?: string; categoryId?: string }>({
@@ -710,6 +716,7 @@ export const apiSlice = createApi({
         const suffix = qs.toString();
         return `/api/repair-brain/service-modes${suffix ? `?${suffix}` : ""}`;
       },
+      transformResponse: (res: { serviceModes: ServiceModeDTO[] }) => res.serviceModes,
       providesTags: ["RepairBrain"],
     }),
     workspaceArticles: builder.query<KnowledgeArticleDTO[], { equipmentModelId?: string; categoryId?: string }>({
@@ -720,6 +727,7 @@ export const apiSlice = createApi({
         const suffix = qs.toString();
         return `/api/repair-brain/articles${suffix ? `?${suffix}` : ""}`;
       },
+      transformResponse: (res: { articles: KnowledgeArticleDTO[] }) => res.articles,
       providesTags: ["RepairBrain"],
     }),
     workspaceEdges: builder.query<KnowledgeEdgeDTO[], { equipmentModelId?: string; categoryId?: string }>({
@@ -730,6 +738,7 @@ export const apiSlice = createApi({
         const suffix = qs.toString();
         return `/api/repair-brain/edges${suffix ? `?${suffix}` : ""}`;
       },
+      transformResponse: (res: { edges: KnowledgeEdgeDTO[] }) => res.edges,
       providesTags: ["RepairBrain"],
     }),
     createWorkspaceCategory: builder.mutation<EquipmentCategoryDTO, { name: string; description?: string }>({
