@@ -95,6 +95,22 @@ export function buildServer(
     bodyLimit: 1_048_576,
     trustProxy: process.env.TRUST_PROXY === "true",
   });
+  // Tolerate empty JSON bodies: the staff web app force-sends
+  // content-type: application/json even for body-less POSTs (retry, approve,
+  // unpublish…), which Fastify's default parser rejects as
+  // FST_ERR_CTP_EMPTY_JSON_BODY. Treat an empty body as {} instead.
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
+    const text = (body as string).trim();
+    if (!text) {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(text));
+    } catch (err) {
+      done(err as Error);
+    }
+  });
   app.addHook("onClose", async () => {
     await closeRedis();
   });
