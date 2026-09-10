@@ -36,7 +36,7 @@ function oauthConfigFor(channel: PublishingChannel): OAuthConfig | null {
         process.env.LINKEDIN_CLIENT_SECRET,
 "https://www.linkedin.com/oauth/v2/authorization",
       "https://www.linkedin.com/oauth/v2/accessToken",
-      "w_member_social openid profile email",
+      "w_organization_social r_organization_social openid",
       );
     case "FACEBOOK":
     case "INSTAGRAM":
@@ -239,7 +239,37 @@ async function resolveIdentity(channel: PublishingChannel, accessToken: string, 
       });
       if (res.status >= 400) return null;
       const body = res.body as { sub?: string; name?: string };
-      return { accountId: body.sub, accountName: body.name ?? null, meta: {} };
+
+      // Resolve the Company Page the user administers so we can publish as the
+      // organization (urn:li:organization:<pageId>). Requires the
+      // w_organization_social/r_organization_social scopes.
+      let page: { id?: string; entityUrn?: string; localizedName?: string; vanityName?: string } | null = null;
+      try {
+        const orgs = await providerFetch(
+          "https://api.linkedin.com/v2/organizations?q=roleAssignees&role=ADMINISTRATOR&projection=(elements(*(id,localizedName,vanityName,entityUrn)))",
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        const elements = (orgs.body as { elements?: { id?: string; entityUrn?: string; localizedName?: string; vanityName?: string }[] })?.elements;
+        page = Array.isArray(elements) ? (elements[0] ?? null) : null;
+      } catch {
+        // best-effort: fall through to member identity below
+      }
+
+      let pageId: string | null = page?.id ?? null;
+      if (!pageId && typeof page?.entityUrn === "string") pageId = page.entityUrn.split(":").pop() ?? null;
+
+      return {
+        accountId: body.sub,
+        accountName: page?.localizedName ?? body.name ?? null,
+        pageId,
+        meta: {
+          pageId,
+          pageName: page?.localizedName ?? null,
+          vanityName: page?.vanityName ?? null,
+          memberName: body.name ?? null,
+          memberSub: body.sub ?? null,
+        },
+      };
     }
 
     // Meta: resolve pages for the user token.
@@ -251,7 +281,7 @@ async function resolveIdentity(channel: PublishingChannel, accessToken: string, 
       `https://graph.facebook.com/v21.0/${meBody.id ?? "me"}/accounts?fields=id,name,access_token&access_token=${accessToken}`,
     );
     const page = (pages.body as { data?: { id: string; name: string; access_token: string }[] })?.data?.[0];
-    if (!page) return { accountId: meBody.id, accountName: meBody.name ?? null, meta: { page: null } };
+    if (!page) return { accountId: meBody.id, accountName: meBody.name ?? null, pageId: null, meta: { page: null } };
 
     if (channel === "INSTAGRAM") {
       const ig = await providerFetch(

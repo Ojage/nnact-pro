@@ -20,7 +20,7 @@ export class DbConnectionStore implements CredentialStorePort {
   async get(
     orgId: string,
     channel: string,
-  ): Promise<{ accessToken: string; accountId?: string | null; meta?: Record<string, unknown> } | null> {
+  ): Promise<{ accessToken: string; accountId?: string | null; pageId?: string | null; meta?: Record<string, unknown> } | null> {
     const [row] = await db
       .select()
       .from(publishingConnections)
@@ -34,6 +34,7 @@ export class DbConnectionStore implements CredentialStorePort {
       return {
         accessToken: blob.accessToken,
         accountId: blob.accountId ?? row.accountId,
+        pageId: blob.pageId ?? null,
         meta: blob.meta,
       };
     } catch {
@@ -72,11 +73,11 @@ export class DbConnectionStore implements CredentialStorePort {
 
 /** Simple in-memory store for tests / local dev without a real provider. */
 export class MemoryCredentialStore implements CredentialStorePort {
-  private creds = new Map<string, { accessToken: string; accountId?: string | null; meta?: Record<string, unknown> }>();
+  private creds = new Map<string, { accessToken: string; accountId?: string | null; pageId?: string | null; meta?: Record<string, unknown> }>();
   get(orgId: string, channel: string) {
     return Promise.resolve(this.creds.get(`${orgId}:${channel}`) ?? null);
   }
-  set(orgId: string, channel: string, value: { accessToken: string; accountId?: string | null; meta?: Record<string, unknown> }) {
+  set(orgId: string, channel: string, value: { accessToken: string; accountId?: string | null; pageId?: string | null; meta?: Record<string, unknown> }) {
     this.creds.set(`${orgId}:${channel}`, value);
     return Promise.resolve();
   }

@@ -16,7 +16,7 @@ export interface MediaProviderPort {
 
 /** Access to stored OAuth/provider credentials for a connection (encrypted at rest). */
 export interface CredentialStorePort {
-  get(orgId: string, channel: string): Promise<{ accessToken: string; accountId?: string | null; meta?: Record<string, unknown> } | null>;
+  get(orgId: string, channel: string): Promise<{ accessToken: string; accountId?: string | null; pageId?: string | null; meta?: Record<string, unknown> } | null>;
   setLastError(orgId: string, channel: string, error: string | null): Promise<void>;
   markExpired(orgId: string, channel: string): Promise<void>;
   markValidated(orgId: string, channel: string, accountName: string | null, accountId: string | null): Promise<void>;

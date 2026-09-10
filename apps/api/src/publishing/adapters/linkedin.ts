@@ -70,11 +70,13 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
     if (!cred?.accessToken) {
       throw new ProviderError(normalizeError("AUTH_EXPIRED", "No LinkedIn connection configured. Connect LinkedIn to retry.", null));
     }
-    const pageId = (request.metadata?.pageId as string | undefined)?.trim();
-    const authorUrn = pageId ? `urn:li:organization:${pageId}` : `urn:li:person:${cred.accountId?.trim()}`;
-    if (!pageId && (!cred.accountId || !cred.accountId.trim())) {
-      throw new ProviderError(normalizeError("AUTH_EXPIRED", "LinkedIn account id missing. Reconnect LinkedIn to retry.", null));
+    // Company Page publishing: author is the organization URN resolved from the
+    // administered page captured at connect time.
+    const pageId = (request.metadata?.pageId as string | undefined)?.trim() || cred.pageId?.trim() || null;
+    if (!pageId) {
+      throw new ProviderError(normalizeError("AUTH_EXPIRED", "No LinkedIn Company Page on this connection. Reconnect LinkedIn to select your page.", null));
     }
+    const authorUrn = `urn:li:organization:${pageId}`;
     const text = request.body ?? request.caption ?? "";
     const shareCommentary = [text, ...(request.hashtags ?? [])].join(" ");
 
