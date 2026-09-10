@@ -20,6 +20,8 @@ interface Props {
   onChange?: (doc: BodyDocument) => void;
   editable?: boolean;
   placeholder?: string;
+  /** Upload image files to Content Studio media and resolve them to media ids. */
+  onUploadImages?: (files: File[]) => Promise<string[]>;
 }
 
 function countWords(text: string): number {
@@ -79,10 +81,14 @@ export function BlockNoteEditorComponent({
   initialDocument,
   onChange,
   editable = true,
+  onUploadImages,
 }: Props) {
   const { theme } = useTheme();
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -122,8 +128,67 @@ export function BlockNoteEditorComponent({
     setCharCount(charsFromDoc(doc));
   }, [editor]);
 
+  const insertUploadedImages = useCallback(
+    async (files: File[]) => {
+      const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+      if (imageFiles.length === 0 || !onUploadImages) return;
+      setUploadBusy(true);
+      setUploadError(null);
+      try {
+        const ids = await onUploadImages(imageFiles);
+        if (ids.length === 0) {
+          setUploadError("The image couldn't be uploaded.");
+          return;
+        }
+        const blocks = ids.map((id) => ({
+          type: "nnactUploadedImage",
+          props: { url: id },
+        }));
+        const cursor = editor.getTextCursorPosition();
+        editor.insertBlocks(blocks as any, cursor.block, "after");
+      } catch (err) {
+        setUploadError("Paste/drop failed. Try the Add photo button instead.");
+        console.error(err);
+      } finally {
+        setUploadBusy(false);
+      }
+    },
+    [editor, onUploadImages],
+  );
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const files = Array.from(e.clipboardData?.items ?? [])
+        .filter((i) => i.kind === "file")
+        .map((i) => i.getAsFile())
+        .filter((f): f is File => Boolean(f));
+      if (files.length) {
+        e.preventDefault();
+        e.stopPropagation();
+        void insertUploadedImages(files);
+      }
+    },
+    [insertUploadedImages],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      if (files.length) {
+        e.preventDefault();
+        e.stopPropagation();
+        void insertUploadedImages(files);
+      }
+    },
+    [insertUploadedImages],
+  );
+
   return (
-    <div className="blocknote-editor-wrapper">
+    <div
+      className="blocknote-editor-wrapper"
+      onPaste={handlePaste}
+      onDrop={handleDrop}
+    >
       <BlockNoteView
         editor={editor}
         theme={theme}
@@ -131,13 +196,39 @@ export function BlockNoteEditorComponent({
         onChange={handleChange}
         className="min-h-[400px]"
       />
-      <div className="flex items-center gap-4 border-t border-border px-3 py-2 text-xs text-fg-muted">
+      <div className="flex flex-wrap items-center gap-4 border-t border-border px-3 py-2 text-xs text-fg-muted">
         <span>{wordCount.toLocaleString()}</span>
         <span>{wordCount === 1 ? "word" : "words"}</span>
         <span className="opacity-50">·</span>
         <span>{charCount.toLocaleString()} chars</span>
         <span className="opacity-50">·</span>
         <span>{readingMinutes(wordCount)} min read</span>
+        <span className="ml-auto flex items-center gap-3">
+          {uploadError && <span className="text-red">{uploadError}</span>}
+          {onUploadImages && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  void insertUploadedImages(Array.from(e.target.files ?? []));
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadBusy}
+                className="rounded-md border border-border bg-background px-2 py-1 font-medium text-fg outline-none focus:ring-2 focus:ring-primary/30 hover:bg-fg/5 disabled:opacity-50"
+              >
+                {uploadBusy ? "Uploading…" : "Add photo"}
+              </button>
+            </>
+          )}
+        </span>
       </div>
     </div>
   );
