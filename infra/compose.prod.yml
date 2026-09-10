@@ -136,6 +136,7 @@ services:
       NTFY_URL: ${NTFY_URL:-}
       NNPMAINTENANCE_FILE: /var/lib/nnactpro-ops/state/maintenance.json
       WORKER_STATUS_PORT: 3020
+      CONTENT_PUBLISHING_KEY: ${CONTENT_PUBLISHING_KEY:-}
     expose:
       - "3020"
     volumes:
