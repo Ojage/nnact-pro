@@ -17,7 +17,29 @@ rmdir .git/objects/.nnact-write-probe
 
 if [ -n "${NNACT_PRO_ENV:-}" ]; then
   umask 077
+
+  # Preserve any manually-added keys (e.g. LinkedIn/Meta OAuth creds) that
+  # are not managed by the CI secret.  We compare key names so CI-managed
+  # values always win, but server-side additions survive across deploys.
+  ENV_PREV=".env.prev"
+  if [ -f .env ]; then
+    cp .env "$ENV_PREV"
+  fi
+
   printf '%s\n' "$NNACT_PRO_ENV" > .env
+
+  if [ -f "$ENV_PREV" ]; then
+    while IFS= read -r line; do
+      # Skip blanks and comments
+      [[ -z "$line" || "$line" =~ ^# ]] && continue
+      key="${line%%=*}"
+      # If this key is NOT already in the new .env, carry it forward
+      if ! grep -q "^${key}=" .env 2>/dev/null; then
+        echo "$line" >> .env
+      fi
+    done < "$ENV_PREV"
+    rm -f "$ENV_PREV"
+  fi
 fi
 
 if [ ! -f .env ]; then
