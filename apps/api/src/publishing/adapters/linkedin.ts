@@ -66,17 +66,24 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
   }
 
   async publish(request: PublishRequest): Promise<PublishResult> {
-    const token = await this.auth(request.organizationId);
-    const urn = `urn:li:organization:${request.metadata?.pageId ?? request.canonicalUrl ?? "self"}`;
+    const cred = await this.deps.credentialStore.get(request.organizationId, this.channel);
+    if (!cred?.accessToken) {
+      throw new ProviderError(normalizeError("AUTH_EXPIRED", "No LinkedIn connection configured. Connect LinkedIn to retry.", null));
+    }
+    const pageId = (request.metadata?.pageId as string | undefined)?.trim();
+    const authorUrn = pageId ? `urn:li:organization:${pageId}` : `urn:li:person:${cred.accountId?.trim()}`;
+    if (!pageId && (!cred.accountId || !cred.accountId.trim())) {
+      throw new ProviderError(normalizeError("AUTH_EXPIRED", "LinkedIn account id missing. Reconnect LinkedIn to retry.", null));
+    }
     const text = request.body ?? request.caption ?? "";
     const shareCommentary = [text, ...(request.hashtags ?? [])].join(" ");
 
     let body: Record<string, unknown>;
     if (request.media.length > 0) {
       // Upload image, then post with media (simplified single-image flow).
-      const upload = await this.uploadImage(token, request.organizationId, request.media[0], urn);
+      const upload = await this.uploadImage(cred.accessToken, request.organizationId, request.media[0], authorUrn);
       body = {
-        author: urn,
+        author: authorUrn,
         commentary: shareCommentary,
         visibility: "PUBLIC",
         distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionTargets: [] },
@@ -84,7 +91,7 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
       };
     } else {
       body = {
-        author: urn,
+        author: authorUrn,
         commentary: shareCommentary,
         visibility: "PUBLIC",
         distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionTargets: [] },
@@ -93,7 +100,7 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
 
     const res = await providerFetch(`${this.baseUrl}/v2/ugcPosts`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0", "LinkedIn-Version": "202501" },
+      headers: { Authorization: `Bearer ${cred.accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0", "LinkedIn-Version": "202501" },
       body: JSON.stringify(body),
     });
     if (res.status >= 400) {
@@ -102,10 +109,10 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
     const id = (res.body as { id?: string })?.id ?? request.idempotencyKey;
     return {
       providerPublicationId: id,
-      externalUrl: this.postUrl(urn, id),
+      externalUrl: this.postUrl(id),
       publishedAt: new Date(),
       providerStatus: "PUBLISHED",
-      rawMetadata: { urn },
+      rawMetadata: { authorUrn },
     };
   }
 
@@ -134,7 +141,7 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
     });
     if (res.status === 404) return { status: "DELETED" };
     if (res.status >= 400) throw new ProviderError(this.mapError(res.status, res.body, providerPublicationId));
-    return { status: "PUBLISHED", externalUrl: this.postUrl("", providerPublicationId) };
+    return { status: "PUBLISHED", externalUrl: this.postUrl(providerPublicationId) };
   }
 
   private async uploadImage(token: string, orgId: string, media: { url: string; contentType: string }, urn: string) {
@@ -154,9 +161,8 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
     return { asset: value.asset };
   }
 
-  private postUrl(urn: string, id: string): string {
-    const orgId = urn.split(":").pop() ?? "";
-    return `https://www.linkedin.com/company/${orgId}/posts/${id}`;
+  private postUrl(id: string): string {
+    return id.startsWith("urn:li:") ? `https://www.linkedin.com/feed/update/${id}` : `https://www.linkedin.com/feed/update/urn:li:share:${id}`;
   }
 
   private mapError(status: number, body: unknown, requestId: string) {
