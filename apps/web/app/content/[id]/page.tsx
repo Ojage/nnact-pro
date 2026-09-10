@@ -50,8 +50,16 @@ export default function ContentEditorPage() {
   const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "";
 
-  const { data: item, isLoading, isError } = useContentItemQuery(id, { skip: !id });
+  const { data: item, isLoading, isError, refetch } = useContentItemQuery(id, { skip: !id });
   const { data: media } = useContentMediaQuery();
+
+  // While the publishing worker is running, poll so the button re-enables
+  // (and the status badge updates) as soon as the item leaves PUBLISHING.
+  useEffect(() => {
+    if (item?.status !== "PUBLISHING") return;
+    const timer = setInterval(() => void refetch(), 3000);
+    return () => clearInterval(timer);
+  }, [item?.status, refetch]);
 
   const [patchContent, { isLoading: saving }] = usePatchContentItemMutation();
   const [submitReview] = useSubmitContentReviewMutation();
@@ -182,11 +190,13 @@ export default function ContentEditorPage() {
 
   const handlePublish = async () => {
     await publish({ id, channels: sources }).unwrap();
+    await refetch();
   };
 
   const handleSchedule = async () => {
     if (!scheduleAt) return;
     await schedule({ id, channels: sources, scheduledAt: new Date(scheduleAt).toISOString() }).unwrap();
+    await refetch();
   };
 
   const handleUnpublish = async () => {
@@ -383,8 +393,15 @@ export default function ContentEditorPage() {
                     <Input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)} />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Button loading={scheduling} onClick={handleSchedule} disabled={!scheduleAt}>Schedule</Button>
-                    <Button variant="success" loading={publishing} onClick={handlePublish}>Publish Now</Button>
+                    <Button loading={scheduling} onClick={handleSchedule} disabled={!scheduleAt || item.status === "PUBLISHING"}>Schedule</Button>
+                    <Button
+                      variant="success"
+                      loading={publishing || item.status === "PUBLISHING"}
+                      disabled={item.status === "PUBLISHING"}
+                      onClick={handlePublish}
+                    >
+                      {item.status === "PUBLISHING" ? "Publishing…" : item.status === "PUBLISHED" ? "Update" : "Publish Now"}
+                    </Button>
                   </div>
                 </>
               )}

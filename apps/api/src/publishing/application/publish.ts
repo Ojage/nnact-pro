@@ -2,7 +2,7 @@
 // providers. No provider SDK and no HTTP to social platforms appears here; the
 // registry + adapters own that. This is where the atomic outbox + publication
 // records are created so the worker can publish reliably and idempotently.
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@nnact/db";
 import { channelPublications, contentItems, publicationOutbox } from "@nnact/db";
 import type { ChannelPublicationDTO, PublishingChannel } from "@nnact/shared";
@@ -86,14 +86,22 @@ export class PublishContentUseCase {
         if (pub.status === "DRAFT" || pub.status === "SCHEDULED") continue;
 
         // Re-publishing an already-published piece is an "update": keep the same
-        // external post and push new content to it. Skip anything already queued
-        // or in flight so double-clicks can't fan out duplicate events.
-        const [pending] = await tx
+        // external post and push new content to it. Skip anything queued,
+        // in flight, or already delivered for this exact revision so repeated
+        // clicks can't fan out duplicate events. Retry re-queues its own events
+        // (no revision in payload) and is unaffected by this guard.
+        const [alreadyHandled] = await tx
           .select({ id: publicationOutbox.id })
           .from(publicationOutbox)
-          .where(and(eq(publicationOutbox.publicationId, pub.id), eq(publicationOutbox.status, "pending")))
+          .where(
+            and(
+              eq(publicationOutbox.publicationId, pub.id),
+              sql`${publicationOutbox.status} <> 'failed'`,
+              sql`${publicationOutbox.payload}->>'revision' = ${String(content.revision)}`,
+            ),
+          )
           .limit(1);
-        if (pending) continue;
+        if (alreadyHandled) continue;
 
         const isUpdate = pub.status === "PUBLISHED" && content.status === "PUBLISHED";
         await tx.insert(publicationOutbox).values({
