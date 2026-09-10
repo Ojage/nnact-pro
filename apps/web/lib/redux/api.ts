@@ -197,7 +197,6 @@ export const apiSlice = createApi({
   baseQuery: fetchBaseQuery({
     baseUrl: API_URL,
     credentials: "include",
-    headers: { "content-type": "application/json" },
   }),
   keepUnusedDataFor: 300,
   refetchOnMountOrArgChange: 60,
