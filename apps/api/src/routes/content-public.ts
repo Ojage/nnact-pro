@@ -148,7 +148,9 @@ function collectAllMediaIds(items: ContentItemDTO[]): string[] {
 function toPseudo(r: typeof contentItems.$inferSelect): ContentItemDTO {
   return {
     id: r.id, orgId: r.orgId, type: r.type, title: r.title, slug: r.slug,
-    summary: r.summary, body: r.body, bodyDocument: r.bodyDocument as BodyDocument | null, status: r.status, visibility: r.visibility,
+    summary: r.summary, body: r.body, bodyDocument: r.bodyDocument as BodyDocument | null,
+    bodyHtml: r.bodyHtml ?? null, bodyMarkdown: r.bodyMarkdown ?? null,
+    status: r.status, visibility: r.visibility,
     language: r.language, revision: r.revision, featuredMediaId: r.featuredMediaId,
     authorId: r.authorId, categoryId: r.categoryId, tagIds: [],
     seo: { seoTitle: r.seoTitle, seoDescription: r.seoDescription, canonicalUrl: r.canonicalUrl, openGraphTitle: r.openGraphTitle, openGraphDescription: r.openGraphDescription, openGraphMediaId: r.openGraphMediaId },
