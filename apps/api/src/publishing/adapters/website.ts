@@ -36,7 +36,8 @@ export class WebsitePublishingAdapter implements PublishingProviderPort {
     const slug = (request.metadata?.slug as string) || request.contentId;
     return {
       providerPublicationId: request.publicationId,
-      externalUrl: `${this.deps.websiteBaseUrl.replace(/\/$/, "")}/blog/${slug}`,
+      // The marketing site only routes locale-prefixed blog URLs.
+      externalUrl: `${this.deps.websiteBaseUrl.replace(/\/$/, "")}/en/blog/${slug}`,
       publishedAt: new Date(),
       providerStatus: "PUBLISHED",
       rawMetadata: { channel: "WEBSITE", slug },

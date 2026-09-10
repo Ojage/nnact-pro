@@ -411,7 +411,9 @@ export class AutomationEngine {
     const services = publishingServices();
     await services.publishUseCase.publish({ orgId, contentId: created.id, actorId: AI_ACTOR, channels: ["WEBSITE"] });
     await services.worker.sweep(this.deps.now());
-    const canonicalUrl = `${publicSiteUrl(process.env).replace(/\/$/, "")}/blog/${created.slug}`;
+    // The marketing site only routes locale-prefixed blog URLs
+    // (/:locale/blog/:slug); a bare /blog/:slug hits its catch-all 404 page.
+    const canonicalUrl = `${publicSiteUrl(process.env).replace(/\/$/, "")}/en/blog/${created.slug}`;
     await this.deps.runs.updateRun(orgId, runId, { canonicalUrl });
 
     // 7 · LinkedIn (best-effort, after website success)

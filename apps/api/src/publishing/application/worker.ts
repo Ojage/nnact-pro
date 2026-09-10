@@ -233,7 +233,7 @@ export class PublicationWorker {
   private canonical(_orgId: string, _channel: PublishingChannel, slug: string): string {
     const base = publicSiteUrl(process.env);
     // Website is the canonical destination for public articles.
-    return `${base}/blog/${slug}`;
+    return `${base}/en/blog/${slug}`;
   }
 
   private async maybeFinalizeContent(orgId: string, contentId: string): Promise<void> {
