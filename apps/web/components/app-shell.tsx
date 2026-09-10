@@ -11,6 +11,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { isPublicPath } from "@/lib/public-routes";
 import { WalkthroughProvider } from "@/components/walkthroughs/walkthrough-provider";
 import { LiveNotificationsBridge } from "@/components/live-notifications-bridge";
+import { AiRunTray } from "@/components/ai/ai-run-tray";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -35,6 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="mx-auto w-full max-w-[1600px]">{children}</div>
         </main>
         <CommandPalette />
+        <AiRunTray />
       </WalkthroughProvider>
     </AuthGate>
   );

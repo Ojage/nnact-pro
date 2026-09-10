@@ -193,6 +193,35 @@ export class AutomationEngine {
     return { runId: run.id, state: latest?.state ?? "UNKNOWN" };
   }
 
+  /**
+   * "Run now" queued in the background. Claims the slot synchronously (so the
+   * caller gets a stable runId immediately) but executes the pipeline on the
+   * event loop instead of inside the HTTP request. The worker and the API both
+   * use claimRun() as the single executor gate, so a duplicate request (or a
+   * concurrent worker sweep) can never execute the same slot twice.
+   */
+  async runNowQueued(orgId: string, isoDate: string, slot: AiSlot): Promise<{ runId: string; state: string }> {
+    if (this.deps.settings.killSwitchActive()) throw paramError("global kill switch is active (AI_AUTOPUBLISH_DISABLED)");
+    const schedule: SlotSchedule = { isoDate, slot, dueAt: this.deps.now() };
+    const run = await this.deps.runs.ensureRun(orgId, schedule);
+    if (run.state === "PUBLISHED" || run.state === "PARTIALLY_PUBLISHED") {
+      return { runId: run.id, state: run.state };
+    }
+    setImmediate(() => {
+      this.runNow(orgId, isoDate, slot)
+        .then(() => undefined)
+        .catch((error) => {
+          this.deps.notifications.inform("slot_failed", {
+            slot,
+            isoDate,
+            error: (error as Error).message,
+            level: "error",
+          });
+        });
+    });
+    return { runId: run.id, state: run.state };
+  }
+
   private async executeIteration(orgId: string, settings: AiAutomationSettingsDTO, schedule: SlotSchedule, preClaimedRun?: NonNullable<Awaited<ReturnType<AiRunStorePort["getRun"]>>>): Promise<void> {
     let run = preClaimedRun ?? (await this.deps.runs.ensureRun(orgId, schedule));
     if (preClaimedRun) {

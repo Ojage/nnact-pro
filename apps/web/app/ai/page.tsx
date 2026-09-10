@@ -23,6 +23,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { FormSelect } from "@/components/ui/form-select";
+import { RunProgress } from "@/components/ai/run-progress";
+import { isActiveRun } from "@/components/ai/run-steps";
+import { cn } from "@/lib/utils";
 
 const PROVIDERS: AiProviderId[] = ["OPENAI", "CLAUDE", "GROK"];
 const PROVIDER_NAMES: Record<AiProviderId, string> = { OPENAI: "OpenAI", CLAUDE: "Anthropic Claude", GROK: "xAI Grok" };
@@ -89,13 +92,14 @@ export default function AiPage() {
     setMessage(null);
     try {
       const res = await triggerRun({ isoDate: todayDouala(), slot: "MORNING" }).unwrap();
-      setMessage({ kind: "ok", text: `Triggered run ${res.runId} (${res.state}). Poll "Recent runs" to watch it.` });
+      setMessage({ kind: "ok", text: `Run ${res.runId.slice(0, 8)} queued — watch it live in the tray (bottom right).` });
     } catch (err) {
       setMessage({ kind: "err", text: explainRtkError(err, "Failed to trigger run") });
     }
   };
 
   const providers: AiProviderConfigDTO[] = providersQ.data ?? [];
+  const activeRun = (runsQ.data?.items ?? []).find((r) => isActiveRun(r)) ?? null;
   const health = healthQ.data as { nextRun?: { slot: string; isoDate: string; dueAt: string } | null; killSwitch?: boolean; runStateDistribution?: Record<string, number>; reserveAvailable?: number; reserveTarget?: number } | undefined;
   const usage = usageQ.data as { todaySpend?: number; monthSpend?: number; dailyBudgetCents?: number; monthlyBudgetCents?: number; today?: { calls?: number; costCents?: number; images?: number }; month?: { calls?: number; costCents?: number; images?: number } } | undefined;
 
@@ -124,6 +128,21 @@ export default function AiPage() {
 
       {health?.killSwitch && (
         <Card className="border-red/40 bg-red/5"><CardContent className="p-3"><p className="text-sm text-red">Global kill switch active (AI_AUTOPUBLISH_DISABLED) — no slots will run.</p></CardContent></Card>
+      )}
+
+      {activeRun && (
+        <Card className="border-blue/30">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-fg">Live generation</h3>
+              <span className="flex items-center gap-1.5 text-xs font-medium text-blue">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-blue" />
+                running
+              </span>
+            </div>
+            <RunProgress run={activeRun} />
+          </CardContent>
+        </Card>
       )}
 
       {settings && (
@@ -295,7 +314,7 @@ export default function AiPage() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {run.error && <p className="max-w-[240px] truncate text-xs text-red" title={run.error}>{run.error}</p>}
-                  <Badge className="border-transparent bg-surface-300/60 text-fg">{run.state}</Badge>
+                  <Badge className={cn("border-transparent", isActiveRun(run) ? "bg-blue/10 text-blue" : run.state === "PUBLISHED" || run.state === "PARTIALLY_PUBLISHED" ? "bg-green/10 text-green" : run.state === "NEEDS_ATTENTION" ? "bg-amber/10 text-amber" : "bg-red/10 text-red")}>{run.state}</Badge>
                 </div>
               </div>
             ))}

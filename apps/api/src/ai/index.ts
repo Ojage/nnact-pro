@@ -127,8 +127,9 @@ export async function aiRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const body = triggerBody.parse(req.body);
     try {
-      const outcome = await engine.runNow(orgId, body.isoDate, body.slot);
-      return reply.code(202).send(outcome);
+      // Fire-and-forget: reply 202 immediately; the run row + tray poll track it.
+      const outcome = await engine.runNowQueued(orgId, body.isoDate, body.slot);
+      return reply.code(202).send({ ...outcome, async: true });
     } catch (error) {
       const err = error as Error & { statusCode?: number };
       return reply.code(err.statusCode ?? 422).send({ error: err.message });
