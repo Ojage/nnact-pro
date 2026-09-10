@@ -62,7 +62,7 @@ export class PublishContentUseCase {
         const [existing] = await tx
           .select()
           .from(channelPublications)
-          .where(and(eq(channelPublications.orgId, input.orgId), eq(channelPublications.idempotencyKey, idempotencyKey)))
+          .where(and(eq(channelPublications.contentId, input.contentId), eq(channelPublications.channel, channel as never)))
           .limit(1);
         if (existing) {
           created.push(mapPublication(existing));
