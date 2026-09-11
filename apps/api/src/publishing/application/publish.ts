@@ -123,7 +123,14 @@ export class PublishContentUseCase {
 
     await db
       .update(contentItems)
-      .set({ status: target, scheduledAt: input.scheduledAt ?? null, updatedAt: new Date() })
+      // Publishing an extra channel must not regress an item that is already
+      // live on the canonical website; otherwise a failing side channel (e.g.
+      // LinkedIn) leaves the article stuck in PUBLISHING and invisible publicly.
+      .set({
+        status: content.status === "PUBLISHED" ? "PUBLISHED" : target,
+        scheduledAt: input.scheduledAt ?? null,
+        updatedAt: new Date(),
+      })
       .where(and(eq(contentItems.orgId, input.orgId), eq(contentItems.id, input.contentId)));
 
     await contentAudit(input.orgId, {
