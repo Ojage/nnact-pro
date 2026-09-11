@@ -4,18 +4,26 @@ import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { NavLinkItem } from "@/components/nav-link-item";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
+import { activeNavHref, navSectionsForRole } from "@/lib/nav";
+import type { NavRole } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
-import { useSessionUser } from "@/lib/use-session-user";
+import type { SessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
 import { requestLearn } from "@/lib/walkthroughs/events";
 
-export function Sidebar() {
+interface SidebarProps {
+  user: SessionUser | null;
+  loading: boolean;
+  signingOut: boolean;
+  signOut: () => Promise<void>;
+}
+
+export function Sidebar({ user, loading, signingOut, signOut }: SidebarProps) {
   const pathname = usePathname();
   const currentNavHref = activeNavHref(pathname);
   const { theme, toggle } = useTheme();
-  const { user, loading, signingOut, signOut } = useSessionUser();
+  const sections = user?.role ? navSectionsForRole(user.role as NavRole) : [];
 
   return (
     <aside className="fixed bottom-0 left-0 top-0 z-40 hidden w-64 flex-col border-r border-border bg-surface-50 md:flex">
@@ -25,28 +33,32 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.label} className="mb-5 last:mb-0">
-            <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">
-              {section.label}
-            </p>
-            <div className="flex flex-col gap-1">
-              {section.links.map(({ href, label, icon, tour }) => {
-                const active = currentNavHref === href;
-                return (
-                  <NavLinkItem
-                    key={href}
-                    href={href}
-                    label={label}
-                    icon={icon}
-                    tour={tour}
-                    active={active}
-                  />
-                );
-              })}
+        {sections.length === 0 ? (
+          <div className="flex items-center justify-center py-10 text-xs text-fg-dim">Loading…</div>
+        ) : (
+          sections.map((section) => (
+            <div key={section.label} className="mb-5 last:mb-0">
+              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">
+                {section.label}
+              </p>
+              <div className="flex flex-col gap-1">
+                {section.links.map(({ href, label, icon, tour }) => {
+                  const active = currentNavHref === href;
+                  return (
+                    <NavLinkItem
+                      key={href}
+                      href={href}
+                      label={label}
+                      icon={icon}
+                      tour={tour}
+                      active={active}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </nav>
 
       <div className="shrink-0 border-t border-border p-3">

@@ -5,18 +5,26 @@ import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { NavLinkItem } from "@/components/nav-link-item";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_SECTIONS, activeNavHref } from "@/lib/nav";
+import { activeNavHref, navSectionsForRole } from "@/lib/nav";
+import type { NavRole } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
-import { useSessionUser } from "@/lib/use-session-user";
+import type { SessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 
-export function MobileNav() {
+interface MobileNavProps {
+  user: SessionUser | null;
+  loading: boolean;
+  signingOut: boolean;
+  signOut: () => Promise<void>;
+}
+
+export function MobileNav({ user, loading, signingOut, signOut }: MobileNavProps) {
   const pathname = usePathname();
   const currentNavHref = activeNavHref(pathname);
   const { theme, toggle } = useTheme();
-  const { user, loading, signingOut, signOut } = useSessionUser();
   const [open, setOpen] = useState(false);
+  const sections = user?.role ? navSectionsForRole(user.role as NavRole) : [];
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -84,28 +92,32 @@ export function MobileNav() {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label} className="mb-5 last:mb-0">
-              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">{section.label}</p>
-              <div className="flex flex-col gap-1">
-                {section.links.map(({ href, label, icon, tour }) => {
-                  const active = currentNavHref === href;
-                  return (
-                    <NavLinkItem
-                      key={href}
-                      href={href}
-                      label={label}
-                      icon={icon}
-                      tour={tour}
-                      active={active}
-                      onNavigate={() => setOpen(false)}
-                      className="py-3"
-                    />
-                  );
-                })}
+          {sections.length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-xs text-fg-dim">Loading…</div>
+          ) : (
+            sections.map((section) => (
+              <div key={section.label} className="mb-5 last:mb-0">
+                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">{section.label}</p>
+                <div className="flex flex-col gap-1">
+                  {section.links.map(({ href, label, icon, tour }) => {
+                    const active = currentNavHref === href;
+                    return (
+                      <NavLinkItem
+                        key={href}
+                        href={href}
+                        label={label}
+                        icon={icon}
+                        tour={tour}
+                        active={active}
+                        onNavigate={() => setOpen(false)}
+                        className="py-3"
+                      />
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </nav>
 
         <div className="shrink-0 border-t border-border p-3">

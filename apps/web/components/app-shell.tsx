@@ -3,18 +3,21 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
+import { RoleGate } from "@/components/role-gate";
 import { CacheWarmer } from "@/components/cache-warmer";
 import { NavigationPending } from "@/components/navigation-pending";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { CommandPalette } from "@/components/command-palette";
 import { isPublicPath } from "@/lib/public-routes";
+import { useSessionUser } from "@/lib/use-session-user";
 import { WalkthroughProvider } from "@/components/walkthroughs/walkthrough-provider";
 import { LiveNotificationsBridge } from "@/components/live-notifications-bridge";
 import { AiRunTray } from "@/components/ai/ai-run-tray";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const session = useSessionUser();
 
   // Router context can be unavailable during the first SSR pass; avoid calling
   // string helpers on null and keep public routes (e.g. /login) free of the shell.
@@ -30,10 +33,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             window.dispatchEvent(new CustomEvent("nnact:field-refresh", { detail: { reason } }));
           }}
         />
-        <Sidebar />
-        <MobileNav />
+        <Sidebar {...session} />
+        <MobileNav {...session} />
         <main className="ml-0 min-h-screen p-4 pt-16 md:ml-64 md:p-8">
-          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+          <div className="mx-auto w-full max-w-[1600px]">
+            <RoleGate user={session.user} loading={session.loading}>{children}</RoleGate>
+          </div>
         </main>
         <CommandPalette />
         <AiRunTray />
