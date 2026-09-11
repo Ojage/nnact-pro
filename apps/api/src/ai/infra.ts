@@ -22,6 +22,8 @@ import type {
   AiRunState,
   AiSlot,
   AiUsageSummaryDTO,
+  AiUsageAnalyticsDTO,
+  AiUsageDailyDTO,
 } from "@nnact/shared";
 import { decryptSecret, encryptSecret } from "../publishing/infra/encryption.js";
 import { slotKey } from "./domain.js";
@@ -395,6 +397,46 @@ export class DbUsageStore implements AiUsageStorePort {
       add(byProvider[providerKey], r);
     }
     return { today, month, byProvider };
+  }
+
+  async usageAnalytics(orgId: string, from: Date, to: Date): Promise<AiUsageAnalyticsDTO> {
+    const rows = await db
+      .select()
+      .from(aiUsageRecords)
+      .where(and(eq(aiUsageRecords.orgId, orgId), gte(aiUsageRecords.createdAt, from), lte(aiUsageRecords.createdAt, to)));
+    const byDay = new Map<string, { calls: number; images: number; costCents: number; inputTokens: number; outputTokens: number }>();
+    const byTask = new Map<string, { key: string; calls: number; images: number; costCents: number; inputTokens: number; outputTokens: number }>();
+    const byModel = new Map<string, { key: string; calls: number; images: number; costCents: number; inputTokens: number; outputTokens: number }>();
+    const add = (m: Map<string, { calls: number; images: number; costCents: number; inputTokens: number; outputTokens: number }>, key: string, r: typeof aiUsageRecords.$inferSelect, zero: { calls: number; images: number; costCents: number; inputTokens: number; outputTokens: number }) => {
+      const g = m.get(key) ?? { ...zero, key };
+      g.calls += 1;
+      g.images += r.imageCount ?? 0;
+      g.costCents += r.costCents ?? 0;
+      g.inputTokens += r.inputTokens ?? 0;
+      g.outputTokens += r.outputTokens ?? 0;
+      m.set(key, g);
+    };
+    for (const r of rows) {
+      if (!r.createdAt) continue;
+      const day = r.createdAt.toISOString().slice(0, 10);
+      add(byDay, day, r, { calls: 0, images: 0, costCents: 0, inputTokens: 0, outputTokens: 0 });
+      add(byTask, r.task ?? "other", r, { calls: 0, images: 0, costCents: 0, inputTokens: 0, outputTokens: 0 });
+      add(byModel, `${r.provider ?? "unknown"} / ${r.model ?? "default"}`, r, { calls: 0, images: 0, costCents: 0, inputTokens: 0, outputTokens: 0 });
+    }
+    const daily: AiUsageDailyDTO[] = [];
+    const cursor = new Date(from);
+    cursor.setUTCHours(0, 0, 0, 0);
+    while (cursor.getTime() <= to.getTime()) {
+      const date = cursor.toISOString().slice(0, 10);
+      const g = byDay.get(date) ?? { calls: 0, images: 0, costCents: 0, inputTokens: 0, outputTokens: 0 };
+      daily.push({ date, ...g });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return {
+      daily,
+      byTask: [...byTask.values()].sort((a, b) => b.costCents - a.costCents),
+      byModel: [...byModel.values()].sort((a, b) => b.costCents - a.costCents),
+    };
   }
 }
 

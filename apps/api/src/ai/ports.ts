@@ -14,6 +14,7 @@ import type {
   AiRunState,
   AiSlot,
   AiUsageSummaryDTO,
+  AiUsageAnalyticsDTO,
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageQualityAssessmentDTO,
@@ -124,6 +125,7 @@ export interface AiUsageStorePort {
     costCents?: number;
   }): Promise<void>;
   usageSummary(orgId: string, todayStart: Date, monthStart: Date): Promise<AiUsageSummaryDTO>;
+  usageAnalytics(orgId: string, from: Date, to: Date): Promise<AiUsageAnalyticsDTO>;
   spendBetween(orgId: string, from: Date, to: Date): Promise<number>;
 }
 

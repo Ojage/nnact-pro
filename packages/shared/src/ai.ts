@@ -283,6 +283,30 @@ export interface AiUsageBucketDTO {
   costCents: number;
 }
 
+export interface AiUsageDailyDTO {
+  date: string;
+  calls: number;
+  images: number;
+  costCents: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface AiUsageGroupDTO {
+  key: string;
+  calls: number;
+  images: number;
+  costCents: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface AiUsageAnalyticsDTO {
+  daily: AiUsageDailyDTO[];
+  byTask: AiUsageGroupDTO[];
+  byModel: AiUsageGroupDTO[];
+}
+
 export interface AiHealthDTO {
   automation: "HEALTHY" | "DEGRADED" | "CRITICAL";
   automationEnabled: boolean;

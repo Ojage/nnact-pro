@@ -25,7 +25,9 @@ import { Switch } from "@/components/ui/switch";
 import { FormSelect } from "@/components/ui/form-select";
 import { RunProgress } from "@/components/ai/run-progress";
 import { isActiveRun } from "@/components/ai/run-steps";
+import { BudgetMeter, UsageTrendChart } from "@/components/ai/usage/usage-charts";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 const PROVIDERS: AiProviderId[] = ["OPENAI", "CLAUDE", "GROK"];
 const PROVIDER_NAMES: Record<AiProviderId, string> = { OPENAI: "OpenAI", CLAUDE: "Anthropic Claude", GROK: "xAI Grok" };
@@ -109,7 +111,7 @@ export default function AiPage() {
   const providers: AiProviderConfigDTO[] = providersQ.data ?? [];
   const activeRun = (runsQ.data?.items ?? []).find((r) => isActiveRun(r)) ?? null;
   const health = healthQ.data as { nextRun?: { slot: string; isoDate: string; dueAt: string } | null; killSwitch?: boolean; runStateDistribution?: Record<string, number>; reserveAvailable?: number; reserveTarget?: number } | undefined;
-  const usage = usageQ.data as { todaySpend?: number; monthSpend?: number; dailyBudgetCents?: number; monthlyBudgetCents?: number; today?: { calls?: number; costCents?: number; images?: number }; month?: { calls?: number; costCents?: number; images?: number } } | undefined;
+  const usage = usageQ.data;
 
   if (settingsQ.isError || providersQ.isError) {
     return <div className="space-y-4"><PageHeader title="AI Content Automation" description="Autonomous NNACT content on an unattended schedule" /><Card className="border-red/30 bg-red/5"><CardContent className="p-4"><p className="text-sm text-red">Failed to load AI settings</p></CardContent></Card></div>;
@@ -290,26 +292,62 @@ export default function AiPage() {
         </Card>
 
         <Card>
-          <CardContent className="p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-fg">Usage (AI API)</h3>
+          <CardContent className="space-y-3 p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-fg">Usage (AI API)</h3>
+              <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                <Link href="/ai/usage">Analytics ↗</Link>
+              </Button>
+            </div>
             {usage ? (
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid gap-2 md:grid-cols-2">
                 <div className="rounded-lg bg-surface-300/40 p-3">
-                  <p className="text-xs text-fg-muted">Today</p>
-                  <p className="text-fg">{usage.today?.calls ?? 0} calls · {usage.today?.images ?? 0} images</p>
-                  <p className="text-red-500">{usage.todaySpend}c / {usage.dailyBudgetCents}c budget</p>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className="text-xs text-fg-muted">Today</p>
+                      <p className="text-lg font-bold text-fg">{usage.today?.calls ?? 0}<span className="ml-1 text-xs font-normal text-fg-muted">calls · {usage.today?.images ?? 0} images</span></p>
+                    </div>
+                    <p className="text-xs font-mono text-fg-muted">{usage.todaySpend}c</p>
+                  </div>
+                  <div className="mt-2"><BudgetMeter spent={usage.todaySpend} budget={usage.dailyBudgetCents} tone={usage.dailyBudgetCents > 0 && usage.todaySpend / usage.dailyBudgetCents > 0.8 ? "red" : "green"} /></div>
                 </div>
                 <div className="rounded-lg bg-surface-300/40 p-3">
-                  <p className="text-xs text-fg-muted">This month</p>
-                  <p className="text-fg">{usage.month?.calls ?? 0} calls · {usage.month?.images ?? 0} images</p>
-                  <p className="text-amber-500">{usage.monthSpend}c / {usage.monthlyBudgetCents}c budget</p>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className="text-xs text-fg-muted">This month</p>
+                      <p className="text-lg font-bold text-fg">{usage.month?.calls ?? 0}<span className="ml-1 text-xs font-normal text-fg-muted">calls · {usage.month?.images ?? 0} images</span></p>
+                    </div>
+                    <p className="text-xs font-mono text-fg-muted">{usage.monthSpend}c</p>
+                  </div>
+                  <div className="mt-2"><BudgetMeter spent={usage.monthSpend} budget={usage.monthlyBudgetCents} tone={usage.monthlyBudgetCents > 0 && usage.monthSpend / usage.monthlyBudgetCents > 0.5 ? "amber" : "green"} /></div>
                 </div>
               </div>
             ) : <Skeleton className="h-24" />}
 
-            <h3 className="text-sm font-semibold text-fg pt-2">Reserve pool</h3>
-            <p className="text-xs text-fg-muted">Pre-approved evergreen pieces ready to publish on schedule.</p>
-            <p className="text-sm text-fg">{health?.reserveAvailable ?? 0} ready of {health?.reserveTarget ?? 0} target</p>
+            <div className="pt-1">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-xs text-fg-muted">Spend · last 30 days</p>
+                <span className="font-mono text-xs text-fg-muted">{usage?.analytics?.daily.reduce((a, d) => a + d.costCents, 0).toLocaleString() ?? 0}c</span>
+              </div>
+              <div className="h-36">
+                {usage?.analytics?.daily.length ? <UsageTrendChart data={usage.analytics.daily} /> : <Skeleton className="h-full w-full" />}
+              </div>
+            </div>
+
+            <div className="pt-1">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-fg">Reserve pool</h3>
+                <span className="text-xs text-fg-muted">{health?.reserveAvailable ?? 0} ready of {health?.reserveTarget ?? 0} target</span>
+              </div>
+              <p className="text-xs text-fg-muted">Pre-approved evergreen pieces ready to publish on schedule.</p>
+              <div className="mt-2">
+                <BudgetMeter
+                  spent={(health?.reserveAvailable ?? 0) * 100}
+                  budget={Math.max(1, health?.reserveTarget ?? 4) * 100}
+                  tone={health?.reserveAvailable && health?.reserveTarget && health.reserveAvailable >= health.reserveTarget ? "green" : "amber"}
+                />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

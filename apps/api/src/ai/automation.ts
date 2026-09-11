@@ -113,13 +113,15 @@ export class AutomationEngine {
   async usage(orgId: string) {
     const now = this.deps.now();
     const { todayStart, monthStart } = windowStarts(now);
-    const [summary] = await Promise.all([
-      this.deps.usage.usageSummary(orgId, todayStart, monthStart),
-    ]);
+    const seriesStart = new Date(now.getTime() - 29 * 86_400_000);
     const todaySpend = await this.deps.usage.spendBetween(orgId, todayStart, now);
     const monthSpend = await this.deps.usage.spendBetween(orgId, monthStart, now);
+    const [summary, analytics] = await Promise.all([
+      this.deps.usage.usageSummary(orgId, todayStart, monthStart),
+      this.deps.usage.usageAnalytics(orgId, seriesStart, now),
+    ]);
     const settings = await this.deps.settings.get(orgId);
-    return { ...summary, todaySpend, monthSpend, dailyBudgetCents: settings.dailyBudgetCents, monthlyBudgetCents: settings.monthlyBudgetCents };
+    return { ...summary, todaySpend, monthSpend, dailyBudgetCents: settings.dailyBudgetCents, monthlyBudgetCents: settings.monthlyBudgetCents, analytics };
   }
 
   async reserve(orgId: string) {

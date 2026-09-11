@@ -200,6 +200,47 @@ export interface ConnectionsResponseDTO {
   connections: ConnectionDTO[];
 }
 
+export interface AiUsageBucket {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  images: number;
+  costCents: number;
+}
+
+export interface AiUsageDailyPoint {
+  date: string;
+  calls: number;
+  images: number;
+  costCents: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface AiUsageGroup {
+  key: string;
+  calls: number;
+  images: number;
+  costCents: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface AiUsageAnalyticsPayload {
+  today: AiUsageBucket;
+  month: AiUsageBucket;
+  byProvider: Record<string, AiUsageBucket>;
+  todaySpend: number;
+  monthSpend: number;
+  dailyBudgetCents: number;
+  monthlyBudgetCents: number;
+  analytics: {
+    daily: AiUsageDailyPoint[];
+    byTask: AiUsageGroup[];
+    byModel: AiUsageGroup[];
+  };
+}
+
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({
@@ -1072,7 +1113,8 @@ export const apiSlice = createApi({
       query: (provider) => ({ url: `/api/ai/providers/${provider}/probe`, method: "POST", body: {} }),
       invalidatesTags: ["Ai"],
     }),
-    aiHealth: builder.query<Record<string, unknown>, void>({
+
+aiHealth: builder.query<Record<string, unknown>, void>({
       query: () => "/api/ai/health",
       providesTags: ["Ai"],
     }),
@@ -1088,7 +1130,7 @@ export const apiSlice = createApi({
       query: (body) => ({ url: "/api/ai/trigger", method: "POST", body }),
       invalidatesTags: ["Ai"],
     }),
-    aiUsage: builder.query<Record<string, unknown>, void>({
+    aiUsage: builder.query<AiUsageAnalyticsPayload, void>({
       query: () => "/api/ai/usage",
       providesTags: ["Ai"],
     }),
