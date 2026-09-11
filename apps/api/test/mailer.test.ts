@@ -1,7 +1,7 @@
 // Runnable check (no DB, no network): node --import tsx --test test/mailer.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveSmtpConfig, sendEmail, type SmtpConfig } from "../src/mailer.ts";
+import { resolveCategorySender, resolveSmtpConfig, sendEmail, type SmtpConfig } from "../src/mailer.ts";
 
 const CONFIG: SmtpConfig = { host: "smtp.example.test", port: 587, secure: false, user: "noreply@example.test", pass: "s3cret", from: "NNACT Pro <noreply@example.test>" };
 
@@ -24,6 +24,32 @@ test("resolveSmtpConfig reads the environment with defaults", () => {
     SMTP_FROM: "NNACT Pro <u@example.test>",
   });
   assert.deepEqual(withOverrides, { host: "mail.example.test", port: 465, secure: true, user: "u", pass: "p", from: "NNACT Pro <u@example.test>" });
+});
+
+test("resolveCategorySender prefers category override, then generic, then default", () => {
+  assert.equal(
+    resolveCategorySender("security", { SMTP_FROM_SECURITY: "S <security@x.test>", SMTP_FROM: "G <g@x.test>" }),
+    "S <security@x.test>",
+  );
+  assert.equal(resolveCategorySender("billing", { SMTP_FROM: "G <g@x.test>" }), "G <g@x.test>");
+  assert.equal(resolveCategorySender("billing", {}), "NNACT Billing <billing@nnact.com>");
+  assert.equal(resolveCategorySender("service", {}), "NNACT Service <service@nnact.com>");
+  assert.equal(resolveCategorySender("newsletter", {}), "NNACT News <newsletter@nnact.com>");
+});
+
+test("sendEmail honors a per-message from override", async () => {
+  const sent: Array<Record<string, string>> = [];
+  const fake = {
+    sendMail: async (mail: Record<string, string>) => {
+      sent.push(mail);
+      return { messageId: "m2", accepted: ["c@example.test"] };
+    },
+  } as never;
+  await sendEmail(
+    { to: "c@example.test", subject: "s", text: "t", from: "NNACT Billing <billing@nnact.com>" },
+    { transport: fake, config: CONFIG },
+  );
+  assert.equal(sent[0].from, "NNACT Billing <billing@nnact.com>");
 });
 
 test("sendEmail returns null without attempting a send when SMTP is unconfigured", async () => {

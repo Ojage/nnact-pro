@@ -21,7 +21,7 @@ import {
   renderInvoiceMessage,
   type TemplateVariables,
 } from "./message-templates.js";
-import { sendEmail, type EmailAttachment, type SendResult } from "./mailer.js";
+import { resolveCategorySender, sendEmail, type EmailAttachment, type SendResult } from "./mailer.js";
 import { renderDocumentMessageHtml, renderEstimateEmailHtml, renderInvoiceEmailHtml } from "./emails/templates.js";
 
 export const MESSAGE_KINDS = ["invoice", "estimate"] as const;
@@ -137,6 +137,7 @@ async function attemptDelivery(
             d.html ??
             renderDocumentMessageHtml({ companyName: d.companyName ?? "", subject: d.subject, body: d.body }),
           attachments: d.attachments,
+          from: resolveCategorySender("billing"),
         })))(delivery);
     outcome = result
       ? { ok: true, messageId: result.messageId }

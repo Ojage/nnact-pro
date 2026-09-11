@@ -39,7 +39,7 @@ import { resolveJwtSecret, resolvePublicCustomerUrl } from "../runtime-security.
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { renderMessageTemplate } from "../message-templates.js";
-import { resolveSmtpConfig, sendEmail } from "../mailer.js";
+import { resolveCategorySender, resolveSmtpConfig, sendEmail } from "../mailer.js";
 import { renderPortalLinkEmailHtml } from "../emails/templates.js";
 import { nextEstimateLifecycle } from "./estimates.js";
 import { createDepositInvoiceTx } from "../estimate-approval.js";
@@ -229,6 +229,7 @@ export async function portalRoutes(app: FastifyInstance) {
         body,
         portalLink: portalUrl,
       }).html,
+      from: resolveCategorySender("billing"),
     });
     if (!result) return reply.code(501).send({ error: "email is not configured" });
 

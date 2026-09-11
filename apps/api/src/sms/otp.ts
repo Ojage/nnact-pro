@@ -13,7 +13,7 @@ import { and, eq, gt, isNull, lte } from "drizzle-orm";
 import { db, verificationCodes } from "@nnact/db";
 import { renderSmsTemplate } from "./templates.js";
 import { sendSms } from "./sms.js";
-import { sendEmail } from "../mailer.js";
+import { resolveCategorySender, sendEmail } from "../mailer.js";
 import { renderPasswordResetOtpEmailHtml, renderSecurityOtpEmailHtml } from "../emails/templates.js";
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
@@ -129,6 +129,7 @@ export async function requestOtp(
         subject: renderedSubject(purpose, companyName),
         text: rendered.text,
         html: rendered.html,
+        from: resolveCategorySender("security"),
       });
       if (sent) return { sent: true };
       if (isProd) throw new Error("email sending failed");

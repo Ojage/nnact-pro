@@ -25,11 +25,44 @@ export interface EmailMessage {
   /** Optional branded HTML body; when absent clients fall back to `text`. */
   html?: string;
   attachments?: EmailAttachment[];
+  /** Optional per-message "from". Defaults to the resolved SMTP_FROM sender. */
+  from?: string;
 }
 
 export interface SendResult {
   messageId: string;
   accepted: string[];
+}
+
+/**
+ * Email categories and their dedicated "from" senders. Each category falls
+ * back to the category-specific SMTP_FROM_<CATEGORY> env var, then the
+ * generic SMTP_FROM, then the SMTP user.
+ */
+export type EmailCategory = "security" | "billing" | "service" | "newsletter";
+
+const CATEGORY_ENV_KEYS: Record<EmailCategory, string> = {
+  security: "SMTP_FROM_SECURITY",
+  billing: "SMTP_FROM_BILLING",
+  service: "SMTP_FROM_SERVICE",
+  newsletter: "SMTP_FROM_NEWSLETTER",
+};
+
+const CATEGORY_DEFAULTS: Record<EmailCategory, string> = {
+  security: "NNACT Security <security@nnact.com>",
+  billing: "NNACT Billing <billing@nnact.com>",
+  service: "NNACT Service <service@nnact.com>",
+  newsletter: "NNACT News <newsletter@nnact.com>",
+};
+
+/** Resolves the display sender for a given email category. */
+export function resolveCategorySender(category: EmailCategory, env: NodeJS.ProcessEnv = process.env): string {
+  const envKey = CATEGORY_ENV_KEYS[category];
+  const fromCategory = env[envKey]?.trim();
+  if (fromCategory) return fromCategory;
+  const fromGeneric = env.SMTP_FROM?.trim();
+  if (fromGeneric) return fromGeneric;
+  return CATEGORY_DEFAULTS[category];
 }
 
 export function resolveSmtpConfig(env: NodeJS.ProcessEnv = process.env): SmtpConfig | null {
@@ -69,7 +102,7 @@ export async function sendEmail(
   if (!config) return null;
   const transport = injected?.transport ?? createSmtpTransport(config);
   const info = await transport.sendMail({
-    from: config.from,
+    from: message.from ?? config.from,
     to: message.to,
     subject: message.subject,
     text: message.text,

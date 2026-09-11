@@ -17,7 +17,7 @@ import { hashPortalToken } from "../portal-links.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";
 import { safeNotifyUser } from "../notify-user.js";
-import { sendEmail } from "../mailer.js";
+import { resolveCategorySender, sendEmail } from "../mailer.js";
 import { renderBookingConfirmationEmailHtml, renderNewsletterWelcomeEmailHtml } from "../emails/templates.js";
 import { bookingConfigForOrg, marketingProfileForOrg } from "../public-marketing.js";
 
@@ -328,6 +328,7 @@ function sendBookingConfirmationEmail(input: {
 await sendEmail({
         to: input.to,
         subject: `We received your ${input.orgName} service request`,
+        from: resolveCategorySender("service"),
         text: [
           `Hi ${input.customerName},`,
           "",
@@ -739,6 +740,7 @@ export async function publicRoutes(app: FastifyInstance) {
                 subject: `Thanks for subscribing to ${org.name} updates`,
                 text: welcome.text,
                 html: welcome.html,
+                from: resolveCategorySender("newsletter"),
               });
             }
           } catch (err) {
@@ -818,6 +820,7 @@ export async function publicRoutes(app: FastifyInstance) {
               subject: `Thanks for subscribing to ${org.name} updates`,
               text: welcome.text,
               html: welcome.html,
+              from: resolveCategorySender("newsletter"),
             });
           } catch (err) {
             console.error("[public] newsletter confirmation email failed:", err);
