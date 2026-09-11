@@ -43,6 +43,22 @@ function paramError(message: string): Error {
   return Object.assign(new Error(message), { statusCode: 400 });
 }
 
+/** Normalize model-supplied tags into clean, deduped, "AI"-free site tags. */
+function normalizeArticleTags(raw: unknown[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of raw) {
+    const tag = typeof entry === "string"
+      ? entry.trim().toLowerCase().replace(/^#/, "").replace(/[^a-z0-9-]/g, "-").replace(/-{2,}/g, "-").replace(/^-|-$/g, "").slice(0, 40)
+      : "";
+    if (!tag || tag === "ai" || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
 function publishingServices() {
   const registry = defaultRegistry();
   const media = new DbMediaProvider({ publicApiBaseUrl: (process.env.PUBLIC_API_URL ?? process.env.PUBLIC_WEB_URL ?? "http://localhost:3003").replace(/\/$/, "") });
@@ -317,7 +333,7 @@ export class AutomationEngine {
       recentTitles: recentTitles.slice(0, 8),
     });
 
-    let article: { title: string; seoTitle: string; seoDescription?: string; summary?: string; blocks: ArticleBlock[]; hashtags: string[]; linkedinCaption?: string } | null = null;
+    let article: { title: string; seoTitle: string; seoDescription?: string; summary?: string; blocks: ArticleBlock[]; hashtags: string[]; tags: string[]; linkedinCaption?: string } | null = null;
     let writerProvider: AiProviderId | null = null;
     for (let attempt = 0; attempt <= 1 && !article; attempt++) {
       const prompt = attempt === 1 ? rewriteDirective(articlePrompt) : articlePrompt;
@@ -358,6 +374,7 @@ export class AutomationEngine {
         summary: typeof data.summary === "string" ? data.summary : undefined,
         blocks,
         hashtags: Array.isArray(data.hashtags) ? data.hashtags.map(String).filter((h) => /^#[\w-]{2,}$/.test(h)).slice(0, 6) : ["#nnact"],
+        tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
         linkedinCaption: typeof data.linkedinCaption === "string" ? data.linkedinCaption : undefined,
       };
     }
@@ -386,7 +403,9 @@ export class AutomationEngine {
     const bodyDocument = blocksToBodyDocument(article.blocks, featured.mediaId ?? null);
     const derived = await transform.derive(bodyDocument);
     const category = await upsertCategory(orgId, plan.categoryName, slugify(plan.categoryName), `AI-generated ${plan.contentType.toLowerCase()} articles`);
-    const tagIds = await ensureTags(orgId, ["AI", plan.contentType.replace(/_/g, " ").toLowerCase()]);
+    const spec = normalizeArticleTags([...(article.tags ?? []), ...article.hashtags.map((h) => h.replace(/^#/, ""))]);
+    const tagNames = spec.length > 0 ? spec : [slugify(plan.categoryName)];
+    const tagIds = await ensureTags(orgId, tagNames);
     const slug = `${slugify(article.title) || "article"}-${(hashValue(`${ctx.run.scheduledDate}:${ctx.run.slot}`) % 46656).toString(36)}`;
     const created = await createContent({
       orgId,
