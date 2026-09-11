@@ -90,6 +90,10 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_SECURITY: ${SMTP_FROM_SECURITY:-}
+      SMTP_FROM_BILLING: ${SMTP_FROM_BILLING:-}
+      SMTP_FROM_SERVICE: ${SMTP_FROM_SERVICE:-}
+      SMTP_FROM_NEWSLETTER: ${SMTP_FROM_NEWSLETTER:-}
     volumes:
       - ../data/uploads:/uploads
       - operations_state:/var/lib/nnactpro-ops/state:ro
