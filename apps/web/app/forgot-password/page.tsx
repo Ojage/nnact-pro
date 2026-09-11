@@ -38,7 +38,8 @@ export default function ForgotPasswordPage() {
     return () => clearInterval(timer);
   }, [resendIn]);
 
-  async function onRequestCode() {
+  async function onRequestCode(event?: React.FormEvent) {
+    event?.preventDefault();
     const value = identifier.trim();
     if (!value) {
       setError("Enter the email or phone number on your account.");
