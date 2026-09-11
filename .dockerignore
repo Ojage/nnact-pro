@@ -15,7 +15,10 @@
 **/.next
 **/.expo
 **/build
-**/coverage
+# Keep apps/web/app/coverage (a Next.js route); only exclude package-level
+# test island coverage output.
+apps/*/coverage
+packages/*/coverage
 **/playwright-report
 **/test-results
 **/*.tsbuildinfo
