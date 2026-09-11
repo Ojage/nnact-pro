@@ -10,39 +10,40 @@ import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { CommandPalette } from "@/components/command-palette";
 import { isPublicPath } from "@/lib/public-routes";
-import { useSessionUser } from "@/lib/use-session-user";
+import { SessionProvider } from "@/lib/session-context";
 import { WalkthroughProvider } from "@/components/walkthroughs/walkthrough-provider";
 import { LiveNotificationsBridge } from "@/components/live-notifications-bridge";
 import { AiRunTray } from "@/components/ai/ai-run-tray";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const session = useSessionUser();
 
   // Router context can be unavailable during the first SSR pass; avoid calling
   // string helpers on null and keep public routes (e.g. /login) free of the shell.
   if (pathname == null || isPublicPath(pathname)) return <>{children}</>;
 
   return (
-    <AuthGate>
-      <WalkthroughProvider>
-        <CacheWarmer />
-        <NavigationPending />
-        <LiveNotificationsBridge
-          onFieldRefresh={(reason) => {
-            window.dispatchEvent(new CustomEvent("nnact:field-refresh", { detail: { reason } }));
-          }}
-        />
-        <Sidebar {...session} />
-        <MobileNav {...session} />
-        <main className="ml-0 min-h-screen p-4 pt-16 md:ml-64 md:p-8">
-          <div className="mx-auto w-full max-w-[1600px]">
-            <RoleGate user={session.user} loading={session.loading}>{children}</RoleGate>
-          </div>
-        </main>
-        <CommandPalette />
-        <AiRunTray />
-      </WalkthroughProvider>
-    </AuthGate>
+    <SessionProvider>
+      <AuthGate>
+        <WalkthroughProvider>
+          <CacheWarmer />
+          <NavigationPending />
+          <LiveNotificationsBridge
+            onFieldRefresh={(reason) => {
+              window.dispatchEvent(new CustomEvent("nnact:field-refresh", { detail: { reason } }));
+            }}
+          />
+          <Sidebar />
+          <MobileNav />
+          <main className="ml-0 min-h-screen p-4 pt-16 md:ml-64 md:p-8">
+            <div className="mx-auto w-full max-w-[1600px]">
+              <RoleGate>{children}</RoleGate>
+            </div>
+          </main>
+          <CommandPalette />
+          <AiRunTray />
+        </WalkthroughProvider>
+      </AuthGate>
+    </SessionProvider>
   );
 }

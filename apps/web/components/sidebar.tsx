@@ -8,21 +8,15 @@ import { activeNavHref, navSectionsForRole } from "@/lib/nav";
 import type { NavRole } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
-import type { SessionUser } from "@/lib/use-session-user";
+import { useSessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
 import { requestLearn } from "@/lib/walkthroughs/events";
 
-interface SidebarProps {
-  user: SessionUser | null;
-  loading: boolean;
-  signingOut: boolean;
-  signOut: () => Promise<void>;
-}
-
-export function Sidebar({ user, loading, signingOut, signOut }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname();
   const currentNavHref = activeNavHref(pathname);
   const { theme, toggle } = useTheme();
+  const { user, loading, signingOut, signOut } = useSessionUser();
   const sections = user?.role ? navSectionsForRole(user.role as NavRole) : [];
 
   return (

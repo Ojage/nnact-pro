@@ -8,21 +8,15 @@ import { cn } from "@/lib/utils";
 import { activeNavHref, navSectionsForRole } from "@/lib/nav";
 import type { NavRole } from "@/lib/nav";
 import { useTheme } from "@/components/theme-provider";
-import type { SessionUser } from "@/lib/use-session-user";
+import { useSessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 
-interface MobileNavProps {
-  user: SessionUser | null;
-  loading: boolean;
-  signingOut: boolean;
-  signOut: () => Promise<void>;
-}
-
-export function MobileNav({ user, loading, signingOut, signOut }: MobileNavProps) {
+export function MobileNav() {
   const pathname = usePathname();
   const currentNavHref = activeNavHref(pathname);
   const { theme, toggle } = useTheme();
+  const { user, loading, signingOut, signOut } = useSessionUser();
   const [open, setOpen] = useState(false);
   const sections = user?.role ? navSectionsForRole(user.role as NavRole) : [];
 

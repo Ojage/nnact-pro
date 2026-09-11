@@ -1,29 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { currentUser, logout } from "@/lib/api";
+import { SessionContext, type SessionUser, type SessionUserSession } from "@/lib/session-context";
 
-export interface SessionUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  orgId: string;
-  mustChangePassword?: boolean;
-}
+export type { SessionUser } from "@/lib/session-context";
 
-export function useSessionUser() {
+/** Standalone fetch used when the shared SessionProvider is not mounted. */
+function useStandaloneSession(): SessionUserSession {
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
-
-  const refreshUser = useCallback(() => {
-    return currentUser()
-      .then((nextUser) => setUser(nextUser))
-      .catch(() => setUser(null));
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -42,6 +31,12 @@ export function useSessionUser() {
     };
   }, []);
 
+  const refreshUser = useCallback(() => {
+    return currentUser()
+      .then((nextUser) => setUser(nextUser))
+      .catch(() => setUser(null));
+  }, []);
+
   const signOut = useCallback(async () => {
     setSigningOut(true);
     try {
@@ -55,4 +50,13 @@ export function useSessionUser() {
   }, [router]);
 
   return { user, loading, signingOut, signOut, setUser, refreshUser };
+}
+
+/**
+ * The session hook. Inside the app shell it reads the shared SessionProvider;
+ * outside it (pages rendered without the shell) it falls back to its own fetch.
+ */
+export function useSessionUser(): SessionUserSession {
+  const ctx = useContext(SessionContext);
+  return ctx ?? useStandaloneSession();
 }
