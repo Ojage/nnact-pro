@@ -5,10 +5,15 @@
 // context only lists approved_for_marketing rows.
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { db, contentMedia, contentItems, customers, jobs, orgs } from "@nnact/db";
+import { NNACT_COMPANY, NNACT_SERVICE_BUCKETS, mergeBusinessSettings } from "@nnact/shared";
 
 const MAX_CONTEXT_CHARS = 8_000;
 const MAX_MEDIA_LIST = 24;
 const MAX_JOB_FIELD_STORIES = 3;
+/** Flat list of service buckets for the prompt: "<bucket name>: <service 1, service 2, …>". */
+const SERVICE_BUCKET_LINES = NNACT_SERVICE_BUCKETS.map(
+  (bucket) => `${bucket.name}\n  - ${bucket.services.join("\n  - ")}`,
+);
 
 export function sanitizeForAi(value: string): string {
   return value
@@ -31,7 +36,12 @@ export interface BusinessContext {
   companyName: string;
   tagline: string | null;
   contactSummary: string;
+  /** The org's configured services/categories, or the canonical NNACT Service Buckets. */
   servicesAndCategories: string[];
+  /** Every NNACT Service Bucket with its services — always centered in the article. */
+  serviceBuckets: string[];
+  /** Valid places the business serves — content must only mention these. */
+  serviceAreas: string[];
   specialization: string;
   fieldStorySummaries: string[];
   customerCount: number;
@@ -40,10 +50,15 @@ export interface BusinessContext {
 export async function buildBusinessContext(orgId: string): Promise<BusinessContext> {
   const [org] = await db.select().from(orgs).where(eq(orgs.id, orgId)).limit(1);
   const companyName = org?.name ?? "NNACT";
-  const businessSettings = (org?.businessSettings ?? {}) as Record<string, unknown>;
-  const services = Array.isArray(businessSettings.services)
-    ? businessSettings.services.map((s) => (typeof s === "string" ? s : asString((s as Record<string, unknown>)?.name ?? (s as Record<string, unknown>)?.label ?? s))).filter(Boolean).slice(0, 12)
+  const rawSettings = (org?.businessSettings ?? {}) as Record<string, unknown>;
+  const businessSettings = mergeBusinessSettings(rawSettings);
+  const configuredServices = Array.isArray(rawSettings.services)
+    ? rawSettings.services.map((s) => (typeof s === "string" ? s : asString((s as Record<string, unknown>)?.name ?? (s as Record<string, unknown>)?.label ?? s))).filter(Boolean).slice(0, 12)
     : [];
+  // When the org hasn't configured a service catalog, ground content in the
+  // authoritative NNACT Service Buckets so articles never drift off-brand.
+  const servicesAndCategories = configuredServices.length > 0 ? configuredServices : SERVICE_BUCKET_LINES.slice(0, 12);
+  const serviceAreas = businessSettings.serviceAreas.length > 0 ? businessSettings.serviceAreas : [...NNACT_COMPANY.serviceAreas];
 
   const [customerCountRow] = await db.select({ value: count() }).from(customers).where(eq(customers.orgId, orgId)).catch(() => [{ value: 0 }]);
   const customerCount = Number(customerCountRow?.value ?? 0);
@@ -62,14 +77,16 @@ export async function buildBusinessContext(orgId: string): Promise<BusinessConte
 
   const contactSummary = [org?.publicAddress, org?.publicPhone, org?.publicEmail].filter((v): v is string => Boolean(v)).map(sanitizeForAi).join(" · ");
 
-  const tagline = typeof businessSettings.tagline === "string" ? businessSettings.tagline : null;
+  const tagline = typeof rawSettings.tagline === "string" ? rawSettings.tagline : null;
 
   return truncateContext({
     companyName,
     tagline,
     contactSummary,
-    servicesAndCategories: services.map(sanitizeForAi),
-    specialization: asString(businessSettings.specialization ?? capacityText(businessSettings)),
+    servicesAndCategories: servicesAndCategories.map(sanitizeForAi),
+    serviceBuckets: SERVICE_BUCKET_LINES.slice(0, 12).map(sanitizeForAi),
+    serviceAreas: serviceAreas.map(sanitizeForAi),
+    specialization: asString(rawSettings.specialization ?? capacityText(rawSettings)),
     fieldStorySummaries,
     customerCount,
   });
@@ -77,7 +94,9 @@ export async function buildBusinessContext(orgId: string): Promise<BusinessConte
 
 function capacityText(settings: Record<string, unknown>): string {
   const equipment = asString(settings.industry ?? settings.focus ?? "");
-  return equipment ? equipment : "Industrial equipment maintenance, repair and reliability services";
+  if (equipment) return equipment;
+  const names = NNACT_SERVICE_BUCKETS.map((b) => b.name);
+  return `${names.slice(0, 3).join(", ")} and more — home appliance, HVAC, electrical, mechanical and commercial equipment services`;
 }
 
 function truncateContext(context: BusinessContext): BusinessContext {
@@ -95,24 +114,27 @@ export interface MarketingKnowledge {
 }
 
 export function buildMarketingKnowledge(context: BusinessContext): MarketingKnowledge {
+  const areas = context.serviceAreas.length > 0 ? context.serviceAreas.join(", ") : "the surrounding region";
   return {
     companyName: context.companyName,
     brandVoice:
       "Reliable, field-honest, safety-first. Short paragraphs, concrete examples, no hype and no fake urgency. " +
-      "Explain real maintenance and reliability truths employers and operators in the Douala industrial belt actually care about.",
+      "Explain real maintenance and reliability truths employers and operators across the service area actually care about. " +
+      "Content must always center on one or more of the NNACT Service Buckets listed for the business.",
     guarantees: [
       "NEVER give DIY electrical, refrigeration, gas, or lift instructions that could be unsafe.",
       "Never recommend bypassing safety devices or tampering with certified equipment.",
       "Whenever a task is genuinely unsafe for a layperson, say so and refer to certified NNACT technicians.",
       "Never invent facts, statistics, brands, or customer case studies.",
+      `Only mention places from the served areas: ${areas}. Never invent a neighborhood, city, or landmark that is not in that list.`,
     ],
     evergreenFacts: [
       "Predictive and preventive maintenance extends equipment life and reduces unplanned downtime.",
-      "Vibration analysis, oil analysis and thermographic surveys are industry-standard condition-monitoring methods.",
+      "Regular servicing of home appliances, AC systems, refrigeration, generators and motors prevents expensive breakdowns.",
       "Contractor documentation and compliance records matter for insurance and guarantees.",
       "Branded, certified spare parts usually outlast non-certified alternates for heavy equipment.",
     ],
-    audience: "Plant managers, maintenance superintendents, equipment owners and operators across Douala and the Cameroon industrial region.",
+    audience: `Homeowners and businesses across ${areas} who need repairs and maintenance for appliances, air conditioning, HVAC, vehicles, electrical and mechanical equipment.`,
   };
 }
 

@@ -9,14 +9,14 @@ import { buildBriefPrompt } from "./prompts.js";
 import { hashValue } from "./domain.js";
 
 const TOPIC_POOL: { topic: string; angle: string; contentType: ContentBriefDTO["contentType"] }[] = [
-  { topic: "Why vibration analysis predicts bearing failure", angle: "Field-tested condition monitoring before costs spike", contentType: "ARTICLE" },
-  { topic: "The real cost of skipping oil analysis", angle: "What sample intervals actually protect", contentType: "ARTICLE" },
-  { topic: "Generator set weekly inspection checklist", angle: "A practical walk-through operators can run", contentType: "MAINTENANCE_TIP" },
-  { topic: "When should you schedule a thermographic survey", angle: "Heat signatures that precede electrical failure", contentType: "ARTICLE" },
-  { topic: "Maintenance planning for busy clients", angle: "How NNACT keeps uptime high without surprises", contentType: "ARTICLE" },
-  { topic: "Conveyor gearbox reliability tips", angle: "Lubrication and alignment basics for plant teams", contentType: "MAINTENANCE_TIP" },
-  { topic: "From the field: a routine that saved a shutdown", angle: "Honest field story, anonymized", contentType: "FIELD_STORY" },
-  { topic: "Predictive maintenance for small industrial fleets", angle: "Right-sized monitoring without consultant budgets", contentType: "ARTICLE" },
+  { topic: "Why fridge breakdowns spike after power cuts", angle: "How appliance repair and maintenance prevents the pattern", contentType: "ARTICLE" },
+  { topic: "The real cost of skipping AC gas and cleaning visits", angle: "Why AC gas refilling and maintenance beat full replacements", contentType: "MAINTENANCE_TIP" },
+  { topic: "Home appliance troubleshooting: when to call a technician", angle: "Refrigerator, freezer, washer, dryer and microwave care", contentType: "ARTICLE" },
+  { topic: "Keeping a cold room and display freezer reliable", angle: "Commercial refrigeration maintenance for shops and businesses", contentType: "ARTICLE" },
+  { topic: "Generator servicing checklist before the next outage", angle: "Electrical and generator maintenance that keeps power on", contentType: "MAINTENANCE_TIP" },
+  { topic: "Vehicle AC not cooling? A practical field check", angle: "Car AC gas refilling, leak detection and compressor care", contentType: "ARTICLE" },
+  { topic: "Commercial HVAC: why office and factory systems need a service plan", angle: "HVAC maintenance contracts and preventative maintenance", contentType: "ARTICLE" },
+  { topic: "Motor rewinding and repairs: extending equipment life", angle: "Electrical and mechanical repairs that avoid full machine replacement", contentType: "ARTICLE" },
 ];
 
 export interface PlanResult {
@@ -47,16 +47,18 @@ export function categoryFor(contentType: ContentBriefDTO["contentType"]): string
 }
 
 export function localBrief(result: { topic: string; angle: string; contentType: ContentBriefDTO["contentType"]; imageNeeded: boolean }, ctx: BusinessContext): ContentBriefDTO {
+  const bucket = ctx.serviceBuckets.length ? ctx.serviceBuckets[0].split("\n")[0] : (ctx.servicesAndCategories[0] ?? "Home appliance, HVAC and equipment maintenance");
+  const areas = ctx.serviceAreas.length ? ctx.serviceAreas.join(", ") : "the service area";
   return {
     topic: result.topic,
     angle: result.angle,
-    audience: "Plant managers and maintenance teams",
-    serviceCategory: ctx.servicesAndCategories[0] ?? "Industrial maintenance",
+    audience: `Homeowners and businesses across ${areas}`,
+    serviceCategory: bucket,
     contentType: result.contentType,
-    primaryMessage: `Reliable maintenance that prevents breakdowns`,
-    cta: `Contact NNACT to schedule a field assessment`,
+    primaryMessage: `Reliable repairs and maintenance that prevent breakdowns`,
+    cta: `Contact NNACT to schedule a service visit`,
     desiredLength: result.contentType === "MAINTENANCE_TIP" ? 320 : 420,
-    imageDirection: result.imageNeeded ? "Technician performing safe preventive maintenance on industrial equipment" : "none",
+    imageDirection: result.imageNeeded ? "Technician performing safe preventive maintenance on residential and commercial equipment" : "none",
   };
 }
 

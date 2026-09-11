@@ -47,9 +47,14 @@ export function buildBriefPrompt(input: {
   isoDate: string;
   topicIdea: string;
 }): string {
+  const bucketNames = input.dx.serviceBuckets.length
+    ? input.dx.serviceBuckets.map((b) => b.split("\n")[0]).join("; ")
+    : input.dx.servicesAndCategories.join("; ");
+  const areas = input.dx.serviceAreas.length ? input.dx.serviceAreas.join(", ") : "the company service areas";
   return `Write a CONTENT BRIEF as JSON (no markdown) for a ${input.slot.toLowerCase()} publish on ${input.isoDate}.
 Company: ${input.dx.companyName}
-Specialization: ${input.dx.specialization}
+NNACT Service Buckets — every article must center on one or more of these: ${bucketNames}
+Service areas served (the only places you may reference): ${areas}
 Available approved photos count: ${input.media.approved.length}${input.media.canGenerateImages ? "; image generation allowed" : "; NO image generation available — prefer practical text"}.
 
 Chosen topic seed: "${input.topicIdea}"
@@ -65,9 +70,11 @@ export function buildArticlePrompt(input: {
   recentTitles: string[];
 }): string {
   const dedupeNote = input.recentTitles.length ? `REFUSE to rewrite any of these recent published titles (pick a genuinely different angle):\n${input.recentTitles.map((t) => `- ${t}`).join("\n")}` : "";
+  const areas = input.dx.serviceAreas.length ? input.dx.serviceAreas.join(", ") : "the company service areas";
   return [
     systemVoice(input.knowledge),
-    input.dx.companyName ? `Company profile: ${JSON.stringify({ companyName: input.dx.companyName, tagline: input.dx.tagline, services: input.dx.servicesAndCategories, specialization: input.dx.specialization, customers: input.dx.customerCount })}` : "",
+    input.dx.companyName ? `Company profile: ${JSON.stringify({ companyName: input.dx.companyName, tagline: input.dx.tagline, specialization: input.dx.specialization, customers: input.dx.customerCount, serviceAreas: input.dx.serviceAreas })}` : "",
+    input.dx.serviceBuckets.length ? `NNACT SERVICE BUCKETS — the entire article must center exclusively on one or more of these categories and their services:\n${input.dx.serviceBuckets.join("\n\n")}` : "",
     `Published context to reflect (not copy): ${input.dx.fieldStorySummaries.join(" | ") || "none"}`,
     dedupeNote,
     "",
@@ -78,6 +85,8 @@ export function buildArticlePrompt(input: {
     "- No electrical, refrigeration, gas, or lift repair instructions intended for a layperson.",
     "- If a task is unsafe for non-certified staff, say so and defer to certified technicians.",
     "- No invented facts, statistics, brands, testimonials, or case studies.",
+    `- When mentioning a location, use ONLY the service areas: ${areas}. Never invent a neighborhood, city, landmark, or district not in that list.`,
+    "- Content must center directly on NNACT's actual service buckets (home appliances, HVAC, automotive AC, electrical, mechanical, commercial/industrial equipment, specialized services).",
     "- Plain, factual, calm marketing tone. No clickbait, no exaggerated claims.",
     "",
     ARTICLE_JSON_SCHEMA_DOC,

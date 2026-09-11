@@ -1,3 +1,89 @@
+/**
+ * NNACT Service Buckets — the authoritative list of services NNACT offers,
+ * preserving the categories and terminology from the "NNACT SERVICE BUCKETS"
+ * PDF. The AI content pipeline centers every brief/article/newsletter on
+ * these buckets, so keep them in sync with the document.
+ */
+export const NNACT_SERVICE_BUCKETS = [
+  {
+    name: "Home Appliance Repairs & Maintenance",
+    services: [
+      "Repair and maintenance of refrigerators",
+      "Repair and maintenance of freezers",
+      "Repair and maintenance of washing machines",
+      "Repair and maintenance of dryers",
+      "Gas cooker and oven repairs",
+      "Microwave servicing and repairs",
+      "Water heater installation and maintenance",
+      "General home electrical appliance troubleshooting",
+    ],
+  },
+  {
+    name: "HVAC Services (Heating, Ventilation and Air Conditioning)",
+    services: [
+      "Installation of air conditioning units (split units, central AC, window units)",
+      "AC gas refilling",
+      "AC leak detection",
+      "AC cleaning and maintenance",
+      "HVAC system design and installation",
+      "Ventilation system repairs and optimization",
+      "Commercial HVAC solutions",
+      "Industrial HVAC solutions",
+    ],
+  },
+  {
+    name: "Automotive Air Conditioning & Cooling Systems",
+    services: [
+      "Car air conditioning installation",
+      "Car air conditioning repairs",
+      "Vehicle AC gas refilling",
+      "Vehicle AC leak detection",
+      "AC compressor repairs",
+      "AC condenser repairs",
+      "Cabin air filter replacement",
+      "Cooling system diagnostics",
+      "Cooling system repairs",
+      "Preventative maintenance for vehicle air conditioning systems",
+    ],
+  },
+  {
+    name: "Electrical & Mechanical Repairs",
+    services: [
+      "Power supply troubleshooting and repair",
+      "Generator servicing and maintenance",
+      "Electrical panel repairs",
+      "Electrical wiring repairs",
+      "Motor rewinding",
+      "Motor maintenance",
+      "Equipment repairs",
+      "Machine repairs",
+    ],
+  },
+  {
+    name: "Commercial & Industrial Equipment Maintenance",
+    services: [
+      "Business refrigeration systems (cold rooms, display freezers)",
+      "Air conditioning systems for offices and factories",
+      "Electrical repairs for heavy-duty machines",
+      "Mechanical repairs for heavy-duty machines",
+      "Generator servicing for commercial buildings",
+      "Preventative maintenance contracts for businesses",
+    ],
+  },
+  {
+    name: "Specialized Services & Consultation",
+    services: [
+      "Procurement of spare parts for home appliances",
+      "Procurement of spare parts for HVAC systems",
+      "Equipment transportation",
+      "Equipment installation",
+      "Consultancy for HVAC system setup",
+      "Energy efficiency audits for homes and businesses",
+      "Custom repair solutions based on client needs",
+    ],
+  },
+] as const;
+
 /** Canonical NNACT company and product identity — shared across web, mobile, and documents. */
 
 export const NNACT_COMPANY = {
