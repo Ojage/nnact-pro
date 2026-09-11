@@ -15,6 +15,7 @@ import { clearSessionCookie, setSessionCookie } from "../session-cookie.js";
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   issueRefreshToken,
+  revokeAllRefreshTokens,
   revokeRefreshToken,
   rotateRefreshToken,
 } from "../refresh-tokens.js";
@@ -56,6 +57,28 @@ const refreshBody = z.object({
   refreshToken: z.string().trim().min(10).max(512),
 });
 
+const passwordResetRequestBody = z
+  .object({
+    email: z.string().trim().email().max(320).optional(),
+    phone: z.string().trim().min(7).max(20).optional(),
+  })
+  .refine((body) => Boolean(body.email || body.phone), {
+    message: "provide an email or phone",
+    path: ["email"],
+  });
+
+const passwordResetVerifyBody = z
+  .object({
+    email: z.string().trim().email().max(320).optional(),
+    phone: z.string().trim().min(7).max(20).optional(),
+    code: z.string().trim().regex(/^\d{6}$/),
+    newPassword: z.string().min(12).max(128),
+  })
+  .refine((body) => Boolean(body.email || body.phone), {
+    message: "provide an email or phone",
+    path: ["email"],
+  });
+
 const registerRateLimit = createFixedWindowRateLimit({
   max: 5,
   windowMs: 60 * 60 * 1000,
@@ -74,6 +97,36 @@ const loginRateLimit = createFixedWindowRateLimit({
           ? normalizePhone(body.phone)
           : "unknown";
     return `${requestIpKey(request)}:${identity}`;
+  },
+});
+
+const passwordResetRequestRateLimit = createFixedWindowRateLimit({
+  max: 5,
+  windowMs: 15 * 60 * 1000,
+  key: (request: FastifyRequest) => {
+    const body = request.body as { email?: unknown; phone?: unknown } | undefined;
+    const identity =
+      typeof body?.email === "string"
+        ? body.email.trim().toLowerCase()
+        : typeof body?.phone === "string"
+          ? normalizePhone(body.phone)
+          : "unknown";
+    return `password-reset:${requestIpKey(request)}:${identity}`;
+  },
+});
+
+const passwordResetVerifyRateLimit = createFixedWindowRateLimit({
+  max: 10,
+  windowMs: 15 * 60 * 1000,
+  key: (request: FastifyRequest) => {
+    const body = request.body as { email?: unknown; phone?: unknown } | undefined;
+    const identity =
+      typeof body?.email === "string"
+        ? body.email.trim().toLowerCase()
+        : typeof body?.phone === "string"
+          ? normalizePhone(body.phone)
+          : "unknown";
+    return `password-reset-verify:${requestIpKey(request)}:${identity}`;
   },
 });
 
@@ -274,6 +327,82 @@ export async function authRoutes(app: FastifyInstance) {
       name: user.name,
       email: user.email,
       mustChangePassword: user.mustChangePassword,
+    }, req, true);
+  });
+
+  app.post("/password-reset/request", { preHandler: passwordResetRequestRateLimit }, async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const parsed = passwordResetRequestBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const email = parsed.data.email?.trim().toLowerCase();
+    const phone = parsed.data.phone ? normalizePhone(parsed.data.phone) : undefined;
+
+    const [user] = email
+      ? await db.select({ id: users.id, active: users.active, email: users.email, phone: users.phone }).from(users).where(eq(users.email, email)).limit(1)
+      : await db.select({ id: users.id, active: users.active, email: users.email, phone: users.phone }).from(users).where(eq(users.phone, phone!)).limit(1);
+
+    // Do not reveal whether the email/phone is registered.
+    let devCode: string | undefined;
+    if (user?.active) {
+      try {
+        if (email) {
+          const result = await requestOtp(email, "email", "password_reset");
+          devCode = result.devCode;
+        } else {
+          const result = await requestOtp(phone!, "phone", "password_reset");
+          devCode = result.devCode;
+        }
+      } catch {
+        // Delivery failure in production — respond generically.
+      }
+    }
+
+    return reply.code(202).send({
+      sent: true,
+      message: "if the email or phone is registered, a code was sent",
+      ...(devCode ? { devCode } : {}),
+    });
+  });
+
+  app.post("/password-reset/verify", { preHandler: passwordResetVerifyRateLimit }, async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const parsed = passwordResetVerifyBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const email = parsed.data.email?.trim().toLowerCase();
+    const phone = parsed.data.phone ? normalizePhone(parsed.data.phone) : undefined;
+
+    const [user] = email
+      ? await db.select().from(users).where(eq(users.email, email)).limit(1)
+      : await db.select().from(users).where(eq(users.phone, phone!)).limit(1);
+    if (!user?.active) return reply.code(401).send({ error: "invalid credentials" });
+
+    const channel: "email" | "phone" = email ? "email" : "phone";
+    const result = await verifyOtp(email ?? phone!, parsed.data.code, "password_reset", channel);
+    if (!result.ok) {
+      const reason = result.reason === "too_many_attempts" ? "too many attempts" : "invalid or expired code";
+      return reply.code(401).send({ error: reason });
+    }
+
+    const passwordError = validatePasswordStrength(parsed.data.newPassword);
+    if (passwordError) return reply.code(400).send({ error: passwordError });
+
+    const [updated] = await db
+      .update(users)
+      .set({ passwordHash: await hashPassword(parsed.data.newPassword), mustChangePassword: false })
+      .where(eq(users.id, user.id))
+      .returning();
+
+    await revokeAllRefreshTokens("staff", user.id);
+
+    return staffAuthResponse(app, reply, {
+      id: updated.id,
+      orgId: updated.orgId,
+      role: updated.role,
+      name: updated.name,
+      email: updated.email,
+      mustChangePassword: false,
     }, req, true);
   });
 

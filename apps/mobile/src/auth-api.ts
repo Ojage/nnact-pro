@@ -69,6 +69,26 @@ export async function staffVerifyOtp(phone: string, code: string): Promise<Store
   return toStoredSession(payload);
 }
 
+export async function staffRequestPasswordReset(payload: { email?: string; phone?: string }): Promise<OtpRequestResult> {
+  return request<OtpRequestResult>("/api/auth/password-reset/request", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function staffResetPassword(payload: {
+  email?: string;
+  phone?: string;
+  code: string;
+  newPassword: string;
+}): Promise<StoredStaffSession> {
+  const result = await request<StaffAuthResponseDTO & { orgId: string }>("/api/auth/password-reset/verify", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return toStoredSession(result);
+}
+
 export async function staffMe(accessToken: string): Promise<StaffAuthResponseDTO["user"]> {
   return request<StaffAuthResponseDTO["user"]>("/api/auth/me", {
     headers: { authorization: `Bearer ${accessToken}` },

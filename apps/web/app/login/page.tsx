@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import { login, loginWithPhone, requestOtp, verifyOtp } from "@/lib/api";
@@ -222,6 +223,11 @@ export default function LoginPage() {
                   placeholder="Password"
                   required
                 />
+                <div className="flex justify-end">
+                  <Link href="/forgot-password" className="text-xs font-medium text-fg-muted hover:text-fg">
+                    Forgot password?
+                  </Link>
+                </div>
               </div>
               <Button type="submit" className="w-full" loading={submitting}>
                 Sign in

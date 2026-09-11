@@ -12,6 +12,7 @@ export const SMS_TEMPLATE_SLUGS = [
   // Authentication & onboarding
   "otp_login",
   "otp_signup",
+  "otp_password_reset",
   "account_welcome",
   // Job lifecycle
   "job_assigned",
@@ -77,6 +78,16 @@ export const SMS_TEMPLATE_CATALOG: SmsTemplateDef[] = [
     requiredVariables: ["code"],
     template:
       "Welcome to {{companyName}}! Your verification code is {{code}} and expires in {{ttlMinutes}} minutes. Enter it in the app to finish signing up.",
+  },
+  {
+    slug: "otp_password_reset",
+    label: "Password reset verification code",
+    audience: "staff",
+    trigger: "A staff member resets a forgotten password and receives a one-time code by SMS or email.",
+    variables: ["companyName", "code", "ttlMinutes"],
+    requiredVariables: ["code"],
+    template:
+      "{{code}} is your {{companyName}} password-reset code. It expires in {{ttlMinutes}} minutes. If you didn't request a reset, ignore this message.",
   },
   {
     slug: "account_welcome",

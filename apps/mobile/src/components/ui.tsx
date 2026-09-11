@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode, type RefObject } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -433,6 +433,7 @@ export function TextField({
   autoComplete,
   multiline,
   error,
+  inputRef,
 }: {
   colors: Palette;
   label: string;
@@ -445,12 +446,14 @@ export function TextField({
   autoComplete?: TextInputProps["autoComplete"];
   multiline?: boolean;
   error?: string;
+  inputRef?: RefObject<TextInput | null>;
 }) {
   const styles = createStyles(colors);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}

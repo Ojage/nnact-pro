@@ -19,7 +19,7 @@ import {
   isValidCameroonMobile,
   normalizePhone,
 } from "@nnact/shared";
-import { staffLogin, staffLoginWithPhone, staffRequestOtp, staffVerifyOtp } from "../auth-api";
+import { staffLogin, staffLoginWithPhone, staffRequestOtp, staffVerifyOtp, staffRequestPasswordReset, staffResetPassword } from "../auth-api";
 import type { StoredStaffSession } from "../auth-storage";
 import { Card, LoadingScreen, PrimaryButton, TextField } from "../components/ui";
 import { HeroCarousel } from "../components/HeroCarousel";
@@ -91,19 +91,38 @@ export function LoginScreen({
   const [verifying, setVerifying] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const [showReset, setShowReset] = useState(false);
+  const [resetStage, setResetStage] = useState<"identifier" | "code">("identifier");
+  const [resetIdentifier, setResetIdentifier] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetDevCode, setResetDevCode] = useState<string | null>(null);
+  const [requestingReset, setRequestingReset] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetResendIn, setResetResendIn] = useState(0);
+  const [resetSent, setResetSent] = useState(false);
   const styles = createStyles(colors);
   const otpRefs = useRef<Array<TextInput | null>>([]);
+  const resetCodeRef = useRef<TextInput | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const heroHeight = clamp(Math.round(windowHeight * 0.42), 300, 340);
   const kenBurns = useRef(new Animated.Value(0)).current;
 
   const isPhoneValid = isValidCameroonMobile(phone);
+  const resetLooksLikeEmail = /@/.test(resetIdentifier.trim());
 
   useEffect(() => {
     if (resendIn <= 0) return;
     const timer = setInterval(() => setResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => clearInterval(timer);
   }, [resendIn > 0]);
+
+  useEffect(() => {
+    if (resetResendIn <= 0) return;
+    const timer = setInterval(() => setResetResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(timer);
+  }, [resetResendIn > 0]);
 
   useEffect(() => {
     const phase = (toValue: number) =>
@@ -214,6 +233,59 @@ export function LoginScreen({
     }
   }
 
+  async function requestResetCode() {
+    const value = resetIdentifier.trim();
+    if (!value) {
+      setError("Enter the email or phone on your account.");
+      return;
+    }
+    setRequestingReset(true);
+    setError(null);
+    try {
+      const result = await staffRequestPasswordReset(resetLooksLikeEmail ? { email: value } : { phone: value });
+      if (result.devCode) setResetDevCode(result.devCode);
+      setResetSent(true);
+      setResetStage("code");
+      setResetCode("");
+      setResetResendIn(RESEND_COOLDOWN_SECONDS);
+      setTimeout(() => resetCodeRef.current?.focus(), 150);
+    } catch (err) {
+      setError(formatNetworkError(err, getApiUrl()));
+    } finally {
+      setRequestingReset(false);
+    }
+  }
+
+  async function submitReset() {
+    if (resetCode.trim().length !== OTP_DIGITS) {
+      setError("Enter the 6-digit code.");
+      return;
+    }
+    setResettingPassword(true);
+    setError(null);
+    try {
+      const payload = resetLooksLikeEmail
+        ? { email: resetIdentifier.trim(), code: resetCode.trim(), newPassword: resetNewPassword }
+        : { phone: resetIdentifier.trim(), code: resetCode.trim(), newPassword: resetNewPassword };
+      onSignedIn(await staffResetPassword(payload));
+    } catch (err) {
+      setError(formatNetworkError(err, getApiUrl()));
+    } finally {
+      setResettingPassword(false);
+    }
+  }
+
+  function exitReset() {
+    setShowReset(false);
+    setResetStage("identifier");
+    setResetIdentifier("");
+    setResetCode("");
+    setResetNewPassword("");
+    setResetDevCode(null);
+    setResetSent(false);
+    setError(null);
+  }
+
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView
@@ -258,26 +330,119 @@ export function LoginScreen({
         </View>
 
         <View style={styles.form}>
-          <Card colors={colors} elevated>
-            <View style={styles.modeRow}>
-              {(["password", "otp"] as const).map((tab) => (
-                <Pressable
-                  key={tab}
-                  onPress={() => {
-                    setMode(tab);
-                    setError(null);
-                    if (tab === "otp") setOtpStage("phone");
-                  }}
-                  style={[styles.modeTab, mode === tab && styles.modeTabActive]}
-                >
-                  <Text style={[styles.modeTabText, mode === tab && styles.modeTabTextActive]}>
-                    {tab === "password" ? "Password" : "Code (OTP)"}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {mode === "otp" ? (
+<Card colors={colors} elevated>
+{showReset ? (
+  <>
+    <Text style={styles.codeTitle}>Reset your password</Text>
+    <Text style={styles.codeSub}>
+      Enter the email or phone linked to your account and we&apos;ll send a one-time code.
+    </Text>
+    {resetStage === "identifier" ? (
+      <>
+        <TextField
+          colors={colors}
+          label="Email or phone"
+          value={resetIdentifier}
+          onChangeText={setResetIdentifier}
+          placeholder="you@nnact.com or 6XX XX XX XX"
+          autoCapitalize="none"
+          autoComplete="email"
+        />
+        <PrimaryButton
+          colors={colors}
+          label={requestingReset ? "Sending…" : "Send code"}
+          onPress={() => void requestResetCode()}
+          loading={requestingReset}
+          variant="accent"
+          size="md"
+        />
+      </>
+    ) : (
+      <>
+        <TextField
+          colors={colors}
+          label="Verification code"
+          value={resetCode}
+          onChangeText={(text) => setResetCode(text.replace(/\D+/g, "").slice(0, OTP_DIGITS))}
+          placeholder="000000"
+          keyboardType="number-pad"
+          autoComplete="one-time-code"
+          inputRef={resetCodeRef}
+        />
+        {resetDevCode ? (
+          <Text style={[styles.devHint, { color: colors.success }]}>
+            Dev code: {resetDevCode} (delivery not configured)
+          </Text>
+        ) : null}
+        <PasswordInput
+          colors={colors}
+          fonts={{ medium: fonts.medium, semibold: fonts.semibold, bold: fonts.bold }}
+          label="New password"
+          value={resetNewPassword}
+          onChangeText={setResetNewPassword}
+          placeholder="At least 12 characters"
+          autoComplete="new-password"
+          returnKeyType="go"
+          onSubmitEditing={() => void submitReset()}
+        />
+        <PrimaryButton
+          colors={colors}
+          label={resettingPassword ? "Resetting…" : "Reset password"}
+          onPress={() => void submitReset()}
+          loading={resettingPassword}
+          variant="accent"
+          size="md"
+        />
+        <View style={styles.otpMeta}>
+          <Pressable
+            onPress={() => { setResetStage("identifier"); setResetSent(false); setResetDevCode(null); setError(null); }}
+            disabled={resettingPassword}
+            hitSlop={8}
+          >
+            <Text style={[styles.otpLink, { color: colors.dimForeground }]}>Change email / phone</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void requestResetCode()}
+            disabled={resetResendIn > 0 || requestingReset}
+            hitSlop={8}
+          >
+            <Text style={[styles.otpLink, { color: resetResendIn > 0 || requestingReset ? colors.dimForeground : colors.accent }]}>
+              {resetResendIn > 0 ? `Resend code in ${resetResendIn}s` : requestingReset ? "Sending…" : "Resend code"}
+            </Text>
+          </Pressable>
+        </View>
+      </>
+    )}
+    {error ? <Text style={styles.formError}>{error}</Text> : null}
+    <Pressable onPress={exitReset} disabled={requestingReset || resettingPassword} hitSlop={8} style={{ marginTop: spacing.sm }}>
+      <Text style={[styles.otpLink, { color: colors.dimForeground }]}>Back to sign in</Text>
+    </Pressable>
+  </>
+) : (
+  <>
+    {(() => {
+      const modeRow = (
+        <View style={styles.modeRow}>
+          {(["password", "otp"] as const).map((tab) => (
+            <Pressable
+              key={tab}
+              onPress={() => {
+                setMode(tab);
+                setError(null);
+                if (tab === "otp") setOtpStage("phone");
+              }}
+              style={[styles.modeTab, mode === tab && styles.modeTabActive]}
+            >
+              <Text style={[styles.modeTabText, mode === tab && styles.modeTabTextActive]}>
+                {tab === "password" ? "Password" : "Code (OTP)"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      );
+      return modeRow;
+    })()}
+    {mode === "otp" ? (
               otpStage === "phone" ? (
                 <>
                   <TextField
@@ -384,9 +549,14 @@ export function LoginScreen({
                   returnKeyType="go"
                   onSubmitEditing={() => void submit()}
                 />
+                <Pressable onPress={() => { setShowReset(true); setError(null); }} hitSlop={8} style={{ alignSelf: "flex-end", marginTop: 4 }}>
+                  <Text style={[styles.otpLink, { color: colors.dimForeground }]}>Forgot password?</Text>
+                </Pressable>
               </>
             )}
             {error ? <Text style={[styles.formError, { color: colors.danger }]}>{error}</Text> : null}
+            </>
+          )}
           </Card>
           {mode === "password" ? (
             <PrimaryButton

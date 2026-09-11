@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { diagnosticsApi, type CoverageResponse } from "@/lib/diagnostics-api";
+import { serverApi } from "@/lib/server-api";
+import type { CoverageResponse } from "@/lib/diagnostics-api";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ export default async function CoveragePage() {
   let coverage = EMPTY;
   let error: string | null = null;
   try {
-    coverage = await diagnosticsApi.coverage();
+    coverage = await serverApi.diagnosticsCoverage();
   } catch (caught) {
     error = caught instanceof Error ? caught.message : String(caught);
   }

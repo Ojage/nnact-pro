@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -382,6 +382,7 @@ export function TextField({
   autoComplete,
   multiline,
   error,
+  inputRef,
 }: {
   colors: Palette;
   label: string;
@@ -394,12 +395,14 @@ export function TextField({
   autoComplete?: TextInputProps["autoComplete"];
   multiline?: boolean;
   error?: string;
+  inputRef?: RefObject<TextInput>;
 }) {
   const styles = createStyles(colors);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}

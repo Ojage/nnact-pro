@@ -82,3 +82,17 @@ export async function revokeRefreshToken(presentedToken: string) {
     .set({ revokedAt: new Date() })
     .where(and(eq(authRefreshTokens.tokenHash, tokenHash), isNull(authRefreshTokens.revokedAt)));
 }
+
+/** Revokes every live refresh token for a subject — used when a password changes. */
+export async function revokeAllRefreshTokens(subjectType: "staff" | "customer", subjectId: string) {
+  await db
+    .update(authRefreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(authRefreshTokens.subjectType, subjectType),
+        eq(authRefreshTokens.subjectId, subjectId),
+        isNull(authRefreshTokens.revokedAt),
+      ),
+    );
+}

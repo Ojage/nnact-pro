@@ -143,6 +143,25 @@ export async function verifyOtp(phone: string, code: string): Promise<LoginResul
   });
 }
 
+export async function requestPasswordReset(payload: { email?: string; phone?: string }): Promise<OtpRequestResult> {
+  return request("/api/auth/password-reset/request", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function resetPassword(payload: {
+  email?: string;
+  phone?: string;
+  code: string;
+  newPassword: string;
+}): Promise<LoginResult> {
+  return request("/api/auth/password-reset/verify", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function currentUser(): Promise<LoginResult["user"]> {
   return parseSessionUser(await request<unknown>("/api/auth/me"));
 }

@@ -86,6 +86,25 @@ export async function customerVerifyOtp(phone: string, code: string): Promise<St
   }));
 }
 
+export async function customerRequestPasswordReset(payload: { email?: string; phone?: string }): Promise<OtpRequestResult> {
+  return request<OtpRequestResult>("/api/customer-auth/password-reset/request", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function customerResetPassword(payload: {
+  email?: string;
+  phone?: string;
+  code: string;
+  newPassword: string;
+}): Promise<StoredCustomerSession> {
+  return toStoredSession(await request<CustomerAuthResponseDTO>("/api/customer-auth/password-reset/verify", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
 export async function customerRefresh(refreshToken: string): Promise<StoredCustomerSession> {
   return toStoredSession(await request<CustomerAuthResponseDTO>("/api/customer-auth/refresh", {
     method: "POST",

@@ -13,18 +13,28 @@ import { and, eq, gt, isNull, lte } from "drizzle-orm";
 import { db, verificationCodes } from "@nnact/db";
 import { renderSmsTemplate } from "./templates.js";
 import { sendSms } from "./sms.js";
+import { sendEmail } from "../mailer.js";
+import { renderPasswordResetOtpEmailHtml, renderSecurityOtpEmailHtml } from "../emails/templates.js";
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 export const OTP_HOURLY_LIMIT = 5;
 
-const OTP_TEXT = (code: string) =>
-  renderSmsTemplate("otp_login", { code, companyName: process.env.SMS_ALIAS ?? "NNACT", ttlMinutes: OTP_TTL_MS / 60_000 });
+export type OtpPurpose = "login" | "password_reset";
+
+function smsText(purpose: OtpPurpose, code: string): string {
+  const companyName = process.env.SMS_ALIAS ?? "NNACT";
+  const ttlMinutes = OTP_TTL_MS / 60_000;
+  if (purpose === "password_reset") {
+    return renderSmsTemplate("otp_password_reset", { code, companyName, ttlMinutes });
+  }
+  return renderSmsTemplate("otp_login", { code, companyName, ttlMinutes });
+}
 
 export interface OtpRequestResult {
   sent: boolean;
-  /** Only populated in non-production when SMS is not configured. */
+  /** Only populated in non-production when the delivery channel is unconfigured. */
   devCode?: string;
 }
 
@@ -68,13 +78,13 @@ function bumpHourly(channel: string, target: string): boolean {
 }
 
 /**
- * Generates, persists, and (for phone) delivers an OTP. Returns the dev code
- * when sending is impossible and we are not in production.
+ * Generates, persists, and delivers an OTP over the requested channel. Returns
+ * the dev code when delivery is impossible and we are not in production.
  */
 export async function requestOtp(
   target: string,
   channel: "phone" | "email",
-  purpose = "login",
+  purpose: OtpPurpose = "login",
 ): Promise<OtpRequestResult> {
   const isProd = process.env.NODE_ENV === "production";
   const normalized = target.trim().toLowerCase();
@@ -100,11 +110,31 @@ export async function requestOtp(
 
   if (channel === "phone") {
     try {
-      await sendSms(normalized, OTP_TEXT(code));
+      await sendSms(normalized, smsText(purpose, code));
       return { sent: true };
     } catch {
       if (isProd) throw new Error("sms sending failed");
       // Falls through — in dev we surface the code so flows can be tested.
+    }
+  } else {
+    try {
+      const companyName = process.env.SMS_ALIAS ?? "NNACT";
+      const ttlMinutes = OTP_TTL_MS / 60_000;
+      const rendered =
+        purpose === "password_reset"
+          ? renderPasswordResetOtpEmailHtml({ companyName, code, ttlMinutes })
+          : renderSecurityOtpEmailHtml({ companyName, code, ttlMinutes });
+      const sent = await sendEmail({
+        to: normalized,
+        subject: renderedSubject(purpose, companyName),
+        text: rendered.text,
+        html: rendered.html,
+      });
+      if (sent) return { sent: true };
+      if (isProd) throw new Error("email sending failed");
+      // SMTP unconfigured — fall through to dev code in non-production.
+    } catch (error) {
+      if (isProd) throw error;
     }
   }
 
@@ -112,11 +142,18 @@ export async function requestOtp(
   return { sent: true, devCode: code };
 }
 
+function renderedSubject(purpose: OtpPurpose, companyName: string): string {
+  return purpose === "password_reset"
+    ? `Reset your ${companyName} password`
+    : `Your ${companyName} verification code`;
+}
+
 /** Verifies a submitted code against the latest live record for the target. */
 export async function verifyOtp(
   target: string,
   code: string,
-  purpose = "login",
+  purpose: OtpPurpose = "login",
+  channel: "phone" | "email" = "phone",
 ): Promise<OtpVerificationResult> {
   const normalized = target.trim().toLowerCase();
   const now = new Date();
@@ -127,7 +164,7 @@ export async function verifyOtp(
       and(
         eq(verificationCodes.target, normalized),
         eq(verificationCodes.purpose, purpose),
-        eq(verificationCodes.channel, "phone"),
+        eq(verificationCodes.channel, channel),
         isNull(verificationCodes.usedAt),
         gt(verificationCodes.expiresAt, now),
       ),

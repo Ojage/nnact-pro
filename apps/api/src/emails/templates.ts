@@ -170,6 +170,25 @@ export function renderSecurityOtpEmailHtml(
   return { html, text };
 }
 
+export function renderPasswordResetOtpEmailHtml(
+  input: { companyName: string; code: string; ttlMinutes: number } & EnvDate,
+): EmailRender {
+  const html = emailShell({
+    subject: `Reset your ${input.companyName} password`,
+    preheader: `Use code ${input.code} to reset your password. It expires in ${input.ttlMinutes} minutes.`,
+    kicker: "Security",
+    headline: "Reset your password",
+    bodyHtml: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">
+      <tr><td align="center" style="padding:14px 0;"><span style="font-family:monospace;font-size:34px;font-weight:700;letter-spacing:8px;color:#0b1118;">${escapeHtml(input.code)}</span></td></tr>
+    </table>
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#334155;">Enter this code to choose a new password. It expires in ${escapeHtml(input.ttlMinutes)} minutes. If you didn't request a reset, you can safely ignore this email.</p>`,
+    companyName: input.companyName,
+    env: input.env,
+  });
+  const text = `Your ${input.companyName} password-reset code is ${input.code}.\nIt expires in ${input.ttlMinutes} minutes. If you didn't request a reset, ignore this message.`;
+  return { html, text };
+}
+
 export function renderReviewRequestEmailHtml(
   input: { companyName: string; customerName: string; body: string; reviewHref: string } & EnvDate,
 ): EmailRender {
@@ -222,7 +241,7 @@ export function renderReopenEmailHtml(
   input: { companyName: string; customerName: string; body?: string; cta?: EmailCta } & EnvDate,
 ): EmailRender {
   const bodyText = input.body ?? `It's been a while since your last visit to ${input.companyName}. The team is ready when you are — seasonal maintenance, repairs, or a straight-up checkup.`;
-  const cta = input.cta ?? { label: "Book now", href: `https://pro.nnact.com/welcome` };
+  const cta = input.cta ?? { label: "Book now", href: `https://nnact.com` };
   const html = emailShell({
     subject: `We miss you, ${input.customerName}`,
     preheader: `Life gets busy — ${input.companyName} is here when you need us.`,
