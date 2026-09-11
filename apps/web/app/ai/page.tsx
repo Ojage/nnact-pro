@@ -98,6 +98,20 @@ export default function AiPage() {
     }
   };
 
+  const handleModels = async (provider: AiProviderId) => {
+    const current = models[provider];
+    if (current === undefined) return;
+    try {
+      await saveProvider({
+        provider,
+        body: { defaultTextModel: current.text.trim() || null, defaultImageModel: current.image.trim() || null },
+      }).unwrap();
+      setMessage({ kind: "ok", text: `${PROVIDER_NAMES[provider]} models saved.` });
+    } catch (err) {
+      setMessage({ kind: "err", text: explainRtkError(err, "Failed to save models") });
+    }
+  };
+
   const runNow = async () => {
     setMessage(null);
     try {
@@ -278,6 +292,7 @@ export default function AiPage() {
                   <div className="flex items-center gap-2">
                     <Input type="password" placeholder="API key (saved encrypted)" value={keys[provider] ?? ""} onChange={(e) => setKeys((k) => ({ ...k, [provider]: e.target.value }))} />
                     <Button size="sm" disabled={!keys[provider]} onClick={() => void handleKey(provider, keys[provider] ?? "")}>Save key</Button>
+                    <Button size="sm" variant="outline" disabled={models[provider] === undefined} onClick={() => void handleModels(provider)}>Save models</Button>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Input size={1} className="h-8 text-xs" placeholder="Text model (e.g. gpt-4o)" value={models[provider] !== undefined ? models[provider].text : (cfg?.defaultTextModel ?? "")} onChange={(e) => setModels((m) => ({ ...m, [provider]: { text: e.target.value, image: m[provider] !== undefined ? m[provider].image : (cfg?.defaultImageModel ?? "") } }))} />

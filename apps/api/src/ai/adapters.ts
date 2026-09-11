@@ -62,7 +62,7 @@ class OpenAiTextAdapter implements TextProviderPort {
       },
     });
     if (response.status < 200 || response.status >= 300) {
-      throw new TransportError(extractErrorDetail(response.json, `OpenAI returned ${response.status}`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
+      throw new TransportError(extractErrorDetail(response.json, `OpenAI returned ${response.status} (model: ${model})`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
     }
     const data = response.json as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number }; id?: string };
     const content = data.choices?.[0]?.message?.content ?? "";
@@ -166,13 +166,12 @@ class AnthropicTextAdapter implements TextProviderPort {
       body: {
         model,
         max_tokens: request.maxTokens ?? 2048,
-        temperature: request.temperature ?? 0.4,
         ...(request.system ? { system: request.system } : {}),
         messages: [{ role: "user", content: request.prompt }],
       },
     });
     if (response.status < 200 || response.status >= 300) {
-      throw new TransportError(extractErrorDetail(response.json, `Anthropic returned ${response.status}`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
+      throw new TransportError(extractErrorDetail(response.json, `Anthropic returned ${response.status} (model: ${model})`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
     }
     const data = response.json as { content?: { type?: string; text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number }; id?: string };
     const content = (data.content ?? []).map((b) => b.text ?? "").join("");
@@ -203,7 +202,6 @@ class AnthropicVisionAdapter implements VisionProviderPort {
       body: {
         model,
         max_tokens: 600,
-        temperature: 0,
         messages: [
           {
             role: "user",
@@ -259,7 +257,7 @@ class GrokTextAdapter implements TextProviderPort {
       },
     });
     if (response.status < 200 || response.status >= 300) {
-      throw new TransportError(extractErrorDetail(response.json, `Grok returned ${response.status}`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
+      throw new TransportError(extractErrorDetail(response.json, `Grok returned ${response.status} (model: ${model})`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
     }
     const data = response.json as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number }; id?: string };
     const content = data.choices?.[0]?.message?.content ?? "";
