@@ -162,8 +162,48 @@ export interface DiagnosticSessionDetail extends DiagnosticSessionListItem {
   steps: DiagnosticStep[];
 }
 
+export interface CoverageFamily {
+  productType: string;
+  make: string;
+  sessions: number;
+  blocked: number;
+  escalated: number;
+  unsupported: number;
+  bestWorkflow: {
+    id: string;
+    name: string;
+    supportStatus: string;
+    lifecycleStatus: string;
+  } | null;
+}
+
+export interface CoverageCorrection {
+  correction: {
+    id: string;
+    workflowId: string;
+    workflowVersion: number;
+    sessionId: string | null;
+    stepId: string | null;
+    category: string;
+    severity: string;
+    description: string;
+    status: string;
+    createdAt: string;
+  };
+  workflow: {
+    id: string;
+    name: string;
+  };
+}
+
 export interface CoverageResponse {
   workflows: DiagnosticWorkflow[];
+  families: CoverageFamily[];
+  quality: {
+    openCorrections: number;
+    safetyCriticalCorrections: number;
+    corrections: CoverageCorrection[];
+  };
   demand: {
     totalSessions: number;
     unsupportedOrUnresolved: number;

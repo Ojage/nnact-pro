@@ -3,18 +3,44 @@ import { serverApi } from "@/lib/server-api";
 import type { CoverageResponse } from "@/lib/diagnostics-api";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 
 const EMPTY: CoverageResponse = {
   workflows: [],
+  families: [],
+  quality: { openCorrections: 0, safetyCriticalCorrections: 0, corrections: [] },
   demand: { totalSessions: 0, unsupportedOrUnresolved: 0, blocked: 0, escalated: 0 },
 };
 
-function tone(status: string) {
-  if (["published", "validated"].includes(status)) return "bg-green/10 text-green";
-  if (["suspended", "unsupported"].includes(status)) return "bg-red/10 text-red";
-  if (["pilot", "experimental"].includes(status)) return "bg-yellow/10 text-yellow";
-  return "bg-surface-400 text-fg-muted";
+function statusPill(status: string) {
+  if (["published", "validated"].includes(status))
+    return "border-green/30 bg-green/5 text-green";
+  if (["suspended", "unsupported"].includes(status))
+    return "border-red/30 bg-red/5 text-red";
+  if (["pilot", "experimental"].includes(status))
+    return "border-yellow/30 bg-yellow/5 text-yellow";
+  return "border-border bg-surface-300 text-fg-muted";
+}
+
+function coverageStatus(bestWorkflow: CoverageResponse["families"][number]["bestWorkflow"]) {
+  if (!bestWorkflow) return { label: "No workflow", pill: "border-red/30 bg-red/5 text-red" };
+  if (bestWorkflow.supportStatus === "validated" && bestWorkflow.lifecycleStatus === "published")
+    return { label: "Validated", pill: "border-green/30 bg-green/5 text-green" };
+  if (bestWorkflow.supportStatus === "pilot")
+    return { label: "Pilot", pill: "border-yellow/30 bg-yellow/5 text-yellow" };
+  if (bestWorkflow.supportStatus === "experimental")
+    return { label: "Experimental", pill: "border-yellow/30 bg-yellow/5 text-yellow" };
+  if (bestWorkflow.lifecycleStatus === "suspended")
+    return { label: "Suspended", pill: "border-red/30 bg-red/5 text-red" };
+  return { label: bestWorkflow.supportStatus, pill: "border-border bg-surface-300 text-fg-muted" };
+}
+
+function severityPill(severity: string) {
+  if (severity === "safety_critical") return "border-red/30 bg-red/5 text-red";
+  if (severity === "high") return "border-orange/30 bg-orange/5 text-orange";
+  if (severity === "medium") return "border-yellow/30 bg-yellow/5 text-yellow";
+  return "border-border bg-surface-300 text-fg-muted";
 }
 
 export default async function CoveragePage() {
@@ -27,15 +53,16 @@ export default async function CoveragePage() {
   }
 
   const validated = coverage.workflows.filter(
-    (workflow) => workflow.lifecycleStatus === "published" && workflow.supportStatus === "validated",
+    (w) => w.lifecycleStatus === "published" && w.supportStatus === "validated",
   ).length;
-  const held = coverage.workflows.filter((workflow) => workflow.lifecycleStatus === "suspended").length;
+  const held = coverage.workflows.filter((w) => w.lifecycleStatus === "suspended").length;
+  const gaps = coverage.families.filter((f) => !f.bestWorkflow);
 
   return (
     <div>
       <PageHeader
         title="Coverage & quality"
-        description="See what NNACT Pro can support, where field demand exceeds coverage, and which workflows require review."
+        description="Which product families can we diagnose automatically today, where is field demand uncovered, and how healthy are published workflows?"
         actions={
           <Link href="/diagnostics">
             <Button variant="secondary" size="sm">Back to diagnostics</Button>
@@ -49,9 +76,10 @@ export default async function CoveragePage() {
         </Card>
       )}
 
+      {/* --- Hero stats --- */}
       <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-6">
         {[
-          ["Validated", validated, "text-green"],
+          ["Validated workflows", validated, "text-green"],
           ["Pilot / experimental", coverage.workflows.length - validated - held, "text-yellow"],
           ["Suspended", held, "text-red"],
           ["Sessions", coverage.demand.totalSessions, "text-blue"],
@@ -67,81 +95,219 @@ export default async function CoveragePage() {
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_.65fr]">
+      <div className="space-y-8">
+        {/* --- Coverage gaps by product family --- */}
         <Card>
           <CardHeader>
-            <CardTitle>Workflow library status</CardTitle>
+            <CardTitle>
+              Coverage by product family
+              {gaps.length > 0 && (
+                <span className="ml-2 rounded-full bg-red/10 px-2 py-0.5 text-[10px] font-semibold text-red">
+                  {gaps.length} gap{gaps.length !== 1 && "s"}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {coverage.families.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-8 text-center">
+                <p className="font-semibold text-fg">No diagnostic sessions yet</p>
+                <p className="mt-1 text-sm text-fg-muted">
+                  Coverage gaps will appear here once field sessions are recorded.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product type</TableHead>
+                    <TableHead>Make</TableHead>
+                    <TableHead className="text-right">Sessions</TableHead>
+                    <TableHead className="text-right">Blocked</TableHead>
+                    <TableHead className="text-right">Escalated</TableHead>
+                    <TableHead className="text-right">Unsupported</TableHead>
+                    <TableHead>Coverage</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {coverage.families.map((family) => {
+                    const cs = coverageStatus(family.bestWorkflow);
+                    return (
+                      <TableRow key={`${family.productType}|${family.make}`}>
+                        <TableCell className="font-medium">{family.productType}</TableCell>
+                        <TableCell>{family.make}</TableCell>
+                        <TableCell className="text-right tabular-nums">{family.sessions}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {family.blocked > 0 ? (
+                            <span className="text-red">{family.blocked}</span>
+                          ) : (
+                            <span className="text-fg-dim">0</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {family.escalated > 0 ? (
+                            <span className="text-red">{family.escalated}</span>
+                          ) : (
+                            <span className="text-fg-dim">0</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {family.unsupported > 0 ? (
+                            <span className="text-yellow">{family.unsupported}</span>
+                          ) : (
+                            <span className="text-fg-dim">0</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-block rounded-full border px-2.5 py-1 text-[10px] font-semibold capitalize ${cs.pill}`}
+                          >
+                            {cs.label}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* --- Workflow library health --- */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Workflow library</CardTitle>
           </CardHeader>
           <CardContent>
             {coverage.workflows.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center">
                 <p className="font-semibold text-fg">No diagnostic workflows yet</p>
                 <p className="mt-1 text-sm text-fg-muted">
-                  The operations core remains usable. Add the first model-family workflow before advertising diagnostic coverage.
+                  Create the first workflow in the Diagnostic Library to begin covering product families.
                 </p>
+                <Link href="/diagnostic-library">
+                  <Button size="sm" className="mt-4">Open Diagnostic Library</Button>
+                </Link>
               </div>
             ) : (
               <div className="space-y-3">
-                {coverage.workflows.map((workflow) => (
-                  <div key={workflow.id} className="rounded-xl border border-border bg-surface-200 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-fg">{workflow.name}</p>
-                        <p className="mt-1 text-xs text-fg-muted">
-                          {[workflow.make, workflow.modelFamily, workflow.productType].filter(Boolean).join(" · ")}
-                        </p>
-                        <p className="mt-2 text-xs text-fg-dim">
-                          Source revision: {workflow.sourceRevision || "not recorded"} · Version {workflow.versionNumber}
-                        </p>
+                {coverage.workflows.map((workflow) => {
+                  const workflowCorrections = coverage.quality.corrections.filter(
+                    (c) => c.correction.workflowId === workflow.id,
+                  );
+                  const hasOpenCorrections = workflowCorrections.length > 0;
+                  return (
+                    <div
+                      key={workflow.id}
+                      className={`rounded-xl border p-4 ${
+                        hasOpenCorrections
+                          ? "border-yellow/30 bg-yellow/5"
+                          : "border-border bg-surface-200"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-fg">{workflow.name}</p>
+                            {hasOpenCorrections && (
+                              <span
+                                className={`inline-block rounded-full border px-2 py-0.5 text-[9px] font-semibold ${severityPill(workflowCorrections[0].correction.severity)}`}
+                              >
+                                {workflowCorrections.length} open correction{workflowCorrections.length !== 1 && "s"}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs text-fg-muted">
+                            {[workflow.make, workflow.modelFamily, workflow.productType]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                          <p className="mt-1 text-[11px] text-fg-dim">
+                            Source revision: {workflow.sourceRevision || "not recorded"} · Version{" "}
+                            {workflow.versionNumber}
+                          </p>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold capitalize ${statusPill(workflow.supportStatus)}`}
+                          >
+                            {workflow.supportStatus}
+                          </span>
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold capitalize ${statusPill(workflow.lifecycleStatus)}`}
+                          >
+                            {workflow.lifecycleStatus.replaceAll("_", " ")}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ${tone(workflow.supportStatus)}`}>
-                          {workflow.supportStatus}
-                        </span>
-                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ${tone(workflow.lifecycleStatus)}`}>
-                          {workflow.lifecycleStatus.replaceAll("_", " ")}
-                        </span>
-                      </div>
+                      {workflow.limitations.length > 0 && (
+                        <div className="mt-3 rounded-lg border border-yellow/20 bg-yellow/5 p-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-yellow">
+                            Known limitations
+                          </p>
+                          <ul className="mt-1 space-y-1 text-xs text-fg-muted">
+                            {workflow.limitations.map((limitation) => (
+                              <li key={limitation}>&#8226; {limitation}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                    {workflow.limitations.length > 0 && (
-                      <div className="mt-3 rounded-lg border border-yellow/20 bg-yellow/5 p-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-yellow">Known limitations</p>
-                        <ul className="mt-1 space-y-1 text-xs text-fg-muted">
-                          {workflow.limitations.map((limitation) => <li key={limitation}>• {limitation}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
+        {/* --- Open corrections --- */}
+        {coverage.quality.openCorrections > 0 && (
           <Card>
-            <CardHeader><CardTitle>Publication gate</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm text-fg-muted">
-              <p>Exact technician-facing labels</p>
-              <p>Resolved meter endpoints</p>
-              <p>Correct operating condition</p>
-              <p>Expected result and interpretation</p>
-              <p>Continuous route with no islands</p>
-              <p>No unintended branches or bus crossings</p>
-              <p>Electrical review</p>
-              <p>Visual trace audit</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Product rule</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>
+                Open corrections
+                <span className="ml-2 rounded-full bg-red/10 px-2 py-0.5 text-[10px] font-semibold text-red">
+                  {coverage.quality.openCorrections}
+                  {coverage.quality.safetyCriticalCorrections > 0 &&
+                    ` · ${coverage.quality.safetyCriticalCorrections} safety critical`}
+                </span>
+              </CardTitle>
+            </CardHeader>
             <CardContent>
-              <p className="text-sm text-fg-muted">
-                Unsupported demand is product evidence. It should influence the next model-family build, but it must never trigger an automatically published, unreviewed diagnostic path.
-              </p>
+              <div className="space-y-3">
+                {coverage.quality.corrections.map((entry) => (
+                  <div
+                    key={entry.correction.id}
+                    className="rounded-xl border border-border bg-surface-200 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-block rounded-full border px-2 py-0.5 text-[9px] font-semibold capitalize ${severityPill(entry.correction.severity)}`}
+                          >
+                            {entry.correction.severity.replaceAll("_", " ")}
+                          </span>
+                          <span className="text-xs text-fg-dim">
+                            {entry.correction.category.replaceAll("_", " ")}
+                          </span>
+                        </div>
+                        <p className="mt-1.5 text-sm text-fg">{entry.correction.description}</p>
+                        <p className="mt-1 text-[11px] text-fg-dim">
+                          on {entry.workflow.name} · v{entry.correction.workflowVersion}
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-border px-2 py-0.5 text-[9px] font-medium text-fg-muted">
+                        {entry.correction.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
-        </div>
+        )}
       </div>
     </div>
   );

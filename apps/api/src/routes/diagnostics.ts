@@ -317,28 +317,122 @@ export async function diagnosticRoutes(app: FastifyInstance) {
 
   app.get("/coverage", async (req) => {
     const orgId = await resolveOrgId(req);
-    const [workflows, sessions] = await Promise.all([
+    const [workflows, sessionRows, openCorrections] = await Promise.all([
       db
         .select()
         .from(diagnosticWorkflows)
         .where(eq(diagnosticWorkflows.orgId, orgId))
         .orderBy(desc(diagnosticWorkflows.updatedAt)),
       db
-        .select()
+        .select({ session: diagnosticSessions, equipment })
         .from(diagnosticSessions)
+        .innerJoin(equipment, eq(diagnosticSessions.equipmentId, equipment.id))
         .where(eq(diagnosticSessions.orgId, orgId))
         .orderBy(desc(diagnosticSessions.createdAt)),
+      db
+        .select({ correction: correctionReports, workflow: diagnosticWorkflows })
+        .from(correctionReports)
+        .innerJoin(diagnosticWorkflows, eq(correctionReports.workflowId, diagnosticWorkflows.id))
+        .where(
+          and(
+            eq(correctionReports.orgId, orgId),
+            inArray(correctionReports.status, ["open", "triaged", "in_review"]),
+          ),
+        )
+        .orderBy(desc(correctionReports.createdAt)),
     ]);
+
+    // Build per-{productType, make} demand map to identify coverage gaps.
+    const familyMap = new Map<
+      string,
+      {
+        productType: string;
+        make: string;
+        sessions: number;
+        blocked: number;
+        escalated: number;
+        unsupported: number;
+        bestWorkflow: {
+          id: string;
+          name: string;
+          supportStatus: string;
+          lifecycleStatus: string;
+        } | null;
+      }
+    >();
+
+    for (const row of sessionRows) {
+      const make = row.equipment.make ?? "unknown";
+      const key = `${row.equipment.type}|${make}`;
+      if (!familyMap.has(key)) {
+        familyMap.set(key, {
+          productType: row.equipment.type,
+          make,
+          sessions: 0,
+          blocked: 0,
+          escalated: 0,
+          unsupported: 0,
+          bestWorkflow: null,
+        });
+      }
+      const entry = familyMap.get(key)!;
+      entry.sessions++;
+      if (row.session.status === "blocked") entry.blocked++;
+      if (row.session.status === "escalated") entry.escalated++;
+      if (row.session.status === "identification_required" || !row.session.workflowId)
+        entry.unsupported++;
+    }
+
+    // Match the best workflow per family (validated > pilot > experimental).
+    const priority: Record<string, number> = {
+      validated: 0,
+      pilot: 1,
+      experimental: 2,
+      unsupported: 3,
+    };
+    for (const entry of familyMap.values()) {
+      const candidates = workflows.filter(
+        (w) =>
+          w.productType === entry.productType && (w.make === entry.make || !w.make),
+      );
+      candidates.sort(
+        (a, b) => (priority[a.supportStatus] ?? 99) - (priority[b.supportStatus] ?? 99),
+      );
+      const best = candidates[0];
+      if (best) {
+        entry.bestWorkflow = {
+          id: best.id,
+          name: best.name,
+          supportStatus: best.supportStatus,
+          lifecycleStatus: best.lifecycleStatus,
+        };
+      }
+    }
+
+    // Gaps first, then by session volume descending.
+    const families = Array.from(familyMap.values()).sort((a, b) => {
+      if (!a.bestWorkflow && b.bestWorkflow) return -1;
+      if (a.bestWorkflow && !b.bestWorkflow) return 1;
+      return b.sessions - a.sessions;
+    });
 
     return {
       workflows,
-      demand: {
-        totalSessions: sessions.length,
-        unsupportedOrUnresolved: sessions.filter(
-          (session) => session.status === "identification_required" || !session.workflowId,
+      families,
+      quality: {
+        openCorrections: openCorrections.length,
+        safetyCriticalCorrections: openCorrections.filter(
+          (c) => c.correction.severity === "safety_critical",
         ).length,
-        blocked: sessions.filter((session) => session.status === "blocked").length,
-        escalated: sessions.filter((session) => session.status === "escalated").length,
+        corrections: openCorrections.slice(0, 10),
+      },
+      demand: {
+        totalSessions: sessionRows.length,
+        unsupportedOrUnresolved: sessionRows.filter(
+          (r) => r.session.status === "identification_required" || !r.session.workflowId,
+        ).length,
+        blocked: sessionRows.filter((r) => r.session.status === "blocked").length,
+        escalated: sessionRows.filter((r) => r.session.status === "escalated").length,
       },
     };
   });
