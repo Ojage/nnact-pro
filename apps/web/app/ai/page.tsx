@@ -91,7 +91,12 @@ export default function AiPage() {
         provider,
         body: { apiKey, defaultTextModel: textModel.trim() || null, defaultImageModel: imageModel.trim() || null },
       }).unwrap();
-      setMessage({ kind: "ok", text: `${PROVIDER_NAMES[provider]} key saved (stored encrypted).` });
+      try {
+        await probe(provider).unwrap();
+        setMessage({ kind: "ok", text: `${PROVIDER_NAMES[provider]} key saved & probed — use the badge to check connectivity.` });
+      } catch {
+        setMessage({ kind: "ok", text: `${PROVIDER_NAMES[provider]} key saved (stored encrypted).` });
+      }
       setKeys((k) => ({ ...k, [provider]: "" }));
     } catch (err) {
       setMessage({ kind: "err", text: explainRtkError(err, "Failed to save key") });
