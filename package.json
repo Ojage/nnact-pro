@@ -21,6 +21,7 @@
     "db:push": "pnpm --filter @nnact/db push",
     "db:seed": "pnpm --filter @nnact/db seed",
     "seed:nnact": "pnpm --filter @nnact/db seed:nnact",
+    "seed:nnact-models": "pnpm --filter @nnact/db seed:nnact-models",
     "test": "pnpm -r test",
     "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "test:release": "node --test scripts/*.test.mjs",

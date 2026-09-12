@@ -65,6 +65,122 @@ export const EQUIPMENT_MODELS = [
   { id: nnactEquipmentModelId(8), manufacturer: "Perkins", modelNumber: "404D-22G", modelName: "Standby Generator 22kVA", category: "generator", normalizedIdentifier: "perkins404d22g" },
 ] as const;
 
+/** Real-world equipment models NNACT catalogues and services, used to seed the live Repair Brain. */
+export interface EquipmentModelSeedRow {
+  id: string;
+  manufacturer: string;
+  modelNumber: string;
+  modelName: string;
+  category: string;
+  normalizedIdentifier: string;
+}
+
+function knowledgeModel(
+  index: number,
+  manufacturer: string,
+  modelNumber: string,
+  modelName: string,
+  category: string,
+): EquipmentModelSeedRow {
+  return {
+    id: nnactEquipmentModelId(index),
+    manufacturer,
+    modelNumber,
+    modelName,
+    category,
+    normalizedIdentifier: `${manufacturer.toLowerCase()}${modelNumber.toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+  };
+}
+
+export const NNACT_KNOWLEDGE_MODELS: EquipmentModelSeedRow[] = [
+  // ── Split / wall AC ──────────────────────────────────────────────────
+  knowledgeModel(101, "Gree", "GWC12CE", "Split AC 12,000 BTU", "ac_unit"),
+  knowledgeModel(102, "Gree", "GWC18YE", "Split AC 18,000 BTU", "ac_unit"),
+  knowledgeModel(103, "Gree", "GWH24ACA", "Split AC 24,000 BTU", "ac_unit"),
+  knowledgeModel(104, "Midea", "MSAB-07HRN1", "Mini Split AC 9,000 BTU", "ac_unit"),
+  knowledgeModel(105, "Midea", "MS12A-12HRN1", "Inverter Split AC 12,000 BTU", "ac_unit"),
+  knowledgeModel(106, "Midea", "MS18A-18HRN1", "Inverter Split AC 18,000 BTU", "ac_unit"),
+  knowledgeModel(107, "Samsung", "AR12TVFYBWK", "Wind-Free Split AC 12,000 BTU", "ac_unit"),
+  knowledgeModel(108, "Samsung", "AR18TYHYCWK", "Inverter Split AC 18,000 BTU", "ac_unit"),
+  knowledgeModel(109, "LG", "T13EVN", "Dual Inverter AC 12,000 BTU", "ac_unit"),
+  knowledgeModel(110, "LG", "S12ENV", "Split AC 12,000 BTU", "ac_unit"),
+  knowledgeModel(111, "LG", "S18ENV", "Split AC 18,000 BTU", "ac_unit"),
+  knowledgeModel(112, "Daikin", "FTKF35BVMA", "Split AC R32 12,000 BTU", "ac_unit"),
+  knowledgeModel(113, "Daikin", "FTKF50BVMA", "Split AC R32 18,000 BTU", "ac_unit"),
+  knowledgeModel(114, "Panasonic", "CS-YU12WKXA", "Inverter Split AC 12,000 BTU", "ac_unit"),
+  knowledgeModel(115, "Haier", "HSU-12HJA03", "Split AC 12,000 BTU", "ac_unit"),
+  knowledgeModel(116, "Hisense", "AS-12HR4SYDB1G", "Inverter Split AC 12,000 BTU", "ac_unit"),
+  // ── Refrigerators ────────────────────────────────────────────────────
+  knowledgeModel(201, "LG", "GN-B315WLBA", "Refrigerator 259L", "refrigerator"),
+  knowledgeModel(202, "LG", "GC-B439RVMZ", "Refrigerator 385L", "refrigerator"),
+  knowledgeModel(203, "Samsung", "RT39K5987WW", "Frost Free Refrigerator 386L", "refrigerator"),
+  knowledgeModel(204, "Samsung", "RT46K6255DV", "Frost Free Refrigerator 433L", "refrigerator"),
+  knowledgeModel(205, "Hisense", "HRD331N4EBEC", "Double Door Refrigerator 341L", "refrigerator"),
+  knowledgeModel(206, "Hisense", "HRM154N4BJE", "Refrigerator 154L", "refrigerator"),
+  knowledgeModel(207, "Haier", "HTM208E5", "Refrigerator 208L", "refrigerator"),
+  knowledgeModel(208, "Thermocool", "TTR320B", "Refrigerator 320L", "refrigerator"),
+  knowledgeModel(209, "Scanfrost", "SF-240F", "Refrigerator 240L", "refrigerator"),
+  knowledgeModel(210, "Binatone", "BRN-220", "Refrigerator 220L", "refrigerator"),
+  knowledgeModel(211, "Panasonic", "NR-BD306GNX1W", "Frost Free Refrigerator 306L", "refrigerator"),
+  // ── Freezers ─────────────────────────────────────────────────────────
+  knowledgeModel(301, "Hisense", "HCF-3024", "Chest Freezer 302L", "freezer"),
+  knowledgeModel(302, "Haier", "HCF-300", "Chest Freezer 300L", "freezer"),
+  knowledgeModel(303, "LG", "GF-820", "Chest Freezer 231L", "freezer"),
+  knowledgeModel(304, "Scanfrost", "SF-320C", "Chest Freezer 320L", "freezer"),
+  knowledgeModel(305, "Midea", "SD-300", "Chest Freezer 300L", "freezer"),
+  knowledgeModel(306, "Thermocool", "TCF182W", "Upright Freezer 182L", "freezer"),
+  // ── Washing machines ─────────────────────────────────────────────────
+  knowledgeModel(401, "Samsung", "WW90J54E0BW", "Front Load Washer 9kg", "washing_machine"),
+  knowledgeModel(402, "Samsung", "WA10F5S4UAB", "Top Load Washer 10kg", "washing_machine"),
+  knowledgeModel(403, "LG", "F10B8NDA24", "Front Load Washer 8kg", "washing_machine"),
+  knowledgeModel(404, "LG", "T1308TEFT1", "Top Load Washer 13kg", "washing_machine"),
+  knowledgeModel(405, "Hisense", "WFQA8014EVJM", "Front Load Washer 8kg", "washing_machine"),
+  knowledgeModel(406, "Scanfrost", "SF-WM1000", "Twin Tub Washer 10kg", "washing_machine"),
+  knowledgeModel(407, "Binatone", "BWM-7000", "Single Tub Washer 7kg", "washing_machine"),
+  knowledgeModel(408, "Beko", "WML15106S", "Front Load Washer 10kg", "washing_machine"),
+  // ── Dryers & washer-dryers ───────────────────────────────────────────
+  knowledgeModel(501, "Samsung", "DV90K8200CW", "Heat Pump Dryer 9kg", "dryer"),
+  knowledgeModel(502, "LG", "RD0892BBS", "Ventless Dryer 8kg", "dryer"),
+  knowledgeModel(503, "Samsung", "WD90K5410OW", "Washer-Dryer 9/6kg", "washer_dryer_combo"),
+  knowledgeModel(504, "LG", "F4J5VNP4W", "Washer-Dryer 10.5/7kg", "washer_dryer_combo"),
+  // ── Dishwashers ──────────────────────────────────────────────────────
+  knowledgeModel(601, "LG", "D1450SB", "Dishwasher 14 Place Settings", "dishwasher"),
+  knowledgeModel(602, "Samsung", "DW60T5045FW", "Dishwasher 60cm", "dishwasher"),
+  // ── Microwaves / ovens / cooktops ────────────────────────────────────
+  knowledgeModel(701, "Samsung", "ME83XJW", "Microwave Oven 23L", "microwave"),
+  knowledgeModel(702, "LG", "MS2044HGT", "Microwave Oven 20L", "microwave"),
+  knowledgeModel(703, "Panasonic", "NN-SM32HMPKG", "Microwave Oven 32L", "microwave"),
+  knowledgeModel(704, "Binatone", "MB-313E", "Microwave Oven 20L", "microwave"),
+  knowledgeModel(705, "Thermocool", "TBO-45", "Bake Oven 45L", "oven"),
+  knowledgeModel(706, "Scanfrost", "SF-4529", "Gas Range 4 Burner", "range"),
+  knowledgeModel(707, "Hisense", "HI6401FB", "Induction Cooktop 4 Zone", "cooktop"),
+  // ── Generators ───────────────────────────────────────────────────────
+  knowledgeModel(801, "Fusteq", "FG7.5-3D", "Diesel Generator 7.5kVA", "generator"),
+  knowledgeModel(802, "Fusteq", "FG20SP", "Silent Diesel Generator 20kVA", "generator"),
+  knowledgeModel(803, "Firman", "SPG7000", "Petrol Generator 7kVA", "generator"),
+  knowledgeModel(804, "Yanmar", "YDG7000", "Diesel Generator 7kVA", "generator"),
+  knowledgeModel(805, "Kubota", "J108", "Diesel Generator 10kVA", "generator"),
+  knowledgeModel(806, "Lister Petter", "LPWS4", "Diesel Generator 27kVA", "generator"),
+  knowledgeModel(807, "FG Wilson", "P22-1", "Silent Diesel Generator 22kVA", "generator"),
+  knowledgeModel(808, "Elemax", "SH9500", "Petrol Generator 9.5kVA", "generator"),
+  // ── Solar inverters & batteries ──────────────────────────────────────
+  knowledgeModel(901, "Deye", "SUN-5K-SG03LP1", "Hybrid Inverter 5kW", "inverter"),
+  knowledgeModel(902, "Deye", "SUN-8K-SG04LP3", "Hybrid Inverter 8kW", "inverter"),
+  knowledgeModel(903, "Growatt", "SPF5000ES", "Off-Grid Inverter 5kW", "inverter"),
+  knowledgeModel(904, "MPP Solar", "PIP-5048", "Hybrid Inverter 5kW", "inverter"),
+  knowledgeModel(905, "Luminous", "NXG3.5K", "Hybrid Inverter 3.5kVA", "inverter"),
+  knowledgeModel(906, "FelicitySolar", "LXP-5K", "Hybrid Inverter 5kW", "inverter"),
+  knowledgeModel(907, "Cworth", "CW-HYB-3.5K", "Hybrid Inverter 3.5kW", "inverter"),
+  knowledgeModel(908, "Pylontech", "US2000C", "LiFePO4 Battery 2.4kWh", "battery"),
+  knowledgeModel(909, "FelicitySolar", "LPBF5.12", "LiFePO4 Battery 5.12kWh", "battery"),
+  knowledgeModel(910, "Huawei", "LUNA2000-5-S0", "Modular Battery 5kWh", "battery"),
+  // ── Water pumps ──────────────────────────────────────────────────────
+  knowledgeModel(1001, "Grundfos", "SQ2-70", "Submersible Borehole Pump", "water_pump"),
+  knowledgeModel(1002, "Pedrollo", "4SR2-23", "Submersible Pump", "water_pump"),
+  knowledgeModel(1003, "Speroni", "CA90-50", "Centrifugal Booster Pump", "water_pump"),
+  knowledgeModel(1004, "DAB", "JETINOX102", "Jet Pump", "water_pump"),
+];
+
 export const NNACT_PROPERTIES = [
   ...RESIDENTIAL_CUSTOMERS.map((row, index) => ({
     id: nnactPropertyId(index + 1),

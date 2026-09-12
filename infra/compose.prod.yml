@@ -49,6 +49,21 @@ services:
         pnpm --filter @nnact/db schema:parity
     restart: "no"
 
+  seed-models:
+    profiles: ["tools"]
+    # One-off job: upserts the NNACT Repair Brain equipment-model catalog
+    # (models only — never creates demo customers/jobs) using the same API
+    # image. Run with:
+    #   docker compose -f infra/compose.prod.yml --profile tools run --rm seed-models
+    image: ${NNPAPI_IMAGE:-nnact/api:prod}
+    environment:
+      DATABASE_URL: postgres://ofp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ofp
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-ec", "pnpm --filter @nnact/db seed:nnact-models"]
+    restart: "no"
+
   api:
     image: ${NNPAPI_IMAGE:-nnact/api:prod}
     build:
