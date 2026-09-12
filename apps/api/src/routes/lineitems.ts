@@ -15,6 +15,13 @@ const createBody = z.object({
   unitCost: z.number().int().nonnegative().default(0),
 });
 
+const patchBody = z.object({
+  description: z.string().min(1).optional(),
+  quantity: z.number().int().positive().optional(),
+  unitPrice: z.number().int().nonnegative().optional(),
+  unitCost: z.number().int().nonnegative().optional(),
+});
+
 async function recomputeJobTotals(orgId: string, jobId: string) {
   const [job] = await db
     .select({ laborCostCents: jobs.laborCostCents })
@@ -64,6 +71,33 @@ export async function lineItemRoutes(app: FastifyInstance) {
     const { total, cost, margin } = await recomputeJobTotals(orgId, jobId);
     safeEmitActivity(orgId, "line_item.added", `Added line item: ${row.description}`, { jobId });
     return reply.code(201).send({ lineItem: row, jobTotal: total, jobCostCents: cost, jobMarginCents: margin });
+  });
+
+  app.patch("/line-items/:id", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+    const { id } = req.params as { id: string };
+    const parsed = patchBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const [existing] = await db
+      .select({ id: lineItems.id, jobId: lineItems.jobId, description: lineItems.description })
+      .from(lineItems)
+      .where(and(eq(lineItems.orgId, orgId), eq(lineItems.id, id)));
+    if (!existing || !(await canAccessJob(orgId, existing.jobId, claims.role, claims.userId))) {
+      return reply.code(404).send({ error: "not found" });
+    }
+
+    const [updated] = await db
+      .update(lineItems)
+      .set(parsed.data)
+      .where(and(eq(lineItems.orgId, orgId), eq(lineItems.id, id)))
+      .returning();
+    if (!updated) return reply.code(404).send({ error: "not found" });
+    const { total, cost, margin } = await recomputeJobTotals(orgId, updated.jobId);
+    safeEmitActivity(orgId, "line_item.updated", `Updated line item: ${updated.description}`, { jobId: updated.jobId });
+    return { lineItem: updated, jobTotal: total, jobCostCents: cost, jobMarginCents: margin };
   });
 
   app.delete("/line-items/:id", async (req, reply) => {

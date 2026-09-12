@@ -370,6 +370,8 @@ export interface JobDTO {
   scheduledAt?: string | null;
   assignedTo?: string | null;
   total: Money;
+  /** Tech time cost for the whole job (margin input; never added to the bill). */
+  laborCostCents?: number | null;
   createdAt: string;
 }
 

@@ -258,6 +258,7 @@ export const apiSlice = createApi({
   refetchOnFocus: false,
   tagTypes: [
     "Job",
+    "JobLineItems",
     "Customer",
     "Activity",
     "Appointment",
@@ -313,6 +314,39 @@ export const apiSlice = createApi({
     }),
     jobLineItems: builder.query<LineItemDTO[], string>({
       query: (jobId) => `/api/jobs/${jobId}/line-items`,
+      providesTags: (_result, _error, jobId) => [{ type: "JobLineItems", id: jobId }],
+    }),
+    addJobLineItem: builder.mutation<
+      { lineItem: LineItemDTO; jobTotal: number; jobCostCents: number; jobMarginCents: number },
+      { jobId: string; body: { description: string; quantity: number; unitPrice: number; unitCost?: number } }
+    >({
+      query: ({ jobId, body }) => ({ url: `/api/jobs/${jobId}/line-items`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "JobLineItems", id: arg.jobId },
+        { type: "Job", id: arg.jobId },
+      ],
+    }),
+    updateJobLineItem: builder.mutation<
+      { lineItem: LineItemDTO; jobTotal: number; jobCostCents: number; jobMarginCents: number },
+      { id: string; body: { description: string; quantity: number; unitPrice: number; unitCost?: number } }
+    >({
+      query: ({ id, body }) => ({ url: `/api/line-items/${id}`, method: "PATCH", body }),
+      invalidatesTags: (result, _error, _arg) => {
+        const jobId = result?.lineItem.jobId;
+        return jobId
+          ? [{ type: "JobLineItems", id: jobId }, { type: "Job", id: jobId }]
+          : [];
+      },
+    }),
+    deleteJobLineItem: builder.mutation<
+      { ok: boolean; jobTotal: number; jobCostCents: number; jobMarginCents: number },
+      { id: string; jobId: string }
+    >({
+      query: ({ id }) => ({ url: `/api/line-items/${id}`, method: "DELETE" }),
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "JobLineItems", id: arg.jobId },
+        { type: "Job", id: arg.jobId },
+      ],
     }),
     jobPhotos: builder.query<PhotoRecordDTO[], string>({
       query: (jobId) => `/api/photos/job/${jobId}`,
@@ -1178,6 +1212,9 @@ export const {
   useCreateJobMutation,
   useImportJobsMutation,
   useJobLineItemsQuery,
+  useAddJobLineItemMutation,
+  useUpdateJobLineItemMutation,
+  useDeleteJobLineItemMutation,
   useJobPhotosQuery,
   useJobVoiceNotesQuery,
   useMarkJobVoiceNotesDeliveredMutation,

@@ -7,8 +7,6 @@ import {
   useAppointmentsQuery,
   useCustomersQuery,
   useDiagnosticSessionsQuery,
-  useInvoicesQuery,
-  useJobLineItemsQuery,
   useJobQuery,
 } from "@/lib/redux/api";
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
@@ -18,11 +16,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { InfoTip } from "@/components/ui/info-tip";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { JobStatusBadge, InvoiceStatusBadge } from "@/components/status-badge";
+import { JobStatusBadge } from "@/components/status-badge";
 import { JobRepairBrainWorkflow } from "@/components/job-repair-brain-workflow";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { JobVoiceNotesPanel } from "@/components/job-voice-notes";
+import { JobPricingPanel } from "@/components/job-pricing-panel";
 
 interface Appointment {
   id: string;
@@ -32,24 +31,6 @@ interface Appointment {
   endsAt: string;
 }
 
-interface Invoice {
-  id: string;
-  jobId: string;
-  number: string;
-  status: "draft" | "sent" | "paid" | "void";
-  total: number;
-}
-
-interface LineItem {
-  id: string;
-  jobId: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  unitCost: number;
-  createdAt: string;
-}
-
 export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
   const jobId = params.id;
@@ -57,14 +38,11 @@ export default function JobDetailPage() {
   const { data: job, isLoading } = useJobQuery(jobId, { skip: !jobId });
   const { data: activities = [] } = useActivitiesQuery({ jobId }, { skip: !jobId });
   const { data: appointments = [] } = useAppointmentsQuery();
-  const { data: invoices = [] } = useInvoicesQuery();
   const { data: customers = [] } = useCustomersQuery();
-  const { data: lineItems = [] } = useJobLineItemsQuery(jobId, { skip: !jobId });
   const { data: diagnosticRows = [] } = useDiagnosticSessionsQuery({ jobId }, { skip: !jobId });
 
   const customer = job ? customers.find((item) => item.id === job.customerId) : null;
   const jobAppointments = appointments.filter((item) => item.jobId === jobId);
-  const jobInvoices = invoices.filter((item) => item.jobId === jobId);
   const diagnostic: DiagnosticSessionListItem | null = diagnosticRows[0] ?? null;
 
   if (!job && isLoading) {
@@ -298,7 +276,7 @@ export default function JobDetailPage() {
               </Card>
             )}
 
-            <JobVoiceNotesPanel jobId={jobId} />
+            <JobPricingPanel job={job} />
 
             <Card>
               <CardHeader>
@@ -326,67 +304,7 @@ export default function JobDetailPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="inline-flex items-center gap-1.5">
-                  Invoices
-                  <InfoTip label="About invoices" side="right">
-                    Billing documents generated from this job&apos;s line items. Create from Job Closeout when pricing is final.
-                  </InfoTip>
-                </CardTitle>
-                <CardDescription>{jobInvoices.length ? `${jobInvoices.length} invoice${jobInvoices.length === 1 ? "" : "s"}` : "No invoices yet"}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {jobInvoices.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-fg-muted">Create the invoice from Job Closeout after pricing is complete.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {jobInvoices.map((invoice) => (
-                      <Link key={invoice.id} href={`/invoices/${invoice.id}`} className="flex items-center justify-between rounded-lg bg-surface-200 p-3 no-underline hover:bg-surface-300">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-fg-link">{invoice.number}</span>
-                          <InvoiceStatusBadge status={invoice.status} />
-                        </div>
-                        <span className="text-sm text-fg-muted">{formatMoney(invoice.total)}</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="inline-flex items-center gap-1.5">
-                  Line items
-                  <InfoTip label="About line items" side="right">
-                    Parts, labor, and fees that roll up into the job total and future invoice.
-                  </InfoTip>
-                </CardTitle>
-                <CardDescription>{lineItems.length ? `${lineItems.length} item${lineItems.length === 1 ? "" : "s"}` : "No items yet"}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {lineItems.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-fg-muted">No line items for this job.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {lineItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between rounded-lg bg-surface-200 p-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm text-fg">{item.description}</p>
-                          <p className="mt-0.5 text-xs text-fg-dim">{item.quantity} × {formatMoney(item.unitPrice)}</p>
-                        </div>
-                        <span className="ml-3 shrink-0 text-sm font-semibold text-fg">{formatMoney(item.quantity * item.unitPrice)}</span>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between rounded-lg border border-accent/20 bg-accent/5 p-3">
-                      <span className="text-sm font-medium text-fg">Job total</span>
-                      <span className="text-sm font-bold text-fg">{formatMoney(job.total)}</span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <JobVoiceNotesPanel jobId={jobId} />
           </div>
         </div>
       )}
