@@ -23,6 +23,11 @@ import {
   properties,
   repairOutcomes,
   repairProcedures,
+  serviceAgreements,
+  serviceCategories,
+  serviceChecklists,
+  servicePlans,
+  serviceVisits,
   symptoms,
   testPoints,
   users,
@@ -43,6 +48,7 @@ import {
   xaf,
 } from "./nnact-data.js";
 import { seedNnactCatalog } from "./nnact-catalog.js";
+import { seedNnactServicePlans } from "./nnact-service-plans.js";
 import {
   NNACT_USER_IDS,
   nnactAppointmentId,
@@ -634,6 +640,7 @@ export async function seedNnactDemo(): Promise<void> {
         set: { linkedVia: "demo_seed" },
       });
 
+    await seedNnactServicePlans(tx);
     await seedNnactCatalog(tx);
   });
 
@@ -662,6 +669,11 @@ export async function verifyNnactSeed(): Promise<Record<string, number>> {
     invoices: 0,
     payments: 0,
     repairOutcomes: 0,
+    serviceCategories: 0,
+    serviceChecklists: 0,
+    servicePlans: 0,
+    serviceAgreements: 0,
+    serviceVisits: 0,
   };
 
   const [org] = await db.select().from(orgs).where(sql`${orgs.id} = ${NNACT_ORG_ID}`);
@@ -697,6 +709,21 @@ export async function verifyNnactSeed(): Promise<Record<string, number>> {
 
   const outcomeRows = await db.select().from(repairOutcomes).where(sql`${repairOutcomes.orgId} = ${NNACT_ORG_ID}`);
   counts.repairOutcomes = outcomeRows.length;
+
+  const categoryRows = await db.select().from(serviceCategories).where(sql`${serviceCategories.orgId} = ${NNACT_ORG_ID}`);
+  counts.serviceCategories = categoryRows.length;
+
+  const checklistRows = await db.select().from(serviceChecklists).where(sql`${serviceChecklists.orgId} = ${NNACT_ORG_ID}`);
+  counts.serviceChecklists = checklistRows.length;
+
+  const planRows = await db.select().from(servicePlans).where(sql`${servicePlans.orgId} = ${NNACT_ORG_ID}`);
+  counts.servicePlans = planRows.length;
+
+  const agreementRows = await db.select().from(serviceAgreements).where(sql`${serviceAgreements.orgId} = ${NNACT_ORG_ID}`);
+  counts.serviceAgreements = agreementRows.length;
+
+  const visitRows = await db.select().from(serviceVisits).where(sql`${serviceVisits.orgId} = ${NNACT_ORG_ID}`);
+  counts.serviceVisits = visitRows.length;
 
   return counts;
 }
