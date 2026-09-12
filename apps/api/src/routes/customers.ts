@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
 import { db, customers, properties } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
+import { verifiedClaims } from "../operational-authorization.js";
 
 const createBody = z.object({
   name: z.string().min(1),
@@ -17,6 +18,23 @@ const patchBody = z.object({
   phone: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
+
+const importRow = z.object({
+  name: z.string().trim().min(1, "name is required"),
+  email: z.string().trim().optional(),
+  phone: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
+const importBody = z.object({
+  customers: z.array(importRow).min(1).max(500),
+});
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function officeRole(role: string): role is "owner" | "dispatcher" {
+  return role === "owner" || role === "dispatcher";
+}
 
 export async function customerRoutes(app: FastifyInstance) {
   app.get("/", async (req) => {
@@ -74,5 +92,69 @@ export async function customerRoutes(app: FastifyInstance) {
       .returning();
     if (!row) return reply.code(404).send({ error: "not found" });
     return row;
+  });
+
+  /**
+   * Bulk-import customers from paper records. Skips rows whose normalized
+   * phone/email already belongs to an existing customer in the org; returns a
+   * per-row result so the UI can surface exactly what was skipped and why.
+   */
+  app.post("/import", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+    if (!officeRole(claims.role)) {
+      return reply.code(403).send({ error: "only owners and dispatchers may import customers" });
+    }
+
+    const parsed = importBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    // Load existing contacts once so dedupe is a set lookup.
+    const existing = await db
+      .select({ phone: customers.phone, email: customers.email })
+      .from(customers)
+      .where(eq(customers.orgId, orgId));
+
+    const norm = (v: string | null | undefined) => (v ? v.trim().toLowerCase() : "");
+    const phones = new Set(existing.map((c) => norm(c.phone)).filter(Boolean));
+    const emails = new Set(existing.map((c) => norm(c.email)).filter(Boolean));
+
+    const created = [];
+    const skipped: Array<{ index: number; reason: string }> = [];
+    const rowData = parsed.data.customers;
+
+    for (let i = 0; i < rowData.length; i++) {
+      const row = rowData[i];
+      const phone = norm(row.phone);
+      const email = norm(row.email);
+      if (row.email && !EMAIL_RE.test(row.email)) {
+        skipped.push({ index: i, reason: "invalid email" });
+        continue;
+      }
+      if (phone && phones.has(phone)) {
+        skipped.push({ index: i, reason: "phone already exists" });
+        continue;
+      }
+      if (email && emails.has(email)) {
+        skipped.push({ index: i, reason: "email already exists" });
+        continue;
+      }
+      const [next] = await db
+        .insert(customers)
+        .values({
+          orgId,
+          name: row.name,
+          email: row.email?.trim() ? row.email.trim() : null,
+          phone: row.phone?.trim() ? row.phone.trim() : null,
+          notes: row.notes?.trim() ? row.notes.trim() : null,
+        })
+        .returning();
+      created.push(next);
+      if (phone) phones.add(phone);
+      if (email) emails.add(email);
+    }
+
+    return { created, skipped };
   });
 }

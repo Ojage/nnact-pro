@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination } from "@/components/pagination";
+import JobImportDialog from "./import-dialog";
 
 type SortField = "title" | "status" | "total" | "customer";
 type SortDir = "asc" | "desc";
@@ -73,6 +74,7 @@ export default function JobsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [showImport, setShowImport] = useState(false);
   const [skip, setSkip] = useState(0);
   const take = 50;
 

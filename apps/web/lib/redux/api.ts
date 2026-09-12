@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import type { ActivityDTO, CustomerDTO, JobDTO, JobVoiceNoteDTO, UserDTO } from "@nnact/shared";
+import type { ActivityDTO, CustomerDTO, JobDTO, JobStatus, JobVoiceNoteDTO, UserDTO } from "@nnact/shared";
 import type {
   ChannelPublicationDTO,
   ChannelVariantDTO,
@@ -288,6 +288,23 @@ export const apiSlice = createApi({
       query: (body) => ({ url: "/api/jobs", method: "POST", body: { ...body, status: "lead" } }),
       invalidatesTags: ["Job"],
     }),
+    importJobs: builder.mutation<
+      { created: JobDTO[]; skipped: Array<{ index: number; reason: string }> },
+      {
+        jobs: Array<{
+          customerId?: string;
+          customer?: { name: string; phone?: string; email?: string };
+          title: string;
+          description?: string;
+          date?: string;
+          status?: JobStatus;
+          total?: number;
+        }>;
+      }
+    >({
+      query: (body) => ({ url: "/api/jobs/import", method: "POST", body }),
+      invalidatesTags: ["Job", "Customer", "Activity"],
+    }),
     jobLineItems: builder.query<LineItemDTO[], string>({
       query: (jobId) => `/api/jobs/${jobId}/line-items`,
     }),
@@ -336,6 +353,13 @@ export const apiSlice = createApi({
     >({
       query: (body) => ({ url: "/api/customers", method: "POST", body }),
       invalidatesTags: ["Customer"],
+    }),
+    importCustomers: builder.mutation<
+      { created: CustomerDTO[]; skipped: Array<{ index: number; reason: string }> },
+      { customers: Array<{ name: string; email?: string; phone?: string; notes?: string }> }
+    >({
+      query: (body) => ({ url: "/api/customers/import", method: "POST", body }),
+      invalidatesTags: ["Customer", "Activity"],
     }),
     patchCustomer: builder.mutation<
       CustomerDTO,
@@ -1146,6 +1170,7 @@ export const {
   useJobQuery,
   usePatchJobMutation,
   useCreateJobMutation,
+  useImportJobsMutation,
   useJobLineItemsQuery,
   useJobPhotosQuery,
   useJobVoiceNotesQuery,
@@ -1155,6 +1180,7 @@ export const {
   useCustomersQuery,
   useCustomerQuery,
   useCreateCustomerMutation,
+  useImportCustomersMutation,
   usePatchCustomerMutation,
   useActivitiesQuery,
   useAppointmentsQuery,

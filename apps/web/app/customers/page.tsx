@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/pagination";
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { InfoTip } from "@/components/ui/info-tip";
+import CustomerImportDialog from "./import-dialog";
 import type { ActivityDTO, CustomerDTO } from "@nnact/shared";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
@@ -31,6 +32,7 @@ export default function CustomersPage() {
 
   // ── Create-customer dialog ──
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createEmail, setCreateEmail] = useState("");
   const [createPhone, setCreatePhone] = useState("");
@@ -202,9 +204,19 @@ export default function CustomersPage() {
             : undefined
         }
         actions={
-          <Button size="sm" data-tour="customers-add" onClick={() => setShowCreate(true)}>
-            + New Customer
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              data-tour="customers-import"
+              onClick={() => setShowImport(true)}
+            >
+              ⤓ Import
+            </Button>
+            <Button size="sm" data-tour="customers-add" onClick={() => setShowCreate(true)}>
+              + New Customer
+            </Button>
+          </div>
         }
       />
 
@@ -498,6 +510,8 @@ export default function CustomersPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <CustomerImportDialog open={showImport} onOpenChange={setShowImport} />
 
       <Pagination skip={skip} take={take} total={filteredSorted.length} onSkipChange={setSkip} />
     </div>

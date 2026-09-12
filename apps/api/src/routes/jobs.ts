@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { and, desc, eq, max, sql } from "drizzle-orm";
-import { db, jobs, users, orgs, jobStatusHistory } from "@nnact/db";
+import { and, desc, eq, max, or, sql } from "drizzle-orm";
+import { db, jobs, users, orgs, jobStatusHistory, customers } from "@nnact/db";
 import { JOB_STATUS, mergeBusinessSettings } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
@@ -31,6 +31,40 @@ export const jobPatchBody = z.object({
   laborCostCents: z.number().int().nonnegative().optional(),
   cancelReason: z.string().trim().min(1).max(500).optional(),
 });
+
+const importJobRow = z.object({
+  /** Optional pre-created customer id. */
+  customerId: z.string().uuid().optional(),
+  /** Create-or-lookup customer describing the paper record. */
+  customer: z
+    .object({
+      name: z.string().trim().min(1),
+      phone: z.string().trim().optional(),
+      email: z.string().trim().optional(),
+    })
+    .optional(),
+  title: z.string().trim().min(1, "title is required"),
+  description: z.string().trim().optional(),
+  /** YYYY-MM-DD date the historical job was (originally) done on. */
+  date: z.string().trim().optional(),
+  status: z.enum(JOB_STATUS).optional().default("completed"),
+  total: z.number().int().nonnegative().optional().default(0),
+});
+
+const importJobsBody = z.object({
+  jobs: z.array(importJobRow).min(1).max(500),
+});
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function parseImportDate(raw: string | undefined): Date | undefined {
+  if (!raw) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
+  if (!m) return undefined;
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12));
+  if (Number.isNaN(dt.getTime())) return undefined;
+  return dt;
+}
 
 function officeRole(role: string): role is "owner" | "dispatcher" {
   return role === "owner" || role === "dispatcher";
@@ -267,5 +301,143 @@ export async function jobRoutes(app: FastifyInstance) {
     }
 
     return row;
+  });
+
+  /**
+   * Bulk-backfill historical paper jobs. Each row references an existing
+   * customer id, or describes a customer by phone/email/name so the import can
+   * reuse or create one. Job numbers are allocated per org inside the same
+   * advisory lock as normal creation, and each created job gets a status
+   * history entry so the timeline stays truthful.
+   */
+  app.post("/import", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+    if (!officeRole(claims.role)) {
+      return reply.code(403).send({ error: "only owners and dispatchers may import jobs" });
+    }
+
+    const parsed = importJobsBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const created: typeof jobs.$inferSelect[] = [];
+    const skipped: Array<{ index: number; reason: string }> = [];
+    const rows = parsed.data.jobs;
+
+    await db.transaction(async (tx) => {
+      // Warm the customer lookup cache once for the whole batch.
+      const allCustomers = await tx
+        .select()
+        .from(customers)
+        .where(eq(customers.orgId, orgId));
+      const byId = new Map<string, typeof customers.$inferSelect>(allCustomers.map((c) => [c.id, c]));
+      const byPhone = new Map<string, typeof customers.$inferSelect>();
+      const byEmail = new Map<string, typeof customers.$inferSelect>();
+      const byName = new Map<string, typeof customers.$inferSelect>();
+      for (const c of allCustomers) {
+        if (c.phone) byPhone.set(c.phone.trim().toLowerCase(), c);
+        if (c.email) byEmail.set(c.email.trim().toLowerCase(), c);
+        if (c.name) byName.set(c.name.trim().toLowerCase(), c);
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        let customerId = row.customerId ?? null;
+
+        if (row.customerId) {
+          const known = byId.get(row.customerId);
+          if (!known) {
+            skipped.push({ index: i, reason: "customer not found in this organization" });
+            continue;
+          }
+        } else if (row.customer) {
+          const { phone, email, name } = row.customer;
+          const phoneKey = phone ? phone.trim().toLowerCase() : "";
+          const emailKey = email ? email.trim().toLowerCase() : "";
+          const nameKey = name.trim().toLowerCase();
+          const match =
+            (phoneKey && byPhone.get(phoneKey)) ||
+            (emailKey && EMAIL_RE.test(emailKey) && byEmail.get(emailKey)) ||
+            byName.get(nameKey);
+
+          if (match) {
+            customerId = match.id;
+          } else {
+            if (email && !EMAIL_RE.test(email)) {
+              skipped.push({ index: i, reason: "invalid email, customer not created" });
+              continue;
+            }
+            const [next] = await tx
+              .insert(customers)
+              .values({
+                orgId,
+                name: name.trim(),
+                phone: phone?.trim() ? phone.trim() : null,
+                email: email?.trim() ? email.trim() : null,
+              })
+              .returning();
+            byId.set(next.id, next);
+            if (next.phone) byPhone.set(next.phone.trim().toLowerCase(), next);
+            if (next.email) byEmail.set(next.email.trim().toLowerCase(), next);
+            if (next.name) byName.set(next.name.trim().toLowerCase(), next);
+            customerId = next.id;
+          }
+        } else {
+          skipped.push({ index: i, reason: "no customer reference provided" });
+          continue;
+        }
+        if (!customerId) {
+          skipped.push({ index: i, reason: "could not resolve a customer" });
+          continue;
+        }
+
+        const jobDate = parseImportDate(row.date);
+        if (row.date && !jobDate) {
+          skipped.push({ index: i, reason: "invalid date, expected YYYY-MM-DD" });
+          continue;
+        }
+
+        const number = await allocateNumberInOrg(tx, orgId);
+        const [job] = await tx
+          .insert(jobs)
+          .values({
+            orgId,
+            customerId,
+            number,
+            title: row.title,
+            description: row.description?.trim() || null,
+            status: row.status,
+            source: "staff",
+            preferredDate: jobDate ? jobDate.toISOString().slice(0, 10) : null,
+            scheduledAt: jobDate,
+            createdAt: jobDate,
+            updatedAt: jobDate,
+            total: row.total,
+          })
+          .returning();
+        await tx.insert(jobStatusHistory).values({
+          orgId,
+          jobId: job.id,
+          fromStatus: null,
+          toStatus: job.status,
+          changedBy: claims.userId,
+          reason: "imported historical job",
+        });
+        created.push(job);
+      }
+    });
+
+    if (created.length > 0) {
+      safeEmitActivity(orgId, "job.created", `Imported ${created.length} historical job${created.length === 1 ? "" : "s"}`, {
+        customerId: created[0].customerId,
+      });
+      void safeEmitEvent(orgId, "job.import", {
+        count: created.length,
+        skipped: skipped.length,
+      });
+    }
+
+    return { created, skipped };
   });
 }
