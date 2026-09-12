@@ -11,14 +11,38 @@ function launchOptions(): Parameters<typeof puppeteer.launch>[0] {
   };
 }
 
+async function launchBrowser(): Promise<Browser> {
+  const browser = await puppeteer.launch(launchOptions());
+  // If the Chromium process dies (OOM, kill, network drop), drop the cached
+  // promise so the next render launches a fresh instance instead of failing
+  // on a dead handle forever.
+  browser.on("disconnected", () => {
+    void browserPromise
+      ?.then((current) => {
+        if (current === browser) browserPromise = null;
+      })
+      .catch(() => {});
+  });
+  return browser;
+}
+
 async function getBrowser(): Promise<Browser> {
   if (process.env.NODE_ENV === "test") {
-    return puppeteer.launch(launchOptions());
+    return launchBrowser();
   }
   if (!browserPromise) {
-    browserPromise = puppeteer.launch(launchOptions());
+    browserPromise = launchBrowser();
   }
-  return browserPromise;
+  try {
+    return await browserPromise;
+  } catch (cause) {
+    browserPromise = null;
+    const hint =
+      process.env.PUPPETEER_EXECUTABLE_PATH
+        ? `Could not launch Chromium at ${process.env.PUPPETEER_EXECUTABLE_PATH}.`
+        : "Could not launch Chromium. Install puppeteer or set PUPPETEER_EXECUTABLE_PATH to a system browser.";
+    throw new Error(`${hint} ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
 }
 
 /** Closes the shared Chromium instance (tests and graceful shutdown). */
@@ -29,21 +53,13 @@ export async function closeDocumentPdfBrowser(): Promise<void> {
   await browser.close();
 }
 
-export async function renderFieldDocumentPdfFromHtml(html: string): Promise<Buffer> {
-  const ownsBrowser = process.env.NODE_ENV === "test";
-  let browser: Awaited<ReturnType<typeof getBrowser>>;
-  try {
-    browser = await getBrowser();
-  } catch (cause) {
-    const hint =
-      process.env.PUPPETEER_EXECUTABLE_PATH
-        ? `Could not launch Chromium at ${process.env.PUPPETEER_EXECUTABLE_PATH}.`
-        : "Could not launch Chromium. Install puppeteer or set PUPPETEER_EXECUTABLE_PATH to a system browser.";
-    throw new Error(`${hint} ${cause instanceof Error ? cause.message : String(cause)}`);
-  }
+async function renderPdfPage(browser: Browser, html: string): Promise<Buffer> {
   const page = await browser.newPage();
   try {
-    await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
+    // The HTML is fully self-contained (data-URI images, system font stacks),
+    // so networkidle0 resolves immediately; it also covers the rare case where
+    // a branding asset could not be inlined and falls back to a remote URL.
+    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30_000 });
     await page.emulateMediaType("print");
     const pdf = await page.pdf({
       format: "letter",
@@ -53,8 +69,26 @@ export async function renderFieldDocumentPdfFromHtml(html: string): Promise<Buff
     });
     return Buffer.from(pdf);
   } finally {
-    await page.close();
-    if (ownsBrowser) await browser.close();
+    await page.close().catch(() => {});
+  }
+}
+
+export async function renderFieldDocumentPdfFromHtml(html: string): Promise<Buffer> {
+  const ownsBrowser = process.env.NODE_ENV === "test";
+  let browser = await getBrowser();
+  try {
+    try {
+      return await renderPdfPage(browser, html);
+    } catch (cause) {
+      if (ownsBrowser) throw cause;
+      // The shared browser may have died between getBrowser() and render.
+      // Drop the cached promise and retry once against a fresh instance.
+      browserPromise = null;
+      browser = await getBrowser();
+      return await renderPdfPage(browser, html);
+    }
+  } finally {
+    if (ownsBrowser) await browser.close().catch(() => {});
   }
 }
 
