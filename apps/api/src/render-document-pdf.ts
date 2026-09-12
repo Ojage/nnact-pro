@@ -79,8 +79,10 @@ export async function renderFieldDocumentPdfFromHtml(html: string): Promise<Buff
     } catch (cause) {
       if (ownsBrowser) throw cause;
       // The shared browser may have died between getBrowser() and render.
-      // Drop the cached promise and retry once against a fresh instance.
+      // Drop the cached promise, close the old instance (a live one is no
+      // longer tracked and would otherwise be leaked), and retry once fresh.
       browserPromise = null;
+      await browser.close().catch(() => {});
       browser = await getBrowser();
       return await renderPdfPage(browser, html);
     }
