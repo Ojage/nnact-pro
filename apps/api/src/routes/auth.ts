@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, orgs, users } from "@nnact/db";
 import { validatePasswordStrength } from "@nnact/shared";
 import {
@@ -231,7 +231,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
-      const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+      const [existing] = await tx.select({ id: users.id }).from(users).where(and(eq(users.email, email), eq(users.active, true))).limit(1);
       if (existing) return { conflict: true as const };
 
       const [org] = await tx.insert(orgs).values({ name: orgName }).returning();

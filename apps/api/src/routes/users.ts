@@ -84,7 +84,7 @@ export async function userRoutes(app: FastifyInstance) {
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
 
-      const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+      const [existing] = await tx.select({ id: users.id }).from(users).where(and(eq(users.email, email), eq(users.active, true))).limit(1);
       if (existing) return { conflict: true as const };
 
       const [row] = await tx
@@ -197,7 +197,7 @@ export async function userRoutes(app: FastifyInstance) {
         const existingEmail = await tx
           .select({ id: users.id })
           .from(users)
-          .where(and(eq(users.email, setFields.email as string), ne(users.id, id)))
+          .where(and(eq(users.email, setFields.email as string), eq(users.active, true), ne(users.id, id)))
           .limit(1);
         if (existingEmail[0]) return { status: 409 as const, body: { error: "an account with this email already exists" } };
       }
@@ -205,7 +205,7 @@ export async function userRoutes(app: FastifyInstance) {
         const existingPhone = await tx
           .select({ id: users.id })
           .from(users)
-          .where(and(eq(users.phone, setFields.phone as string), ne(users.id, id)))
+          .where(and(eq(users.phone, setFields.phone as string), eq(users.active, true), ne(users.id, id)))
           .limit(1);
         if (existingPhone[0]) return { status: 409 as const, body: { error: "an account with this phone number already exists" } };
       }
