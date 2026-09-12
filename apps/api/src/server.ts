@@ -34,6 +34,8 @@ import { searchRoutes } from "./routes/search.js";
 import { pluginRoutes } from "./routes/plugins.js";
 import { pluginApiRoutes } from "./routes/plugin-api.js";
 import { servicePlanRoutes } from "./routes/service-plans.js";
+import { serviceAgreementRoutes } from "./routes/service-agreements.js";
+import { serviceVisitRoutes } from "./routes/service-visits.js";
 import { orgSettingsRoutes } from "./routes/org-settings.js";
 import { aiRoutes } from "./ai/index.js";
 import { operationRoutes } from "./routes/operations.js";
@@ -279,6 +281,8 @@ export function buildServer(
   app.register(pluginRoutes, { prefix: withVersion("/plugins") });
   app.register(pluginApiRoutes, { prefix: withVersion("/plugin") });
   app.register(servicePlanRoutes, { prefix: withVersion("/service-plans") });
+  app.register(serviceAgreementRoutes, { prefix: withVersion("/service-agreements") });
+  app.register(serviceVisitRoutes, { prefix: withVersion("/service-visits") });
   app.register(orgSettingsRoutes, { prefix: withVersion("/org") });
   app.register(aiRoutes, { prefix: withVersion("/ai") });
   app.register(operationRoutes, {
@@ -339,6 +343,8 @@ export function buildServer(
   app.register(pluginRoutes, { prefix: withLegacy("/plugins") });
   app.register(pluginApiRoutes, { prefix: withLegacy("/plugin") });
   app.register(servicePlanRoutes, { prefix: withLegacy("/service-plans") });
+  app.register(serviceAgreementRoutes, { prefix: withLegacy("/service-agreements") });
+  app.register(serviceVisitRoutes, { prefix: withLegacy("/service-visits") });
   app.register(orgSettingsRoutes, { prefix: withLegacy("/org") });
   app.register(aiRoutes, { prefix: withLegacy("/ai") });
   app.register(operationRoutes, {

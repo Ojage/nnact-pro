@@ -10,9 +10,8 @@ import {
   jobs,
   estimates,
   estimateOptions,
-  servicePlans,
-  customerServicePlans,
-  servicePlanVisits,
+  serviceAgreements,
+  serviceVisits,
 } from "@nnact/db";
 import { mergeBusinessSettings, type PortalLinkScope, type PortalSessionDTO } from "@nnact/shared";
 import { hashPortalToken, parsePortalLinkScopes, portalLinkStatus } from "./portal-links.js";
@@ -129,32 +128,48 @@ export async function buildPortalSession(input: ActivePortalLink): Promise<Porta
 
   const planViews: PortalSessionDTO["servicePlans"] = [];
   if (scopes.includes("service_plans")) {
-    const enrollments = await db
+    const agreements = await db
       .select()
-      .from(customerServicePlans)
-      .where(and(eq(customerServicePlans.orgId, link.orgId), eq(customerServicePlans.customerId, link.customerId), eq(customerServicePlans.status, "active")))
-      .orderBy(asc(customerServicePlans.createdAt));
+      .from(serviceAgreements)
+      .where(
+        and(
+          eq(serviceAgreements.orgId, link.orgId),
+          eq(serviceAgreements.customerId, link.customerId),
+          eq(serviceAgreements.status, "active"),
+        ),
+      )
+      .orderBy(asc(serviceAgreements.createdAt));
 
-    for (const enrollment of enrollments) {
-      const [plan] = await db
-        .select({ name: servicePlans.name })
-        .from(servicePlans)
-        .where(and(eq(servicePlans.orgId, link.orgId), eq(servicePlans.id, enrollment.servicePlanId)));
+    for (const agreement of agreements) {
       const [nextVisit] = await db
-        .select({ title: servicePlanVisits.title, dueAt: servicePlanVisits.dueAt, status: servicePlanVisits.status })
-        .from(servicePlanVisits)
-        .where(and(eq(servicePlanVisits.orgId, link.orgId), eq(servicePlanVisits.customerServicePlanId, enrollment.id), eq(servicePlanVisits.status, "planned")))
-        .orderBy(asc(servicePlanVisits.dueAt))
+        .select({
+          title: serviceVisits.title,
+          dueAt: serviceVisits.dueAt,
+          status: serviceVisits.status,
+        })
+        .from(serviceVisits)
+        .where(
+          and(
+            eq(serviceVisits.orgId, link.orgId),
+            eq(serviceVisits.agreementId, agreement.id),
+            inArray(serviceVisits.status, ["scheduled", "confirmed"]),
+          ),
+        )
+        .orderBy(asc(serviceVisits.dueAt))
         .limit(1);
       planViews.push({
-        id: enrollment.id,
-        planName: plan?.name ?? "Service plan",
-        status: enrollment.status,
-        visitsIncluded: enrollment.visitsIncluded,
-        visitsCompleted: enrollment.visitsCompleted,
-        renewsAt: enrollment.renewsAt ? enrollment.renewsAt.toISOString() : null,
+        id: agreement.id,
+        planName: agreement.planName,
+        status: agreement.status,
+        visitsIncluded: agreement.visitsIncluded,
+        visitsCompleted: agreement.visitsCompleted,
+        renewsAt: agreement.endsAt ? agreement.endsAt.toISOString() : null,
         nextVisit: nextVisit
-          ? { title: nextVisit.title, dueAt: nextVisit.dueAt ? nextVisit.dueAt.toISOString() : null, status: nextVisit.status }
+          ? {
+              title: nextVisit.title,
+              dueAt: nextVisit.dueAt ? nextVisit.dueAt.toISOString() : null,
+              status: nextVisit.status,
+            }
           : null,
       });
     }

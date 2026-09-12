@@ -486,6 +486,14 @@ export const jobVoiceNotes = pgTable(
   }),
 );
 
+export const equipmentAssetStatus = pgEnum("equipment_status", [
+  "operational",
+  "requires_attention",
+  "under_repair",
+  "offline",
+  "retired",
+]);
+
 export const equipment = pgTable(
   "equipment",
   {
@@ -501,11 +509,13 @@ export const equipment = pgTable(
     model: text("model"),
     serialNumber: text("serial_number"),
     assetTag: text("asset_tag"),
+    capacity: text("capacity"),
     installDate: timestamp("install_date", { withTimezone: true }),
     warrantyExpiry: timestamp("warranty_expiry", { withTimezone: true }),
     condition: text("condition"),
     lastMaintenance: timestamp("last_maintenance", { withTimezone: true }),
     nextMaintenance: timestamp("next_maintenance", { withTimezone: true }),
+    status: equipmentAssetStatus("status").default("operational").notNull(),
     nameplatePhotoId: uuid("nameplate_photo_id"),
     notes: text("notes"),
     createdAt: ts(),

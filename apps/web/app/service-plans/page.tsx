@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,31 +10,30 @@ import { Input } from "@/components/ui/input";
 import { InfoTip } from "@/components/ui/info-tip";
 import { EmptyState } from "@/components/empty-state";
 import { api } from "@/lib/api";
-import { formatMoney, type ServicePlanDTO } from "@nnact/shared";
+import { formatMoney, type ServiceCategoryDTO, type ServicePlanDTO } from "@nnact/shared";
 
-const defaultBenefits = ["Priority scheduling", "Included seasonal tune-ups", "Renewal reminders"];
+const statusColors: Record<string, string> = {
+  active: "bg-green/10 text-green",
+  draft: "bg-surface-500/60 text-fg-dim",
+  inactive: "bg-amber/10 text-amber",
+  archived: "bg-red/10 text-red",
+};
 
 export default function ServicePlansPage() {
+  const router = useRouter();
   const [plans, setPlans] = useState<ServicePlanDTO[]>([]);
+  const [categories, setCategories] = useState<ServiceCategoryDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    name: "Comfort Club",
-    description: "Recurring maintenance plan with included visits and priority scheduling.",
-    includedVisitsPerTerm: "2",
-    termMonths: "12",
-    price: "199",
-    priorityScheduling: true,
-    benefits: defaultBenefits.join("\n"),
-  });
+  const [filter, setFilter] = useState("");
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.servicePlans();
-      setPlans(data);
+      const [planRows, categoryRows] = await Promise.all([api.servicePlans(), api.serviceCategories()]);
+      setPlans(planRows);
+      setCategories(categoryRows);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load service plans");
     } finally {
@@ -44,169 +45,183 @@ export default function ServicePlansPage() {
     void load();
   }, []);
 
-  const activeCount = useMemo(() => plans.filter((p) => p.active).length, [plans]);
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
-  async function createPlan() {
-    const priceCents = Math.round(Number.parseFloat(form.price || "0") * 100);
-    await api.createServicePlan({
-      name: form.name.trim(),
-      description: form.description.trim() || undefined,
-      includedVisitsPerTerm: Number.parseInt(form.includedVisitsPerTerm || "0", 10),
-      termMonths: Number.parseInt(form.termMonths || "12", 10),
-      priceCents,
-      priorityScheduling: form.priorityScheduling,
-      benefits: form.benefits
-        .split("\n")
-        .map((x) => x.trim())
-        .filter(Boolean),
-    });
-    setShowForm(false);
-    await load();
+  const filtered = useMemo(() => {
+    const term = filter.trim().toLowerCase();
+    if (!term) return plans;
+    return plans.filter(
+      (p) =>
+        p.name.toLowerCase().includes(term) ||
+        (p.code ?? "").toLowerCase().includes(term) ||
+        (categoryById.get(p.categoryId ?? "")?.name ?? "").toLowerCase().includes(term),
+    );
+  }, [plans, filter, categoryById]);
+
+  const counts = useMemo(
+    () => ({
+      active: plans.filter((p) => p.status === "active").length,
+      contracts: plans.reduce((sum, p) => sum + (p.activeAgreementCount ?? 0), 0),
+    }),
+    [plans],
+  );
+
+  async function duplicate(plan: ServicePlanDTO) {
+    try {
+      await api.duplicateServicePlan(plan.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to duplicate plan");
+    }
+  }
+
+  async function archive(plan: ServicePlanDTO) {
+    if (!window.confirm(`Archive “${plan.name}”? Existing agreements are not affected.`)) return;
+    try {
+      await api.archiveServicePlan(plan.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to archive plan");
+    }
   }
 
   return (
     <div>
       <PageHeader
         title="Service Plans"
-        description={`${activeCount} active plan${activeCount !== 1 ? "s" : ""} · memberships, included visits, renewal timing, and priority scheduling`}
+        description={
+          <span>
+            {counts.active} active template{counts.active !== 1 ? "s" : ""} ·{" "}
+            <span className="text-fg">{counts.contracts} live agreement{counts.contracts !== 1 ? "s" : ""}</span>{" "}
+            currently drawing on these configurations. Plans are frozen into every agreement they are subscribed
+            under.
+          </span>
+        }
         actions={
-          <Button size="sm" onClick={() => setShowForm((v) => !v)}>
+          <Button size="sm" onClick={() => router.push("/service-plans/new")}>
             ⊕ New Plan
           </Button>
         }
       />
 
-      {showForm && (
-        <Card className="mb-5 border-accent/30 p-6">
-          <div className="grid gap-4">
-            <div>
-              <h3 className="text-base font-semibold text-fg">Create service plan</h3>
-              <p className="text-sm text-fg-muted mt-1">
-                Keep this practical: included visits, reminders, renewals, and priority benefits. No loyalty points needed.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <label className="block">
-                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
-                  Plan name
-                </span>
-                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Plan name" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
-                  Price
-                  <InfoTip label="Price per term">Billed once per term when the membership renews. Enter the dollar amount, e.g. 199 for $199.</InfoTip>
-                </span>
-                <Input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} type="number" min="0" step="0.01" placeholder="Price" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
-                  Included visits
-                  <InfoTip label="Included visits">The number of visits each member gets during one term at no extra charge. Extra visits can be billed separately later.</InfoTip>
-                </span>
-                <Input value={form.includedVisitsPerTerm} onChange={(e) => setForm((f) => ({ ...f, includedVisitsPerTerm: e.target.value }))} type="number" min="0" placeholder="Included visits" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
-                  Term length
-                  <InfoTip label="Term length">How long one plan period lasts (months). Members are renewed at the end unless the plan is cancelled.</InfoTip>
-                </span>
-                <Input value={form.termMonths} onChange={(e) => setForm((f) => ({ ...f, termMonths: e.target.value }))} type="number" min="1" placeholder="Term months" />
-              </label>
-            </div>
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
-                Description
-              </span>
-              <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
-                Benefits
-                <InfoTip label="Benefits" side="bottom">Perks shown to customers on the plan listing. One item per line, for example “Priority scheduling” or “Included seasonal tune-ups”.</InfoTip>
-              </span>
-              <textarea
-                value={form.benefits}
-                onChange={(e) => setForm((f) => ({ ...f, benefits: e.target.value }))}
-                className="min-h-24 rounded-lg border border-border bg-surface-200 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                placeholder="One benefit per line"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm text-fg-muted">
-              <input
-                type="checkbox"
-                checked={form.priorityScheduling}
-                onChange={(e) => setForm((f) => ({ ...f, priorityScheduling: e.target.checked }))}
-              />
-              Priority scheduling benefit
-              <InfoTip label="Priority scheduling">When enabled, members are moved ahead of non-members when booking a visit.</InfoTip>
-            </label>
-            <div className="flex gap-2">
-              <Button onClick={createPlan} disabled={!form.name.trim()}>
-                Create plan
-              </Button>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
+      <div className="mb-5 max-w-sm">
+        <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search plans…" />
+      </div>
 
       {error && (
         <Card className="mb-5 border-red/30 bg-red/5">
-          <p className="text-sm text-red font-medium">Service plan API unavailable</p>
-          <p className="text-xs text-fg-muted mt-1">{error}</p>
+          <p className="text-sm font-medium text-red">Service plan API unavailable</p>
+          <p className="mt-1 text-xs text-fg-muted">{error}</p>
         </Card>
       )}
 
       {loading ? (
         <Card>
-          <p className="text-sm text-fg-muted">Loading service plans...</p>
+          <p className="text-sm text-fg-muted">Loading service plans…</p>
         </Card>
-      ) : plans.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Card>
-          <EmptyState title="No service plans yet" description="Create a plan like Comfort Club to track included visits, renewal timing, and priority benefits." />
+          <EmptyState
+            title={plans.length === 0 ? "No service plans yet" : "No plans match your search"}
+            description={
+              plans.length === 0
+                ? "Create a template like Commercial AC Care — then subscribe customers under it as agreements with scheduled preventive visits."
+                : "Try a different search term."
+            }
+          />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {plans.map((plan) => (
-            <Card key={plan.id} className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-fg">{plan.name}</h3>
-                  {plan.description && <p className="text-sm text-fg-muted mt-1">{plan.description}</p>}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {filtered.map((plan) => {
+            const category = categoryById.get(plan.categoryId ?? "");
+            const benefits = plan.benefits ?? [];
+            return (
+              <Card key={plan.id} className="flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-semibold text-fg">{plan.name}</h3>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusColors[plan.status]}`}>
+                        {plan.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-fg-muted">
+                      {[category?.name, plan.planType, plan.targetCustomerType.replace(/_/g, " ")]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {plan.code ? ` · ${plan.code}` : ""}
+                    </p>
+                    {plan.description && (
+                      <p className="mt-1 text-sm leading-relaxed text-fg-dim">{plan.description}</p>
+                    )}
+                  </div>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${plan.active ? "bg-green/10 text-green" : "bg-surface-500 text-fg-muted"}`}>
-                  {plan.active ? "Active" : "Inactive"}
-                </span>
-              </div>
-              <div className="grid gap-3 text-sm sm:grid-cols-3">
-                <div className="rounded-lg bg-surface-200 p-3">
-                  <p className="text-fg-dim text-xs uppercase tracking-wide">Price</p>
-                  <p className="font-semibold text-fg mt-1">{formatMoney(plan.priceCents)}</p>
+
+                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                  <div className="rounded-lg bg-surface-200 p-3">
+                    <p className="text-xs uppercase tracking-wide text-fg-dim">Price / term</p>
+                    <p className="mt-1 font-semibold text-fg">{formatMoney(plan.priceCents)}</p>
+                  </div>
+                  <div className="rounded-lg bg-surface-200 p-3">
+                    <p className="text-xs uppercase tracking-wide text-fg-dim">Visits</p>
+                    <p className="mt-1 font-semibold text-fg">{plan.visitsPerTerm} / {plan.termMonths} mo</p>
+                  </div>
+                  <div className="rounded-lg bg-surface-200 p-3">
+                    <p className="text-xs uppercase tracking-wide text-fg-dim">Every</p>
+                    <p className="mt-1 font-semibold capitalize text-fg">{plan.maintenanceFrequency.replace(/_/g, " ")}</p>
+                  </div>
+                  <div className="rounded-lg bg-surface-200 p-3">
+                    <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-fg-dim">
+                      Agreements
+                      <InfoTip label="Active agreements" side="top">Agreements currently on a live status that were created from this template.</InfoTip>
+                    </p>
+                    <p className="mt-1 font-semibold text-fg">{plan.activeAgreementCount ?? 0}</p>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-surface-200 p-3">
-                  <p className="text-fg-dim text-xs uppercase tracking-wide">Visits</p>
-                  <p className="font-semibold text-fg mt-1">{plan.includedVisitsPerTerm}</p>
+
+                {(benefits.length > 0 || (plan.coverageEquipmentTypes ?? []).length > 0) && (
+                  <ul className="flex flex-wrap gap-1.5">
+                    {benefits.slice(0, 3).map((b) => (
+                      <li key={b.key} className="rounded-full bg-green/10 px-2.5 py-0.5 text-xs font-medium text-green">
+                        ✓ {b.label}
+                      </li>
+                    ))}
+                    {(plan.coverageEquipmentTypes ?? []).slice(0, 2).map((t) => (
+                      <li key={t} className="rounded-full bg-surface-500/50 px-2.5 py-0.5 text-xs text-fg-muted">
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
+                  <Link
+                    href={`/agreements/new?plan=${plan.id}`}
+                    className="inline-flex h-8 items-center rounded-md bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90"
+                  >
+                    Subscribe customer
+                  </Link>
+                  <Link
+                    href={`/service-plans/${plan.id}`}
+                    className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-fg hover:border-accent/40"
+                  >
+                    Edit
+                  </Link>
+                  <Button variant="secondary" size="sm" onClick={() => duplicate(plan)} disabled={plan.status === "archived"}>
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => archive(plan)}
+                    disabled={plan.status === "archived" || (plan.activeAgreementCount ?? 0) > 0}
+                  >
+                    Archive
+                  </Button>
                 </div>
-                <div className="rounded-lg bg-surface-200 p-3">
-                  <p className="text-fg-dim text-xs uppercase tracking-wide">Term</p>
-                  <p className="font-semibold text-fg mt-1">{plan.termMonths} mo</p>
-                </div>
-              </div>
-              {plan.benefits?.length > 0 && (
-                <ul className="grid gap-2 text-sm text-fg-muted">
-                  {plan.benefits.map((benefit) => (
-                    <li key={benefit} className="flex gap-2">
-                      <span className="text-green">✓</span>
-                      {benefit}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

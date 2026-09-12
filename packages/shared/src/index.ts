@@ -37,11 +37,308 @@ export type JobSource = (typeof JOB_SOURCE)[number];
 export const INVOICE_STATUS = ["draft", "sent", "paid", "void"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUS)[number];
 
-export const SERVICE_PLAN_STATUS = ["active", "paused", "canceled", "expired"] as const;
-export type ServicePlanStatus = (typeof SERVICE_PLAN_STATUS)[number];
+// ──────────────────────────────────────────────────────────────────────────────
+// Service Agreement & Preventive Maintenance domain (plans → agreements → visits)
+// ──────────────────────────────────────────────────────────────────────────────
 
-export const SERVICE_VISIT_STATUS = ["planned", "scheduled", "completed", "skipped"] as const;
+export const SERVICE_PLAN_STATUS = ["draft", "active", "inactive", "archived"] as const;
+export type ServicePlanStatusType = (typeof SERVICE_PLAN_STATUS)[number];
+
+export const PLAN_TYPES = ["standard", "custom"] as const;
+export type PlanType = (typeof PLAN_TYPES)[number];
+
+export const TARGET_CUSTOMER_TYPES = [
+  "residential",
+  "landlord",
+  "small_business",
+  "commercial",
+  "industrial",
+  "institutional",
+] as const;
+export type TargetCustomerType = (typeof TARGET_CUSTOMER_TYPES)[number];
+
+export const PRICING_MODELS = ["fixed", "per_asset", "per_visit", "custom_quote", "negotiated"] as const;
+export type PricingModel = (typeof PRICING_MODELS)[number];
+
+export const BILLING_FREQUENCIES = ["one_time", "monthly", "quarterly", "semi_annual", "annual"] as const;
+export type BillingFrequency = (typeof BILLING_FREQUENCIES)[number];
+
+export const MAINTENANCE_FREQUENCIES = [
+  "monthly",
+  "bi_monthly",
+  "quarterly",
+  "every_4_months",
+  "semi_annual",
+  "annual",
+  "custom",
+] as const;
+export type MaintenanceFrequency = (typeof MAINTENANCE_FREQUENCIES)[number];
+
+export const RENEWAL_TYPES = ["manual", "automatic"] as const;
+export type RenewalType = (typeof RENEWAL_TYPES)[number];
+
+export const SCHEDULE_PRIORITIES = ["standard", "priority", "high_priority", "critical"] as const;
+export type SchedulePriority = (typeof SCHEDULE_PRIORITIES)[number];
+
+export const VISIT_TYPES = [
+  "preventive",
+  "inspection",
+  "cleaning",
+  "performance_testing",
+  "safety_inspection",
+  "full_service",
+] as const;
+export type VisitType = (typeof VISIT_TYPES)[number];
+
+export const EQUIPMENT_STATUSES = [
+  "operational",
+  "requires_attention",
+  "under_repair",
+  "offline",
+  "retired",
+] as const;
+export type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number];
+
+export const AGREEMENT_STATUS = [
+  "draft",
+  "pending_approval",
+  "active",
+  "suspended",
+  "expired",
+  "canceled",
+  "renewed",
+] as const;
+export type AgreementStatus = (typeof AGREEMENT_STATUS)[number];
+
+export const AGREEMENT_PAYMENT_STATUS = ["unpaid", "partial", "paid"] as const;
+export type AgreementPaymentStatus = (typeof AGREEMENT_PAYMENT_STATUS)[number];
+
+export const SERVICE_VISIT_STATUS = [
+  "scheduled",
+  "confirmed",
+  "in_progress",
+  "completed",
+  "rescheduled",
+  "canceled",
+  "missed",
+] as const;
 export type ServiceVisitStatus = (typeof SERVICE_VISIT_STATUS)[number];
+
+export const PARTS_POLICIES = [
+  "not_included",
+  "customer_pays",
+  "labour_only",
+  "discounted_parts",
+  "parts_allowance",
+  "custom",
+] as const;
+export type PartsPolicy = (typeof PARTS_POLICIES)[number];
+
+export const CONSUMABLES_POLICIES = ["included", "not_included", "limited"] as const;
+export type ConsumablesPolicy = (typeof CONSUMABLES_POLICIES)[number];
+
+export const EMERGENCY_CALLOUT_COVERAGES = [
+  "priority_diagnosis_only",
+  "labour_included",
+  "labour_discounted",
+  "custom",
+] as const;
+export type EmergencyCalloutCoverage = (typeof EMERGENCY_CALLOUT_COVERAGES)[number];
+
+export interface BenefitOption {
+  key: string;
+  label: string;
+}
+
+export interface BenefitConfigDTO {
+  key: string;
+  label: string;
+  details?: string | null;
+  custom?: boolean;
+}
+
+export interface CapacityLimitDTO {
+  scope: string;
+  label: string;
+  max?: number | null;
+  unit?: string | null;
+}
+
+export interface AgreementSnapshotDTO {
+  planId: string | null;
+  planName: string;
+  priceCents: number;
+  billingFrequency: BillingFrequency;
+  setupFeeCents: number;
+  termMonths: number;
+  autoRenew: boolean;
+  renewalType: RenewalType;
+  renewalReminders: number[];
+  maintenanceFrequency: MaintenanceFrequency;
+  visitsPerTerm: number;
+  primaryVisitType: VisitType;
+  activities: string[];
+  maxCoveredAssets: number | null;
+  schedulingPriority: SchedulePriority;
+  targetResponseHours: number | null;
+  emergencyCalloutAllowance: number;
+  emergencyCalloutCoverage: EmergencyCalloutCoverage;
+  partsPolicy: PartsPolicy;
+  partsDiscountPercent: number;
+  partsAllowanceCents: number | null;
+  consumablesPolicy: ConsumablesPolicy;
+  transportIncluded: boolean;
+  benefits: BenefitConfigDTO[];
+}
+
+export interface ServiceCategoryDTO {
+  id: string;
+  orgId: string;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  sortOrder: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface ServiceChecklistDTO {
+  id: string;
+  orgId: string;
+  name: string;
+  categoryId?: string | null;
+  items: { id: string; label: string; required?: boolean }[];
+  active: boolean;
+  createdAt: string;
+}
+
+export interface ServiceLocationDTO {
+  id: string;
+  orgId: string;
+  customerId: string;
+  name: string;
+  address?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  notes?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface ServicePlanDTO {
+  id: string;
+  orgId: string;
+  status: ServicePlanStatusType;
+  planType: PlanType;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  internalNotes?: string | null;
+  categoryId?: string | null;
+  coverageCategories: string[];
+  coverageEquipmentTypes: string[];
+  targetCustomerType: TargetCustomerType;
+  maxCoveredAssets: number | null;
+  capacityLimits: CapacityLimitDTO[];
+  pricingModel: PricingModel;
+  priceCents: number;
+  billingFrequency: BillingFrequency;
+  setupFeeCents: number;
+  termMonths: number;
+  autoRenew: boolean;
+  renewalType: RenewalType;
+  renewalReminders: number[];
+  maintenanceFrequency: MaintenanceFrequency;
+  visitsPerTerm: number;
+  primaryVisitType: VisitType;
+  activities: string[];
+  checklistId?: string | null;
+  schedulingPriority: SchedulePriority;
+  targetResponseHours: number | null;
+  emergencyCalloutAllowance: number | null;
+  emergencyCalloutCoverage: EmergencyCalloutCoverage;
+  partsPolicy: PartsPolicy;
+  partsDiscountPercent: number;
+  partsAllowanceCents: number | null;
+  consumablesPolicy: ConsumablesPolicy;
+  transportIncluded: boolean;
+  benefits: BenefitConfigDTO[];
+  /** Count of agreements currently on a live status for this template. */
+  activeAgreementCount?: number;
+  createdAt: string;
+}
+
+export interface ServiceAgreementDTO {
+  id: string;
+  orgId: string;
+  agreementNumber: string;
+  customerId: string;
+  customerName?: string;
+  planId?: string | null;
+  planName: string;
+  planSnapshot: AgreementSnapshotDTO;
+  status: AgreementStatus;
+  paymentStatus: AgreementPaymentStatus;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  autoRenew: boolean;
+  renewalType: RenewalType;
+  renewalReminderAt?: string | null;
+  visitsIncluded: number;
+  visitsCompleted: number;
+  priceCents: number;
+  billingFrequency: BillingFrequency;
+  serviceLocationId?: string | null;
+  locationName?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  createdBy?: string | null;
+}
+
+export interface ServiceAgreementAssetDTO {
+  id: string;
+  agreementId: string;
+  equipmentId: string;
+  equipmentName: string;
+  equipmentModel?: string | null;
+  equipmentSerial?: string | null;
+  status?: EquipmentStatus | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface VisitPartUsedDTO {
+  name: string;
+  quantity: number;
+  costCents: number;
+}
+
+export interface ServiceVisitDTO {
+  id: string;
+  orgId: string;
+  visitNumber: string;
+  agreementId: string;
+  agreementNumber?: string;
+  equipmentId?: string | null;
+  equipmentName?: string | null;
+  jobId?: string | null;
+  title: string;
+  visitType: VisitType;
+  status: ServiceVisitStatus;
+  scheduledAt?: string | null;
+  dueAt?: string | null;
+  arrivedAt?: string | null;
+  completedAt?: string | null;
+  technicianId?: string | null;
+  technicianName?: string | null;
+  activities: string[];
+  problemsFound: string[];
+  workPerformed?: string | null;
+  partsUsed: VisitPartUsedDTO[];
+  recommendations?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
 
 export const PORTAL_LINK_SCOPES = ["balance", "checkout", "receipts", "service_plans", "estimates", "service_history"] as const;
 export type PortalLinkScope = (typeof PORTAL_LINK_SCOPES)[number];
@@ -103,48 +400,6 @@ export interface UserDTO {
 export interface CreateTeamMemberResponseDTO {
   user: UserDTO;
   temporaryPassword: string;
-}
-
-export interface ServicePlanDTO {
-  id: string;
-  orgId: string;
-  name: string;
-  description?: string | null;
-  includedVisitsPerTerm: number;
-  termMonths: number;
-  priceCents: Money;
-  priorityScheduling: boolean;
-  benefits: string[];
-  active: boolean;
-  createdAt: string;
-}
-
-export interface CustomerServicePlanDTO {
-  id: string;
-  orgId: string;
-  customerId: string;
-  servicePlanId: string;
-  status: ServicePlanStatus;
-  startsAt: string;
-  renewsAt?: string | null;
-  renewalReminderAt?: string | null;
-  visitsIncluded: number;
-  visitsCompleted: number;
-  notes?: string | null;
-  createdAt: string;
-}
-
-export interface ServicePlanVisitDTO {
-  id: string;
-  orgId: string;
-  customerServicePlanId: string;
-  jobId?: string | null;
-  title: string;
-  status: ServiceVisitStatus;
-  dueAt?: string | null;
-  completedAt?: string | null;
-  notes?: string | null;
-  createdAt: string;
 }
 
 /** One row of the unified org/customer/job activity timeline. */

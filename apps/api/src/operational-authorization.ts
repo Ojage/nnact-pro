@@ -18,6 +18,8 @@ const OFFICE_WRITE_PREFIXES = [
   "/api/invoices",
   "/api/catalog",
   "/api/service-plans",
+  "/api/service-agreements",
+  "/api/service-visits",
   "/api/recurring",
   "/api/reviews",
   "/api/content",

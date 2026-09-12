@@ -181,8 +181,12 @@ type TechnicianScorecardsReport = import("@nnact/shared").TechnicianScorecardsRe
 type UserDTO = import("@nnact/shared").UserDTO;
 type RecurringJobDTO = import("@nnact/shared").RecurringJobDTO;
 type ServicePlanDTO = import("@nnact/shared").ServicePlanDTO;
-type CustomerServicePlanDTO = import("@nnact/shared").CustomerServicePlanDTO;
-type ServicePlanVisitDTO = import("@nnact/shared").ServicePlanVisitDTO;
+type ServiceCategoryDTO = import("@nnact/shared").ServiceCategoryDTO;
+type ServiceChecklistDTO = import("@nnact/shared").ServiceChecklistDTO;
+type ServiceAgreementDTO = import("@nnact/shared").ServiceAgreementDTO;
+type ServiceAgreementAssetDTO = import("@nnact/shared").ServiceAgreementAssetDTO;
+type ServiceVisitDTO = import("@nnact/shared").ServiceVisitDTO;
+type ServiceLocationDTO = import("@nnact/shared").ServiceLocationDTO;
 export type BusinessSettingsDTO = import("@nnact/shared").BusinessSettings;
 
 export interface OrgSettingsDTO {
@@ -825,32 +829,75 @@ export const api = {
   deleteCatalogItem: (id: string) =>
     request<void>(`/api/catalog/items/${id}`, { method: "DELETE" }),
 
-  // ── Service plans ──
+  // ── Service plans (templates, categories, checklists) ──
   servicePlans: () => request<ServicePlanDTO[]>("/api/service-plans"),
-  createServicePlan: (body: {
-    name: string;
-    description?: string;
-    includedVisitsPerTerm?: number;
-    termMonths?: number;
-    priceCents?: number;
-    priorityScheduling?: boolean;
-    benefits?: string[];
-    active?: boolean;
-  }) => request<ServicePlanDTO>("/api/service-plans", { method: "POST", body: JSON.stringify(body) }),
-  servicePlanEnrollments: (customerId?: string) => {
+  getServicePlan: (id: string) => request<ServicePlanDTO>(`/api/service-plans/${id}`),
+  createServicePlan: (body: Record<string, unknown>) =>
+    request<ServicePlanDTO>("/api/service-plans", { method: "POST", body: JSON.stringify(body) }),
+  updateServicePlan: (id: string, body: Record<string, unknown>) =>
+    request<ServicePlanDTO>(`/api/service-plans/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  duplicateServicePlan: (id: string) =>
+    request<ServicePlanDTO>(`/api/service-plans/${id}/duplicate`, { method: "POST" }),
+  archiveServicePlan: (id: string) =>
+    request<ServicePlanDTO>(`/api/service-plans/${id}/archive`, { method: "POST" }),
+  serviceCategories: () => request<ServiceCategoryDTO[]>("/api/service-plans/categories"),
+  createServiceCategory: (body: Partial<ServiceCategoryDTO>) =>
+    request<ServiceCategoryDTO>("/api/service-plans/categories", { method: "POST", body: JSON.stringify(body) }),
+  updateServiceCategory: (id: string, body: Partial<ServiceCategoryDTO>) =>
+    request<ServiceCategoryDTO>(`/api/service-plans/categories/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  serviceChecklists: () => request<ServiceChecklistDTO[]>("/api/service-plans/checklists"),
+  createServiceChecklist: (body: Record<string, unknown>) =>
+    request<ServiceChecklistDTO>("/api/service-plans/checklists", { method: "POST", body: JSON.stringify(body) }),
+  updateServiceChecklist: (id: string, body: Record<string, unknown>) =>
+    request<ServiceChecklistDTO>(`/api/service-plans/checklists/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  // ── Service agreements ──
+  serviceAgreements: (customerId?: string) => {
     const qs = customerId ? `?customerId=${customerId}` : "";
-    return request<CustomerServicePlanDTO[]>(`/api/service-plans/enrollments${qs}`);
+    return request<ServiceAgreementDTO[]>(`/api/service-agreements${qs}`);
   },
-  createServicePlanEnrollment: (body: {
-    customerId: string;
-    servicePlanId: string;
-    startsAt: string;
-    renewsAt?: string;
-    renewalReminderAt?: string;
-    visitsIncluded?: number;
-    notes?: string;
-  }) => request<CustomerServicePlanDTO>("/api/service-plans/enrollments", { method: "POST", body: JSON.stringify(body) }),
-  servicePlanVisits: () => request<ServicePlanVisitDTO[]>("/api/service-plans/visits"),
+  getServiceAgreement: (id: string) =>
+    request<ServiceAgreementDTO & { customerName?: string; locationName?: string | null }>(
+      `/api/service-agreements/${id}`,
+    ),
+  createServiceAgreement: (body: Record<string, unknown>) =>
+    request<ServiceAgreementDTO>("/api/service-agreements", { method: "POST", body: JSON.stringify(body) }),
+  updateServiceAgreement: (id: string, body: Record<string, unknown>) =>
+    request<ServiceAgreementDTO>(`/api/service-agreements/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  activateServiceAgreement: (id: string) =>
+    request<ServiceAgreementDTO>(`/api/service-agreements/${id}/activate`, { method: "POST" }),
+  agreementAssets: (id: string) => request<ServiceAgreementAssetDTO[]>(`/api/service-agreements/${id}/assets`),
+  addAgreementAsset: (id: string, body: { equipmentId: string; notes?: string | null }) =>
+    request<ServiceAgreementAssetDTO>(`/api/service-agreements/${id}/assets`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  removeAgreementAsset: (agreementId: string, assetId: string) =>
+    request<{ ok: boolean }>(`/api/service-agreements/${agreementId}/assets/${assetId}`, { method: "DELETE" }),
+  agreementVisits: (id: string) => request<ServiceVisitDTO[]>(`/api/service-agreements/${id}/visits`),
+  serviceLocations: (customerId?: string) => {
+    const qs = customerId ? `?customerId=${customerId}` : "";
+    return request<ServiceLocationDTO[]>(`/api/service-agreements/locations${qs}`);
+  },
+  createServiceLocation: (body: Record<string, unknown>) =>
+    request<ServiceLocationDTO>("/api/service-agreements/locations", { method: "POST", body: JSON.stringify(body) }),
+  updateServiceLocation: (id: string, body: Record<string, unknown>) =>
+    request<ServiceLocationDTO>(`/api/service-agreements/locations/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  // ── Service visits ──
+  serviceVisits: (params?: { agreementId?: string; status?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.agreementId) qs.set("agreementId", params.agreementId);
+    if (params?.status) qs.set("status", params.status);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return request<ServiceVisitDTO[]>(`/api/service-visits${suffix}`);
+  },
+  createServiceVisit: (body: Record<string, unknown>) =>
+    request<ServiceVisitDTO>("/api/service-visits", { method: "POST", body: JSON.stringify(body) }),
+  updateServiceVisit: (id: string, body: Record<string, unknown>) =>
+    request<ServiceVisitDTO>(`/api/service-visits/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  submitServiceVisitReport: (id: string, body: Record<string, unknown>) =>
+    request<ServiceVisitDTO>(`/api/service-visits/${id}/report`, { method: "POST", body: JSON.stringify(body) }),
 
   // ── Customer portal links (owner management) ──
   portalLinks: (customerId: string) => request<PortalLinkDTO[]>(`/api/portal/links?customerId=${customerId}`),

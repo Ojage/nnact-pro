@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, eq, ilike, or, sql } from "drizzle-orm";
 import {
   db,
   jobs,
@@ -133,7 +133,7 @@ export async function searchRoutes(app: FastifyInstance) {
           .where(
             and(
               eq(servicePlans.orgId, orgId),
-              eq(servicePlans.active, true),
+              sql`${servicePlans.status} <> 'archived'`,
               ilike(servicePlans.name, term),
             ),
           )
