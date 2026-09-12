@@ -1250,7 +1250,7 @@ export default function ScheduleCalendar() {
         <div className="sched-calendar-area">
           {error ? (
             <div className="error-banner" style={{ marginTop: 16 }}>
-              API unreachable ({error}). Start it with <code>pnpm dev:api</code>.
+              We couldn't load the schedule. Check your connection and try again.
             </div>
           ) : loading ? (
             <div className="empty-state">

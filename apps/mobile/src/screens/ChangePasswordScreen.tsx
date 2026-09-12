@@ -5,7 +5,7 @@ import { PASSWORD_MIN_LENGTH, validatePasswordStrength } from "@nnact/shared";
 import { staffChangePassword } from "../auth-api";
 import type { StoredStaffSession } from "../auth-storage";
 import { Card, PrimaryButton } from "../components/ui";
-import { formatNetworkError, getApiUrl } from "../env";
+import { formatNetworkError } from "../env";
 import { fonts, spacing, type Palette } from "../theme";
 
 export function ChangePasswordScreen({
@@ -37,7 +37,7 @@ export function ChangePasswordScreen({
     try {
       onComplete(await staffChangePassword(session, currentPassword, newPassword));
     } catch (err) {
-      setError(formatNetworkError(err, getApiUrl()));
+      setError(formatNetworkError(err));
     } finally {
       setSubmitting(false);
     }

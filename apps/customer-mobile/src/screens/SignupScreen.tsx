@@ -15,7 +15,7 @@ import { Card, PrimaryButton, TextField } from "../components/ui";
 import { ImageHero } from "../components/ImageHero";
 import { HeroCarousel } from "../components/HeroCarousel";
 import { SERVICE_CAROUSEL_SLIDES } from "../content/home-carousels";
-import { formatNetworkError, getApiUrl } from "../env";
+import { formatNetworkError } from "../env";
 import { fonts, spacing, type Palette } from "../theme";
 
 const HERO_IMAGE = require("../../assets/photos/nnact-protech-app-hero.png");
@@ -56,7 +56,7 @@ export function SignupScreen({
         }),
       );
     } catch (err) {
-      setError(formatNetworkError(err, getApiUrl()));
+      setError(formatNetworkError(err));
     } finally {
       setSubmitting(false);
     }

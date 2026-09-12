@@ -28,6 +28,6 @@ export async function resolveOrgId(req: FastifyRequest): Promise<string> {
   const header = req.headers["x-org-id"];
   if (typeof header === "string" && header) return header;
   const [first] = await db.select({ id: orgs.id }).from(orgs).limit(1);
-  if (!first) throw new Error("no org found — run `pnpm db:seed`");
+  if (!first) throw new Error("No default organization is configured for this workspace.");
   return first.id;
 }

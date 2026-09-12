@@ -247,7 +247,7 @@ export default function CustomersPage() {
       {/* ── Error ── */}
       {isError && (
         <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">API unreachable ({queryError ? String(queryError) : "unknown error"}).</p>
+          <p className="text-red text-sm">We couldn't load this page. Check your connection and try again.</p>
         </Card>
       )}
 

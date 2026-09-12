@@ -52,14 +52,10 @@ export function getApiUrl(): string {
   return origin.replace(/\/$/, "");
 }
 
-export function formatNetworkError(error: unknown, apiUrl: string): string {
+export function formatNetworkError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/network request failed|failed to fetch|network error/i.test(message)) {
-    const isLocalDev = /localhost|127\.0\.0\.1|10\.0\.2\.2|192\.168\./.test(apiUrl);
-    if (isLocalDev) {
-      return `Cannot reach the API at ${apiUrl}. Start it with "pnpm dev:api", set EXPO_PUBLIC_API_URL in the repo .env, and restart Expo.`;
-    }
-    return `Cannot reach the API at ${apiUrl}. Check your internet connection and try again.`;
+    return "We couldn't reach the server. Check your internet connection and try again.";
   }
   const match = /^(\d{3}):\s*/.exec(message);
   const status = match ? Number(match[1]) : 0;

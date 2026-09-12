@@ -273,7 +273,7 @@ export async function authRoutes(app: FastifyInstance) {
       [user] = await db.select().from(users).where(eq(users.email, lookupEmail)).limit(1);
     }
     if (!user || !user.active || !user.passwordHash || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
-      return reply.code(401).send({ error: "invalid credentials" });
+      return reply.code(401).send({ error: "The email, phone, or code doesn't match our records." });
     }
 
     return staffAuthResponse(app, reply, {
@@ -289,7 +289,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/otp/request", { preHandler: loginRateLimit }, async (req, reply) => {
     reply.header("Cache-Control", "no-store");
     if (!(await isSmsConfigured())) {
-      return reply.code(503).send({ error: "SMS not configured", hint: "configure the SMS provider in the owner dashboard" });
+      return reply.code(503).send({ error: "We couldn't send a code right now. Please try again shortly.", hint: "configure the SMS provider in the owner dashboard" });
     }
     const parsed = otpRequestBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
@@ -310,11 +310,11 @@ export async function authRoutes(app: FastifyInstance) {
     const phone = normalizePhone(parsed.data.phone);
 
     const [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
-    if (!user?.active) return reply.code(401).send({ error: "invalid credentials" });
+    if (!user?.active) return reply.code(401).send({ error: "The email, phone, or code doesn't match our records." });
 
     const result = await verifyOtp(phone, parsed.data.code, "login");
     if (!result.ok) {
-      const reason = result.reason === "too_many_attempts" ? "too many attempts" : "invalid or expired code";
+      const reason = result.reason === "too_many_attempts" ? "Too many attempts. Wait a few minutes and try again." : "That code is invalid or has expired. Request a new one.";
       return reply.code(401).send({ error: reason });
     }
 
@@ -376,12 +376,12 @@ export async function authRoutes(app: FastifyInstance) {
     const [user] = email
       ? await db.select().from(users).where(eq(users.email, email)).limit(1)
       : await db.select().from(users).where(eq(users.phone, phone!)).limit(1);
-    if (!user?.active) return reply.code(401).send({ error: "invalid credentials" });
+    if (!user?.active) return reply.code(401).send({ error: "The email, phone, or code doesn't match our records." });
 
     const channel: "email" | "phone" = email ? "email" : "phone";
     const result = await verifyOtp(email ?? phone!, parsed.data.code, "password_reset", channel);
     if (!result.ok) {
-      const reason = result.reason === "too_many_attempts" ? "too many attempts" : "invalid or expired code";
+      const reason = result.reason === "too_many_attempts" ? "Too many attempts. Wait a few minutes and try again." : "That code is invalid or has expired. Request a new one.";
       return reply.code(401).send({ error: reason });
     }
 

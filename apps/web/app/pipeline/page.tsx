@@ -112,7 +112,7 @@ export default function PipelinePage() {
 
       {error && (
         <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">API unreachable ({error}).</p>
+          <p className="text-red text-sm">We couldn't load this page. Check your connection and try again.</p>
         </Card>
       )}
 

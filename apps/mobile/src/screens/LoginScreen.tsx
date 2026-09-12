@@ -24,7 +24,7 @@ import type { StoredStaffSession } from "../auth-storage";
 import { Card, LoadingScreen, PrimaryButton, TextField } from "../components/ui";
 import { HeroCarousel } from "../components/HeroCarousel";
 import { NNACT_BUEA_SLIDES } from "../content/field-carousels";
-import { formatNetworkError, getApiUrl } from "../env";
+import { formatNetworkError } from "../env";
 import { fonts, radius, spacing, type Palette } from "../theme";
 
 const HERO_IMAGE = require("../../assets/photos/nnact-protech-app-hero.png");
@@ -85,7 +85,6 @@ export function LoginScreen({
   const [requestedPhone, setRequestedPhone] = useState("");
   const [password, setPassword] = useState("");
   const [digits, setDigits] = useState<string[]>(() => Array(OTP_DIGITS).fill(""));
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -97,7 +96,6 @@ export function LoginScreen({
   const [resetIdentifier, setResetIdentifier] = useState("");
   const [resetCode, setResetCode] = useState("");
   const [resetNewPassword, setResetNewPassword] = useState("");
-  const [resetDevCode, setResetDevCode] = useState<string | null>(null);
   const [requestingReset, setRequestingReset] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [resetResendIn, setResetResendIn] = useState(0);
@@ -151,7 +149,6 @@ export function LoginScreen({
     try {
       const target = normalizePhone(phone);
       const result = await staffRequestOtp(target);
-      if (result.devCode) setDevCode(result.devCode);
       if (!result.sent) {
         setError("Could not send a code right now. Try again in a minute.");
         return;
@@ -162,7 +159,7 @@ export function LoginScreen({
       setResendIn(RESEND_COOLDOWN_SECONDS);
       setTimeout(() => otpRefs.current[0]?.focus(), 150);
     } catch (err) {
-      setError(formatNetworkError(err, getApiUrl()));
+      setError(formatNetworkError(err));
     } finally {
       setSendingCode(false);
     }
@@ -201,7 +198,7 @@ export function LoginScreen({
     try {
       onSignedIn(await staffVerifyOtp(requestedPhone, code));
     } catch (err) {
-      setError(formatNetworkError(err, getApiUrl()));
+      setError(formatNetworkError(err));
       setDigits(Array(OTP_DIGITS).fill(""));
       otpRefs.current[0]?.focus();
     } finally {
@@ -227,7 +224,7 @@ export function LoginScreen({
         setError("Enter your email or phone number.");
       }
     } catch (err) {
-      setError(formatNetworkError(err, getApiUrl()));
+      setError(formatNetworkError(err));
     } finally {
       setSubmitting(false);
     }
@@ -243,14 +240,13 @@ export function LoginScreen({
     setError(null);
     try {
       const result = await staffRequestPasswordReset(resetLooksLikeEmail ? { email: value } : { phone: value });
-      if (result.devCode) setResetDevCode(result.devCode);
       setResetSent(true);
       setResetStage("code");
       setResetCode("");
       setResetResendIn(RESEND_COOLDOWN_SECONDS);
       setTimeout(() => resetCodeRef.current?.focus(), 150);
     } catch (err) {
-      setError(formatNetworkError(err, getApiUrl()));
+      setError(formatNetworkError(err));
     } finally {
       setRequestingReset(false);
     }
@@ -269,7 +265,7 @@ export function LoginScreen({
         : { phone: resetIdentifier.trim(), code: resetCode.trim(), newPassword: resetNewPassword };
       onSignedIn(await staffResetPassword(payload));
     } catch (err) {
-      setError(formatNetworkError(err, getApiUrl()));
+      setError(formatNetworkError(err));
     } finally {
       setResettingPassword(false);
     }
@@ -281,7 +277,6 @@ export function LoginScreen({
     setResetIdentifier("");
     setResetCode("");
     setResetNewPassword("");
-    setResetDevCode(null);
     setResetSent(false);
     setError(null);
   }
@@ -369,11 +364,6 @@ export function LoginScreen({
           autoComplete="one-time-code"
           inputRef={resetCodeRef}
         />
-        {resetDevCode ? (
-          <Text style={[styles.devHint, { color: colors.success }]}>
-            Dev code: {resetDevCode} (delivery not configured)
-          </Text>
-        ) : null}
         <PasswordInput
           colors={colors}
           fonts={{ medium: fonts.medium, semibold: fonts.semibold, bold: fonts.bold }}
@@ -395,7 +385,7 @@ export function LoginScreen({
         />
         <View style={styles.otpMeta}>
           <Pressable
-            onPress={() => { setResetStage("identifier"); setResetSent(false); setResetDevCode(null); setError(null); }}
+            onPress={() => { setResetStage("identifier"); setResetSent(false); setError(null); }}
             disabled={resettingPassword}
             hitSlop={8}
           >
@@ -500,11 +490,6 @@ export function LoginScreen({
                       />
                     ))}
                   </View>
-                  {devCode ? (
-                    <Text style={[styles.devHint, { color: colors.success }]}>
-                      Dev code: {devCode} (SMS provider not configured)
-                    </Text>
-                  ) : null}
                   <View style={styles.otpMeta}>
                     <Pressable onPress={resetOtp} hitSlop={8}>
                       <Text style={[styles.otpLink, { color: colors.dimForeground }]}>Change number</Text>
@@ -697,11 +682,6 @@ const createStyles = (colors: Palette) =>
     },
     modeTabTextActive: {
       color: colors.accent,
-    },
-    devHint: {
-      fontSize: 12,
-      fontFamily: fonts.regular,
-      marginTop: 4,
     },
     phoneHint: {
       fontSize: 12,

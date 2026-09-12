@@ -27,7 +27,6 @@ export default function ForgotPasswordPage() {
   const [resetting, setResetting] = useState(false);
   const [sent, setSent] = useState(false);
   const [resendIn, setResendIn] = useState(0);
-  const [devCode, setDevCode] = useState<string | null>(null);
   const otpRef = useRef<HTMLInputElement | null>(null);
 
   const looksLikeEmail = useMemo(() => /@/.test(identifier.trim()), [identifier]);
@@ -49,7 +48,6 @@ export default function ForgotPasswordPage() {
     setRequesting(true);
     try {
       const result = await requestPasswordReset(looksLikeEmail ? { email: value } : { phone: value });
-      if (result.devCode) setDevCode(result.devCode);
       setSent(true);
       setResendIn(60);
       setCode("");
@@ -83,15 +81,14 @@ export default function ForgotPasswordPage() {
   function reportError(err: unknown) {
     const message = err instanceof Error ? err.message : "Something went wrong. Try again.";
     if (message.includes("failed to fetch") || message.toLowerCase().includes("network") || message.includes("ECONNREFUSED")) {
-      setError(`Cannot reach the API (${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003"}). Start it with: pnpm dev:api`);
+      setError("We couldn't reach the server. Check your connection and try again.");
     } else {
-      setError(message);
+      setError("Something went wrong. Please try again.");
     }
   }
 
   function changeIdentifier() {
     setSent(false);
-    setDevCode(null);
     setError(null);
   }
 
@@ -152,11 +149,6 @@ export default function ForgotPasswordPage() {
                   disabled={resetting}
                   required
                 />
-                {devCode ? (
-                  <p className="text-xs text-emerald-600">
-                    Dev code: {devCode} (delivery not configured)
-                  </p>
-                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reset-password" className="text-xs text-fg-muted">

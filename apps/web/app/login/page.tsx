@@ -34,7 +34,6 @@ export default function LoginPage() {
   const [requestedPhone, setRequestedPhone] = useState("");
   const [password, setPassword] = useState("");
   const [digits, setDigits] = useState<string[]>(() => Array(OTP_DIGITS).fill(""));
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -53,19 +52,15 @@ export default function LoginPage() {
   function reportError(err: unknown) {
     const message = err instanceof Error ? err.message : "Sign-in failed";
     if (message.includes("401") || message.toLowerCase().includes("invalid credentials")) {
-      setError(
-        "Invalid credentials or code. If this is a fresh setup, run: pnpm infra:up && pnpm db:push && pnpm seed:nnact",
-      );
+      setError("The email, phone, or code you entered doesn't match our records. Check your details and try again.");
     } else if (
       message.toLowerCase().includes("failed to fetch") ||
       message.toLowerCase().includes("network") ||
       message.includes("ECONNREFUSED")
     ) {
-      setError(
-        `Cannot reach the API (${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003"}). Start it with: pnpm dev:api`,
-      );
+      setError("We couldn't reach the server. Check your connection and try again.");
     } else {
-      setError(message);
+      setError("Something went wrong. Please try again.");
     }
   }
 
@@ -79,7 +74,6 @@ export default function LoginPage() {
     try {
       const target = normalizePhone(phone);
       const result = await requestOtp(target);
-      if (result.devCode) setDevCode(result.devCode);
       if (!result.sent) {
         setError("Could not send a code right now. Try again in a minute.");
         return;
@@ -298,11 +292,6 @@ export default function LoginPage() {
                   />
                 ))}
               </div>
-              {devCode ? (
-                <p className="text-xs text-emerald-600">
-                  Dev code: {devCode} (SMS provider not configured)
-                </p>
-              ) : null}
               <div className="flex items-center justify-between text-xs">
                 <button
                   type="button"
