@@ -9,6 +9,13 @@ import { buildRootMetadata } from "@/lib/site-metadata";
 
 export const metadata = buildRootMetadata();
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "var(--color-surface-100)",
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en-CM" data-theme="light" suppressHydrationWarning>

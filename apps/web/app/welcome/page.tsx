@@ -116,7 +116,7 @@ export default function WelcomePage() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid gap-3 sm:grid-cols-3">
                 {[["6", "visits today"], ["4", "active jobs"], ["2", "maintenance plans"]].map(([value, label]) => (
                   <div key={label} className="rounded-2xl border border-border bg-surface-200 p-4 text-center">
                     <p className="text-2xl font-black text-fg">{value}</p>

@@ -889,8 +889,8 @@ function TaxesSection({ settings, updateSettings }: SettingsProps) {
         ) : (
           <div className="grid gap-2">
             {profiles.map((profile) => (
-              <div key={profile.id} className="grid grid-cols-[auto_1fr_auto_auto] items-end gap-3 rounded-lg bg-surface-200 p-3">
-                <label className="flex items-center gap-1.5 pb-2 text-xs text-fg-muted" title="Use as the default profile">
+              <div key={profile.id} className="grid gap-3 rounded-lg bg-surface-200 p-3 sm:grid-cols-[auto_1fr_auto_auto] sm:items-end">
+                <label className="flex items-center gap-1.5 text-xs text-fg-muted sm:pb-2" title="Use as the default profile">
                   <input
                     type="radio"
                     name="default-tax-profile"
@@ -925,7 +925,7 @@ function TaxesSection({ settings, updateSettings }: SettingsProps) {
         ) : (
           <div className="grid gap-2">
             {discounts.map((discount) => (
-              <div key={discount.id} className="grid grid-cols-[1fr_auto_auto_auto] items-end gap-3 rounded-lg bg-surface-200 p-3">
+              <div key={discount.id} className="grid gap-3 rounded-lg bg-surface-200 p-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
                 <TextField label="Name" value={discount.name} onChange={(value) => patchDiscount(discount.id, { name: value })} />
                 <SelectField label="Type" value={discount.type} onChange={(value) => patchDiscount(discount.id, { type: value as "fixed" | "percent", value: 0 })}>
                   <option value="fixed">Fixed amount</option>

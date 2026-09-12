@@ -181,7 +181,7 @@ export default function ServicePlansPage() {
                   {plan.active ? "Active" : "Inactive"}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-3 text-sm">
+              <div className="grid gap-3 text-sm sm:grid-cols-3">
                 <div className="rounded-lg bg-surface-200 p-3">
                   <p className="text-fg-dim text-xs uppercase tracking-wide">Price</p>
                   <p className="font-semibold text-fg mt-1">{formatMoney(plan.priceCents)}</p>
