@@ -6,6 +6,9 @@
 // NNACT demo organization — no passwords or other demo records are altered.
 import { sql } from "drizzle-orm";
 import {
+  customers,
+  equipment,
+  users,
   serviceCategories,
   serviceChecklists,
   servicePlans,
@@ -17,9 +20,37 @@ import {
 } from "../index.js";
 import { NNACT_ORG_ID, NNACT_USER_IDS } from "./ids.js";
 
-// SQL client with the subset of operations the seed uses (insert + chaining).
+// SQL client with the subset of operations the seed uses (insert/select +
+// their chains). Consumer code assigns the real client (db or a transaction).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbClient = any;
+
+async function customerExists(client: DbClient, customerId: string): Promise<boolean> {
+  const rows = await client
+    .select({ id: customers.id })
+    .from(customers)
+    .where(sql`${customers.id} = ${customerId}`);
+  return rows.length > 0;
+}
+
+async function equipmentExists(client: DbClient, equipmentId: string, customerId: string): Promise<boolean> {
+  const rows = await client
+    .select({ id: equipment.id })
+    .from(equipment)
+    .where(sql`${equipment.id} = ${equipmentId} and ${equipment.customerId} = ${customerId}`);
+  return rows.length > 0;
+}
+
+// Only attribute a row to a demo staff member when that user actually exists
+// (e.g. in dev/full demo seeds); stay FK-safe on databases with real staff.
+async function ifUserExists(client: DbClient, userId: string): Promise<{ createdBy: string } | Record<string, never>> {
+  const rows = await client
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`${users.id} = ${userId}`)
+    .limit(1);
+  return rows.length > 0 ? { createdBy: userId } : {};
+}
 
 export function nnactServiceCategoryId(index: number): string {
   return `b0000001-0014-4000-8000-${String(index).padStart(12, "0")}`;
@@ -611,7 +642,6 @@ export async function seedNnactServicePlans(client: { insert: (table: unknown) =
         consumablesPolicy: plan.consumablesPolicy,
         transportIncluded: plan.transportIncluded,
         benefits: plan.benefits,
-        createdBy: NNACT_USER_IDS.owner,
       })
       .onConflictDoUpdate({
         target: servicePlans.id,
@@ -648,11 +678,20 @@ export async function seedNnactServicePlans(client: { insert: (table: unknown) =
       });
   }
 
-  // Agreements (idempotent by stable id) + assets + scheduled visits
+  // Agreements (idempotent by stable id) + assets + scheduled visits.
+  // Agreements are only created when the referenced customer exists, so the
+  // same seed can run on an empty catalog in production (which has real
+  // customers, not the demo ones) and still safely fill the plan templates.
   let visitCounter = 0;
+  let agreementCounter = 0;
   for (const agreement of SERVICE_AGREEMENTS) {
     const plan = SERVICE_PLANS.find((p) => p.id === agreement.planId);
     if (!plan) continue;
+    const customerId = `b0000001-0003-4000-8000-${String(agreement.customerIndex).padStart(12, "0")}`;
+    if (!(await customerExists(client, customerId))) {
+      console.log(`seed:nnact-service-plans → skipping agreement for missing customer ${customerId} (${plan.name})`);
+      continue;
+    }
     const startsAt = new Date(Date.now() - agreement.startsDaysAgo * 86_400_000);
     const snapshot = snapshotFrom(plan);
     const endsAt = addMonths(startsAt, plan.termMonths);
@@ -662,7 +701,7 @@ export async function seedNnactServicePlans(client: { insert: (table: unknown) =
         id: agreement.id,
         orgId: NNACT_ORG_ID,
         agreementNumber: `NNACT-SVC-2026-${String(SERVICE_AGREEMENTS.indexOf(agreement) + 1).padStart(6, "0")}`,
-        customerId: `b0000001-0003-4000-8000-${String(agreement.customerIndex).padStart(12, "0")}`,
+        customerId,
         planId: plan.id,
         planName: plan.name,
         planSnapshot: snapshot,
@@ -677,7 +716,7 @@ export async function seedNnactServicePlans(client: { insert: (table: unknown) =
         priceCents: plan.priceCents,
         billingFrequency: plan.billingFrequency,
         notes: agreement.notes ?? null,
-        createdBy: NNACT_USER_IDS.dispatchGrace,
+        ...(await ifUserExists(client, NNACT_USER_IDS.dispatchGrace)),
       })
       .onConflictDoUpdate({
         target: serviceAgreements.id,
@@ -690,20 +729,28 @@ export async function seedNnactServicePlans(client: { insert: (table: unknown) =
           updatedAt: new Date(),
         },
       });
+    agreementCounter += 1;
 
     for (let slot = 0; slot < agreement.assetEquipmentIndexes.length; slot += 1) {
       const equipmentIndex = agreement.assetEquipmentIndexes[slot];
+      const equipmentId = nnactEquipmentId(equipmentIndex);
+      if (!(await equipmentExists(client, equipmentId, customerId))) {
+        console.log(`seed:nnact-service-plans → skipping asset ${equipmentId} for agreement ${agreement.id} (not owned by customer)`);
+        continue;
+      }
       await (client.insert(serviceAgreementAssets) as any)
         .values({
           id: nnactServiceAssetId(SERVICE_AGREEMENTS.indexOf(agreement) + 1, slot),
           orgId: NNACT_ORG_ID,
           agreementId: agreement.id,
-          equipmentId: nnactEquipmentId(equipmentIndex),
+          equipmentId,
         })
         .onConflictDoNothing();
     }
 
     const monthsPerVisit = intervalMonths(plan.maintenanceFrequency);
+    const techAttribution = await ifUserExists(client, NNACT_USER_IDS.techFrankline);
+    const dispatchAttribution = await ifUserExists(client, NNACT_USER_IDS.dispatchGrace);
     const due = new Date(startsAt);
     for (let i = 1; i <= agreement.visitsIncluded; i += 1) {
       visitCounter += 1;
@@ -715,7 +762,7 @@ export async function seedNnactServicePlans(client: { insert: (table: unknown) =
           orgId: NNACT_ORG_ID,
           visitNumber: `VISIT-2026-${String(visitCounter).padStart(6, "0")}`,
           agreementId: agreement.id,
-          equipmentId: agreement.assetEquipmentIndexes[0] ? nnactEquipmentId(agreement.assetEquipmentIndexes[0]) : null,
+          equipmentId: null,
           title: `${plan.name} — Service ${i}/${agreement.visitsIncluded}`,
           visitType: plan.primaryVisitType,
           status: isCompleted ? "completed" : "scheduled",
@@ -723,13 +770,13 @@ export async function seedNnactServicePlans(client: { insert: (table: unknown) =
           dueAt: new Date(due),
           arrivedAt: isCompleted ? completedAt : null,
           completedAt: isCompleted ? completedAt : null,
-          technicianId: isCompleted ? NNACT_USER_IDS.techFrankline : null,
+          technicianId: isCompleted ? (techAttribution.createdBy ?? null) : null,
           activities: plan.activities,
           problemsFound: isCompleted ? ["Coil fins bent in two places", "Dirty filters"] : [],
           workPerformed: isCompleted ? "Cleaned evaporator and condenser coils, straightened fins, replaced filters, refrigerant pressures within spec." : null,
           partsUsed: [],
           recommendations: isCompleted ? "Monitor compressor run current; review at next visit." : null,
-          createdBy: isCompleted ? NNACT_USER_IDS.techFrankline : NNACT_USER_IDS.dispatchGrace,
+          createdBy: isCompleted ? (techAttribution.createdBy ?? null) : (dispatchAttribution.createdBy ?? null),
         })
         .onConflictDoNothing();
       due.setUTCMonth(due.getUTCMonth() + monthsPerVisit);
@@ -737,6 +784,6 @@ export async function seedNnactServicePlans(client: { insert: (table: unknown) =
   }
 
   console.log(
-    `seed:nnact-service-plans → ${SERVICE_CATEGORIES.length} categories, ${SERVICE_CHECKLISTS.length} checklists, ${SERVICE_PLANS.length} plan templates, ${SERVICE_AGREEMENTS.length} agreements, ${visitCounter} visits`,
+    `seed:nnact-service-plans → ${SERVICE_CATEGORIES.length} categories, ${SERVICE_CHECKLISTS.length} checklists, ${SERVICE_PLANS.length} plan templates, ${agreementCounter} agreements, ${visitCounter} visits`,
   );
 }
