@@ -45,6 +45,8 @@ async function main() {
   console.log(
     `seed:nnact-models → ${NNACT_KNOWLEDGE_MODELS.length}/${verify.count} equipment models upserted for org ${NNACT_ORG_ID}`,
   );
+
+  process.exit(0);
 }
 
 main().catch((error) => {
