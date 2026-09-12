@@ -8,6 +8,7 @@ import { CacheWarmer } from "@/components/cache-warmer";
 import { NavigationPending } from "@/components/navigation-pending";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
+import { TopBar } from "@/components/top-bar";
 import { CommandPalette } from "@/components/command-palette";
 import { isPublicPath } from "@/lib/public-routes";
 import { SessionProvider } from "@/lib/session-context";
@@ -35,7 +36,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           />
           <Sidebar />
           <MobileNav />
-          <main className="ml-0 min-h-screen p-4 pt-16 md:ml-64 md:p-8">
+          <TopBar />
+          <main className="ml-0 min-h-screen p-4 pb-8 pt-16 md:ml-64 md:px-8 md:pt-24">
             <div className="mx-auto w-full max-w-[1600px]">
               <RoleGate>{children}</RoleGate>
             </div>

@@ -109,8 +109,14 @@ export interface EquipmentDTO {
 
 export interface CoreSearchResults {
   jobs: { id: string; title: string; status: string }[];
-  customers: { id: string; name: string }[];
+  customers: { id: string; name: string; email: string | null; phone: string | null }[];
+  team: { id: string; name: string; email: string; role: string }[];
   invoices: { id: string; number: string; status: string }[];
+  estimates: { id: string; number: string; status: string }[];
+  appointments: { id: string; jobId: string; jobTitle: string; startsAt: string }[];
+  equipment: { id: string; label: string; serialNumber: string | null }[];
+  servicePlans: { id: string; name: string }[];
+  repairBrain: RepairBrainSearchResults;
 }
 
 export interface ProposalRow {

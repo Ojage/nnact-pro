@@ -8,6 +8,8 @@ import {
   estimates,
   appointments,
   equipment,
+  users,
+  servicePlans,
 } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
 import { searchRepairBrain } from "../repair-brain.js";
@@ -21,10 +23,12 @@ export async function searchRoutes(app: FastifyInstance) {
       return {
         jobs: [],
         customers: [],
+        team: [],
         invoices: [],
         estimates: [],
         appointments: [],
         equipment: [],
+        servicePlans: [],
         repairBrain: {
           models: [],
           faults: [],
@@ -38,7 +42,7 @@ export async function searchRoutes(app: FastifyInstance) {
 
     const term = `%${q.trim()}%`;
 
-    const [jobResults, customerResults, invoiceResults, estimateResults, appointmentResults, equipmentResults, repairBrain] =
+    const [jobResults, customerResults, teamResults, invoiceResults, estimateResults, appointmentResults, equipmentResults, servicePlanResults, repairBrain] =
       await Promise.all([
         db
           .select({ id: jobs.id, title: jobs.title, number: jobs.number, status: jobs.status })
@@ -66,6 +70,22 @@ export async function searchRoutes(app: FastifyInstance) {
           )
           .limit(6),
         db
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+          })
+          .from(users)
+          .where(
+            and(
+              eq(users.orgId, orgId),
+              eq(users.active, true),
+              or(ilike(users.name, term), ilike(users.email, term)),
+            ),
+          )
+          .limit(6),
+        db
           .select({ id: invoices.id, number: invoices.number, status: invoices.status })
           .from(invoices)
           .where(and(eq(invoices.orgId, orgId), ilike(invoices.number, term)))
@@ -78,6 +98,7 @@ export async function searchRoutes(app: FastifyInstance) {
         db
           .select({
             id: appointments.id,
+            jobId: appointments.jobId,
             jobTitle: jobs.title,
             startsAt: appointments.startsAt,
           })
@@ -106,6 +127,17 @@ export async function searchRoutes(app: FastifyInstance) {
             ),
           )
           .limit(6),
+        db
+          .select({ id: servicePlans.id, name: servicePlans.name })
+          .from(servicePlans)
+          .where(
+            and(
+              eq(servicePlans.orgId, orgId),
+              eq(servicePlans.active, true),
+              ilike(servicePlans.name, term),
+            ),
+          )
+          .limit(6),
         searchRepairBrain(orgId, q, 5),
       ]);
 
@@ -118,14 +150,17 @@ export async function searchRoutes(app: FastifyInstance) {
     return {
       jobs: jobResults,
       customers: customerResults,
+      team: teamResults,
       invoices: invoiceResults,
       estimates: estimateResults,
       appointments: appointmentResults.map((row) => ({
         id: row.id,
+        jobId: row.jobId,
         jobTitle: row.jobTitle,
         startsAt: row.startsAt.toISOString(),
       })),
       equipment: equipmentMapped,
+      servicePlans: servicePlanResults,
       repairBrain,
     };
   });

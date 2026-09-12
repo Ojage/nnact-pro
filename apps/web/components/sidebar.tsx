@@ -10,6 +10,7 @@ import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
 import { useSessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
+import { SidebarSearch } from "@/components/sidebar-search";
 import { requestLearn } from "@/lib/walkthroughs/events";
 
 export function Sidebar() {
@@ -25,6 +26,8 @@ export function Sidebar() {
         <BrandMark href="/" size="md" />
         <NotificationsPopover />
       </div>
+
+      <SidebarSearch />
 
       <nav className="flex-1 overflow-y-auto p-3">
         {sections.length === 0 ? (
