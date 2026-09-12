@@ -56,10 +56,7 @@ export async function closeDocumentPdfBrowser(): Promise<void> {
 async function renderPdfPage(browser: Browser, html: string): Promise<Buffer> {
   const page = await browser.newPage();
   try {
-    // The HTML is fully self-contained (data-URI images, system font stacks),
-    // so networkidle0 resolves immediately; it also covers the rare case where
-    // a branding asset could not be inlined and falls back to a remote URL.
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30_000 });
+    await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
     await page.emulateMediaType("print");
     const pdf = await page.pdf({
       format: "letter",
