@@ -22,6 +22,7 @@ import {
   index,
   uniqueIndex,
   customType,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 
 // drizzle 0.45 does not ship a bytea column type; define one mapping Buffer.
