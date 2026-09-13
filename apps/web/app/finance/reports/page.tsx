@@ -29,7 +29,7 @@ export default function ReportsPage() {
 
   const rows = data ?? [];
 
-  const downloadUrl = `/api/finance/reports/${kind}${period ? `?period=${period}` : ""}.csv`;
+  const downloadUrl = `/api/finance/reports/${kind}.csv${period ? `?period=${period}` : ""}`;
 
   return (
     <div>
