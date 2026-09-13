@@ -11,6 +11,7 @@ export * from "./sms-templates.js";
 export * from "./notifications.js";
 export * from "./currency.js";
 export * from "./repair-brain.js";
+export * from "./finance.js";
 export * from "./mobile-search.js";
 export * from "./walkthroughs.js";
 export * from "./content.js";

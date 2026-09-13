@@ -253,6 +253,13 @@
       "when": 1790000001900,
       "tag": "0038_harsh_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790000002900,
+      "tag": "0038_far_talkback",
+      "breakpoints": true
     }
   ]
 }

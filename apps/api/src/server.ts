@@ -37,6 +37,15 @@ import { servicePlanRoutes } from "./routes/service-plans.js";
 import { serviceAgreementRoutes } from "./routes/service-agreements.js";
 import { serviceVisitRoutes } from "./routes/service-visits.js";
 import { orgSettingsRoutes } from "./routes/org-settings.js";
+import { financeConfigRoutes } from "./routes/finance-config.js";
+import { financeExpenseRoutes } from "./routes/finance-expenses.js";
+import { financeBillRoutes } from "./routes/finance-bills.js";
+import { financeAdvanceRoutes, financeReimbursementRoutes } from "./routes/finance-advances.js";
+import { financePettyCashRoutes } from "./routes/finance-petty-cash.js";
+import { financeBudgetRoutes } from "./routes/finance-budgets.js";
+import { financeDashboardRoutes } from "./routes/finance-dashboard.js";
+import { financeReportRoutes } from "./routes/finance-reports.js";
+import { financeReceiptRoutes } from "./finance-files.js";
 import { aiRoutes } from "./ai/index.js";
 import { operationRoutes } from "./routes/operations.js";
 import { diagnosticRoutes } from "./routes/diagnostics.js";
@@ -284,6 +293,16 @@ export function buildServer(
   app.register(serviceAgreementRoutes, { prefix: withVersion("/service-agreements") });
   app.register(serviceVisitRoutes, { prefix: withVersion("/service-visits") });
   app.register(orgSettingsRoutes, { prefix: withVersion("/org") });
+  app.register(financeConfigRoutes, { prefix: withVersion("") });
+  app.register(financeExpenseRoutes, { prefix: withVersion("") });
+  app.register(financeBillRoutes, { prefix: withVersion("") });
+  app.register(financeAdvanceRoutes, { prefix: withVersion("") });
+  app.register(financeReimbursementRoutes, { prefix: withVersion("") });
+  app.register(financePettyCashRoutes, { prefix: withVersion("") });
+  app.register(financeBudgetRoutes, { prefix: withVersion("") });
+  app.register(financeDashboardRoutes, { prefix: withVersion("") });
+  app.register(financeReportRoutes, { prefix: withVersion("") });
+  app.register(financeReceiptRoutes, { prefix: withVersion("") });
   app.register(aiRoutes, { prefix: withVersion("/ai") });
   app.register(operationRoutes, {
     prefix: withVersion("/operations"),
@@ -346,6 +365,16 @@ export function buildServer(
   app.register(serviceAgreementRoutes, { prefix: withLegacy("/service-agreements") });
   app.register(serviceVisitRoutes, { prefix: withLegacy("/service-visits") });
   app.register(orgSettingsRoutes, { prefix: withLegacy("/org") });
+  app.register(financeConfigRoutes, { prefix: withLegacy("") });
+  app.register(financeExpenseRoutes, { prefix: withLegacy("") });
+  app.register(financeBillRoutes, { prefix: withLegacy("") });
+  app.register(financeAdvanceRoutes, { prefix: withLegacy("") });
+  app.register(financeReimbursementRoutes, { prefix: withLegacy("") });
+  app.register(financePettyCashRoutes, { prefix: withLegacy("") });
+  app.register(financeBudgetRoutes, { prefix: withLegacy("") });
+  app.register(financeDashboardRoutes, { prefix: withLegacy("") });
+  app.register(financeReportRoutes, { prefix: withLegacy("") });
+  app.register(financeReceiptRoutes, { prefix: withLegacy("") });
   app.register(aiRoutes, { prefix: withLegacy("/ai") });
   app.register(operationRoutes, {
     prefix: withLegacy("/operations"),

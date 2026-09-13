@@ -131,6 +131,14 @@ export interface NumberingSettings {
   estimateNextNumber: number;
   jobPrefix: string;
   jobNextNumber: number;
+  expensePrefix: string;
+  expenseNextNumber: number;
+  billPrefix: string;
+  billNextNumber: number;
+  advancePrefix: string;
+  advanceNextNumber: number;
+  reimbursementPrefix: string;
+  reimbursementNextNumber: number;
 }
 
 export interface PortalSettings {
@@ -232,6 +240,14 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
     estimateNextNumber: 1000,
     jobPrefix: "JOB",
     jobNextNumber: 1000,
+    expensePrefix: "NNACT/EXP",
+    expenseNextNumber: 1000,
+    billPrefix: "NNACT/BILL",
+    billNextNumber: 1000,
+    advancePrefix: "NNACT/ADV",
+    advanceNextNumber: 1000,
+    reimbursementPrefix: "NNACT/REIMB",
+    reimbursementNextNumber: 1000,
   },
   portal: {
     enabled: true,

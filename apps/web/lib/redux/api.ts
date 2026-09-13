@@ -1,6 +1,27 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { ActivityDTO, CustomerDTO, JobDTO, JobStatus, JobVoiceNoteDTO, UserDTO } from "@nnact/shared";
 import type {
+  AdvanceSettlementDTO,
+  BillPaymentDTO,
+  BillFrequency,
+  BillStatus,
+  BudgetDTO,
+  BudgetLineDTO,
+  CashAdvanceDTO,
+  CostCenterDTO,
+  ExpenseCategoryDTO,
+  ExpenseDTO,
+  FinanceDashboardDTO,
+  FinanceReportRowDTO,
+  JobCostingDTO,
+  PettyCashFundDTO,
+  PettyCashTransactionDTO,
+  RecurringBillDTO,
+  ReimbursementDTO,
+  SupplierBillDTO,
+  SupplierBillLineDTO,
+} from "@nnact/shared";
+import type {
   ChannelPublicationDTO,
   ChannelVariantDTO,
   ContentCategoryDTO,
@@ -276,6 +297,7 @@ export const apiSlice = createApi({
     "Publication",
     "Connection",
     "Ai",
+    "Finance",
   ],
   endpoints: (builder) => ({
     // ── Jobs ──
@@ -1198,9 +1220,268 @@ aiHealth: builder.query<Record<string, unknown>, void>({
       query: () => "/api/ai/usage",
       providesTags: ["Ai"],
     }),
-    aiReserve: builder.query<Record<string, unknown>, void>({
+aiReserve: builder.query<Record<string, unknown>, void>({
       query: () => "/api/ai/reserve",
       providesTags: ["Ai"],
+    }),
+
+    // ── Finance ──────────────────────────────────────────────────────────
+    financeDashboard: builder.query<FinanceDashboardDTO, void>({
+      query: () => "/api/finance/dashboard",
+      providesTags: ["Finance"],
+    }),
+    jobCosting: builder.query<JobCostingDTO[], { jobId?: string } | void>({
+      query: (params) => ({ url: "/api/finance/job-costing", params: params as Record<string, unknown> | undefined }),
+      providesTags: ["Finance"],
+    }),
+    expenseCategories: builder.query<ExpenseCategoryDTO[], void>({
+      query: () => "/api/finance/expense-categories",
+      providesTags: ["Finance"],
+    }),
+    createExpenseCategory: builder.mutation<ExpenseCategoryDTO, { name: string }>({
+      query: (body) => ({ url: "/api/finance/expense-categories", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchExpenseCategory: builder.mutation<ExpenseCategoryDTO, { id: string; data: { name?: string } }>({
+      query: ({ id, data }) => ({ url: `/api/finance/expense-categories/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    deleteExpenseCategory: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/finance/expense-categories/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    costCenters: builder.query<CostCenterDTO[], void>({
+      query: () => "/api/finance/cost-centers",
+      providesTags: ["Finance"],
+    }),
+    createCostCenter: builder.mutation<CostCenterDTO, { name: string; code?: string; description?: string | null }>({
+      query: (body) => ({ url: "/api/finance/cost-centers", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchCostCenter: builder.mutation<CostCenterDTO, { id: string; data: { name?: string; code?: string; description?: string | null } }>({
+      query: ({ id, data }) => ({ url: `/api/finance/cost-centers/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    deleteCostCenter: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/finance/cost-centers/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    expenses: builder.query<ExpenseDTO[], void>({
+      query: () => "/api/finance/expenses",
+      providesTags: ["Finance"],
+    }),
+    expense: builder.query<ExpenseDTO, string>({
+      query: (id) => `/api/finance/expenses/${id}`,
+      providesTags: ["Finance"],
+    }),
+    createExpense: builder.mutation<
+      ExpenseDTO,
+      {
+        title: string;
+        description?: string | null;
+        amountCents: number;
+        momoFeeCents?: number;
+        paymentMethod?: string;
+        categoryId?: string | null;
+        costCenterId?: string | null;
+        jobId?: string | null;
+        equipmentId?: string | null;
+        submitImmediately?: boolean;
+      }
+    >({
+      query: (body) => ({ url: "/api/finance/expenses", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchExpense: builder.mutation<ExpenseDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/finance/expenses/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    expenseTransition: builder.mutation<ExpenseDTO, { id: string; action: "submit" | "review" | "approve" | "reject" | "pay" | "void"; body?: Record<string, unknown> }>({
+      query: ({ id, action, body }) => ({ url: `/api/finance/expenses/${id}/${action}`, method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    deleteExpense: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/finance/expenses/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    uploadExpenseReceipt: builder.mutation<ExpenseDTO, { id: string; file: File }>({
+      query: ({ id, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return { url: `/api/finance/expenses/${id}/receipt`, method: "POST", body };
+      },
+      invalidatesTags: ["Finance"],
+    }),
+    deleteExpenseReceipts: builder.mutation<ExpenseDTO, string>({
+      query: (id) => ({ url: `/api/finance/expenses/${id}/receipts`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    supplierBills: builder.query<SupplierBillDTO[], void>({
+      query: () => "/api/finance/bills",
+      providesTags: ["Finance"],
+    }),
+    supplierBill: builder.query<SupplierBillDTO, string>({
+      query: (id) => `/api/finance/bills/${id}`,
+      providesTags: ["Finance"],
+    }),
+    createSupplierBill: builder.mutation<
+      SupplierBillDTO,
+      {
+        supplierName: string;
+        supplierReference?: string | null;
+        categoryId?: string | null;
+        costCenterId?: string | null;
+        jobId?: string | null;
+        issueDate: string;
+        dueDate?: string | null;
+        taxCents?: number;
+        notes?: string | null;
+        status?: "DRAFT" | "RECEIVED";
+        lines: Array<{ description: string; quantity?: number; unitPriceCents: number }>;
+      }
+    >({
+      query: (body) => ({ url: "/api/finance/bills", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchSupplierBill: builder.mutation<SupplierBillDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/finance/bills/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    billTransition: builder.mutation<SupplierBillDTO, { id: string; action: "approve" | "dispute" | "void"; body?: { reason?: string } }>({
+      query: ({ id, action, body }) => ({ url: `/api/finance/bills/${id}/${action}`, method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    deleteSupplierBill: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/finance/bills/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    addBillPayment: builder.mutation<SupplierBillDTO, { id: string; amountCents: number; method?: string; reference?: string | null; paidAt?: string }>({
+      query: ({ id, ...body }) => ({ url: `/api/finance/bills/${id}/payments`, method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    deleteBillPayment: builder.mutation<SupplierBillDTO, { id: string; paymentId: string }>({
+      query: ({ id, paymentId }) => ({ url: `/api/finance/bills/${id}/payments/${paymentId}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    recurringBills: builder.query<RecurringBillDTO[], void>({
+      query: () => "/api/finance/recurring-bills",
+      providesTags: ["Finance"],
+    }),
+    createRecurringBill: builder.mutation<RecurringBillDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/finance/recurring-bills", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchRecurringBill: builder.mutation<RecurringBillDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/finance/recurring-bills/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    deleteRecurringBill: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/finance/recurring-bills/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    generateRecurringBill: builder.mutation<RecurringBillDTO, string>({
+      query: (id) => ({ url: `/api/finance/recurring-bills/${id}/generate`, method: "POST", body: {} }),
+      invalidatesTags: ["Finance"],
+    }),
+    cashAdvances: builder.query<CashAdvanceDTO[], void>({
+      query: () => "/api/finance/advances",
+      providesTags: ["Finance"],
+    }),
+    cashAdvance: builder.query<CashAdvanceDTO, string>({
+      query: (id) => `/api/finance/advances/${id}`,
+      providesTags: ["Finance"],
+    }),
+    createCashAdvance: builder.mutation<CashAdvanceDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/finance/advances", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchCashAdvance: builder.mutation<CashAdvanceDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/finance/advances/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    advanceTransition: builder.mutation<CashAdvanceDTO, { id: string; action: "approve" | "disburse" | "cancel"; body?: Record<string, unknown> }>({
+      query: ({ id, action, body }) => ({ url: `/api/finance/advances/${id}/${action}`, method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    settleAdvance: builder.mutation<CashAdvanceDTO, { id: string; settledCents: number; description?: string | null; expenseIds?: string[] }>({
+      query: ({ id, ...body }) => ({ url: `/api/finance/advances/${id}/settle`, method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    deleteCashAdvance: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/finance/advances/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    reimbursements: builder.query<ReimbursementDTO[], void>({
+      query: () => "/api/finance/reimbursements",
+      providesTags: ["Finance"],
+    }),
+    reimbursement: builder.query<ReimbursementDTO, string>({
+      query: (id) => `/api/finance/reimbursements/${id}`,
+      providesTags: ["Finance"],
+    }),
+    createReimbursement: builder.mutation<ReimbursementDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/finance/reimbursements", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchReimbursement: builder.mutation<ReimbursementDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/finance/reimbursements/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    reimbursementTransition: builder.mutation<ReimbursementDTO, { id: string; action: "approve" | "pay" | "reject"; body?: { reason?: string } }>({
+      query: ({ id, action, body }) => ({ url: `/api/finance/reimbursements/${id}/${action}`, method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    uploadReimbursementReceipt: builder.mutation<ReimbursementDTO, { id: string; file: File }>({
+      query: ({ id, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return { url: `/api/finance/reimbursements/${id}/receipt`, method: "POST", body };
+      },
+      invalidatesTags: ["Finance"],
+    }),
+    deleteReimbursement: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/finance/reimbursements/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    pettyCashFunds: builder.query<PettyCashFundDTO[], void>({
+      query: () => "/api/finance/petty-cash",
+      providesTags: ["Finance"],
+    }),
+    pettyCashTransactions: builder.query<PettyCashTransactionDTO[], string>({
+      query: (id) => `/api/finance/petty-cash/${id}/transactions`,
+      providesTags: ["Finance"],
+    }),
+    createPettyCashFund: builder.mutation<PettyCashFundDTO, { name: string; custodianId?: string | null; openingBalanceCents?: number }>({
+      query: (body) => ({ url: "/api/finance/petty-cash", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchPettyCashFund: builder.mutation<PettyCashFundDTO, { id: string; data: { name?: string; custodianId?: string | null } }>({
+      query: ({ id, data }) => ({ url: `/api/finance/petty-cash/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    pettyCashOperate: builder.mutation<PettyCashFundDTO, { id: string; action: "deposit" | "expense" | "close"; body?: Record<string, unknown> }>({
+      query: ({ id, action, body }) => ({ url: `/api/finance/petty-cash/${id}/${action}`, method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    budgets: builder.query<BudgetDTO[], { period?: string } | void>({
+      query: (params) => ({ url: "/api/finance/budgets", params: params as Record<string, unknown> | undefined }),
+      providesTags: ["Finance"],
+    }),
+    createBudget: builder.mutation<BudgetDTO, { period: string; label?: string | null; costCenterId?: string | null; lines: Array<{ categoryId?: string | null; plannedCents: number }> }>({
+      query: (body) => ({ url: "/api/finance/budgets", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
+    patchBudget: builder.mutation<BudgetDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/finance/budgets/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: ["Finance"],
+    }),
+    deleteBudget: builder.mutation<{ ok: boolean }, string>({
+      query: (id) => ({ url: `/api/finance/budgets/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Finance"],
+    }),
+    financeReport: builder.query<FinanceReportRowDTO, { kind: "expenses" | "payables-aging" | "budget-analysis" | "job-costing"; period?: string }>({
+      query: ({ kind, ...params }) => ({ url: `/api/finance/reports/${kind}`, params }),
+      providesTags: ["Finance"],
     }),
   }),
 });
@@ -1372,6 +1653,61 @@ export const {
   useTriggerAiRunMutation,
   useAiUsageQuery,
   useAiReserveQuery,
+  useFinanceDashboardQuery,
+  useJobCostingQuery,
+  useExpenseCategoriesQuery,
+  useCreateExpenseCategoryMutation,
+  usePatchExpenseCategoryMutation,
+  useDeleteExpenseCategoryMutation,
+  useCostCentersQuery,
+  useCreateCostCenterMutation,
+  usePatchCostCenterMutation,
+  useDeleteCostCenterMutation,
+  useExpensesQuery,
+  useExpenseQuery,
+  useCreateExpenseMutation,
+  usePatchExpenseMutation,
+  useExpenseTransitionMutation,
+  useDeleteExpenseMutation,
+  useUploadExpenseReceiptMutation,
+  useDeleteExpenseReceiptsMutation,
+  useSupplierBillsQuery,
+  useSupplierBillQuery,
+  useCreateSupplierBillMutation,
+  usePatchSupplierBillMutation,
+  useBillTransitionMutation,
+  useDeleteSupplierBillMutation,
+  useAddBillPaymentMutation,
+  useDeleteBillPaymentMutation,
+  useRecurringBillsQuery,
+  useCreateRecurringBillMutation,
+  usePatchRecurringBillMutation,
+  useDeleteRecurringBillMutation,
+  useGenerateRecurringBillMutation,
+  useCashAdvancesQuery,
+  useCashAdvanceQuery,
+  useCreateCashAdvanceMutation,
+  usePatchCashAdvanceMutation,
+  useAdvanceTransitionMutation,
+  useSettleAdvanceMutation,
+  useDeleteCashAdvanceMutation,
+  useReimbursementsQuery,
+  useReimbursementQuery,
+  useCreateReimbursementMutation,
+  usePatchReimbursementMutation,
+  useReimbursementTransitionMutation,
+  useUploadReimbursementReceiptMutation,
+  useDeleteReimbursementMutation,
+  usePettyCashFundsQuery,
+  usePettyCashTransactionsQuery,
+  useCreatePettyCashFundMutation,
+  usePatchPettyCashFundMutation,
+  usePettyCashOperateMutation,
+  useBudgetsQuery,
+  useCreateBudgetMutation,
+  usePatchBudgetMutation,
+  useDeleteBudgetMutation,
+  useFinanceReportQuery,
 } = apiSlice;
 
 /** Extract a readable message from an RTK Query / fetchBaseQuery error. */
