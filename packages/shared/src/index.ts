@@ -375,6 +375,12 @@ export interface JobDTO {
   total: Money;
   /** Tech time cost for the whole job (margin input; never added to the bill). */
   laborCostCents?: number | null;
+  /** Dispatcher quick-money snapshot: advance received from the customer for this job (cents). */
+  advanceReceivedCents?: number | null;
+  /** Dispatcher quick-money snapshot: balance the customer still owes after the advance (cents). */
+  customerBalanceCents?: number | null;
+  /** Dispatcher quick-money snapshot: money set aside from this job to cover expenses (cents). */
+  expenseAllowanceCents?: number | null;
   createdAt: string;
 }
 

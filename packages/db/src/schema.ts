@@ -212,6 +212,12 @@ export const jobs = pgTable(
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     total: integer("total").default(0).notNull(),
     laborCostCents: integer("labor_cost_cents").default(0).notNull(),
+    /** Advance received from the customer for this job (dispatcher quick-money snapshot, in cents). */
+    advanceReceivedCents: integer("advance_received_cents").default(0).notNull(),
+    /** Balance the customer still owes on this job after the advance (quick-money snapshot, in cents). */
+    customerBalanceCents: integer("customer_balance_cents").default(0).notNull(),
+    /** Money set aside from this job to cover expenses (quick-money snapshot, in cents). */
+    expenseAllowanceCents: integer("expense_allowance_cents").default(0).notNull(),
     version: version(),
     updatedAt: updatedAt(),
     createdAt: ts(),

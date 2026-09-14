@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { JobVoiceNotesPanel } from "@/components/job-voice-notes";
 import { JobPricingPanel } from "@/components/job-pricing-panel";
+import { JobQuickMoney } from "@/components/job-quick-money";
 import { UserAvatar } from "@/components/user-avatar";
 
 interface Appointment {
@@ -284,6 +285,8 @@ export default function JobDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            <JobQuickMoney job={job} />
 
             <JobPricingPanel job={job} />
 

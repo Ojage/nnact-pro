@@ -30,6 +30,12 @@ export const jobPatchBody = z.object({
   total: z.number().int().nonnegative().optional(),
   laborCostCents: z.number().int().nonnegative().optional(),
   cancelReason: z.string().trim().min(1).max(500).optional(),
+  /** Dispatcher quick-money snapshot: advance received from the customer for this job. */
+  advanceReceivedCents: z.number().int().nonnegative().max(999_999_999).optional(),
+  /** Dispatcher quick-money snapshot: balance the customer still owes after the advance. */
+  customerBalanceCents: z.number().int().nonnegative().max(999_999_999).optional(),
+  /** Dispatcher quick-money snapshot: money set aside from this job to cover expenses. */
+  expenseAllowanceCents: z.number().int().nonnegative().max(999_999_999).optional(),
 });
 
 const importJobRow = z.object({
