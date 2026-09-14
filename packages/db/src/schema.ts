@@ -22,7 +22,6 @@ import {
   index,
   uniqueIndex,
   customType,
-  doublePrecision,
   foreignKey,
 } from "drizzle-orm/pg-core";
 
@@ -827,58 +826,5 @@ export const documents = pgTable(
   },
   (t) => ({
     orgDocument: uniqueIndex("documents_org_kind_document_idx").on(t.orgId, t.kind, t.documentId),
-  }),
-);
-
-// Append-only technician location reservoir. The mobile technician tracker POSTs
-// a fire-and-forget batch here; the office board reads latest-per-technician.
-// There is deliberately NO update/delete path in the app — retention/export are
-// job-driven, never row removal (compliance + dispatch forensics).
-export const technician_locations = pgTable(
-  "technician_locations",
-  {
-    id: id(),
-    orgId: orgId(),
-    technicianId: uuid("technician_id").notNull().references(() => users.id, { onDelete: "set null" }),
-    latitude: doublePrecision("latitude").notNull(),
-    longitude: doublePrecision("longitude").notNull(),
-    accuracyMeters: doublePrecision("accuracy_meters"),
-    speedKph: doublePrecision("speed_kph"),
-    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
-    version: version(),
-    createdAt: ts(),
-  },
-  (t) => ({
-    orgTime: index("technician_locations_org_recorded_idx").on(t.orgId, t.recordedAt),
-    techTime: index("technician_locations_technician_recorded_idx").on(t.technicianId, t.recordedAt),
-  }),
-);
-
-// Append-only technician location reservoir. The mobile technician app pushes
-// low-frequency GPS pings here; the office live map reads latest-per-technician.
-// There is deliberately NO update/delete at the application layer — retention,
-// export and dedupe are job-driven (see technician-location export), never row
-// surgery. Multiple rows per (org, technician, minute) are legal; the office
-// view picks the newest recordedAt per technician.
-export const technicianLocations = pgTable(
-  "technician_locations",
-  {
-    id: id(),
-    orgId: orgId(),
-    technicianId: uuid("technician_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "set null" }),
-    latitude: doublePrecision("latitude").notNull(),
-    longitude: doublePrecision("longitude").notNull(),
-    accuracyMeters: doublePrecision("accuracy_meters"),
-    speedKph: doublePrecision("speed_kph"),
-    headingDegrees: doublePrecision("heading_degrees"),
-    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
-    version: version(),
-    createdAt: ts(),
-  },
-  (t) => ({
-    orgTime: index("technician_locations_org_time_idx").on(t.orgId, t.recordedAt),
-    techTime: index("technician_locations_technician_recorded_idx").on(t.technicianId, t.recordedAt),
   }),
 );

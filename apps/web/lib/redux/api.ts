@@ -1304,6 +1304,13 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       query: (id) => ({ url: `/api/finance/cost-centers/${id}`, method: "DELETE" }),
       invalidatesTags: ["Finance"],
     }),
+    seedFinanceSetup: builder.mutation<
+      { createdCategories: number; createdCostCenters: number; skippedCategories: number; skippedCostCenters: number },
+      { categories: string[]; costCenters: Array<{ name: string; code?: string; description?: string | null }> }
+    >({
+      query: (body) => ({ url: "/api/finance/seed-setup", method: "POST", body }),
+      invalidatesTags: ["Finance"],
+    }),
     expenses: builder.query<ExpenseDTO[], void>({
       query: () => "/api/finance/expenses",
       providesTags: ["Finance"],
@@ -1792,6 +1799,7 @@ export const {
   useCreateCostCenterMutation,
   usePatchCostCenterMutation,
   useDeleteCostCenterMutation,
+  useSeedFinanceSetupMutation,
   useExpensesQuery,
   useExpenseQuery,
   useCreateExpenseMutation,

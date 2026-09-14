@@ -79,6 +79,21 @@ services:
     command: ["sh", "-ec", "pnpm --filter @nnact/db seed:nnact-service-plans"]
     restart: "no"
 
+  seed-finance-setup:
+    profiles: ["tools"]
+    # One-off job: idempotently inserts the NNACT recommended expense
+    # categories and cost centers for the NNACT org (matching by name, never
+    # deletes user-created records). Run with:
+    #   docker compose -f infra/compose.prod.yml --profile tools run --rm seed-finance-setup
+    image: ${NNPAPI_IMAGE:-nnact/api:prod}
+    environment:
+      DATABASE_URL: postgres://ofp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ofp
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-ec", "pnpm --filter @nnact/db seed:nnact-finance-setup"]
+    restart: "no"
+
   api:
     image: ${NNPAPI_IMAGE:-nnact/api:prod}
     build:

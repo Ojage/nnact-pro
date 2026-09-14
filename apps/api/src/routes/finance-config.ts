@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db, expenseCategories, costCenters } from "@nnact/db";
 import type { ExpenseCategoryDTO, CostCenterDTO } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
@@ -163,5 +163,109 @@ export async function financeConfigRoutes(app: FastifyInstance) {
       .returning();
     if (!row) return reply.code(404).send({ error: "not found" });
     return { ok: true };
+  });
+
+  // ── Batch seed (idempotent) ─────────────────────────────────────────
+  const seedBody = z.object({
+    categories: z.array(z.string().trim().min(1).max(80)).default([]),
+    costCenters: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1).max(80),
+          code: z.string().trim().min(1).max(20).optional(),
+          description: z.string().trim().max(300).optional().nullable(),
+        }),
+      )
+      .default([]),
+  });
+
+  app.post("/finance/seed-setup", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+    if (!isOfficeRole(claims.role))
+      return reply.code(403).send({ error: "office role required" });
+
+    const parsed = seedBody.safeParse(req.body);
+    if (!parsed.success)
+      return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const { categories: wantedCategories, costCenters: wantedCenters } =
+      parsed.data;
+
+    // ── Categories (skip existing by name) ──────────────────────────
+    const existingCats = await db
+      .select({ name: expenseCategories.name })
+      .from(expenseCategories)
+      .where(
+        and(
+          eq(expenseCategories.orgId, orgId),
+          inArray(expenseCategories.name, wantedCategories),
+        ),
+      );
+    const existingCatNames = new Set(existingCats.map((r) => r.name));
+
+    const newCatNames = wantedCategories.filter(
+      (n) => !existingCatNames.has(n),
+    );
+
+    let createdCategories = 0;
+    if (newCatNames.length > 0) {
+      const rows = await db
+        .insert(expenseCategories)
+        .values(
+          newCatNames.map((name) => ({
+            orgId,
+            name,
+            createdBy: claims.userId,
+          })),
+        )
+        .returning();
+      createdCategories = rows.length;
+    }
+
+    // ── Cost centers (skip existing by name) ────────────────────────
+    const wantedCenterNames = wantedCenters.map((c) => c.name);
+    const existingCCs = await db
+      .select({ name: costCenters.name })
+      .from(costCenters)
+      .where(
+        and(
+          eq(costCenters.orgId, orgId),
+          inArray(costCenters.name, wantedCenterNames),
+        ),
+      );
+    const existingCCNames = new Set(existingCCs.map((r) => r.name));
+
+    const newCenters = wantedCenters.filter(
+      (c) => !existingCCNames.has(c.name),
+    );
+
+    let createdCostCenters = 0;
+    if (newCenters.length > 0) {
+      const rows = await db
+        .insert(costCenters)
+        .values(
+          newCenters.map((c) => ({
+            orgId,
+            name: c.name,
+            code: c.code ?? null,
+            description: c.description ?? null,
+            createdBy: claims.userId,
+          })),
+        )
+        .returning();
+      createdCostCenters = rows.length;
+    }
+
+    const skippedCategories = wantedCategories.length - newCatNames.length;
+    const skippedCostCenters = wantedCenters.length - newCenters.length;
+
+    return {
+      createdCategories,
+      createdCostCenters,
+      skippedCategories,
+      skippedCostCenters,
+    };
   });
 }

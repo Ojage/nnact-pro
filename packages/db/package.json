@@ -14,7 +14,8 @@
     "seed:nnact": "tsx src/seed-nnact.ts",
     "seed:nnact-catalog": "tsx src/seed-nnact-catalog.ts",
     "seed:nnact-models": "tsx src/seed-nnact-models.ts",
-    "seed:nnact-service-plans": "tsx src/seed-service-plans.ts"
+    "seed:nnact-service-plans": "tsx src/seed-service-plans.ts",
+    "seed:nnact-finance-setup": "tsx src/seed-nnact-finance-setup.ts"
   },
   "dependencies": {
     "@nnact/shared": "workspace:*",
