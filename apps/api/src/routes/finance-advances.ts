@@ -20,7 +20,7 @@ import type {
 import { ADVANCE_STATUS, REIMBURSEMENT_STATUS } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
-import { isOfficeRole, withFinanceNumber } from "../finance-utils.js";
+import { isOfficeRole, officeWriter, withFinanceNumber } from "../finance-utils.js";
 import { validateOrgIds } from "../finance-validate.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeNotifyUser } from "../notify-user.js";
@@ -167,7 +167,7 @@ export async function financeAdvanceRoutes(app: FastifyInstance) {
     await refreshOverdueAdvances(orgId);
 
     const conds = [eq(cashAdvances.orgId, orgId)];
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office) conds.push(eq(cashAdvances.employeeId, claims.userId));
     if (q.data.status) conds.push(eq(cashAdvances.status, q.data.status));
     if (q.data.employeeId) {
@@ -191,7 +191,7 @@ export async function financeAdvanceRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findAdvance(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    if (!isOfficeRole(claims.role) && row.employeeId !== claims.userId) {
+    if (!officeWriter(claims.role) && row.employeeId !== claims.userId) {
       return reply.code(403).send({ error: "not your advance" });
     }
     const [dto] = await hydrateAdvances(orgId, [row]);
@@ -205,7 +205,7 @@ export async function financeAdvanceRoutes(app: FastifyInstance) {
     const parsed = advanceCreate.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     const employeeId = parsed.data.employeeId ?? claims.userId;
     if (parsed.data.employeeId && !office) return reply.code(403).send({ error: "office role required to set employee" });
     if (!office && employeeId !== claims.userId) return reply.code(403).send({ error: "technicians may only request their own advances" });
@@ -267,7 +267,7 @@ export async function financeAdvanceRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const row = await findAdvance(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && row.employeeId !== claims.userId) return reply.code(403).send({ error: "not your advance" });
     if (row.status !== "REQUESTED") return reply.code(409).send({ error: `only REQUESTED advances can be edited (current: ${row.status})` });
     const validated = await validateOrgIds(orgId, {
@@ -453,7 +453,7 @@ export async function financeAdvanceRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findAdvance(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && row.employeeId !== claims.userId) return reply.code(403).send({ error: "not your advance" });
     if (row.status !== "REQUESTED") {
       return reply.code(409).send({ error: `only REQUESTED advances can be deleted (current: ${row.status})` });
@@ -535,7 +535,7 @@ export async function financeReimbursementRoutes(app: FastifyInstance) {
       .safeParse(req.query);
     if (!q.success) return reply.code(400).send({ error: q.error.flatten() });
     const conds = [eq(reimbursements.orgId, orgId)];
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office) conds.push(eq(reimbursements.employeeId, claims.userId));
     if (q.data.status) conds.push(eq(reimbursements.status, q.data.status));
     const rows = await db
@@ -554,7 +554,7 @@ export async function financeReimbursementRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findReimbursement(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    if (!isOfficeRole(claims.role) && row.employeeId !== claims.userId) {
+    if (!officeWriter(claims.role) && row.employeeId !== claims.userId) {
       return reply.code(403).send({ error: "not your reimbursement" });
     }
     const [dto] = await hydrateReimbursements(orgId, [row]);
@@ -568,7 +568,7 @@ export async function financeReimbursementRoutes(app: FastifyInstance) {
     const parsed = reimbursementCreate.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     const employeeId = parsed.data.employeeId ?? claims.userId;
     if (parsed.data.employeeId && !office) return reply.code(403).send({ error: "office role required to set employee" });
     if (!office && employeeId !== claims.userId) return reply.code(403).send({ error: "technicians may only claim their own reimbursements" });
@@ -619,7 +619,7 @@ export async function financeReimbursementRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const row = await findReimbursement(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && row.employeeId !== claims.userId) return reply.code(403).send({ error: "not your reimbursement" });
     if (row.status !== "SUBMITTED") return reply.code(409).send({ error: `only SUBMITTED reimbursements can be edited (current: ${row.status})` });
     const validated = await validateOrgIds(orgId, { jobId: parsed.data.jobId });
@@ -724,7 +724,7 @@ export async function financeReimbursementRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findReimbursement(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && row.employeeId !== claims.userId) return reply.code(403).send({ error: "not your reimbursement" });
     if (row.status === "PAID" || row.status === "REJECTED") {
       return reply.code(409).send({ error: `reimbursement is ${row.status}; receipts can no longer be attached` });
@@ -749,7 +749,7 @@ export async function financeReimbursementRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findReimbursement(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && row.employeeId !== claims.userId) return reply.code(403).send({ error: "not your reimbursement" });
     if (row.status !== "SUBMITTED") {
       return reply.code(409).send({ error: `only SUBMITTED reimbursements can be deleted (current: ${row.status})` });

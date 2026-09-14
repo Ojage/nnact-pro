@@ -15,6 +15,7 @@ export const NNACT_STAFF = [
   { id: NNACT_USER_IDS.dispatchGrace, email: "grace.nkweta@nnact.demo", name: "Grace Nkweta", role: "dispatcher" as const, skills: "Dispatch, scheduling, customer follow-up" },
   { id: NNACT_USER_IDS.dispatchBertrand, email: "bertrand.fonge@nnact.demo", name: "Bertrand Fonge", role: "dispatcher" as const, skills: "Operations, job intake, technician routing" },
   { id: NNACT_USER_IDS.financeClaudia, email: "claudia.ashu@nnact.demo", name: "Claudia Ashu", role: "dispatcher" as const, skills: "Finance, quotations, invoices, receipts" },
+  { id: NNACT_USER_IDS.secretaryMarie, email: "marie.ebah@nnact.demo", name: "Marie Ebah", role: "secretary" as const, skills: "Front office, customer records, appointments, invoicing support" },
   { id: NNACT_USER_IDS.seniorEmmanuel, email: "emmanuel.tabi@nnact.demo", name: "Emmanuel Tabi", role: "technician" as const, skills: "HVAC, refrigeration, appliance diagnostics, electrical diagnostics" },
   { id: NNACT_USER_IDS.techFrankline, email: "frankline.njomo@nnact.demo", name: "Frankline Njomo", role: "technician" as const, skills: "HVAC, refrigeration, split AC" },
   { id: NNACT_USER_IDS.techDelphine, email: "delphine.ekane@nnact.demo", name: "Delphine Ekane", role: "technician" as const, skills: "Washing machines, home appliances" },

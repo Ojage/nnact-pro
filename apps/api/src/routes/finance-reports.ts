@@ -6,7 +6,7 @@ import type { ExpenseReportRowDTO, BudgetAnalysisRowDTO, JobCostingDTO } from "@
 import { toCsv } from "../reports.js";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
-import { isOfficeRole, userNameMap } from "../finance-utils.js";
+import { isOfficeRole, officeWriter, userNameMap } from "../finance-utils.js";
 import { hydrateBudgets, periodRange } from "./finance-budgets.js";
 import { jobCosting } from "./finance-dashboard.js";
 
@@ -28,7 +28,7 @@ export async function financeReportRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return null;
-    if (!isOfficeRole(claims.role)) {
+    if (!officeWriter(claims.role)) {
       reply.code(403).send({ error: "office role required" });
       return null;
     }

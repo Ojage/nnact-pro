@@ -15,7 +15,7 @@ import {
 import type { BudgetDTO } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
-import { isOfficeRole } from "../finance-utils.js";
+import { isOfficeRole, officeWriter } from "../finance-utils.js";
 import { safeEmitActivity } from "../activities.js";
 
 const lineSchema = z.object({
@@ -220,7 +220,7 @@ export async function financeBudgetRoutes(app: FastifyInstance) {
     if (!claims || reply.sent) return;
     const q = z.object({ period: z.string().regex(/^\d{4}-\d{2}$/).optional() }).safeParse(req.query);
     if (!q.success) return reply.code(400).send({ error: q.error.flatten() });
-    if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required" });
+    if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required" });
     return hydrateBudgets(orgId, q.data.period);
   });
 
@@ -228,7 +228,7 @@ export async function financeBudgetRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required" });
+    if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required" });
     const { id } = req.params as { id: string };
     const all = await hydrateBudgets(orgId);
     const found = all.find((b) => b.id === id);

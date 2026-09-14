@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { UserAvatar } from "@/components/user-avatar";
 import { Label } from "@/components/ui/label";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Input } from "@/components/ui/input";
@@ -87,6 +88,7 @@ function DispatchCard({
   const title = job?.title ?? `Job ${appointment.jobId.slice(0, 8)}`;
   const status = job?.status ?? "scheduled";
   const hasConflict = conflictTitles.length > 0;
+  const assignedTechnician = technicians.find((item) => item.id === appointment.technicianId);
 
   return (
     <article
@@ -127,9 +129,14 @@ function DispatchCard({
       ) : null}
 
       <div className="mt-3 border-t border-border pt-3">
-        <Label htmlFor={`assign-${appointment.id}`} className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">
-          Assigned technician
-        </Label>
+        <div className="flex items-center gap-1.5">
+          {assignedTechnician ? (
+            <UserAvatar name={assignedTechnician.name} src={assignedTechnician.profilePictureUrl} size="xs" />
+          ) : null}
+          <Label htmlFor={`assign-${appointment.id}`} className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">
+            Assigned technician
+          </Label>
+        </div>
         <div data-tour="dispatch-assign">
           <FormSelect
             id={`assign-${appointment.id}`}

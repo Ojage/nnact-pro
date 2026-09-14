@@ -37,6 +37,7 @@ module.exports = {
         { image: "./assets/icon.png", resizeMode: "contain", backgroundColor: "#0f172a" },
       ],
       ["expo-notifications", { defaultChannel: "field-assignments" }],
+      "@react-native-community/datetimepicker",
     ],
     ios: {
       supportsTablet: true,

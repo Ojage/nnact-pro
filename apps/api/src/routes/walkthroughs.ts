@@ -119,7 +119,7 @@ async function resolveStaffIdentity(
     if (
       identifier?.userId &&
       identifier?.orgId &&
-      ["owner", "dispatcher", "technician"].includes(identifier.role)
+      ["owner", "dispatcher", "secretary", "technician"].includes(identifier.role)
     ) {
       return { userId: identifier.userId, orgId: identifier.orgId };
     }

@@ -17,7 +17,7 @@ export async function queryTokenClaims(
     const decoded = (await app.jwt.verify(token)) as unknown;
     if (!isStaffClaims(decoded)) return null;
     const claims = decoded as StaffJwtClaims;
-    if (!claims.orgId || !claims.userId || !["owner", "dispatcher", "technician"].includes(claims.role)) {
+    if (!claims.orgId || !claims.userId || !["owner", "dispatcher", "secretary", "technician"].includes(claims.role)) {
       return null;
     }
     return claims;

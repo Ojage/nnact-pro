@@ -15,8 +15,10 @@ import {
   customers,
   orgs,
   messageLogs,
+  equipment,
+  jobEquipmentLinks,
 } from "@nnact/db";
-import { formatDocumentCents, invoiceDocumentData, estimateDocumentData, fieldDocumentTitle, type FieldDocumentData } from "@nnact/shared";
+import { formatDocumentCents, invoiceDocumentData, estimateDocumentData, fieldDocumentTitle, type FieldDocumentData, type DocumentEstimateLike } from "@nnact/shared";
 import { mergeBusinessSettings } from "@nnact/shared";
 import { getOrgLogo, getOrgSignature, getOrgStamp } from "./uploads.js";
 import { renderFieldDocumentPdf } from "./render-document-pdf.js";
@@ -256,7 +258,7 @@ export async function ensureEstimateDocument(orgId: string, estimateId: string):
         .select()
         .from(estimateOptionLineItems)
         .where(and(eq(estimateOptionLineItems.orgId, orgId), inArray(estimateOptionLineItems.optionId, optionIds)))
-        .orderBy(asc(estimateOptionLineItems.createdAt))
+        .orderBy(asc(estimateOptionLineItems.position), asc(estimateOptionLineItems.createdAt))
     : [];
   const estimateOptionsForDoc = options.map((option) => ({
     id: option.id,
@@ -267,20 +269,30 @@ export async function ensureEstimateDocument(orgId: string, estimateId: string):
         description: line.description,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
+        unit: line.unit ?? undefined,
       })),
     pricing: option.pricing,
   }));
   const primaryLineItems = estimateOptionsForDoc[0]?.lineItems ?? [];
 
+  // The primary appliance for this job (one equipment link per job).
+  const equipmentRows = await db
+    .select()
+    .from(jobEquipmentLinks)
+    .innerJoin(equipment, eq(equipment.id, jobEquipmentLinks.equipmentId))
+    .where(and(eq(jobEquipmentLinks.orgId, orgId), eq(jobEquipmentLinks.jobId, estimate.jobId)));
+
   const data = estimateDocumentData({
     estimate: {
       ...estimate,
+      acceptedMethod: (estimate.acceptedMethod ?? null) as NonNullable<DocumentEstimateLike["acceptedMethod"]> | null,
       options: estimateOptionsForDoc,
       selectedOptionId: estimate.selectedOptionId,
     },
     customer,
     job,
     lineItems: primaryLineItems,
+    equipment: equipmentRows.map((row) => row.equipment),
     org,
   });
   const buffer = await renderStoredDocumentPdf(data, orgId);

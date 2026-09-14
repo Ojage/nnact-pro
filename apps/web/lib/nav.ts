@@ -15,9 +15,9 @@ export interface NavSection {
 }
 
 /** Staff roles in NNACT Pro. Owner sees everything; the matrix below narrows the rest. */
-export type NavRole = "owner" | "dispatcher" | "technician";
+export type NavRole = "owner" | "dispatcher" | "secretary" | "technician";
 
-const ALL_ROLES: readonly NavRole[] = ["owner", "dispatcher", "technician"];
+const ALL_ROLES: readonly NavRole[] = ["owner", "dispatcher", "secretary", "technician"];
 
 /**
  * Route-prefix → roles that may see it. Longest matching prefix wins, so a
@@ -39,19 +39,22 @@ const ROUTE_ROLES: ReadonlyArray<readonly [string, readonly NavRole[]]> = [
   ["/dispatch", ["owner", "dispatcher"]],
   ["/schedule", ["owner", "dispatcher"]],
   ["/pipeline", ["owner", "dispatcher"]],
-  ["/customers", ["owner", "dispatcher"]],
-  ["/equipment", ["owner", "dispatcher"]],
-  ["/estimates", ["owner", "dispatcher"]],
-  ["/invoices", ["owner", "dispatcher"]],
-  ["/service-plans", ["owner", "dispatcher"]],
-  ["/agreements", ["owner", "dispatcher"]],
+  ["/customers", ["owner", "dispatcher", "secretary"]],
+  ["/equipment", ["owner", "dispatcher", "secretary"]],
+  ["/estimates", ["owner", "dispatcher", "secretary"]],
+  ["/invoices", ["owner", "dispatcher", "secretary"]],
+  ["/service-plans", ["owner", "dispatcher", "secretary"]],
+  ["/agreements", ["owner", "dispatcher", "secretary"]],
   ["/documents", ["owner", "dispatcher"]],
   ["/price-book", ["owner", "dispatcher"]],
-  ["/finance", ["owner", "dispatcher"]],
+  ["/finance/budgets", ["owner", "dispatcher"]],
+  ["/finance/categories", ["owner", "dispatcher"]],
+  ["/finance", ["owner", "dispatcher", "secretary"]],
   ["/diagnostic-library", ["owner", "dispatcher"]],
   ["/coverage", ["owner", "dispatcher"]],
   ["/reviews", ["owner", "dispatcher"]],
   ["/reports", ["owner", "dispatcher"]],
+  ["/quality/comebacks", ["owner", "dispatcher"]],
 ];
 
 export function rolesForRoute(pathname: string): readonly NavRole[] {
@@ -101,22 +104,27 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/closeout", label: "Job Closeout", icon: "✓" },
       { href: "/pipeline", label: "Pipeline", icon: "⊟" },
       { href: "/customers", label: "Customers & Equipment", icon: "⊕", tour: "nav-customers" },
-      { href: "/estimates", label: "Estimates", icon: "◷" },
-      { href: "/invoices", label: "Invoices & Payments", icon: "◎", tour: "nav-invoices" },
-      { href: "/service-plans", label: "Service Plans", icon: "◌" },
-      { href: "/agreements", label: "Agreements", icon: "✍" },
       { href: "/documents", label: "Documents", icon: "▤" },
       { href: "/price-book", label: "Price Book", icon: "⊡" },
-      { href: "/finance", label: "Finance", icon: "⟡" },
+      { href: "/newsletter", label: "Newsletter", icon: "✉", tour: "nav-newsletter" },
+    ],
+  },
+  {
+    label: "Finance",
+    links: [
+      { href: "/finance", label: "Overview", icon: "⟡", tour: "nav-finance" },
+      { href: "/invoices", label: "Invoices & Payments", icon: "◎", tour: "nav-invoices" },
+      { href: "/estimates", label: "Estimates", icon: "◷" },
+      { href: "/agreements", label: "Agreements", icon: "✍" },
+      { href: "/service-plans", label: "Service Plans", icon: "◌" },
       { href: "/finance/expenses", label: "Expenses", icon: "↗" },
       { href: "/finance/bills", label: "Supplier Bills", icon: "◳" },
       { href: "/finance/advances", label: "Advances", icon: "⇧" },
       { href: "/finance/reimbursements", label: "Reimbursements", icon: "⇪" },
       { href: "/finance/petty-cash", label: "Petty Cash", icon: "⌀" },
       { href: "/finance/budgets", label: "Budgets", icon: "◇" },
-      { href: "/finance/reports", label: "Finance Reports", icon: "◫" },
-      { href: "/finance/categories", label: "Finance Setup", icon: "⚙" },
-      { href: "/newsletter", label: "Newsletter", icon: "✉", tour: "nav-newsletter" },
+      { href: "/finance/reports", label: "Reports", icon: "◫" },
+      { href: "/finance/categories", label: "Setup", icon: "⚙" },
     ],
   },
   {
@@ -136,6 +144,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/repair-brain/workspace", label: "Model Workspace", icon: "▣" },
       { href: "/diagnostic-library", label: "Diagnostic Library", icon: "⌘" },
       { href: "/coverage", label: "Coverage & Quality", icon: "◇" },
+      { href: "/quality/comebacks", label: "Comebacks", icon: "↩" },
       { href: "/reviews", label: "Reviews", icon: "★" },
       { href: "/reports", label: "Reports", icon: "◫" },
     ],

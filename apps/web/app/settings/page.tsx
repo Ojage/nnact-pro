@@ -18,6 +18,7 @@ import { FormSelect, type FormSelectOption } from "@/components/ui/form-select";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { TeamMemberCreatedDialog } from "@/components/team-member-created-dialog";
+import { UserAvatar } from "@/components/user-avatar";
 import { SmsSettingsEditor } from "@/components/settings/sms-settings-editor";
 import { buildTeamMemberDefaultPassword } from "@nnact/shared";
 import type { CreateTeamMemberResponseDTO } from "@nnact/shared";
@@ -52,6 +53,9 @@ interface User {
   email: string;
   phone: string | null;
   role: string;
+  title: string | null;
+  about: string | null;
+  profilePictureUrl: string | null;
 }
 
 export default function SettingsPage() {
@@ -1017,6 +1021,7 @@ function CurrencySection({ settings, updateSettings }: SettingsProps) {
 const ROLE_SUMMARY: { role: string; label: string; description: string }[] = [
   { role: "owner", label: "Owner", description: "Full access: settings, team, finances, and every workflow." },
   { role: "dispatcher", label: "Dispatcher", description: "Runs the schedule, dispatch board, jobs, and customer records." },
+  { role: "secretary", label: "Secretary", description: "Office records: customers, appointments, invoices, and estimates. Submits expenses and bills but does not approve them." },
   { role: "technician", label: "Technician", description: "Sees and closes out the jobs assigned to them." },
 ];
 
@@ -1099,7 +1104,7 @@ function TeamTab() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"dispatcher" | "technician">("technician");
+  const [inviteRole, setInviteRole] = useState<"dispatcher" | "secretary" | "technician">("technician");
   const [inviting, setInviting] = useState(false);
   const [createdMember, setCreatedMember] = useState<CreateTeamMemberResponseDTO | null>(null);
   const [showCreatedDialog, setShowCreatedDialog] = useState(false);
@@ -1149,7 +1154,7 @@ function TeamTab() {
 
   const handleUserPatch = async (
     id: string,
-    patch: { name?: string; email?: string; phone?: string | null },
+    patch: { name?: string; email?: string; phone?: string | null; title?: string | null; about?: string | null },
   ) => {
     setSavingId(id);
     setNotice(null);
@@ -1174,6 +1179,36 @@ function TeamTab() {
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (err) {
       setError(teamErrorMessage(err));
+    }
+  };
+
+  const handleAvatarChange = async (id: string, file: File) => {
+    setSavingId(id);
+    setNotice(null);
+    setError(null);
+    try {
+      const updated = await api.uploadUserAvatar(id, file);
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      setNotice("Profile picture updated.");
+    } catch (err) {
+      setError(teamErrorMessage(err));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleAvatarRemove = async (id: string) => {
+    setSavingId(id);
+    setNotice(null);
+    setError(null);
+    try {
+      const updated = await api.deleteUserAvatar(id);
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      setNotice("Profile picture removed.");
+    } catch (err) {
+      setError(teamErrorMessage(err));
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -1232,9 +1267,10 @@ function TeamTab() {
                 <SelectField
                   label="Role"
                   value={inviteRole}
-                  onChange={(value) => setInviteRole(value as "dispatcher" | "technician")}
+                  onChange={(value) => setInviteRole(value as "dispatcher" | "secretary" | "technician")}
                   options={[
                     { value: "technician", label: "Technician — field app & assigned jobs" },
+                    { value: "secretary", label: "Secretary — office records, invoices & estimates" },
                     { value: "dispatcher", label: "Dispatcher — schedule, dispatch, customers" },
                   ]}
                 />
@@ -1272,7 +1308,7 @@ function TeamTab() {
       <Card className="overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Phone</TableHead><TableHead>Role</TableHead><TableHead className="w-24">Actions</TableHead></TableRow>
+            <TableRow><TableHead>Name</TableHead><TableHead>Job title</TableHead><TableHead>Email</TableHead><TableHead>Phone</TableHead><TableHead>Role</TableHead><TableHead className="w-24">Actions</TableHead></TableRow>
           </TableHeader>
           <TableBody>
             {users.map((u) => {
@@ -1282,17 +1318,68 @@ function TeamTab() {
               return (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">
+                    <div className="flex items-center gap-3">
+                      {isOwner ? (
+                        <label
+                          className="relative cursor-pointer"
+                          title={savingId === u.id ? "Saving…" : "Change profile picture"}
+                          aria-label={`Change ${u.name}'s profile picture`}
+                        >
+                          <UserAvatar name={u.name} src={u.profilePictureUrl} className="h-10 w-10" />
+                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface-300 text-[10px] text-fg-muted">
+                            ✎
+                          </span>
+                          <input
+                            type="file"
+                            hidden
+                            accept="image/png,image/jpeg,image/webp"
+                            disabled={savingId === u.id}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) void handleAvatarChange(u.id, file);
+                              event.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
+                      ) : (
+                        <UserAvatar name={u.name} src={u.profilePictureUrl} className="h-10 w-10" />
+                      )}
+                      <div className="min-w-0">
+                        {isOwner ? (
+                          <EditableField
+                            value={u.name}
+                            onSave={(v) => handleUserPatch(u.id, { name: v })}
+                            placeholder="Full name"
+                            className="h-8 w-full min-w-40"
+                          />
+                        ) : (
+                          <span className="text-fg">{u.name}</span>
+                        )}
+                        {isSelf ? <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">You</span> : null}
+                        {isOwner && u.profilePictureUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAvatarRemove(u.id)}
+                            disabled={savingId === u.id}
+                            className="mt-1 block text-[10px] font-medium text-fg-dim underline-offset-2 hover:text-destructive hover:underline disabled:opacity-50"
+                          >
+                            Remove photo
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     {isOwner ? (
                       <EditableField
-                        value={u.name}
-                        onSave={(v) => handleUserPatch(u.id, { name: v })}
-                        placeholder="Full name"
-                        className="h-8 w-full min-w-40"
+                        value={u.title ?? ""}
+                        onSave={(v) => handleUserPatch(u.id, { title: v || null })}
+                        placeholder="Job title (optional)"
+                        className="h-8 w-full min-w-36 text-fg-muted"
                       />
                     ) : (
-                      <span className="text-fg">{u.name}</span>
+                      <span className="text-fg-muted">{u.title ?? "—"}</span>
                     )}
-                    {isSelf ? <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">You</span> : null}
                   </TableCell>
                   <TableCell>
                     {isOwner ? (
@@ -1330,6 +1417,7 @@ function TeamTab() {
                       options={[
                         { value: "owner", label: "Owner" },
                         { value: "dispatcher", label: "Dispatcher" },
+                        { value: "secretary", label: "Secretary" },
                         { value: "technician", label: "Technician" },
                       ]}
                     />

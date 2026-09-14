@@ -110,3 +110,35 @@ export async function notifyReimbursementSubmittedToOffice(
     void safeNotifyUser(orgId, userId, { type: "reimbursement.submitted", title, body, link: "/finance/reimbursements" });
   }
 }
+
+/** Push any new comeback (returned complaint) to the office queue. */
+export async function notifyComebackReportedToOffice(
+  orgId: string,
+  authorUserId: string,
+  authorName: string,
+  caseNumber: string,
+  complaintSummary: string,
+): Promise<void> {
+  const recipients = await listOfficeStaffUserIds(orgId, authorUserId);
+  const title = `Comeback reported · ${caseNumber}`;
+  const body = `${authorName} reported a return: "${complaintSummary}"`;
+  for (const userId of recipients) {
+    void safeNotifyUser(orgId, userId, { type: "comeback.reported", title, body, link: "/quality/comebacks" });
+  }
+}
+
+/** Escalated repeats go to the owner for intervention (never the technician). */
+export async function notifyComebackEscalatedToOwner(orgId: string, caseNumber: string): Promise<void> {
+  const [owner] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.orgId, orgId), eq(users.active, true), eq(users.role, "owner")))
+    .limit(1);
+  if (!owner) return;
+  void safeNotifyUser(orgId, owner.id, {
+    type: "comeback.escalated",
+    title: `Comeback escalated · ${caseNumber}`,
+    body: "A repeat comeback has crossed the escalation threshold. Owner review requested.",
+    link: "/quality/comebacks",
+  });
+}

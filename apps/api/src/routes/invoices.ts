@@ -19,6 +19,7 @@ import { resolvePublicWebUrl } from "../runtime-security.js";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";
+import { isApproverRole, verifiedClaims } from "../operational-authorization.js";
 
 const createBody = z.object({ jobId: z.string().uuid(), dueAt: z.string().datetime().optional(), discountId: z.string().trim().min(1).max(80).optional() });
 const statusBody = z.object({ status: z.enum(["sent", "void"]) });
@@ -280,6 +281,9 @@ export async function invoiceRoutes(app: FastifyInstance) {
 
   app.post("/:id/pay", async (req, reply) => {
     const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+    if (!isApproverRole(claims.role)) return reply.code(403).send({ error: "invoice payments require an approver role" });
     const { id } = req.params as { id: string };
     const parsed = payBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });

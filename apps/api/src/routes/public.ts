@@ -11,7 +11,7 @@ import {
   type NewsletterUnsubscribeDTO,
 } from "@nnact/shared";
 import { createFixedWindowRateLimit, requestIpKey } from "../rate-limit.js";
-import { getOrgLogo, getOrgSignature, getOrgStamp } from "../uploads.js";
+import { getOrgLogo, getOrgSignature, getOrgStamp, getUserAvatar } from "../uploads.js";
 import { resolveDefaultOrgId } from "../runtime-security.js";
 import { hashPortalToken } from "../portal-links.js";
 import { safeEmitActivity } from "../activities.js";
@@ -634,6 +634,14 @@ export async function publicRoutes(app: FastifyInstance) {
     if (!stamp) return reply.code(404).send({ error: "stamp not found" });
     reply.header("Cache-Control", "public, max-age=300, immutable");
     return reply.type(stamp.contentType).send(stamp.buffer);
+  });
+
+  app.get("/:orgId/avatar/:userId", async (req, reply) => {
+    const { orgId, userId } = req.params as { orgId: string; userId: string };
+    const avatar = await getUserAvatar(orgId, userId);
+    if (!avatar) return reply.code(404).send({ error: "avatar not found" });
+    reply.header("Cache-Control", "public, max-age=300, immutable");
+    return reply.type(avatar.contentType).send(avatar.buffer);
   });
 
   app.get("/:orgId/booking", {

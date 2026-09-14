@@ -23,6 +23,7 @@ import {
   uniqueIndex,
   customType,
   doublePrecision,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 // drizzle 0.45 does not ship a bytea column type; define one mapping Buffer.
@@ -53,7 +54,7 @@ export const estimateStatus = pgEnum("estimate_status", [
   "declined",
   "expired",
 ]);
-export const userRole = pgEnum("user_role", ["owner", "dispatcher", "technician"]);
+export const userRole = pgEnum("user_role", ["owner", "dispatcher", "secretary", "technician"]);
 
 const id = () => uuid("id").primaryKey().defaultRandom();
 const orgId = () =>
@@ -98,6 +99,12 @@ export const users = pgTable(
     phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true }),
     name: text("name").notNull(),
     role: userRole("role").default("technician").notNull(),
+    /** Optional job title shown on profiles and dispatch (e.g. "Senior technician"). */
+    title: text("title"),
+    /** Short optional bio / about line a member can describe themselves with. */
+    about: text("about"),
+    /** Avatar served from /api/public/:orgId/avatar/:userId; null until uploaded. */
+    profilePictureUrl: text("profile_picture_url"),
     passwordHash: text("password_hash"),
     active: boolean("active").default(true).notNull(),
     mustChangePassword: boolean("must_change_password").default(false).notNull(),
@@ -144,6 +151,8 @@ export const customers = pgTable(
     name: text("name").notNull(),
     email: text("email"),
     phone: text("phone"),
+    company: text("company"),
+    address: text("address"),
     notes: text("notes"),
     version: version(),
     updatedAt: updatedAt(),
@@ -185,6 +194,16 @@ export const jobs = pgTable(
     status: jobStatus("status").default("lead").notNull(),
     /** How the job entered the system — "staff" (in-house) or "customer_request" (public booking form). */
     source: text("source").default("staff").notNull(),
+    /**
+     * Work-type discriminator. Standard repairs keep `"standard"`; a comeback
+     * (quality follow-up) is `"comeback"` and links back to its original job
+     * via `comebackCaseId` + `originalJobId`.
+     */
+    jobType: text("job_type").default("standard").notNull(),
+    /** The comeback quality case this job is the operational visit for. */
+    comebackCaseId: uuid("comeback_case_id"),
+    /** The original repair job this job is a repeat/comeback visit of. */
+    originalJobId: uuid("original_job_id"),
     serviceCategory: text("service_category"),
     serviceAddress: text("service_address"),
     preferredDate: text("preferred_date"),
@@ -203,6 +222,13 @@ export const jobs = pgTable(
     sched: index("jobs_scheduled_idx").on(t.scheduledAt),
     tracking: uniqueIndex("jobs_tracking_hash_idx").on(t.trackingTokenHash),
     orgNumber: uniqueIndex("jobs_org_number_idx").on(t.orgId, t.number),
+    comebackCase: index("jobs_comeback_case_idx").on(t.orgId, t.comebackCaseId),
+    originalJob: index("jobs_original_job_idx").on(t.orgId, t.originalJobId),
+    originalJobRef: foreignKey({
+      name: "jobs_original_job_id_jobs_id_fk",
+      columns: [t.originalJobId],
+      foreignColumns: [t.id],
+    }),
   }),
 );
 
@@ -241,11 +267,11 @@ export const lineItems = pgTable("line_items", {
   quantity: integer("quantity").default(1).notNull(),
   unitPrice: integer("unit_price").default(0).notNull(),
   unitCost: integer("unit_cost").default(0).notNull(),
+  unit: text("unit"),
   version: version(),
   updatedAt: updatedAt(),
   createdAt: ts(),
 });
-
 export const estimates = pgTable("estimates", {
   id: id(),
   orgId: orgId(),
@@ -257,9 +283,16 @@ export const estimates = pgTable("estimates", {
   accepted: boolean("accepted").default(false).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
-  acceptedByName: text("accepted_by_name"),    status: estimateStatus("status").default("draft").notNull(),
-    pricing: jsonb("pricing").$type<PricingSnapshot | null>(),
-    selectedOptionId: uuid("selected_option_id"),
+  acceptedByName: text("accepted_by_name"),
+  acceptedMethod: text("accepted_method"),
+  status: estimateStatus("status").default("draft").notNull(),
+  pricing: jsonb("pricing").$type<PricingSnapshot | null>(),
+  selectedOptionId: uuid("selected_option_id"),
+  scope: text("scope"),
+  internalNotes: text("internal_notes"),
+  recommendations: text("recommendations"),
+  exclusions: text("exclusions"),
+  revision: integer("revision").default(1).notNull(),
   signatureName: text("signature_name"),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   declinedAt: timestamp("declined_at", { withTimezone: true }),
@@ -280,6 +313,7 @@ export const estimateOptions = pgTable(
       .notNull()
       .references(() => estimates.id, { onDelete: "cascade" }),
     label: text("label").notNull(),
+    recommended: boolean("recommended").default(false).notNull(),
     position: integer("position").default(0).notNull(),
     total: integer("total").default(0).notNull(),
     pricing: jsonb("pricing").$type<PricingSnapshot | null>(),
@@ -304,6 +338,8 @@ export const estimateOptionLineItems = pgTable(
     quantity: integer("quantity").default(1).notNull(),
     unitPrice: integer("unit_price").default(0).notNull(),
     unitCost: integer("unit_cost").default(0).notNull(),
+    unit: text("unit"),
+    position: integer("position").default(0).notNull(),
     createdAt: ts(),
     updatedAt: updatedAt(),
   },
@@ -318,6 +354,7 @@ export const invoices = pgTable(
     jobId: uuid("job_id")
       .notNull()
       .references(() => jobs.id, { onDelete: "cascade" }),
+    estimateId: uuid("estimate_id"),
     number: text("number").notNull(),
     status: invoiceStatus("status").default("draft").notNull(),
     total: integer("total").default(0).notNull(),
@@ -342,6 +379,7 @@ export const invoiceLineItems = pgTable(
     quantity: integer("quantity").default(1).notNull(),
     unitPrice: integer("unit_price").default(0).notNull(),
     unitCost: integer("unit_cost").default(0).notNull(),
+    unit: text("unit"),
     position: integer("position").default(0).notNull(),
     createdAt: ts(),
     updatedAt: updatedAt(),
@@ -789,5 +827,58 @@ export const documents = pgTable(
   },
   (t) => ({
     orgDocument: uniqueIndex("documents_org_kind_document_idx").on(t.orgId, t.kind, t.documentId),
+  }),
+);
+
+// Append-only technician location reservoir. The mobile technician tracker POSTs
+// a fire-and-forget batch here; the office board reads latest-per-technician.
+// There is deliberately NO update/delete path in the app — retention/export are
+// job-driven, never row removal (compliance + dispatch forensics).
+export const technician_locations = pgTable(
+  "technician_locations",
+  {
+    id: id(),
+    orgId: orgId(),
+    technicianId: uuid("technician_id").notNull().references(() => users.id, { onDelete: "set null" }),
+    latitude: doublePrecision("latitude").notNull(),
+    longitude: doublePrecision("longitude").notNull(),
+    accuracyMeters: doublePrecision("accuracy_meters"),
+    speedKph: doublePrecision("speed_kph"),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+    version: version(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgTime: index("technician_locations_org_recorded_idx").on(t.orgId, t.recordedAt),
+    techTime: index("technician_locations_technician_recorded_idx").on(t.technicianId, t.recordedAt),
+  }),
+);
+
+// Append-only technician location reservoir. The mobile technician app pushes
+// low-frequency GPS pings here; the office live map reads latest-per-technician.
+// There is deliberately NO update/delete at the application layer — retention,
+// export and dedupe are job-driven (see technician-location export), never row
+// surgery. Multiple rows per (org, technician, minute) are legal; the office
+// view picks the newest recordedAt per technician.
+export const technicianLocations = pgTable(
+  "technician_locations",
+  {
+    id: id(),
+    orgId: orgId(),
+    technicianId: uuid("technician_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "set null" }),
+    latitude: doublePrecision("latitude").notNull(),
+    longitude: doublePrecision("longitude").notNull(),
+    accuracyMeters: doublePrecision("accuracy_meters"),
+    speedKph: doublePrecision("speed_kph"),
+    headingDegrees: doublePrecision("heading_degrees"),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+    version: version(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgTime: index("technician_locations_org_time_idx").on(t.orgId, t.recordedAt),
+    techTime: index("technician_locations_technician_recorded_idx").on(t.technicianId, t.recordedAt),
   }),
 );

@@ -16,6 +16,7 @@ interface SearchRow {
   badge?: string;
   icon: string;
   href: string;
+  avatar?: string | null;
 }
 
 interface SectionDef {
@@ -177,6 +178,7 @@ export function GlobalSearch({ variant = "bar", className }: { variant?: "bar" |
         badge: t.role,
         icon: "♟",
         href: "/settings",
+        avatar: t.profilePictureUrl ?? null,
       })),
     );
     push(
@@ -449,9 +451,18 @@ export function GlobalSearch({ variant = "bar", className }: { variant?: "bar" |
                             selected ? "bg-accent/10 text-fg" : "text-fg-muted hover:bg-surface-300",
                           )}
                         >
-                          <span className="w-4 shrink-0 text-center text-sm text-fg-dim" aria-hidden="true">
-                            {row.icon}
-                          </span>
+                          {row.avatar ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={row.avatar}
+                              alt=""
+                              className="h-6 w-6 shrink-0 rounded-full object-cover"
+                            />
+                          ) : (
+                            <span className="w-4 shrink-0 text-center text-sm text-fg-dim" aria-hidden="true">
+                              {row.icon}
+                            </span>
+                          )}
                           <span className="min-w-0 flex-1">
                             <span className={cn("block truncate text-sm", selected ? "text-fg" : "text-fg")}>
                               <MatchedText text={row.label} query={trimmed} />

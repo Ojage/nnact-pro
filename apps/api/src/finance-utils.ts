@@ -13,6 +13,15 @@ export function isOfficeRole(role: string): boolean {
   return role === "owner" || role === "dispatcher";
 }
 
+/**
+ * Office staff who may create/submit/record finance documents and read the
+ * books, but cannot approve payments or move money. Secretary is included.
+ * Approval decisions remain gated by {@link isOfficeRole} (owner/dispatcher).
+ */
+export function officeWriter(role: string): boolean {
+  return role === "owner" || role === "dispatcher" || role === "secretary";
+}
+
 export async function orgBusinessSettingsTx(
   tx: FinanceTx,
   orgId: string,

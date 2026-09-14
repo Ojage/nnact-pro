@@ -13,6 +13,7 @@ export const NNACT_USER_IDS = {
   techJunior: "b0000001-0002-4000-8000-000000000008",
   techRita: "b0000001-0002-4000-8000-000000000009",
   techPascal: "b0000001-0002-4000-8000-000000000010",
+  secretaryMarie: "b0000001-0002-4000-8000-000000000011",
 } as const;
 
 export function nnactCustomerId(index: number): string {

@@ -11,6 +11,9 @@ export interface SessionUser {
   role: string;
   orgId: string;
   mustChangePassword?: boolean;
+  profilePictureUrl?: string | null;
+  title?: string | null;
+  about?: string | null;
 }
 
 export interface SessionUserSession {

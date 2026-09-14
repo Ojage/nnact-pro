@@ -8,6 +8,7 @@ import {
   useCustomersQuery,
   useDiagnosticSessionsQuery,
   useJobQuery,
+  useUsersQuery,
 } from "@/lib/redux/api";
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import { formatMoney } from "@nnact/shared";
@@ -22,6 +23,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { JobVoiceNotesPanel } from "@/components/job-voice-notes";
 import { JobPricingPanel } from "@/components/job-pricing-panel";
+import { UserAvatar } from "@/components/user-avatar";
 
 interface Appointment {
   id: string;
@@ -40,9 +42,11 @@ export default function JobDetailPage() {
   const { data: appointments = [] } = useAppointmentsQuery();
   const { data: customers = [] } = useCustomersQuery();
   const { data: diagnosticRows = [] } = useDiagnosticSessionsQuery({ jobId }, { skip: !jobId });
+  const { data: users = [] } = useUsersQuery();
 
   const customer = job ? customers.find((item) => item.id === job.customerId) : null;
   const jobAppointments = appointments.filter((item) => item.jobId === jobId);
+  const technicianById = new Map(users.filter((u) => u.active).map((u) => [u.id, u]));
   const diagnostic: DiagnosticSessionListItem | null = diagnosticRows[0] ?? null;
 
   if (!job && isLoading) {
@@ -106,6 +110,11 @@ export default function JobDetailPage() {
               ) : (
                 <Link href={`/diagnostics/new?jobId=${jobId}`}>
                   <Button size="sm" variant="secondary">Add equipment record</Button>
+                </Link>
+              )}
+              {job.status === "completed" && (
+                <Link href={`/quality/comebacks/new?jobId=${jobId}`}>
+                  <Button size="sm" variant="secondary">Report comeback</Button>
                 </Link>
               )}
               {customer && (
@@ -293,12 +302,23 @@ export default function JobDetailPage() {
                   <Link href="/schedule"><Button variant="secondary" size="sm" className="w-full">Schedule this job</Button></Link>
                 ) : (
                   <div className="space-y-2">
-                    {jobAppointments.map((appointment) => (
-                      <div key={appointment.id} className="rounded-lg bg-surface-200 p-3">
-                        <p className="text-sm font-semibold text-fg">{new Date(appointment.startsAt).toLocaleString()}</p>
-                        <p className="mt-1 text-xs text-fg-dim">to {new Date(appointment.endsAt).toLocaleString()}</p>
-                      </div>
-                    ))}
+                    {jobAppointments.map((appointment) => {
+                      const technician = appointment.technicianId ? technicianById.get(appointment.technicianId) : null;
+                      return (
+                        <div key={appointment.id} className="rounded-lg bg-surface-200 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold text-fg">{new Date(appointment.startsAt).toLocaleString()}</p>
+                            <span className="shrink-0 text-xs text-fg-dim">to {new Date(appointment.endsAt).toLocaleTimeString()}</span>
+                          </div>
+                          {technician ? (
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <UserAvatar name={technician.name} src={technician.profilePictureUrl} size="xs" />
+                              <span className="text-xs text-fg-dim">{technician.name}{technician.title ? ` · ${technician.title}` : ""}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>

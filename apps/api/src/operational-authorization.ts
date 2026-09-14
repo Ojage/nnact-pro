@@ -2,7 +2,12 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { JwtClaims, StaffJwtClaims } from "./auth.js";
 import { isStaffClaims } from "./auth.js";
 
-export type UserRole = "owner" | "dispatcher" | "technician";
+export type UserRole = "owner" | "dispatcher" | "secretary" | "technician";
+
+/** Roles that may approve payments, job conversion and money movement. */
+export function isApproverRole(role: string): boolean {
+  return role === "owner" || role === "dispatcher";
+}
 
 const OWNER_ONLY_WRITE_PREFIXES = [
   "/api/users",
@@ -26,6 +31,16 @@ const OFFICE_WRITE_PREFIXES = [
   "/api/equipment",
 ];
 
+const SECRETARY_WRITE_PREFIXES = [
+  "/api/appointments",
+  "/api/customers",
+  "/api/estimates",
+  "/api/invoices",
+  "/api/service-plans",
+  "/api/service-agreements",
+  "/api/equipment",
+];
+
 export function requiredRolesForRequest(method: string, rawUrl: string): UserRole[] | null {
   const rawPath = rawUrl.split("?")[0] ?? rawUrl;
   // Normalize versioned prefixes so role guards apply identically to the
@@ -34,8 +49,23 @@ export function requiredRolesForRequest(method: string, rawUrl: string): UserRol
   if (path === "/api/operations" || path.startsWith("/api/operations/")) return ["owner"];
   if (["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase())) return null;
 
+  // Self-service profile routes. The handlers authorize each change themselves
+  // (identity fields stay owner-only; title/about and the avatar are also open
+  // to the member for their own profile), so they are exempt from the blanket
+  // owner-only write gate on /api/users/*.
+  if (method.toUpperCase() === "PATCH" && /^\/api\/users\/[^/]+$/.test(path)) return null;
+  if (
+    (method.toUpperCase() === "POST" || method.toUpperCase() === "DELETE") &&
+    /^\/api\/users\/[^/]+\/avatar$/.test(path)
+  ) {
+    return null;
+  }
+
   if (OWNER_ONLY_WRITE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
     return ["owner"];
+  }
+  if (SECRETARY_WRITE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+    return ["owner", "dispatcher", "secretary"];
   }
   if (OFFICE_WRITE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
     return ["owner", "dispatcher"];
@@ -58,7 +88,7 @@ export async function verifiedClaims(
       return null;
     }
     const claims = request.user as StaffJwtClaims;
-    if (!claims.orgId || !claims.userId || !["owner", "dispatcher", "technician"].includes(claims.role)) {
+    if (!claims.orgId || !claims.userId || !["owner", "dispatcher", "secretary", "technician"].includes(claims.role)) {
       await reply.code(401).send({ error: "invalid authentication claims" });
       return null;
     }
@@ -106,6 +136,7 @@ export function roleCanSyncOperation(
   operation: { table: string; type: string; payload: Record<string, unknown> },
 ) {
   if (CANONICAL_API_ONLY_SYNC_TABLES.has(operation.table)) return false;
+  if (role === "secretary") return false;
   if (role === "owner" || role === "dispatcher") return true;
   if (!TECHNICIAN_SYNC_TABLES.has(operation.table)) return false;
   if (operation.table === "jobs") {

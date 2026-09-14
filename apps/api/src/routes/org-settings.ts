@@ -6,6 +6,7 @@ import { db, orgs } from "@nnact/db";
 import {
   CURRENCY_CODES,
   DEFAULT_BUSINESS_SETTINGS,
+  DEFAULT_COMEBACK_SETTINGS,
   DEFAULT_CURRENCY,
   mergeBusinessSettings,
   validateMessageTemplate,
@@ -164,6 +165,8 @@ export const businessSettingsSchema = z.object({
     advanceNextNumber: z.number().int().min(1).max(999_999_999).optional().default(1000),
     reimbursementPrefix: z.string().trim().min(1).max(16).regex(/^[A-Za-z0-9-]+$/).optional().default("NNACT/REIMB"),
     reimbursementNextNumber: z.number().int().min(1).max(999_999_999).optional().default(1000),
+    comebackPrefix: z.string().trim().min(1).max(16).regex(/^[A-Za-z0-9-]+$/).optional().default("NNACT/RET"),
+    comebackNextNumber: z.number().int().min(1).max(999_999_999).optional().default(1000),
   }).default(DEFAULT_BUSINESS_SETTINGS.numbering),
   portal: z.object({
     enabled: z.boolean(),
@@ -172,6 +175,23 @@ export const businessSettingsSchema = z.object({
     allowInvoicePayment: z.boolean(),
     allowServiceHistory: z.boolean(),
   }).default(DEFAULT_BUSINESS_SETTINGS.portal),
+  comeback: z.object({
+    enabled: z.boolean(),
+    allowTechnicianSelfReport: z.boolean(),
+    workmanshipWarrantyDays: z.number().int().min(1).max(3650),
+    partsWarrantyDays: z.number().int().min(1).max(3650),
+    comebackWindowDays: z.number().int().min(0).max(3650),
+    duplicateWindowDays: z.number().int().min(0).max(3650),
+    escalationAfterCount: z.number().int().min(1).max(10),
+    monitoringDays: z.number().int().min(0).max(365),
+    requireFinalVerification: z.boolean(),
+    slaAttendanceHours: z.object({
+      LOW: z.number().int().min(0).max(24_000),
+      MEDIUM: z.number().int().min(0).max(24_000),
+      HIGH: z.number().int().min(0).max(24_000),
+      CRITICAL: z.number().int().min(0).max(24_000),
+    }),
+  }).default(DEFAULT_COMEBACK_SETTINGS),
 });
 
 const patchBody = z.object({

@@ -10,6 +10,7 @@ import { useTheme } from "@/components/theme-provider";
 import { NotificationsPopover } from "@/components/notifications-popover";
 import { useSessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
+import { UserAvatar } from "@/components/user-avatar";
 import { SidebarSearch } from "@/components/sidebar-search";
 import { requestLearn } from "@/lib/walkthroughs/events";
 
@@ -89,15 +90,16 @@ export function Sidebar() {
           <div className="px-3 py-2 text-xs text-fg-dim">Loading session…</div>
         ) : user ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-medium text-white">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
+            <Link
+              href="/profile"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 no-underline transition-all duration-150 hover:bg-surface-300"
+            >
+              <UserAvatar name={user.name} src={user.profilePictureUrl} size="default" />
               <div className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-fg-muted">{user.name}</span>
-                <span className="block text-[10px] capitalize text-fg-dim">{user.role || "team member"}</span>
+                <span className="block text-[10px] capitalize text-fg-dim">{user.title || user.role || "team member"}</span>
               </div>
-            </div>
+            </Link>
             <Button
               type="button"
               variant="ghost"

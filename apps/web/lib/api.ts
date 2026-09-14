@@ -72,6 +72,9 @@ export interface LoginResult {
     role: string;
     orgId: string;
     mustChangePassword?: boolean;
+    profilePictureUrl?: string | null;
+    title?: string | null;
+    about?: string | null;
   };
   mustChangePassword?: boolean;
 }
@@ -99,6 +102,9 @@ export function parseSessionUser(value: unknown): LoginResult["user"] {
     role: user.role as string,
     orgId: typeof user.orgId === "string" ? (user.orgId as string) : "",
     mustChangePassword: Boolean(user.mustChangePassword),
+    profilePictureUrl: typeof user.profilePictureUrl === "string" ? user.profilePictureUrl : null,
+    title: typeof user.title === "string" ? user.title : null,
+    about: typeof user.about === "string" ? user.about : null,
   };
 }
 
@@ -251,6 +257,7 @@ export interface EstimateOptionLineItem {
   quantity: number;
   unitPrice: number;
   unitCost: number;
+  unit: string | null;
   createdAt: string;
 }
 
@@ -275,12 +282,18 @@ export interface Estimate {
   expiresAt?: string | null;
   acceptedAt?: string | null;
   acceptedByName?: string | null;
+  acceptedMethod?: "signature" | "electronic" | "office_approve" | "office_accept" | null;
   status: "draft" | "sent" | "approved" | "declined" | "expired";
   selectedOptionId?: string | null;
   signatureName?: string | null;
   sentAt?: string | null;
   declinedAt?: string | null;
   copiedToJobAt?: string | null;
+  revision?: number;
+  scope?: string | null;
+  internalNotes?: string | null;
+  recommendations?: string | null;
+  exclusions?: string | null;
   createdAt: string;
 }
 
@@ -297,6 +310,11 @@ interface LineItem {
 export interface EstimateDetail extends Estimate {
   lineItems: LineItem[];
   options: EstimateOption[];
+  warnings?: {
+    identicalOptions: boolean;
+    identicalOptionMessage: string | null;
+    scopeGaps: string[];
+  };
   deposit?: {
     requiredCents: number;
     collectedCents: number;
@@ -704,13 +722,19 @@ export const api = {
   estimate: (id: string) => request<EstimateDetail>(`/api/estimates/${id}`),
   createEstimate: (body: { jobId: string }) =>
     request<EstimateDetail>("/api/estimates", { method: "POST", body: JSON.stringify(body) }),
+  patchEstimate: (id: string, body: Partial<{ scope: string | null; internalNotes: string | null; recommendations: string | null; exclusions: string | null }>) =>
+    request<Estimate>(`/api/estimates/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  addEstimateOption: (estimateId: string, body: { label: string; discountId?: string | null; cloneLinesFrom?: string }) =>
+    request<EstimateOption>(`/api/estimates/${estimateId}/options`, { method: "POST", body: JSON.stringify(body) }),
+  createEstimateInvoice: (id: string) =>
+    request<{ id: string; number: string }>(`/api/estimates/${id}/invoice`, { method: "POST" }),
   renameEstimateOption: (estimateId: string, optionId: string, label: string) =>
     request<EstimateOption>(`/api/estimates/${estimateId}/options/${optionId}`, { method: "PATCH", body: JSON.stringify({ label }) }),
   setEstimateOptionDiscount: (estimateId: string, optionId: string, discountId: string | null) =>
     request<EstimateOption>(`/api/estimates/${estimateId}/options/${optionId}`, { method: "PATCH", body: JSON.stringify({ discountId }) }),
-  addEstimateOptionLine: (estimateId: string, optionId: string, body: { description: string; quantity: number; unitPrice: number; unitCost?: number }) =>
+  addEstimateOptionLine: (estimateId: string, optionId: string, body: { description: string; quantity: number; unitPrice: number; unitCost?: number; unit?: string | null }) =>
     request<{ lineItem: EstimateOptionLineItem; total: number }>(`/api/estimates/${estimateId}/options/${optionId}/lines`, { method: "POST", body: JSON.stringify(body) }),
-  patchEstimateOptionLine: (estimateId: string, optionId: string, lineId: string, body: Partial<{ description: string; quantity: number; unitPrice: number; unitCost: number }>) =>
+  patchEstimateOptionLine: (estimateId: string, optionId: string, lineId: string, body: Partial<{ description: string; quantity: number; unitPrice: number; unitCost: number; unit: string | null }>) =>
     request<{ lineItem: EstimateOptionLineItem; total: number }>(`/api/estimates/${estimateId}/options/${optionId}/lines/${lineId}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteEstimateOptionLine: (estimateId: string, optionId: string, lineId: string) =>
     request<{ ok: boolean; total: number }>(`/api/estimates/${estimateId}/options/${optionId}/lines/${lineId}`, { method: "DELETE" }),
@@ -756,13 +780,19 @@ export const api = {
   recurring: () => request<RecurringJobDTO[]>("/api/recurring"),
 
   me: () => request<LoginResult["user"]>("/api/auth/me"),
-  createTeamMember: (body: { name: string; email: string; role: "dispatcher" | "technician" }) =>
+  createTeamMember: (body: { name: string; email: string; role: "dispatcher" | "secretary" | "technician" }) =>
     request<import("@nnact/shared").CreateTeamMemberResponseDTO>("/api/users", {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  patchUser: (id: string, body: { name?: string; email?: string; phone?: string | null; role?: string; active?: boolean }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  patchUser: (id: string, body: { name?: string; email?: string; phone?: string | null; role?: string; active?: boolean; title?: string | null; about?: string | null }) => request<UserDTO>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteUser: (id: string) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
+  uploadUserAvatar: (id: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<UserDTO>(`/api/users/${id}/avatar`, { method: "POST", body });
+  },
+  deleteUserAvatar: (id: string) => request<UserDTO>(`/api/users/${id}/avatar`, { method: "DELETE" }),
 
   // ── Guided-walkthrough progress (server-authoritative) ──
   walkthroughProgress: () =>

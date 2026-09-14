@@ -13,7 +13,7 @@ import type { ExpenseDTO, ExpenseStatus, FinancePaymentMethod } from "@nnact/sha
 import { EXPENSE_STATUS, FINANCE_PAYMENT_METHODS } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
-import { isOfficeRole, withFinanceNumber } from "../finance-utils.js";
+import { isOfficeRole, officeWriter, withFinanceNumber } from "../finance-utils.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeNotifyUser } from "../notify-user.js";
 import { notifyExpenseSubmittedToOffice } from "../notify-office.js";
@@ -146,10 +146,10 @@ export async function financeExpenseRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
     const conditions = [eq(expenses.orgId, orgId)];
-    if (!isOfficeRole(claims.role)) conditions.push(eq(expenses.employeeId, claims.userId));
+    if (!officeWriter(claims.role)) conditions.push(eq(expenses.employeeId, claims.userId));
     if (parsed.data.status) conditions.push(eq(expenses.status, parsed.data.status));
     if (parsed.data.employeeId) {
-      if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required to filter by employee" });
+      if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required to filter by employee" });
       conditions.push(eq(expenses.employeeId, parsed.data.employeeId));
     }
     if (parsed.data.jobId) conditions.push(eq(expenses.jobId, parsed.data.jobId));
@@ -170,7 +170,7 @@ export async function financeExpenseRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findExpense(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    if (!isOfficeRole(claims.role) && row.employeeId !== claims.userId) {
+    if (!officeWriter(claims.role) && row.employeeId !== claims.userId) {
       return reply.code(403).send({ error: "not your expense" });
     }
     const [dto] = await hydrate(orgId, [row]);
@@ -185,10 +185,10 @@ export async function financeExpenseRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
     const employeeId = parsed.data.employeeId ?? claims.userId;
-    if (parsed.data.employeeId && !isOfficeRole(claims.role)) {
+    if (parsed.data.employeeId && !officeWriter(claims.role)) {
       return reply.code(403).send({ error: "office role required to set employee" });
     }
-    if (!isOfficeRole(claims.role) && employeeId !== claims.userId) {
+    if (!officeWriter(claims.role) && employeeId !== claims.userId) {
       return reply.code(403).send({ error: "technicians may only file their own expenses" });
     }
 
@@ -264,7 +264,7 @@ export async function financeExpenseRoutes(app: FastifyInstance) {
     const row = await findExpense(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
     const isOwner = row.employeeId === claims.userId;
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && !isOwner) return reply.code(403).send({ error: "not your expense" });
     if (row.status !== "DRAFT") return reply.code(409).send({ error: "only DRAFT expenses can be edited" });
 
@@ -313,7 +313,7 @@ export async function financeExpenseRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findExpense(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     const chk = transitionable(row, claims.userId, office);
     if (!chk.ok) return reply.code(chk.code).send({ error: chk.error });
     if (row.status !== "DRAFT") return reply.code(409).send({ error: `cannot submit a ${row.status} expense` });
@@ -468,7 +468,7 @@ export async function financeExpenseRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findExpense(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && row.employeeId !== claims.userId) return reply.code(403).send({ error: "not your expense" });
     if (row.status !== "DRAFT") {
       return reply.code(409).send({ error: "only DRAFT expenses can be deleted; use void for recorded expenses" });
@@ -485,7 +485,7 @@ export async function financeExpenseRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findExpense(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && row.employeeId !== claims.userId) return reply.code(403).send({ error: "not your expense" });
     if (row.status === "PAID" || row.status === "VOIDED") {
       return reply.code(409).send({ error: `expense is ${row.status}; receipts can no longer be attached` });
@@ -514,7 +514,7 @@ export async function financeExpenseRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const row = await findExpense(orgId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
-    const office = isOfficeRole(claims.role);
+    const office = officeWriter(claims.role);
     if (!office && row.employeeId !== claims.userId) return reply.code(403).send({ error: "not your expense" });
     const parsed = z.object({ url: z.string().min(1) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });

@@ -162,6 +162,84 @@ export async function deleteOrgStamp(orgId: string) {
   return deleteOrgBrandingAsset(orgId, "stamp");
 }
 
+// ---------------------------------------------------------------------------
+// User avatars  — stored under  avatars/<orgId>/<userId>/
+// ---------------------------------------------------------------------------
+
+function safeUserId(value: string) {
+  if (!/^[\w-]{1,64}$/.test(value)) throw httpError(400, "invalid user id");
+  return value;
+}
+
+function userAvatarDirectory(orgId: string, userId: string) {
+  return join(uploadDir(), "avatars", safePathSegment(orgId), safeUserId(userId));
+}
+
+function userAvatarDestination(orgId: string, userId: string) {
+  return join(userAvatarDirectory(orgId, userId), "avatar");
+}
+
+export async function saveUserAvatar(
+  orgId: string,
+  userId: string,
+  input: SavePhotoInput,
+): Promise<{ contentType: string; fileSize: number }> {
+  const directory = userAvatarDirectory(orgId, userId);
+  const destination = userAvatarDestination(orgId, userId);
+  const temporary = join(directory, `avatar-${randomUUID()}.tmp`);
+  await mkdir(directory, { recursive: true, mode: 0o750 }).catch(() => {
+    throw httpError(500, "internal storage error");
+  });
+
+  let total = 0;
+  let head = Buffer.alloc(0);
+  const inspector = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      total += chunk.length;
+      if (total > ORG_BRANDING_MAX_BYTES) return callback(httpError(413, "avatar exceeds the 2 MB size limit"));
+      if (head.length < SNIFF_HEAD_BYTES) {
+        head = Buffer.concat([head, chunk.subarray(0, SNIFF_HEAD_BYTES - head.length)]);
+      }
+      callback(null, chunk);
+    },
+  });
+
+  try {
+    await pipeline(input.stream, inspector, createWriteStream(temporary, { flags: "wx", mode: 0o640 }));
+    if (total === 0) throw httpError(400, "empty file");
+    const detected = await fileTypeFromBuffer(head);
+    if (!detected || !ORG_BRANDING_MIME.has(detected.mime)) {
+      throw httpError(415, "avatar must be a PNG, JPEG, or WebP image");
+    }
+    await rm(destination, { force: true });
+    await rename(temporary, destination);
+    return { contentType: detected.mime, fileSize: total };
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {});
+    if (error && typeof error === "object" && "statusCode" in error) throw error;
+    throw httpError(500, "internal storage error");
+  }
+}
+
+export async function getUserAvatar(orgId: string, userId: string) {
+  try {
+    const buffer = await readFile(userAvatarDestination(orgId, userId));
+    const detected = await fileTypeFromBuffer(buffer.subarray(0, SNIFF_HEAD_BYTES));
+    if (!detected || !ORG_BRANDING_MIME.has(detected.mime)) throw httpError(500, "stored avatar is invalid");
+    return { contentType: detected.mime, buffer };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
+    if (error && typeof error === "object" && "statusCode" in error) throw error;
+    throw httpError(500, "internal storage error");
+  }
+}
+
+export async function deleteUserAvatar(orgId: string, userId: string) {
+  await rm(userAvatarDirectory(orgId, userId), { recursive: true, force: true }).catch(() => {
+    throw httpError(500, "internal storage error");
+  });
+}
+
 export async function savePhoto(
   orgId: string,
   jobId: string,

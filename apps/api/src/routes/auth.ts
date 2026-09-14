@@ -165,6 +165,9 @@ function publicUser(user: {
   role: string;
   orgId: string;
   mustChangePassword?: boolean;
+  title?: string | null;
+  about?: string | null;
+  profilePictureUrl?: string | null;
 }) {
   return {
     id: user.id,
@@ -173,6 +176,9 @@ function publicUser(user: {
     role: user.role,
     orgId: user.orgId,
     mustChangePassword: Boolean(user.mustChangePassword),
+    title: user.title ?? null,
+    about: user.about ?? null,
+    profilePictureUrl: user.profilePictureUrl ?? null,
   };
 }
 
@@ -523,6 +529,9 @@ export async function authRoutes(app: FastifyInstance) {
         role: users.role,
         orgId: users.orgId,
         mustChangePassword: users.mustChangePassword,
+        title: users.title,
+        about: users.about,
+        profilePictureUrl: users.profilePictureUrl,
       })
       .from(users)
       .where(eq(users.id, claims.userId))

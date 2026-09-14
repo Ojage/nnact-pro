@@ -16,7 +16,7 @@ import type { SupplierBillDTO, BillStatus, BillFrequency, SupplierBillLineDTO, B
 import { BILL_STATUS, BILL_FREQUENCY, FINANCE_PAYMENT_METHODS } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
-import { isOfficeRole, withFinanceNumber } from "../finance-utils.js";
+import { isOfficeRole, officeWriter, withFinanceNumber } from "../finance-utils.js";
 import { validateOrgIds } from "../finance-validate.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeNotifyUser } from "../notify-user.js";
@@ -202,13 +202,17 @@ function officeOnly(claims: { role: string }): boolean {
   return isOfficeRole(claims.role);
 }
 
+function recordKeeper(claims: { role: string }): boolean {
+  return officeWriter(claims.role);
+}
+
 export async function financeBillRoutes(app: FastifyInstance) {
   // ── Bills ─────────────────────────────────────────────────────────────
   app.get("/finance/bills", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!officeOnly(claims)) return reply.code(403).send({ error: "office role required" });
+    if (!recordKeeper(claims)) return reply.code(403).send({ error: "office role required" });
     await refreshOverdue(orgId);
 
     const q = z
@@ -232,7 +236,7 @@ export async function financeBillRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!officeOnly(claims)) return reply.code(403).send({ error: "office role required" });
+    if (!recordKeeper(claims)) return reply.code(403).send({ error: "office role required" });
     await refreshOverdue(orgId);
     const { id } = req.params as { id: string };
     const row = await findBill(orgId, id);
@@ -245,7 +249,7 @@ export async function financeBillRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!officeOnly(claims)) return reply.code(403).send({ error: "office role required" });
+    if (!recordKeeper(claims)) return reply.code(403).send({ error: "office role required" });
     const parsed = createBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
@@ -319,7 +323,7 @@ export async function financeBillRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!officeOnly(claims)) return reply.code(403).send({ error: "office role required" });
+    if (!recordKeeper(claims)) return reply.code(403).send({ error: "office role required" });
     const { id } = req.params as { id: string };
     const parsed = patchBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
@@ -579,7 +583,7 @@ export async function financeBillRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!officeOnly(claims)) return reply.code(403).send({ error: "office role required" });
+    if (!recordKeeper(claims)) return reply.code(403).send({ error: "office role required" });
     const rows = await db
       .select()
       .from(recurringBills)
@@ -610,7 +614,7 @@ export async function financeBillRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!officeOnly(claims)) return reply.code(403).send({ error: "office role required" });
+    if (!recordKeeper(claims)) return reply.code(403).send({ error: "office role required" });
     const parsed = recurringBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const nextDueOn = new Date(parsed.data.nextDueOn);
@@ -649,7 +653,7 @@ export async function financeBillRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!officeOnly(claims)) return reply.code(403).send({ error: "office role required" });
+    if (!recordKeeper(claims)) return reply.code(403).send({ error: "office role required" });
     const { id } = req.params as { id: string };
     const parsed = recurringBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });

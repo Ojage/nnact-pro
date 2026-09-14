@@ -2,39 +2,51 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { fonts, spacing, type Palette } from "../theme";
 
-export type TabId = "today" | "jobs" | "diagnostics" | "account";
+export type TabId = "today" | "jobs" | "diagnostics" | "office" | "account";
+
+export type StaffRole = "owner" | "dispatcher" | "secretary" | "technician";
 
 type TabConfig = {
   id: TabId;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   iconActive: keyof typeof Ionicons.glyphMap;
+  /** Stub only: set to true to hide from the default technician tab set. */
+  officeOnly?: boolean;
 };
 
 const TABS: TabConfig[] = [
   { id: "today", label: "Today", icon: "today-outline", iconActive: "today" },
   { id: "jobs", label: "Jobs", icon: "briefcase-outline", iconActive: "briefcase" },
   { id: "diagnostics", label: "Diagnostics", icon: "pulse-outline", iconActive: "pulse" },
+  { id: "office", label: "Office", icon: "grid-outline", iconActive: "grid", officeOnly: true },
   { id: "account", label: "Account", icon: "person-outline", iconActive: "person" },
 ];
+
+function isOfficeRole(role?: string | null): boolean {
+  return role === "owner" || role === "dispatcher" || role === "secretary";
+}
 
 export function BottomTabBar({
   colors,
   active,
   onChange,
+  role,
   diagnosticsBadge,
   notificationBadge,
 }: {
   colors: Palette;
   active: TabId;
   onChange: (tab: TabId) => void;
+  role?: string | null;
   diagnosticsBadge?: number;
   notificationBadge?: number;
 }) {
   const styles = createStyles(colors);
+  const visibleTabs = TABS.filter((tab) => (tab.officeOnly ? isOfficeRole(role) : true));
   return (
     <View style={styles.wrap}>
-      {TABS.map((tab) => {
+      {visibleTabs.map((tab) => {
         const isActive = active === tab.id;
         const badge =
           tab.id === "diagnostics" && diagnosticsBadge

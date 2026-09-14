@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import Constants from "expo-constants";
 import { BrandLogo } from "@nnact/mobile-ui";
 import { buildGoogleMapsDirectionsUrl, NNACT_COMPANY } from "@nnact/shared";
 import type { StoredStaffSession } from "../auth-storage";
 import type { SyncService } from "../sync/service";
+import { listTeam, patchTeamMember, removeAvatar, uploadAvatar } from "../office-api";
 import { fonts, radius, spacing, type Palette } from "../theme";
 
 type SyncTone = "success" | "warning" | "danger" | "dim";
@@ -62,6 +64,96 @@ export function AccountScreen({
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [cachedJobs, setCachedJobs] = useState<number | null>(null);
   const [storedBytes, setStoredBytes] = useState<number | null>(null);
+  const [profileUrl, setProfileUrl] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [about, setAbout] = useState("");
+  const [savedTitle, setSavedTitle] = useState("");
+  const [savedAbout, setSavedAbout] = useState("");
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  const loadSelf = useCallback(async () => {
+    try {
+      const team = await listTeam(session);
+      const me = team.find((row) => row.id === session.user.id);
+      if (me) {
+        setProfileUrl(me.profilePictureUrl);
+        setTitle(me.title ?? "");
+        setAbout(me.about ?? "");
+        setSavedTitle(me.title ?? "");
+        setSavedAbout(me.about ?? "");
+      }
+    } catch {
+      // Profile stays empty offline; editing below surfaces any network error.
+    }
+  }, [session]);
+
+  useEffect(() => {
+    void loadSelf();
+  }, [loadSelf]);
+
+  const profileDirty = title.trim() !== savedTitle || about.trim() !== savedAbout;
+
+  async function saveProfile() {
+    setProfileBusy(true);
+    setProfileError(null);
+    try {
+      const updated = await patchTeamMember(session, session.user.id, {
+        title: title.trim() || null,
+        about: about.trim() || null,
+      });
+      setTitle(updated.title ?? "");
+      setAbout(updated.about ?? "");
+      setSavedTitle(updated.title ?? "");
+      setSavedAbout(updated.about ?? "");
+      setProfileUrl(updated.profilePictureUrl);
+    } catch (caught) {
+      setProfileError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setProfileBusy(false);
+    }
+  }
+
+  async function changePhoto() {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      setProfileBusy(true);
+      setProfileError(null);
+      try {
+        const updated = await uploadAvatar(session, session.user.id, result.assets[0].uri);
+        setProfileUrl(updated.profilePictureUrl);
+        setTitle(updated.title ?? "");
+        setAbout(updated.about ?? "");
+        setSavedTitle(updated.title ?? "");
+        setSavedAbout(updated.about ?? "");
+      } catch (caught) {
+        setProfileError(caught instanceof Error ? caught.message : String(caught));
+      } finally {
+        setProfileBusy(false);
+      }
+    } catch (caught) {
+      setProfileError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  async function removePhoto() {
+    setProfileBusy(true);
+    setProfileError(null);
+    try {
+      const updated = await removeAvatar(session, session.user.id);
+      setProfileUrl(updated.profilePictureUrl);
+    } catch (caught) {
+      setProfileError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setProfileBusy(false);
+    }
+  }
 
   const roleLabel = humanizeRole(session.user.role);
   const connected = !offline;
@@ -132,9 +224,13 @@ export function AccountScreen({
         </View>
 
         <View style={styles.identityRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initialsFromName(session.user.name)}</Text>
-          </View>
+          {profileUrl ? (
+            <Image source={{ uri: profileUrl }} style={styles.avatarImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initialsFromName(session.user.name)}</Text>
+            </View>
+          )}
           <View style={styles.identityCopy}>
             <Text style={styles.name} numberOfLines={1} accessibilityRole="header">
               {session.user.name}
@@ -178,6 +274,75 @@ export function AccountScreen({
         <View style={styles.opCell}>
           <Text style={styles.opLabel}>Pending changes</Text>
           <Text style={[styles.opValue, { color: queuedWrites > 0 ? colors.warning : colors.foreground }]}>{queuedWrites}</Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Profile</Text>
+        <View style={styles.group}>
+          <View style={styles.profilePhotoRow}>
+            {profileUrl ? (
+              <Image source={{ uri: profileUrl }} style={styles.profilePhoto} resizeMode="cover" />
+            ) : (
+              <View style={[styles.profilePhoto, styles.profilePhotoFallback, { backgroundColor: colors.primaryMuted }]}>
+                <Ionicons name="person" size={26} color={colors.primary} />
+              </View>
+            )}
+            <View style={styles.profilePhotoActions}>
+              <TouchableOpacity style={[styles.profileActionBtn, { backgroundColor: colors.surfaceMuted }]} onPress={() => void changePhoto()} activeOpacity={0.8} disabled={profileBusy}>
+                <Ionicons name="camera-outline" size={15} color={colors.primary} />
+                <Text style={[styles.profileActionText, { color: colors.primary }]}>Change photo</Text>
+              </TouchableOpacity>
+              {profileUrl ? (
+                <TouchableOpacity style={[styles.profileActionBtn, { backgroundColor: colors.surfaceMuted }]} onPress={() => void removePhoto()} activeOpacity={0.8} disabled={profileBusy}>
+                  <Ionicons name="trash-outline" size={15} color={colors.danger} />
+                  <Text style={[styles.profileActionText, { color: colors.danger }]}>Remove</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={styles.rowDivider} />
+
+          <View style={[styles.profileFieldWrap, { marginTop: spacing.sm }]}>
+            <Text style={[styles.profileFieldLabel, { color: colors.mutedForeground }]}>Job title</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder="e.g. Senior technician (shown to the team)"
+              placeholderTextColor={colors.dimForeground}
+              style={[styles.profileInput, { color: colors.foreground, backgroundColor: colors.surfaceMuted }]}
+            />
+          </View>
+          <View style={[styles.profileFieldWrap, { marginTop: spacing.sm }]}>
+            <Text style={[styles.profileFieldLabel, { color: colors.mutedForeground }]}>About</Text>
+            <TextInput
+              value={about}
+              onChangeText={setAbout}
+              placeholder="A short line about you (optional)"
+              placeholderTextColor={colors.dimForeground}
+              multiline
+              numberOfLines={3}
+              style={[styles.profileInput, { color: colors.foreground, backgroundColor: colors.surfaceMuted, minHeight: 76, textAlignVertical: "top" }]}
+            />
+          </View>
+
+          {profileError ? (
+            <View style={{ marginTop: spacing.sm, paddingHorizontal: spacing.md }}>
+              <Text style={[styles.rowValue, { color: colors.danger }]}>{profileError}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.profileSaveRow}>
+            <TouchableOpacity
+              style={[styles.profileSaveBtn, { backgroundColor: colors.primary }, (profileBusy || !profileDirty) && { opacity: 0.5 }]}
+              onPress={() => void saveProfile()}
+              activeOpacity={0.8}
+              disabled={profileBusy || !profileDirty}
+            >
+              {profileBusy ? <ActivityIndicator size="small" color={colors.onEmphasis} /> : <Text style={[styles.profileSaveText, { color: colors.onEmphasis }]}>Save profile</Text>}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -429,6 +594,53 @@ const createStyles = (colors: Palette) =>
       justifyContent: "center",
     },
     avatarText: { color: colors.brandWarmWhite, fontSize: 26, fontFamily: fonts.extraBold, letterSpacing: 0.5 },
+    avatarImage: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      borderWidth: 2,
+      borderColor: colors.brandOrangeBright,
+      backgroundColor: colors.brandCharcoalElevated,
+    },
+    profilePhotoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    profilePhoto: { width: 64, height: 64, borderRadius: 32 },
+    profilePhotoFallback: { alignItems: "center", justifyContent: "center" },
+    profilePhotoActions: { flex: 1, gap: spacing.sm },
+    profileActionBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      borderRadius: radius.md,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    profileActionText: { fontSize: 13, fontFamily: fonts.semibold },
+    profileFieldWrap: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+    profileFieldLabel: { fontSize: 10.5, fontFamily: fonts.bold, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 },
+    profileInput: {
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+      fontSize: 14,
+      fontFamily: fonts.regular,
+    },
+    profileSaveRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.md },
+    profileSaveBtn: {
+      height: 44,
+      borderRadius: radius.md,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    profileSaveText: { fontSize: 14, fontFamily: fonts.bold },
     identityCopy: { flex: 1, gap: 4 },
     name: { color: colors.brandWarmWhite, fontSize: 22, fontFamily: fonts.extraBold, letterSpacing: -0.3 },
     email: { color: "rgba(250,245,238,0.76)", fontSize: 13, fontFamily: fonts.regular },

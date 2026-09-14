@@ -22,13 +22,15 @@
 // ──────────────────────────────────────────────────────────────────────────────
 // Roles + derived permissions
 //
-// NNACT ships three staff roles: owner | dispatcher | technician. There is no
-// "senior technician" role; knowledge review genuinely requires senior staff,
+// NNACT ships four staff roles: owner | dispatcher | secretary | technician. There
+// is no "senior technician" role; knowledge review genuinely requires senior staff,
 // so in this product the review capability sits with owners + dispatchers.
+// Secretaries handle office records (customers, appointments, documents) but do not
+// dispatch or approve money, so they only unlock customer/office tours.
 // Preserve this mapping when a management role is introduced later.
 // ──────────────────────────────────────────────────────────────────────────────
 
-export const WALKTHROUGH_ROLES = ["owner", "dispatcher", "technician"] as const;
+export const WALKTHROUGH_ROLES = ["owner", "dispatcher", "secretary", "technician"] as const;
 export type WalkthroughRole = (typeof WALKTHROUGH_ROLES)[number];
 
 export const WALKTHROUGH_PERMISSIONS = [
@@ -70,6 +72,7 @@ export const ROLE_PERMISSIONS: Record<
     "review_knowledge",
     "manage_money",
   ],
+  secretary: ["manage_customers"],
   technician: ["perform_visits", "use_repair_brain", "diagnose", "contribute_knowledge"],
 };
 

@@ -260,6 +260,34 @@
       "when": 1790000002900,
       "tag": "0038_far_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1790000003900,
+      "tag": "0039_comeback",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790000004900,
+      "tag": "0040_secretary_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790000005900,
+      "tag": "0041_estimate_enhancements",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790000006900,
+      "tag": "0042_user_profile",
+      "breakpoints": true
     }
   ]
 }

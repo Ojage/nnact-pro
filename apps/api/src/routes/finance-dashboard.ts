@@ -20,7 +20,7 @@ import type { FinanceDashboardDTO, JobCostingDTO, ExpenseDTO, SupplierBillDTO } 
 import { mergeBusinessSettings } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
-import { isOfficeRole } from "../finance-utils.js";
+import { isOfficeRole, officeWriter } from "../finance-utils.js";
 import { monthKey, periodRange, hydrateBudgets } from "./finance-budgets.js";
 import { hydrate as hydrateExpenses } from "./finance-expenses.js";
 import { hydrate as hydrateBills } from "./finance-bills.js";
@@ -111,7 +111,7 @@ export async function financeDashboardRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required" });
+    if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required" });
 
     const [org] = await db.select({ businessSettings: orgs.businessSettings }).from(orgs).where(eq(orgs.id, orgId)).limit(1);
     const settings = mergeBusinessSettings(org?.businessSettings);
@@ -209,7 +209,7 @@ export async function financeDashboardRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required" });
+    if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required" });
     const q = z.object({ jobId: z.string().uuid().optional() }).safeParse(req.query);
     if (!q.success) return reply.code(400).send({ error: q.error.flatten() });
     return jobCosting(orgId, q.data.jobId);

@@ -171,6 +171,35 @@ export async function staffFetch<T>(session: StoredStaffSession, path: string, i
   }
 }
 
+export async function staffFetchNoContent(session: StoredStaffSession, path: string, init?: RequestInit): Promise<void> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${getApiUrl()}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+        ...(init?.headers ?? {}),
+      },
+      signal: controller.signal,
+    });
+    if (response.status === 401) throw new Error("session_expired");
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(apiErrorMessage(response.status, body));
+    }
+    await response.text().catch(() => "");
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("network request failed");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function staffSearch(session: StoredStaffSession, query: string) {
   const params = new URLSearchParams({ q: query });
   return staffFetch<StaffSearchResponseDTO>(session, `/api/search?${params}`);

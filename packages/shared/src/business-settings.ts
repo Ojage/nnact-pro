@@ -5,6 +5,10 @@ export type DepositMode = "none" | "fixed" | "percent";
 
 import type { CurrencyCode } from "./currency.js";
 import { DEFAULT_CURRENCY, isCurrencyCode } from "./currency.js";
+import {
+  normalizeComebackSettings,
+  type ComebackSettings,
+} from "./comeback.js";
 
 export interface BusinessHoursSettings {
   timezone: string;
@@ -51,6 +55,20 @@ export interface EstimateSettings {
   format: DocumentFormat;
   defaultMessage: string;
   optionLabels: [string, string, string];
+  /** Default single-option label used when approvalMode is "single_option". */
+  singleOptionLabel: string;
+  /**
+   * Default payment terms printed on the estimate. Kept as text so
+   * organizations use their own wording without code changes.
+   */
+  paymentTerms: string;
+  /** Default workmanship/parts warranty clause. Printed only when configured. */
+  warrantyTerms: string;
+  /**
+   * Default exclusions/assumptions clause. Never implies coverage the
+   * estimate does not actually include.
+   */
+  defaultExclusions: string;
   visibility: EstimateVisibilitySettings;
 }
 
@@ -139,6 +157,8 @@ export interface NumberingSettings {
   advanceNextNumber: number;
   reimbursementPrefix: string;
   reimbursementNextNumber: number;
+  comebackPrefix: string;
+  comebackNextNumber: number;
 }
 
 export interface PortalSettings {
@@ -161,6 +181,7 @@ export interface BusinessSettings {
   messages: MessageSettings;
   numbering: NumberingSettings;
   portal: PortalSettings;
+  comeback: ComebackSettings;
 }
 
 export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
@@ -198,6 +219,11 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
     format: "email",
     defaultMessage: "This estimate is valid pending final service conditions and customer approval.",
     optionLabels: ["Good", "Better", "Best"],
+    singleOptionLabel: "Recommended solution",
+    paymentTerms: "The balance is payable on completion of the work unless otherwise agreed.",
+    warrantyTerms: "Workmanship is guaranteed for 30 days from completion. Parts warranty follows manufacturer or supplier terms.",
+    defaultExclusions:
+      "Additional faults discovered during the work that are not part of this quotation will be reported and approved before proceeding.",
     visibility: {
       showBusinessInfo: true,
       showCustomerInfo: true,
@@ -248,6 +274,8 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
     advanceNextNumber: 1000,
     reimbursementPrefix: "NNACT/REIMB",
     reimbursementNextNumber: 1000,
+    comebackPrefix: "NNACT/RET",
+    comebackNextNumber: 1000,
   },
   portal: {
     enabled: true,
@@ -256,6 +284,7 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
     allowInvoicePayment: true,
     allowServiceHistory: true,
   },
+  comeback: normalizeComebackSettings(null),
 };
 
 export function mergeBusinessSettings(input: unknown): BusinessSettings {
@@ -311,6 +340,7 @@ export function mergeBusinessSettings(input: unknown): BusinessSettings {
       ...DEFAULT_BUSINESS_SETTINGS.portal,
       ...(isRecord(value.portal) ? value.portal : {}),
     },
+    comeback: normalizeComebackSettings(value.comeback),
   };
 }
 

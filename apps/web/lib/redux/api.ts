@@ -1,5 +1,18 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import type { ActivityDTO, CustomerDTO, JobDTO, JobStatus, JobVoiceNoteDTO, UserDTO } from "@nnact/shared";
+import type {
+  ActivityDTO,
+  ComebackAnalyticsDTO,
+  ComebackCaseDetailDTO,
+  ComebackCaseListItemDTO,
+  ComebackSeverity,
+  ComebackStatus,
+  ComebackTechnicianMetricDTO,
+  CustomerDTO,
+  JobDTO,
+  JobStatus,
+  JobVoiceNoteDTO,
+  UserDTO,
+} from "@nnact/shared";
 import type {
   AdvanceSettlementDTO,
   BillPaymentDTO,
@@ -131,7 +144,7 @@ export interface EquipmentDTO {
 export interface CoreSearchResults {
   jobs: { id: string; title: string; status: string }[];
   customers: { id: string; name: string; email: string | null; phone: string | null }[];
-  team: { id: string; name: string; email: string; role: string }[];
+  team: { id: string; name: string; email: string; role: string; title?: string | null; profilePictureUrl?: string | null }[];
   invoices: { id: string; number: string; status: string }[];
   estimates: { id: string; number: string; status: string }[];
   appointments: { id: string; jobId: string; jobTitle: string; startsAt: string }[];
@@ -298,6 +311,10 @@ export const apiSlice = createApi({
     "Connection",
     "Ai",
     "Finance",
+    "Comeback",
+    "Invoice",
+    "Estimate",
+    "ServiceAgreement",
   ],
   endpoints: (builder) => ({
     // ── Jobs ──
@@ -520,6 +537,27 @@ export const apiSlice = createApi({
       query: (body) => ({ url: "/api/estimates", method: "POST", body }),
       invalidatesTags: ["Estimate", "Job"],
     }),
+    patchEstimateDetails: builder.mutation<
+      Estimate,
+      { id: string; body: Partial<{ scope: string | null; internalNotes: string | null; recommendations: string | null; exclusions: string | null }> }
+    >({
+      query: ({ id, body }) => ({ url: `/api/estimates/${id}`, method: "PATCH", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Estimate", id: arg.id }],
+    }),
+    addEstimateOption: builder.mutation<
+      EstimateOption,
+      { estimateId: string; body: { label: string; discountId?: string | null; cloneLinesFrom?: string } }
+    >({
+      query: ({ estimateId, body }) => ({ url: `/api/estimates/${estimateId}/options`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Estimate", id: arg.estimateId }],
+    }),
+    createEstimateInvoice: builder.mutation<
+      { id: string; number: string },
+      { id: string }
+    >({
+      query: ({ id }) => ({ url: `/api/estimates/${id}/invoice`, method: "POST" }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Estimate", id: arg.id }, { type: "Invoice" }],
+    }),
     renameEstimateOption: builder.mutation<EstimateOption, { estimateId: string; optionId: string; label: string }>({
       query: ({ estimateId, optionId, label }) => ({
         url: `/api/estimates/${estimateId}/options/${optionId}`,
@@ -541,7 +579,7 @@ export const apiSlice = createApi({
     }),
     addEstimateOptionLine: builder.mutation<
       { lineItem: EstimateOptionLineItem; total: number },
-      { estimateId: string; optionId: string; body: { description: string; quantity: number; unitPrice: number; unitCost?: number } }
+      { estimateId: string; optionId: string; body: { description: string; quantity: number; unitPrice: number; unitCost?: number; unit?: string | null } }
     >({
       query: ({ estimateId, optionId, body }) => ({
         url: `/api/estimates/${estimateId}/options/${optionId}/lines`,
@@ -552,7 +590,7 @@ export const apiSlice = createApi({
     }),
     patchEstimateOptionLine: builder.mutation<
       { lineItem: EstimateOptionLineItem; total: number },
-      { estimateId: string; optionId: string; lineId: string; body: Partial<{ description: string; quantity: number; unitPrice: number; unitCost: number }> }
+      { estimateId: string; optionId: string; lineId: string; body: Partial<{ description: string; quantity: number; unitPrice: number; unitCost: number; unit: string | null }> }
     >({
       query: ({ estimateId, optionId, lineId, body }) => ({
         url: `/api/estimates/${estimateId}/options/${optionId}/lines/${lineId}`,
@@ -1483,6 +1521,94 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       query: ({ kind, ...params }) => ({ url: `/api/finance/reports/${kind}`, params }),
       providesTags: ["Finance"],
     }),
+
+    // ── Billing (revenue documents, finance-tagged) ──
+    billingInvoices: builder.query<InvoiceDTO[], void>({
+      query: () => "/api/invoices",
+      providesTags: (result) => Array.isArray(result) ? ["Invoice", ...result.map(({ id }) => ({ type: "Invoice" as const, id }))] : ["Invoice"],
+    }),
+    billingInvoice: builder.query<InvoiceDetail, string>({
+      query: (id) => `/api/invoices/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Invoice", id }],
+    }),
+    billingEstimates: builder.query<Estimate[], void>({
+      query: () => "/api/estimates",
+      providesTags: (result) => Array.isArray(result) ? ["Estimate", ...result.map(({ id }) => ({ type: "Estimate" as const, id }))] : ["Estimate"],
+    }),
+
+    // ── Comebacks ──
+    comebacks: builder.query<ComebackCaseListItemDTO[], { status?: ComebackStatus; severity?: ComebackSeverity; originalJobId?: string; customerId?: string; q?: string; isRepeat?: boolean }>({
+      query: (params) => ({ url: "/api/comebacks", params: params as Record<string, unknown> }),
+      providesTags: (result) => Array.isArray(result) ? ["Comeback", ...result.map(({ id }) => ({ type: "Comeback" as const, id }))] : ["Comeback"],
+    }),
+    comeback: builder.query<ComebackCaseDetailDTO, string>({
+      query: (id) => `/api/comebacks/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Comeback", id }],
+    }),
+    comebackAnalytics: builder.query<ComebackAnalyticsDTO, void>({
+      query: () => "/api/comebacks/analytics",
+      providesTags: ["Comeback"],
+    }),
+    comebackTechnicianMetrics: builder.query<ComebackTechnicianMetricDTO[], void>({
+      query: () => "/api/comebacks/technician-metrics",
+      providesTags: ["Comeback"],
+    }),
+    jobComebacks: builder.query<ComebackCaseListItemDTO[], string>({
+      query: (jobId) => `/api/jobs/${jobId}/comebacks`,
+      providesTags: (_result, _error, jobId) => [{ type: "Comeback", id: jobId }],
+    }),
+    createComeback: builder.mutation<ComebackCaseListItemDTO, { originalJobId: string; complaintSummary?: string; complaintDetails?: string; intakeReason?: string; severity?: ComebackSeverity; equipmentId?: string | null; reportedAt?: string }>({
+      query: (body) => ({ url: "/api/comebacks", method: "POST", body }),
+      invalidatesTags: ["Comeback"],
+    }),
+    createComebackFromJob: builder.mutation<ComebackCaseListItemDTO, { jobId: string; complaintSummary?: string; complaintDetails?: string; intakeReason?: string; severity?: ComebackSeverity; equipmentId?: string | null; reportedAt?: string }>({
+      query: ({ jobId, ...body }) => ({ url: `/api/jobs/${jobId}/comeback`, method: "POST", body }),
+      invalidatesTags: ["Comeback", "Job"],
+    }),
+    patchComeback: builder.mutation<ComebackCaseDetailDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/comebacks/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackTriage: builder.mutation<ComebackCaseDetailDTO, { id: string; body?: { assignedReviewerId?: string | null; assignedTechnicianId?: string | null; note?: string } }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/triage`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackScheduleJob: builder.mutation<ComebackCaseDetailDTO, { id: string; body?: { title?: string; description?: string; scheduledAt?: string | null; technicianId?: string | null } }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/jobs`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackClassify: builder.mutation<ComebackCaseDetailDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/classify`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackResolve: builder.mutation<ComebackCaseDetailDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/resolve`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackTransition: builder.mutation<ComebackCaseDetailDTO, { id: string; action: string; body?: Record<string, unknown> }>({
+      query: ({ id, action, body }) => ({ url: `/api/comebacks/${id}/${action}`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackAddCost: builder.mutation<ComebackCaseDetailDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/costs`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackAddEvidence: builder.mutation<ComebackCaseDetailDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/evidence`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackAddCorrectiveAction: builder.mutation<ComebackCaseDetailDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/corrective-actions`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackAddCommunication: builder.mutation<ComebackCaseDetailDTO, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/communications`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
+    comebackKnowledgeProposal: builder.mutation<ComebackCaseDetailDTO, { id: string; body?: { rationale?: string | null } }>({
+      query: ({ id, body }) => ({ url: `/api/comebacks/${id}/knowledge-proposal`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
+    }),
   }),
 });
 
@@ -1521,6 +1647,9 @@ export const {
   useEstimatesQuery,
   useEstimateQuery,
   useCreateEstimateMutation,
+  usePatchEstimateDetailsMutation,
+  useAddEstimateOptionMutation,
+  useCreateEstimateInvoiceMutation,
   useRenameEstimateOptionMutation,
   useSetEstimateOptionDiscountMutation,
   useAddEstimateOptionLineMutation,
@@ -1708,6 +1837,27 @@ export const {
   usePatchBudgetMutation,
   useDeleteBudgetMutation,
   useFinanceReportQuery,
+  useBillingInvoicesQuery,
+  useBillingInvoiceQuery,
+  useBillingEstimatesQuery,
+  useComebacksQuery,
+  useComebackQuery,
+  useComebackAnalyticsQuery,
+  useComebackTechnicianMetricsQuery,
+  useJobComebacksQuery,
+  useCreateComebackMutation,
+  useCreateComebackFromJobMutation,
+  usePatchComebackMutation,
+  useComebackTriageMutation,
+  useComebackScheduleJobMutation,
+  useComebackClassifyMutation,
+  useComebackResolveMutation,
+  useComebackTransitionMutation,
+  useComebackAddCostMutation,
+  useComebackAddEvidenceMutation,
+  useComebackAddCorrectiveActionMutation,
+  useComebackAddCommunicationMutation,
+  useComebackKnowledgeProposalMutation,
 } = apiSlice;
 
 /** Extract a readable message from an RTK Query / fetchBaseQuery error. */

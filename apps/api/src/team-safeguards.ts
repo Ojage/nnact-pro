@@ -8,7 +8,7 @@
 //      owner must perform the change so the account is never orphaned.
 //   3. The final active owner can never be demoted or removed (409) — an org
 //      must always keep at least one owner with access.
-export type UserRole = "owner" | "dispatcher" | "technician";
+export type UserRole = "owner" | "dispatcher" | "secretary" | "technician";
 
 export type TeamChange =
   | { kind: "role"; targetRole: UserRole }

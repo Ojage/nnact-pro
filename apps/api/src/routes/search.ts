@@ -75,6 +75,8 @@ export async function searchRoutes(app: FastifyInstance) {
             name: users.name,
             email: users.email,
             role: users.role,
+            title: users.title,
+            profilePictureUrl: users.profilePictureUrl,
           })
           .from(users)
           .where(

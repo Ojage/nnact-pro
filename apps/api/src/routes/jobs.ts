@@ -190,6 +190,10 @@ export async function jobRoutes(app: FastifyInstance) {
     const parsed = jobPatchBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
+    if (claims.role === "secretary") {
+      return reply.code(403).send({ error: "secretaries cannot modify jobs" });
+    }
+
     const [before] = await db
       .select({ id: jobs.id, status: jobs.status, assignedTo: jobs.assignedTo, title: jobs.title })
       .from(jobs)

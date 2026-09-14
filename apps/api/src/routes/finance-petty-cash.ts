@@ -6,7 +6,7 @@ import type { PettyCashFundDTO, PettyCashTransactionDTO, PettyCashKind } from "@
 import { PETTY_CASH_KIND } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
-import { isOfficeRole } from "../finance-utils.js";
+import { isOfficeRole, officeWriter } from "../finance-utils.js";
 import { validateOrgIds } from "../finance-validate.js";
 import { safeEmitActivity } from "../activities.js";
 
@@ -75,7 +75,7 @@ export async function financePettyCashRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required" });
+    if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required" });
     const rows = await db
       .select()
       .from(pettyCashFunds)
@@ -88,7 +88,7 @@ export async function financePettyCashRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required" });
+    if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required" });
     const parsed = createFund.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const validated = await validateOrgIds(orgId, { employeeId: parsed.data.custodianId });
@@ -123,7 +123,7 @@ export async function financePettyCashRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required" });
+    if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required" });
     const { id } = req.params as { id: string };
     const parsed = patchFund.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
@@ -145,7 +145,7 @@ export async function financePettyCashRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const claims = await verifiedClaims(req, reply);
     if (!claims || reply.sent) return;
-    if (!isOfficeRole(claims.role)) return reply.code(403).send({ error: "office role required" });
+    if (!officeWriter(claims.role)) return reply.code(403).send({ error: "office role required" });
     const { id } = req.params as { id: string };
     const fund = await findFund(orgId, id);
     if (!fund) return reply.code(404).send({ error: "fund not found" });

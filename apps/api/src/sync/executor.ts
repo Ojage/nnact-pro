@@ -311,6 +311,10 @@ async function applyOne(
   const { rows } = await database.execute(
     sql`SELECT version, status FROM ${sql.identifier(op.table)} WHERE id = ${op.entityId} AND org_id = ${orgId} LIMIT 1`,
   );
+
+  if (actor.role === "secretary") {
+    return err(op.opId, "fatal", "secretaries cannot sync operations");
+  }
   const current = rows[0] as { version?: number; status?: string } | undefined;
   if (!current) return err(op.opId, "validation", "not found in this organization");
   if (Number(current.version) !== op.baseVersion) {

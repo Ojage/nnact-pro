@@ -4,6 +4,7 @@ export * from "./portal.js";
 export * from "./brand.js";
 export * from "./sponsors.js";
 export * from "./documents.js";
+export * from "./estimate-checks.js";
 export * from "./business-settings.js";
 export * from "./operations.js";
 export * from "./message-templates.js";
@@ -12,6 +13,7 @@ export * from "./notifications.js";
 export * from "./currency.js";
 export * from "./repair-brain.js";
 export * from "./finance.js";
+export * from "./comeback.js";
 export * from "./mobile-search.js";
 export * from "./walkthroughs.js";
 export * from "./content.js";
@@ -395,9 +397,15 @@ export interface UserDTO {
   email: string;
   name: string;
   phone: string | null;
-  role: "owner" | "dispatcher" | "technician";
+  role: "owner" | "dispatcher" | "secretary" | "technician";
   active: boolean;
   createdAt: string;
+  /** Optional job title (e.g. "Senior technician"). */
+  title: string | null;
+  /** Optional short bio / about line. */
+  about: string | null;
+  /** Absolute avatar URL; null until one is uploaded. */
+  profilePictureUrl: string | null;
 }
 
 export interface CreateTeamMemberResponseDTO {

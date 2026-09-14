@@ -8,8 +8,10 @@ import { ADVANCE_TAG } from "@nnact/shared";
 import { api, type BusinessSettingsDTO, type EstimateOption, type EstimateOptionLineItem } from "@/lib/api";
 import {
   useAddEstimateOptionLineMutation,
+  useAddEstimateOptionMutation,
   useApproveEstimateOptionMutation,
   useCopyApprovedEstimateToJobMutation,
+  useCreateEstimateInvoiceMutation,
   useCustomersQuery,
   useDeclineEstimateMutation,
   useDeleteEstimateOptionLineMutation,
@@ -17,6 +19,7 @@ import {
   useJobsQuery,
   useMarkEstimateSentMutation,
   useOrgQuery,
+  usePatchEstimateDetailsMutation,
   usePatchEstimateOptionLineMutation,
   useRenameEstimateOptionMutation,
   useSetEstimateOptionDiscountMutation,
@@ -47,6 +50,19 @@ function formatDateTime(value?: string | null) {
   return new Date(value).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
 }
 
+function acceptedMethodLabel(method: "signature" | "electronic" | "office_approve" | "office_accept") {
+  switch (method) {
+    case "office_approve":
+      return "Office approval";
+    case "office_accept":
+      return "Office acceptance";
+    case "electronic":
+      return "Electronic signature";
+    default:
+      return "Signature";
+  }
+}
+
 export default function EstimateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: estimate, isLoading, isError, refetch } = useEstimateQuery(id, { skip: !id });
@@ -64,10 +80,19 @@ export default function EstimateDetailPage() {
   const [lineDescription, setLineDescription] = useState("");
   const [lineQuantity, setLineQuantity] = useState("1");
   const [linePrice, setLinePrice] = useState("");
+  const [lineUnit, setLineUnit] = useState("");
   const [lineError, setLineError] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameLabel, setRenameLabel] = useState("");
+  const [alternativeOpen, setAlternativeOpen] = useState(false);
+  const [alternativeLabel, setAlternativeLabel] = useState("");
+  const [createdInvoice, setCreatedInvoice] = useState<{ id: string; number: string } | null>(null);
+  const [scopeDraft, setScopeDraft] = useState("");
+  const [recommendationsDraft, setRecommendationsDraft] = useState("");
+  const [exclusionsDraft, setExclusionsDraft] = useState("");
+  const [internalNotesDraft, setInternalNotesDraft] = useState("");
+  const [narrativeSaved, setNarrativeSaved] = useState(false);
 
   const [markEstimateSent, markSentState] = useMarkEstimateSentMutation();
   const [copyApproved, copyState] = useCopyApprovedEstimateToJobMutation();
@@ -76,6 +101,9 @@ export default function EstimateDetailPage() {
   const [addLine, addLineState] = useAddEstimateOptionLineMutation();
   const [patchLine, patchLineState] = usePatchEstimateOptionLineMutation();
   const [renameOption, renameState] = useRenameEstimateOptionMutation();
+  const [addOption, addOptionState] = useAddEstimateOptionMutation();
+  const [createInvoice, createInvoiceState] = useCreateEstimateInvoiceMutation();
+  const [patchDetails, patchDetailsState] = usePatchEstimateDetailsMutation();
 
   const discounts = org?.businessSettings?.taxes?.discounts ?? [];
   const discountsEnabled = org?.businessSettings?.taxes?.discountsEnabled ?? true;
@@ -92,23 +120,40 @@ export default function EstimateDetailPage() {
   }, [activeId, estimate]);
 
   useEffect(() => {
-    if (!confirmAction && !lineModal && !emailOpen && !renameOpen) return;
+    if (!estimate) return;
+    setScopeDraft(estimate.scope ?? "");
+    setRecommendationsDraft(estimate.recommendations ?? "");
+    setExclusionsDraft(estimate.exclusions ?? "");
+    setInternalNotesDraft(estimate.internalNotes ?? "");
+  }, [estimate?.id, estimate?.scope, estimate?.recommendations, estimate?.exclusions, estimate?.internalNotes]);
+
+  useEffect(() => {
+    if (!confirmAction && !lineModal && !emailOpen && !renameOpen && !alternativeOpen) return;
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setConfirmAction(null);
         setLineModal(null);
         setEmailOpen(false);
         setRenameOpen(false);
+        setAlternativeOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [confirmAction, lineModal, emailOpen, renameOpen]);
+  }, [confirmAction, lineModal, emailOpen, renameOpen, alternativeOpen]);
 
   const active = estimate?.options.find((option) => option.id === activeId) ?? estimate?.options[0];
   const editable = estimate?.status === "draft" || estimate?.status === "sent";
   const canApprove = estimate?.status === "sent" && active;
   const canDecline = estimate?.status === "draft" || estimate?.status === "sent";
+  const warnings = estimate?.warnings;
+  const narrativeDirty = Boolean(
+    estimate &&
+      (scopeDraft !== (estimate.scope ?? "") ||
+        recommendationsDraft !== (estimate.recommendations ?? "") ||
+        exclusionsDraft !== (estimate.exclusions ?? "") ||
+        internalNotesDraft !== (estimate.internalNotes ?? "")),
+  );
 
   async function downloadPdf() {
     setDownloadingPdf(true);
@@ -173,10 +218,11 @@ export default function EstimateDetailPage() {
     }
   }
 
-  function openAddLine() {
-    setLineDescription("");
+  function openAddLine(description = "") {
+    setLineDescription(description);
     setLineQuantity("1");
     setLinePrice("");
+    setLineUnit("");
     setLineError(null);
     setLineModal({ mode: "add" });
   }
@@ -185,8 +231,66 @@ export default function EstimateDetailPage() {
     setLineDescription(line.description);
     setLineQuantity(String(line.quantity));
     setLinePrice((line.unitPrice / 100).toFixed(2));
+    setLineUnit(line.unit ?? "");
     setLineError(null);
     setLineModal({ mode: "edit", lineId: line.id });
+  }
+
+  async function saveNarrative() {
+    if (!estimate) return;
+    setActionError(null);
+    try {
+      await patchDetails({
+        id,
+        body: {
+          scope: scopeDraft || null,
+          recommendations: recommendationsDraft || null,
+          exclusions: exclusionsDraft || null,
+          internalNotes: internalNotesDraft || null,
+        },
+      }).unwrap();
+      setNarrativeSaved(true);
+      window.setTimeout(() => setNarrativeSaved(false), 2500);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "The estimate narrative could not be saved");
+    }
+  }
+
+  function openAddAlternative() {
+    const nextLabel = estimate
+      ? estimate.options.length === 0
+        ? "Recommended solution"
+        : `Option ${String.fromCharCode(65 + estimate.options.length)}`
+      : "Option B";
+    setAlternativeLabel(nextLabel);
+    setAlternativeOpen(true);
+  }
+
+  async function handleAddAlternative() {
+    if (!active) return;
+    const label = alternativeLabel.trim();
+    if (!label) {
+      setActionError("A label for the alternative option is required.");
+      return;
+    }
+    setActionError(null);
+    try {
+      const option = await addOption({ estimateId: id, body: { label, cloneLinesFrom: active.id } }).unwrap();
+      setAlternativeOpen(false);
+      setActiveId(option.id);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "The alternative option could not be added");
+    }
+  }
+
+  async function handleCreateInvoice() {
+    setActionError(null);
+    try {
+      const invoice = await createInvoice({ id }).unwrap();
+      setCreatedInvoice(invoice);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "An invoice could not be created from this estimate");
+    }
   }
 
   if (!estimate && isLoading) {
@@ -303,16 +407,19 @@ export default function EstimateDetailPage() {
           lineDescription={lineDescription}
           lineQuantity={lineQuantity}
           linePrice={linePrice}
+          lineUnit={lineUnit}
           lineError={lineError}
           submitting={lineModal.mode === "edit" ? patchLineState.isLoading : addLineState.isLoading}
           onDescriptionChange={setLineDescription}
           onQuantityChange={setLineQuantity}
           onPriceChange={setLinePrice}
+          onUnitChange={setLineUnit}
           onClose={() => setLineModal(null)}
           onSubmit={async () => {
             const description = lineDescription.trim();
             const quantity = Math.floor(Number(lineQuantity));
             const unitPrice = Math.round(parseFloat(linePrice || "0") * 100);
+            const unit = lineUnit.trim();
             if (!description) {
               setLineError("Description is required.");
               return;
@@ -332,13 +439,13 @@ export default function EstimateDetailPage() {
                   estimateId: id,
                   optionId: active.id,
                   lineId: lineModal.lineId,
-                  body: { description, quantity, unitPrice },
+                  body: { description, quantity, unitPrice, unit: unit || null },
                 }).unwrap();
               } else {
                 await addLine({
                   estimateId: id,
                   optionId: active.id,
-                  body: { description, quantity, unitPrice },
+                  body: { description, quantity, unitPrice, unit: unit || null },
                 }).unwrap();
               }
               setLineModal(null);
@@ -375,6 +482,41 @@ export default function EstimateDetailPage() {
                     Save
                   </Button>
                   <Button variant="secondary" onClick={() => setRenameOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      ) : null}
+
+      {alternativeOpen ? (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setAlternativeOpen(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-sm">
+              <CardHeader>
+                <CardTitle>Add an alternative</CardTitle>
+                <CardDescription>
+                  Copies the lines from "{active?.label}" into a new option so the customer can compare choices.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-1.5">
+                  <Label className="text-sm text-fg-muted">Option label</Label>
+                  <Input
+                    value={alternativeLabel}
+                    onChange={(event) => setAlternativeLabel(event.target.value)}
+                    placeholder="e.g. Option B – More complete repair"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button loading={addOptionState.isLoading} disabled={!alternativeLabel.trim()} onClick={() => void handleAddAlternative()}>
+                    Add option
+                  </Button>
+                  <Button variant="secondary" onClick={() => setAlternativeOpen(false)}>
                     Cancel
                   </Button>
                 </div>
@@ -427,6 +569,11 @@ export default function EstimateDetailPage() {
                 Mark sent
               </Button>
             ) : null}
+            {editable ? (
+              <Button size="sm" variant="secondary" onClick={openAddAlternative}>
+                Add alternative
+              </Button>
+            ) : null}
             {canApprove ? (
               <Button size="sm" onClick={() => setConfirmAction("approve")}>
                 Approve option
@@ -438,20 +585,25 @@ export default function EstimateDetailPage() {
               </Button>
             ) : null}
             {estimate.status === "approved" ? (
-              <Button
-                size="sm"
-                loading={copyState.isLoading}
-                disabled={Boolean(estimate.copiedToJobAt)}
-                onClick={() => {
-                  void copyApproved(id)
-                    .unwrap()
-                    .catch((cause) =>
-                      setActionError(cause instanceof Error ? cause.message : "Could not copy to job"),
-                    );
-                }}
-              >
-                {estimate.copiedToJobAt ? "Copied to job" : "Copy approved work to job"}
-              </Button>
+              <>
+                <Button size="sm" loading={createInvoiceState.isLoading} onClick={() => void handleCreateInvoice()}>
+                  Create invoice
+                </Button>
+                <Button
+                  size="sm"
+                  loading={copyState.isLoading}
+                  disabled={Boolean(estimate.copiedToJobAt)}
+                  onClick={() => {
+                    void copyApproved(id)
+                      .unwrap()
+                      .catch((cause) =>
+                        setActionError(cause instanceof Error ? cause.message : "Could not copy to job"),
+                      );
+                  }}
+                >
+                  {estimate.copiedToJobAt ? "Copied to job" : "Copy approved work to job"}
+                </Button>
+              </>
             ) : null}
             {job ? (
               <Link href={`/jobs/${job.id}`}>
@@ -471,6 +623,64 @@ export default function EstimateDetailPage() {
             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setActionError(null)} aria-label="Dismiss">
               ✕
             </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {createdInvoice ? (
+        <Card className="mb-6 border-green/40 bg-green/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <p className="text-sm font-semibold text-fg">Invoice created from this estimate</p>
+              <p className="mt-1 text-xs text-fg-muted">
+                The approved option was snapshotted into a draft invoice so the customer document stays fixed.
+              </p>
+            </div>
+            <Link href={`/invoices/${createdInvoice.id}`}>
+              <Button size="sm">{createdInvoice.number}</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {warnings?.identicalOptions ? (
+        <Card className="mb-6 border-yellow/40 bg-yellow/5">
+          <CardContent className="py-4">
+            <p className="text-sm font-bold text-fg">Options are identical</p>
+            <p className="mt-1 text-xs text-fg-muted">
+              {warnings.identicalOptionMessage ??
+                "Every option has the same line items and price. Differentiate the options or use a single estimate."}{" "}
+              Marking this estimate sent is blocked while the options match.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {warnings && warnings.scopeGaps.length > 0 ? (
+        <Card className="mb-6 border-yellow/40 bg-yellow/5">
+          <CardContent className="py-4">
+            <p className="text-sm font-bold text-fg">Scope mentions items without a priced line</p>
+            <p className="mt-1 text-xs text-fg-muted">
+              The quote describes work below but has no line item for it. Add the missing lines so the customer sees what is included.
+            </p>
+            <ul className="mt-3 space-y-1">
+              {warnings.scopeGaps.map((gap) => (
+                <li key={gap} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-fg">{gap}</span>
+                  {editable ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        openAddLine(gap);
+                      }}
+                    >
+                      Add line
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       ) : null}
@@ -588,7 +798,85 @@ export default function EstimateDetailPage() {
               ) : null}
               {estimate.declinedAt ? <DetailRow label="Declined" value={formatDateTime(estimate.declinedAt)} /> : null}
               {estimate.copiedToJobAt ? <DetailRow label="Copied to job" value={formatDateTime(estimate.copiedToJobAt)} /> : null}
+              {estimate.revision && estimate.revision > 1 ? <DetailRow label="Revision" value={estimate.revision} /> : null}
+              {estimate.acceptedMethod ? <DetailRow label="Approved via" value={acceptedMethodLabel(estimate.acceptedMethod)} /> : null}
               {estimate.signatureName ? <DetailRow label="Signature" value={estimate.signatureName} /> : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="inline-flex items-center gap-1.5">
+                Quote content
+                <InfoTip label="About quote content" side="right">
+                  The scope of work is what the customer sees on the document; recommendations and exclusions print beneath the
+                  price table; internal notes stay private to the office and are never printed.
+                </InfoTip>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-1.5">
+                <Label className="text-sm text-fg-muted">
+                  Scope of work
+                  <InfoTip label="About scope" side="top">
+                    Customer-facing description. Printed in its own section. Never replaces the job's technical shorthand.
+                  </InfoTip>
+                </Label>
+                <textarea
+                  value={scopeDraft}
+                  onChange={(event) => setScopeDraft(event.target.value)}
+                  rows={4}
+                  disabled={!editable}
+                  className="w-full rounded-lg border border-border bg-surface-100 px-3 py-2 text-sm text-fg outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                  placeholder="e.g. Replace evaporator coil, recharge R-410A, test system"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-sm text-fg-muted">Recommendations</Label>
+                <textarea
+                  value={recommendationsDraft}
+                  onChange={(event) => setRecommendationsDraft(event.target.value)}
+                  rows={2}
+                  disabled={!editable}
+                  className="w-full rounded-lg border border-border bg-surface-100 px-3 py-2 text-sm text-fg outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                  placeholder="Upgrades or follow-up work the customer may consider later."
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-sm text-fg-muted">Exclusions</Label>
+                <textarea
+                  value={exclusionsDraft}
+                  onChange={(event) => setExclusionsDraft(event.target.value)}
+                  rows={2}
+                  disabled={!editable}
+                  className="w-full rounded-lg border border-border bg-surface-100 px-3 py-2 text-sm text-fg outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                  placeholder="Items not covered by this quotation."
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-sm text-fg-muted">
+                  Internal notes
+                  <InfoTip label="About internal notes" side="top">
+                    Private to your office. Never printed on the customer document.
+                  </InfoTip>
+                </Label>
+                <textarea
+                  value={internalNotesDraft}
+                  onChange={(event) => setInternalNotesDraft(event.target.value)}
+                  rows={2}
+                  disabled={!editable}
+                  className="w-full rounded-lg border border-border bg-surface-100 px-3 py-2 text-sm text-fg outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                  placeholder="Margin, supplier quotes, dates... for your eyes only."
+                />
+              </div>
+              {editable ? (
+                <div className="flex items-center gap-2">
+                  <Button size="sm" loading={patchDetailsState.isLoading} disabled={!narrativeDirty} onClick={() => void saveNarrative()}>
+                    Save narrative
+                  </Button>
+                  {narrativeSaved ? <span className="text-xs font-semibold text-green">Saved</span> : null}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -673,11 +961,13 @@ function LineItemDialog({
   lineDescription,
   lineQuantity,
   linePrice,
+  lineUnit,
   lineError,
   submitting,
   onDescriptionChange,
   onQuantityChange,
   onPriceChange,
+  onUnitChange,
   onClose,
   onSubmit,
 }: {
@@ -685,11 +975,13 @@ function LineItemDialog({
   lineDescription: string;
   lineQuantity: string;
   linePrice: string;
+  lineUnit: string;
   lineError: string | null;
   submitting: boolean;
   onDescriptionChange: (value: string) => void;
   onQuantityChange: (value: string) => void;
   onPriceChange: (value: string) => void;
+  onUnitChange: (value: string) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
@@ -720,7 +1012,15 @@ function LineItemDialog({
                   <Input type="number" min={1} step={1} value={lineQuantity} onChange={(event) => onQuantityChange(event.target.value)} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label className="text-xs font-semibold text-fg-muted">Unit price ($) *</Label>
+                  <Label className="text-xs font-semibold text-fg-muted">Unit</Label>
+                  <Input
+                    value={lineUnit}
+                    onChange={(event) => onUnitChange(event.target.value)}
+                    placeholder="e.g. hrs, kg, LS"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold text-fg-muted">Unit price *</Label>
                   <Input type="number" min={0} step="0.01" value={linePrice} onChange={(event) => onPriceChange(event.target.value)} />
                 </div>
               </div>
@@ -813,7 +1113,8 @@ function OptionPanel({
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-fg">{line.description}</p>
                   <p className="mt-0.5 text-xs text-fg-muted">
-                    {line.quantity} × {formatMoney(line.unitPrice)} = {formatMoney(line.quantity * line.unitPrice)}
+                    {line.quantity} {line.unit ? <span className="inline-block">{line.unit}</span> : null} ×{" "}
+                    {formatMoney(line.unitPrice)} = {formatMoney(line.quantity * line.unitPrice)}
                   </p>
                 </div>
                 <span className="text-sm font-semibold tabular-nums text-fg">{formatMoney(line.quantity * line.unitPrice)}</span>

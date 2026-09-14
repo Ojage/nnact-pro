@@ -15,6 +15,7 @@ import { ChangePasswordScreen } from "./src/screens/ChangePasswordScreen";
 import { WelcomeScreen } from "./src/screens/WelcomeScreen";
 import { TodayScreen } from "./src/screens/TodayScreen";
 import { JobsScreen } from "./src/screens/JobsScreen";
+import { OfficeScreen } from "./src/screens/OfficeScreen";
 import { DiagnosticsScreen } from "./src/screens/DiagnosticsScreen";
 import { RepairBrainScreen } from "./src/screens/RepairBrainScreen";
 import { RepairBrainModelScreen } from "./src/screens/RepairBrainModelScreen";
@@ -161,7 +162,7 @@ function FieldApp({
     setRbModelVisible(false);
   }
 
-  const TAB_ORDER: TabId[] = ["today", "jobs", "diagnostics", "account"];
+  const TAB_ORDER: TabId[] = ["today", "jobs", "diagnostics", "office", "account"];
 
   function switchTab(direction: -1 | 1) {
     setTab((current) => {
@@ -291,6 +292,26 @@ function FieldApp({
             onOpenChangePassword={openChangePassword}
             onSignOut={onSignOut}
             signingOut={signingOut}
+          />
+        ) : null}
+
+        {!overlayActive && tab === "office" ? (
+          <OfficeScreen
+            colors={colors}
+            session={session}
+            jobs={field.jobs}
+            appointments={field.appointments}
+            diagnostics={field.diagnostics}
+            loading={field.loading}
+            offline={field.offline}
+            lastSync={field.lastSync}
+            refreshing={field.refreshing}
+            error={field.error}
+            onRefresh={() => void field.refresh()}
+            getSyncService={field.getSyncService}
+            onOpenNotifications={openNotifications}
+            onOpenJob={openJob}
+            onOpenSession={openSession}
           />
         ) : null}
       </TabTransition>
@@ -469,6 +490,7 @@ function FieldApp({
           colors={colors}
           active={tab}
           onChange={setTab}
+          role={session?.user?.role ?? null}
           diagnosticsBadge={field.activeDiagnostics.length}
           notificationBadge={field.unreadNotifications}
         />
