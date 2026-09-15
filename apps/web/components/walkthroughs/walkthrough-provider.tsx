@@ -49,8 +49,8 @@ import {
   targetSelector,
 } from "@/lib/walkthroughs/runtime";
 import { waitForTarget } from "@/lib/walkthroughs/target";
-import { CoachmarkPanel } from "./coachmark";
-import { Spotlight, useElementRect } from "./spotlight";
+import { useElementRect } from "./spotlight";
+import { TourStage } from "./tour-stage";
 import { LearnCenter } from "./learn-center";
 import { WelcomeDialog } from "./welcome-dialog";
 import { Button } from "@/components/ui/button";
@@ -541,14 +541,12 @@ export function WalkthroughProvider({ children }: { children: React.ReactNode })
     <WalkthroughContext.Provider value={contextValue}>
       {children}
 
-      {active && step && tour && status === "ready" ? (
-        <Spotlight rect={targetRect} placement={step.placement} />
-      ) : null}
       {active && step && showPanel ? (
-        <CoachmarkPanel
+        <TourStage
+          key={`${active.tourId}-${active.stepIndex}`}
           step={step}
-          placement={step.placement}
-          rect={status === "navigate" ? null : status === "ready" ? targetRect : null}
+          state={resolved.state}
+          rect={targetRect}
           stepIndex={active.stepIndex}
           totalSteps={tour.steps.length}
           needsNavigation={status === "navigate"}
