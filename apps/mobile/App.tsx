@@ -432,6 +432,8 @@ function FieldApp({
             initialJob={field.jobs.find((job) => job.id === selectedJobId)}
             cachedAppointments={field.appointments}
             cachedDiagnostics={field.diagnostics}
+            offline={field.offline}
+            syncService={field.getSyncService()}
             onJobUpdated={() => void field.refresh()}
           />
         </AnimatedScreen>

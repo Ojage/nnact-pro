@@ -79,6 +79,31 @@ function packageToAppointment(fieldPackage: FieldPackage): Appointment | null {
   };
 }
 
+function queuedSessionToDiagnostic(
+  session: {
+    id: string;
+    jobId: string;
+    equipmentId: string;
+    workflowId: string;
+    status: string;
+  },
+  fieldPackage: FieldPackage | undefined,
+): DiagnosticListItem {
+  const equipment = fieldPackage?.equipment as unknown as DiagnosticListItem["equipment"] | null;
+  return {
+    session: {
+      id: session.id,
+      jobId: session.jobId,
+      status: session.status,
+      customerComplaint: null,
+      updatedAt: new Date().toISOString(),
+    },
+    equipment:
+      equipment ?? { id: session.equipmentId, type: "Appliance", make: null, model: null, serialNumber: null },
+    workflow: (fieldPackage?.workflow as unknown as DiagnosticListItem["workflow"]) ?? null,
+  };
+}
+
 export function useFieldData(session: StoredStaffSession, onSession: (next: StoredStaffSession) => void) {
   const [jobs, setJobs] = useState<JobDTO[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -105,13 +130,28 @@ export function useFieldData(session: StoredStaffSession, onSession: (next: Stor
           return appointment ? [appointment] : [];
         }),
       );
+      const queuedSessions = (await syncRef.current?.listQueuedSessionCreates()) ?? [];
       setDiagnostics(
         packages.flatMap((item) => {
           const diagnostic = packageToDiagnostic(item);
           return diagnostic ? [diagnostic] : [];
         }),
       );
-      setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
+      if (queuedSessions.length > 0) {
+        setDiagnostics((current) => {
+          const merged = new Map(current.map((item) => [item.session.id, item]));
+          for (const session of queuedSessions) {
+            if (!merged.has(session.id)) {
+              merged.set(
+                session.id,
+                queuedSessionToDiagnostic(session, packages.find((item) => item.job?.id === session.jobId)),
+              );
+            }
+          }
+          return [...merged.values()];
+        });
+      }
+      setQueuedWrites((await syncRef.current?.pendingCount()) ?? 0);
       setOffline(true);
       return true;
     } catch {
@@ -134,7 +174,7 @@ export function useFieldData(session: StoredStaffSession, onSession: (next: Stor
       setDiagnostics(diagnosticRows);
       setUnreadNotifications(notifCount.count);
       setOffline(false);
-      setQueuedWrites((await syncRef.current?.queuedCount()) ?? 0);
+      setQueuedWrites((await syncRef.current?.pendingCount()) ?? 0);
     } catch (caught) {
       const restored = await loadCached();
       setError(
@@ -158,9 +198,9 @@ export function useFieldData(session: StoredStaffSession, onSession: (next: Stor
       try {
         const service = syncRef.current;
         if (service) {
-          const result = await service.pull();
+          await service.pull();
           setLastSync(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
-          setQueuedWrites(Math.max(0, (result?.queuedBeforeFlush ?? 0) - (result?.flushed ?? 0)));
+          setQueuedWrites(await service.pendingCount());
         }
         await load();
       } catch {

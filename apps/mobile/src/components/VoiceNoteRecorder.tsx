@@ -10,6 +10,7 @@ import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } fr
 import { Ionicons } from "@expo/vector-icons";
 import type { StoredStaffSession } from "../auth-storage";
 import { uploadVoiceNote } from "../field-api";
+import type { SyncService } from "../sync";
 import { fonts, spacing, type Palette } from "../theme";
 
 function formatDuration(ms: number): string {
@@ -23,11 +24,15 @@ export function VoiceNoteRecorder({
   colors,
   session,
   jobId,
+  offline = false,
+  syncService = null,
   onUploaded,
 }: {
   colors: Palette;
   session: StoredStaffSession;
   jobId: string;
+  offline?: boolean;
+  syncService?: SyncService | null;
   onUploaded: () => void;
 }) {
   const styles = createStyles(colors);
@@ -36,6 +41,7 @@ export function VoiceNoteRecorder({
   const [isUploading, setIsUploading] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [queuedLabel, setQueuedLabel] = useState<string | null>(null);
   const pulse = useRef(new Animated.Value(1)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(0);
@@ -71,6 +77,7 @@ export function VoiceNoteRecorder({
   const startRecording = useCallback(async () => {
     if (isUploading) return;
     setError(null);
+    setQueuedLabel(null);
     try {
       const perm = await AudioModule.requestRecordingPermissionsAsync();
       if (!perm.granted) {
@@ -106,14 +113,20 @@ export function VoiceNoteRecorder({
 
     setIsUploading(true);
     try {
-      await uploadVoiceNote(session, jobId, uri, durationMs);
-      onUploaded();
+      if (offline && syncService) {
+        await syncService.queueVoiceNote(jobId, uri, durationMs);
+        setQueuedLabel("Queued for dispatch — will sync when connectivity returns.");
+        onUploaded();
+      } else {
+        await uploadVoiceNote(session, jobId, uri, durationMs);
+        onUploaded();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setIsUploading(false);
     }
-  }, [jobId, onUploaded, recorder, session]);
+  }, [jobId, offline, onUploaded, recorder, session, syncService]);
 
   return (
     <View style={styles.wrap}>
@@ -123,6 +136,7 @@ export function VoiceNoteRecorder({
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {queuedLabel ? <Text style={styles.queued}>{queuedLabel}</Text> : null}
 
       <View style={styles.controls}>
         {isRecording ? (
@@ -168,6 +182,7 @@ const createStyles = (colors: Palette) =>
     title: { color: colors.foreground, fontSize: 15, fontFamily: fonts.bold },
     subtitle: { color: colors.mutedForeground, fontSize: 12, marginTop: 4, fontFamily: fonts.regular },
     error: { color: colors.danger, fontSize: 12, marginBottom: spacing.sm, fontFamily: fonts.medium },
+    queued: { color: colors.warning, fontSize: 12, marginBottom: spacing.sm, fontFamily: fonts.medium },
     controls: { alignItems: "center", paddingVertical: spacing.sm },
     timer: { color: colors.foreground, fontSize: 22, fontFamily: fonts.extraBold },
     hint: { color: colors.dimForeground, fontSize: 12, marginTop: spacing.xs, fontFamily: fonts.medium },

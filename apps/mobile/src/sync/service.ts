@@ -1,6 +1,8 @@
 import * as SQLite from "expo-sqlite";
+import { Directory, File, Paths } from "expo-file-system";
 
 const REQUEST_TIMEOUT_MS = 12_000;
+const MEDIA_FLUSH_LIMIT = 10;
 
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -27,7 +29,8 @@ export type OfflineOpKind =
   | "measurement.create"
   | "session.create"
   | "session.patch"
-  | "correction.create";
+  | "correction.create"
+  | "job.status";
 
 export interface OfflineOperation {
   opId: string;
@@ -39,6 +42,7 @@ export interface FieldPackage {
   packageVersion: number;
   generatedAt: string;
   job: Record<string, unknown>;
+  customer: Record<string, unknown> | null;
   equipment: Record<string, unknown> | null;
   session: Record<string, unknown> | null;
   workflow: Record<string, unknown> | null;
@@ -48,11 +52,24 @@ export interface FieldPackage {
   downloadReady: boolean;
 }
 
+export interface MediaOutboxItem {
+  mediaId: string;
+  kind: "photo" | "voice_note";
+  jobId: string;
+  localUri: string;
+  durationMs: number | null;
+  attempts: number;
+  createdAt: string;
+}
+
 export interface FieldSyncResult {
   downloaded: number;
   queuedBeforeFlush: number;
   flushed: number;
   failed: number;
+  flushedMedia: number;
+  mediaFailed: number;
+  queuedMedia: number;
   cachedJobs: string[];
 }
 
@@ -65,6 +82,17 @@ interface OutboxRow {
 
 interface PackageRow {
   payload_json: string;
+}
+
+interface MediaOutboxRow {
+  media_id: string;
+  kind: string;
+  job_id: string;
+  file_uri: string;
+  duration_ms: number | null;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
 }
 
 function makeId(): string {
@@ -91,6 +119,16 @@ const SCHEMA_SQL = `
       op_id TEXT PRIMARY KEY NOT NULL,
       kind TEXT NOT NULL,
       payload_json TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS media_outbox (
+      media_id TEXT PRIMARY KEY NOT NULL,
+      kind TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      file_uri TEXT NOT NULL,
+      duration_ms INTEGER,
       attempts INTEGER NOT NULL DEFAULT 0,
       last_error TEXT,
       created_at TEXT NOT NULL
@@ -259,12 +297,30 @@ export class SyncService {
     return null;
   }
 
+  /** Job plus customer from the cached field package — used for offline job detail. */
+  async getCachedJobDetail(jobId: string): Promise<FieldPackage | null> {
+    return this.getCachedPackage(jobId);
+  }
+
   async queuedCount(): Promise<number> {
     const database = await this.database();
     const row = await database.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) AS count FROM diagnostic_outbox",
     );
     return row?.count ?? 0;
+  }
+
+  async queuedMediaCount(): Promise<number> {
+    const database = await this.database();
+    const row = await database.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM media_outbox",
+    );
+    return row?.count ?? 0;
+  }
+
+  /** Total pending changes across the diagnostic outbox and media outbox. */
+  async pendingCount(): Promise<number> {
+    return (await this.queuedCount()) + (await this.queuedMediaCount());
   }
 
   /** Queued offline ops for a session (measurements, then patches). */
@@ -411,6 +467,58 @@ export class SyncService {
     return id;
   }
 
+  async queueJobStatus(input: {
+    jobId: string;
+    toStatus: "scheduled" | "in_progress" | "completed" | "canceled";
+    baseStatus?: "scheduled" | "in_progress" | "completed" | "canceled";
+  }): Promise<string> {
+    const id = makeId();
+    await this.queueOperation({
+      opId: `job:${id}`,
+      kind: "job.status",
+      payload: input,
+    });
+    return id;
+  }
+
+  /** Session summaries for sessions created offline (queued `session.create` ops). */
+  async listQueuedSessionCreates(): Promise<Array<{
+    id: string;
+    jobId: string;
+    equipmentId: string;
+    workflowId: string;
+    status: string;
+  }>> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<OutboxRow>(
+      "SELECT payload_json FROM diagnostic_outbox WHERE kind = ?",
+      "session.create",
+    );
+    return rows.flatMap((row) => {
+      try {
+        const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+        if (
+          typeof payload.id !== "string" ||
+          typeof payload.jobId !== "string" ||
+          typeof payload.workflowId !== "string"
+        ) {
+          return [];
+        }
+        return [
+          {
+            id: payload.id,
+            jobId: payload.jobId,
+            equipmentId: typeof payload.equipmentId === "string" ? payload.equipmentId : "",
+            workflowId: payload.workflowId,
+            status: "workflow_ready",
+          },
+        ];
+      } catch {
+        return [];
+      }
+    });
+  }
+
   async flushOutbox(): Promise<{ flushed: number; failed: number }> {
     const database = await this.database();
     const rows = await database.getAllAsync<OutboxRow>(
@@ -476,6 +584,169 @@ export class SyncService {
     return { flushed, failed };
   }
 
+  private async persistMediaFile(
+    sourceUri: string,
+    kind: "photo" | "voice_note",
+  ): Promise<string> {
+    const dir = new Directory(Paths.document, "nnact-media", kind);
+    dir.create({ intermediates: true, idempotent: true });
+    const ext = /\.([a-zA-Z0-9]+)$/.exec(sourceUri)?.[1] ?? (kind === "photo" ? "jpg" : "m4a");
+    const destination = new File(dir, `${makeId()}.${ext}`);
+    const source = new File(sourceUri);
+    if (!source.exists) throw new Error("captured media file is missing");
+    source.copy(destination);
+    return destination.uri;
+  }
+
+  private async insertMediaRow(payload: {
+    mediaId: string;
+    kind: "photo" | "voice_note";
+    jobId: string;
+    localUri: string;
+    durationMs: number | null;
+  }): Promise<void> {
+    const database = await this.database();
+    await database.runAsync(
+      `INSERT OR REPLACE INTO media_outbox
+        (media_id, kind, job_id, file_uri, duration_ms, attempts, last_error, created_at)
+       VALUES (?, ?, ?, ?, ?, 0, NULL, ?)`,
+      payload.mediaId,
+      payload.kind,
+      payload.jobId,
+      payload.localUri,
+      payload.durationMs,
+      new Date().toISOString(),
+    );
+  }
+
+  private static toMediaItem(row: MediaOutboxRow): MediaOutboxItem {
+    return {
+      mediaId: row.media_id,
+      kind: (row.kind as MediaOutboxItem["kind"]) ?? "photo",
+      jobId: row.job_id,
+      localUri: row.file_uri,
+      durationMs: row.duration_ms,
+      attempts: row.attempts,
+      createdAt: row.created_at,
+    };
+  }
+
+  /**
+   * Queue a field photo offline. The captured image is copied into the app's
+   * persistent media directory so the queue survives restarts.
+   */
+  async queuePhoto(jobId: string, sourceUri: string): Promise<MediaOutboxItem> {
+    const mediaId = makeId();
+    const localUri = await this.persistMediaFile(sourceUri, "photo");
+    await this.insertMediaRow({ mediaId, kind: "photo", jobId, localUri, durationMs: null });
+    return SyncService.toMediaItem({
+      media_id: mediaId,
+      kind: "photo",
+      job_id: jobId,
+      file_uri: localUri,
+      duration_ms: null,
+      attempts: 0,
+      last_error: null,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  /** Queue a voice note offline (e.g. "voice to dispatch") for later upload. */
+  async queueVoiceNote(jobId: string, sourceUri: string, durationMs: number): Promise<MediaOutboxItem> {
+    const mediaId = makeId();
+    const localUri = await this.persistMediaFile(sourceUri, "voice_note");
+    await this.insertMediaRow({
+      mediaId,
+      kind: "voice_note",
+      jobId,
+      localUri,
+      durationMs: Math.round(durationMs),
+    });
+    return SyncService.toMediaItem({
+      media_id: mediaId,
+      kind: "voice_note",
+      job_id: jobId,
+      file_uri: localUri,
+      duration_ms: Math.round(durationMs),
+      attempts: 0,
+      last_error: null,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  async listQueuedMedia(jobId: string): Promise<MediaOutboxItem[]> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<MediaOutboxRow>(
+      "SELECT * FROM media_outbox WHERE job_id = ? ORDER BY created_at ASC",
+      jobId,
+    );
+    return rows.map(SyncService.toMediaItem);
+  }
+
+  /**
+   * Upload queued media to the job photo / voice-note endpoints. Uploaded rows
+   * are deleted; failures stay queued with incremented attempts. A stale or
+   * revoked token simply defers the upload to the next sync.
+   */
+  async flushMediaOutbox(): Promise<{ flushed: number; failed: number }> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<MediaOutboxRow>(
+      "SELECT * FROM media_outbox ORDER BY created_at ASC LIMIT ?",
+      MEDIA_FLUSH_LIMIT,
+    );
+    if (rows.length === 0) return { flushed: 0, failed: 0 };
+
+    let flushed = 0;
+    let failed = 0;
+    for (const row of rows) {
+      if (await this.uploadMediaRow(row)) {
+        await database.runAsync("DELETE FROM media_outbox WHERE media_id = ?", row.media_id);
+        flushed += 1;
+      } else {
+        await database.runAsync(
+          "UPDATE media_outbox SET attempts = attempts + 1, last_error = ? WHERE media_id = ?",
+          "upload deferred while offline",
+          row.media_id,
+        );
+        failed += 1;
+      }
+    }
+    return { flushed, failed };
+  }
+
+  private async uploadMediaRow(row: MediaOutboxRow): Promise<boolean> {
+    const formData = new FormData();
+    const name =
+      row.file_uri.split("/").pop() ??
+      (row.kind === "photo" ? "field-photo.jpg" : "voice-note.m4a");
+
+    if (row.kind === "photo") {
+      formData.append("file", {
+        uri: row.file_uri,
+        name,
+        type: "image/jpeg",
+      } as unknown as Blob);
+      return (await this.uploadForm(`${this.opts.apiUrl}/api/photos/upload/${row.job_id}`, formData)) === 200;
+    }
+
+    formData.append("file", { uri: row.file_uri, name, type: "audio/m4a" } as unknown as Blob);
+    formData.append("durationMs", String(row.duration_ms ?? 0));
+    return (await this.uploadForm(`${this.opts.apiUrl}/api/jobs/${row.job_id}/voice-notes`, formData)) === 200;
+  }
+
+  private async uploadForm(url: string, formData: FormData): Promise<number> {
+    try {
+      const response = await fetchWithTimeout(url, {
+        method: "POST",
+        headers: { authorization: `Bearer ${this.opts.token}` },
+        body: formData,
+      });
+      return response.status;
+    } catch {
+      return 0;
+    }
+  }
+
   /**
    * Synchronize field work as coherent job/appliance/diagnostic packages.
    * This replaces the former empty generic sync request, which could not
@@ -484,6 +755,7 @@ export class SyncService {
   async pull(): Promise<FieldSyncResult> {
     const queuedBeforeFlush = await this.queuedCount();
     const flush = await this.flushOutbox().catch(() => ({ flushed: 0, failed: queuedBeforeFlush }));
+    const flushMedia = await this.flushMediaOutbox().catch(() => ({ flushed: 0, failed: 0 }));
 
     const [appointmentsResponse, sessionsResponse] = await Promise.all([
       fetchWithTimeout(`${this.opts.apiUrl}/api/appointments`, { headers: this.headers() }),
@@ -517,7 +789,7 @@ export class SyncService {
     }
 
     let downloaded = 0;
-    let failed = flush.failed;
+    let failed = flush.failed + flushMedia.failed;
     for (const jobId of jobIds) {
       try {
         await this.downloadPackage(jobId);
@@ -532,6 +804,9 @@ export class SyncService {
       queuedBeforeFlush,
       flushed: flush.flushed,
       failed,
+      flushedMedia: flushMedia.flushed,
+      mediaFailed: flushMedia.failed,
+      queuedMedia: await this.queuedMediaCount(),
       cachedJobs: [...jobIds],
     };
   }

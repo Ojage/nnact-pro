@@ -3,6 +3,7 @@ import { z } from "zod";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   correctionReports,
+  customers,
   db,
   diagnosticMeasurements,
   diagnosticSessions,
@@ -10,6 +11,7 @@ import {
   diagnosticWorkflows,
   equipment,
   jobEquipmentLinks,
+  jobStatusHistory,
   jobs,
   traceRoutes,
 } from "@nnact/db";
@@ -96,15 +98,34 @@ const correctionOp = z.object({
   }),
 });
 
+const jobStatusOp = z.object({
+  opId: z.string().min(1).max(100),
+  kind: z.literal("job.status"),
+  payload: z.object({
+    jobId: z.string().uuid(),
+    toStatus: z.enum(["scheduled", "in_progress", "completed", "canceled"]),
+    baseStatus: z.enum(["scheduled", "in_progress", "completed", "canceled"]).optional(),
+  }),
+});
+
 const batchSchema = z.object({
   ops: z
-    .array(z.discriminatedUnion("kind", [measurementOp, sessionPatchOp, sessionCreateOp, correctionOp]))
+    .array(
+      z.discriminatedUnion("kind", [
+        measurementOp,
+        sessionPatchOp,
+        sessionCreateOp,
+        correctionOp,
+        jobStatusOp,
+      ]),
+    )
     .min(1)
     .max(200),
 });
 
 export const diagnosticOfflineBatchSchema = batchSchema;
 export const diagnosticOfflineSessionCreateOp = sessionCreateOp;
+export const diagnosticOfflineJobStatusOp = jobStatusOp;
 
 type OfflineOp = z.infer<typeof batchSchema>["ops"][number];
 
@@ -122,6 +143,21 @@ async function loadPackage(orgId: string, jobId: string) {
     .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
   if (!job) return null;
 
+  const [customerRow] = await db
+    .select()
+    .from(customers)
+    .where(and(eq(customers.orgId, orgId), eq(customers.id, job.customerId)));
+  const customer = customerRow
+    ? {
+        id: customerRow.id,
+        name: customerRow.name,
+        email: customerRow.email,
+        phone: customerRow.phone,
+        primaryAddress: customerRow.address,
+        createdAt: customerRow.createdAt.toISOString(),
+      }
+    : null;
+
   const [link] = await db
     .select({ link: jobEquipmentLinks, equipment })
     .from(jobEquipmentLinks)
@@ -133,6 +169,7 @@ async function loadPackage(orgId: string, jobId: string) {
       packageVersion: 1,
       generatedAt: new Date().toISOString(),
       job,
+      customer,
       equipment: null,
       session: null,
       workflow: null,
@@ -155,6 +192,7 @@ async function loadPackage(orgId: string, jobId: string) {
       packageVersion: 1,
       generatedAt: new Date().toISOString(),
       job,
+      customer,
       equipment: link.equipment,
       session: null,
       workflow: null,
@@ -195,6 +233,7 @@ async function loadPackage(orgId: string, jobId: string) {
       packageVersion: 1,
       generatedAt: new Date().toISOString(),
       job,
+      customer,
       equipment: link.equipment,
       session,
       workflow: null,
@@ -244,6 +283,7 @@ async function loadPackage(orgId: string, jobId: string) {
     packageVersion: 1,
     generatedAt: new Date().toISOString(),
     job,
+    customer,
     equipment: link.equipment,
     session,
     workflow,
@@ -259,7 +299,11 @@ async function loadPackage(orgId: string, jobId: string) {
   };
 }
 
-async function applyOfflineOp(orgId: string, op: OfflineOp): Promise<OfflineResult> {
+async function applyOfflineOp(
+  orgId: string,
+  op: OfflineOp,
+  changedBy: string | null = null,
+): Promise<OfflineResult> {
   if (op.kind === "measurement.create") {
     const [session] = await db
       .select()
@@ -392,6 +436,37 @@ async function applyOfflineOp(orgId: string, op: OfflineOp): Promise<OfflineResu
     return { opId: op.opId, ok: true };
   }
 
+  if (op.kind === "job.status") {
+    const { jobId, toStatus, baseStatus } = op.payload;
+
+    const [before] = await db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+    if (!before) return { opId: op.opId, ok: false, error: "job not found" };
+
+    if (baseStatus && before.status !== baseStatus) {
+      return { opId: op.opId, ok: false, conflict: { currentVersion: before.version } };
+    }
+
+    const [row] = await db
+      .update(jobs)
+      .set({ status: toStatus, updatedAt: new Date() })
+      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)))
+      .returning({ id: jobs.id, status: jobs.status });
+
+    await db.insert(jobStatusHistory).values({
+      orgId,
+      jobId,
+      fromStatus: before.status,
+      toStatus: row.status,
+      changedBy,
+      reason: "applied offline",
+    });
+
+    return { opId: op.opId, ok: true };
+  }
+
   const [workflow] = await db
     .select({ id: diagnosticWorkflows.id })
     .from(diagnosticWorkflows)
@@ -429,6 +504,8 @@ export async function diagnosticOfflineRoutes(app: FastifyInstance) {
 
   app.post("/offline-batch", async (req, reply) => {
     const orgId = await resolveOrgId(req);
+    const claims = req.user as { userId?: string } | undefined;
+    const changedBy = claims?.userId ?? null;
     const parsed = batchSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid offline batch", issues: parsed.error.issues });
@@ -437,7 +514,7 @@ export async function diagnosticOfflineRoutes(app: FastifyInstance) {
     const results: OfflineResult[] = [];
     for (const op of parsed.data.ops) {
       try {
-        results.push(await applyOfflineOp(orgId, op));
+        results.push(await applyOfflineOp(orgId, op, changedBy));
       } catch (error) {
         req.log.error({ err: error, opId: op.opId }, "offline diagnostic operation failed");
         results.push({

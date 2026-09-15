@@ -27,7 +27,14 @@ import {
 } from "../components/ui";
 import type { Appointment, DiagnosticListItem } from "../hooks/useFieldData";
 import { humanize, statusColor, jobStatusTone, jobStatusToneBg } from "../hooks/useFieldData";
-import { listJobPhotos, listJobVoiceNotes, uploadJobPhoto, jobPhotoFileUrl, type JobPhoto } from "../field-api";
+import {
+  listJobPhotos,
+  listJobVoiceNotes,
+  uploadJobPhoto,
+  jobPhotoFileUrl,
+  type JobPhoto,
+} from "../field-api";
+import type { SyncService, MediaOutboxItem } from "../sync";
 import type { JobVoiceNoteDTO } from "@nnact/shared";
 import { VoiceNoteRecorder } from "../components/VoiceNoteRecorder";
 import { VoiceNoteList } from "../components/VoiceNoteList";
@@ -82,6 +89,8 @@ export function JobDetailScreen({
   initialJob,
   cachedAppointments,
   cachedDiagnostics,
+  offline,
+  syncService,
   onJobUpdated,
 }: {
   colors: Palette;
@@ -94,6 +103,8 @@ export function JobDetailScreen({
   initialJob?: JobDTO;
   cachedAppointments?: Appointment[];
   cachedDiagnostics?: DiagnosticListItem[];
+  offline: boolean;
+  syncService: SyncService | null;
   onJobUpdated?: () => void;
 }) {
   const styles = createStyles(colors);
@@ -108,9 +119,14 @@ export function JobDetailScreen({
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<MediaOutboxItem[]>([]);
   const [voiceNotes, setVoiceNotes] = useState<JobVoiceNoteDTO[]>([]);
   const [viewerPhoto, setViewerPhoto] = useState<JobPhoto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [offlineMode, setOfflineMode] = useState(offline);
+
+  const isOffline = offline || offlineMode;
 
   const jobAppointments = useMemo(() => {
     const fromCache = cachedAppointments?.filter((item) => item.jobId === jobId) ?? [];
@@ -134,10 +150,32 @@ export function JobDetailScreen({
 
   const primaryDiagnostic = diagnostics[0] ?? cachedDiagnostics?.find((item) => item.session.jobId === jobId);
 
+  const restoreFromCache = useCallback(async (): Promise<boolean> => {
+    if (!syncService) return false;
+    try {
+      const pkg = await syncService.getCachedJobDetail(jobId);
+      if (!pkg || !pkg.job) return false;
+      setJob(pkg.job as unknown as JobDTO);
+      setCustomer((pkg.customer as unknown as CustomerDTO | null) ?? null);
+      setLineItems([]);
+      setActivities([]);
+      setHistory([]);
+      setPhotos([]);
+      setVoiceNotes([]);
+      setDiagnostics([]);
+      setPendingPhotos(await syncService.listQueuedMedia(jobId));
+      setOfflineMode(true);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [jobId, syncService]);
+
   const load = useCallback(
     async (isRefresh = false) => {
       if (!isRefresh) setLoading(true);
       setError(null);
+      setNotice(null);
       try {
         const [jobRow, lineItemRows, activityRows, diagnosticRows, photoRows, voiceRows, historyRows] = await Promise.all([
           fetchWithRefresh<JobDTO>(session, `/api/jobs/${jobId}`, onSession),
@@ -155,6 +193,8 @@ export function JobDetailScreen({
         setDiagnostics(diagnosticRows);
         setPhotos(photoRows);
         setVoiceNotes(voiceRows);
+        setPendingPhotos((await syncService?.listQueuedMedia(jobId)) ?? []);
+        setOfflineMode(false);
 
         const customerRow = await fetchWithRefresh<CustomerDTO>(
           session,
@@ -163,13 +203,19 @@ export function JobDetailScreen({
         );
         setCustomer(customerRow);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load job details");
+        const restored = await restoreFromCache();
+        if (restored) {
+          setOfflineMode(true);
+          setNotice("Offline — showing cached work order. Changes will sync when you reconnect.");
+        } else {
+          setError(err instanceof Error ? err.message : "Could not load job details");
+        }
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [jobId, onSession, session],
+    [jobId, onSession, restoreFromCache, session, syncService],
   );
 
   useEffect(() => {
@@ -206,9 +252,16 @@ export function JobDetailScreen({
     if (result.canceled || !result.assets[0]?.uri) return;
     setPhotoUploading(true);
     setError(null);
+    setNotice(null);
     try {
-      const uploaded = await uploadJobPhoto(session, jobId, result.assets[0].uri);
-      setPhotos((prev) => [uploaded, ...prev]);
+      if (isOffline && syncService) {
+        const item = await syncService.queuePhoto(jobId, result.assets[0].uri);
+        setPendingPhotos((prev) => [item, ...prev]);
+        setNotice("Photo queued — will upload when back online.");
+      } else {
+        const uploaded = await uploadJobPhoto(session, jobId, result.assets[0].uri);
+        setPhotos((prev) => [uploaded, ...prev]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Photo upload failed");
     } finally {
@@ -230,9 +283,16 @@ export function JobDetailScreen({
     if (result.canceled || !result.assets[0]?.uri) return;
     setPhotoUploading(true);
     setError(null);
+    setNotice(null);
     try {
-      const uploaded = await uploadJobPhoto(session, jobId, result.assets[0].uri);
-      setPhotos((prev) => [uploaded, ...prev]);
+      if (isOffline && syncService) {
+        const item = await syncService.queuePhoto(jobId, result.assets[0].uri);
+        setPendingPhotos((prev) => [item, ...prev]);
+        setNotice("Photo queued — will upload when back online.");
+      } else {
+        const uploaded = await uploadJobPhoto(session, jobId, result.assets[0].uri);
+        setPhotos((prev) => [uploaded, ...prev]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Photo upload failed");
     } finally {
@@ -244,18 +304,30 @@ export function JobDetailScreen({
     if (!job) return;
     setStatusUpdating(true);
     setError(null);
+    setNotice(null);
     try {
-      const updated = await fetchWithRefresh<JobDTO>(
-        session,
-        `/api/jobs/${job.id}`,
-        onSession,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ status: nextStatus }),
-        },
-      );
-      setJob(updated);
-      onJobUpdated?.();
+      if (isOffline && syncService) {
+        await syncService.queueJobStatus({
+          jobId: job.id,
+          toStatus: nextStatus,
+          baseStatus: job.status as "scheduled" | "in_progress",
+        });
+        setJob((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+        setNotice(`Status queued — "${nextStatus === "in_progress" ? "Start job" : "Mark completed"}" will apply when back online.`);
+        onJobUpdated?.();
+      } else {
+        const updated = await fetchWithRefresh<JobDTO>(
+          session,
+          `/api/jobs/${job.id}`,
+          onSession,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ status: nextStatus }),
+          },
+        );
+        setJob(updated);
+        onJobUpdated?.();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update job status");
     } finally {
@@ -330,9 +402,24 @@ export function JobDetailScreen({
           </View>
         </HeroBanner>
 
+        {isOffline && !error ? (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineText}>
+              Offline — showing the cached work order. New photos, voice notes, readings, and status
+              changes stay queued and sync automatically when you reconnect.
+            </Text>
+          </View>
+        ) : null}
+
         {error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        {notice ? (
+          <View style={styles.noticeBanner}>
+            <Text style={styles.noticeText}>{notice}</Text>
           </View>
         ) : null}
 
@@ -560,6 +647,8 @@ export function JobDetailScreen({
             colors={colors}
             session={session}
             jobId={jobId}
+            offline={isOffline}
+            syncService={syncService}
             onUploaded={() => void load(true)}
           />
           <VoiceNoteList colors={colors} accessToken={session.accessToken} notes={voiceNotes} />
@@ -567,7 +656,7 @@ export function JobDetailScreen({
 
         <SectionHeader colors={colors} title="Field photos" action="Gallery" onAction={() => void pickPhoto()} />
         <View style={styles.section}>
-          {photos.length === 0 ? (
+          {photos.length === 0 && pendingPhotos.length === 0 ? (
             <Text style={styles.mutedText}>No photos yet. Capture evidence or upload from your library.</Text>
           ) : (
             <View style={styles.photoGrid}>
@@ -585,8 +674,26 @@ export function JobDetailScreen({
                   />
                 </TouchableOpacity>
               ))}
+              {pendingPhotos.map((item) => (
+                <View key={item.mediaId} style={styles.photoCell}>
+                  <Image
+                    source={{ uri: item.localUri }}
+                    style={styles.photoThumb}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingBadgeText}>Queued</Text>
+                  </View>
+                </View>
+              ))}
             </View>
           )}
+          {pendingPhotos.length > 0 ? (
+            <Text style={styles.dimText}>
+              {pendingPhotos.length} photo{pendingPhotos.length !== 1 ? "s" : ""} queued for upload —
+              will sync when back online.
+            </Text>
+          ) : null}
         </View>
 
         <SectionHeader colors={colors} title="Line items" />
@@ -754,6 +861,32 @@ const createStyles = (colors: Palette) =>
       padding: spacing.md,
     },
     errorText: { color: colors.danger, fontSize: 13, fontFamily: fonts.medium },
+    noticeBanner: {
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.successAlpha,
+      borderRadius: 12,
+      padding: spacing.md,
+    },
+    noticeText: { color: colors.success, fontSize: 13, fontFamily: fonts.medium },
+    offlineBanner: {
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.warningAlpha,
+      borderRadius: 12,
+      padding: spacing.md,
+    },
+    offlineText: { color: colors.warning, fontSize: 13, fontFamily: fonts.medium },
+    pendingBadge: {
+      position: "absolute",
+      bottom: 6,
+      right: 6,
+      backgroundColor: colors.danger,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    pendingBadgeText: { color: colors.onEmphasis, fontSize: 9, fontFamily: fonts.extraBold },
     statsRow: {
       flexDirection: "row",
       gap: spacing.sm,

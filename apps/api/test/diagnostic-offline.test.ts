@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   diagnosticOfflineBatchSchema,
+  diagnosticOfflineJobStatusOp,
   diagnosticOfflineSessionCreateOp,
 } from "../src/routes/diagnostic-offline.js";
 
@@ -38,6 +39,27 @@ test("accepts a valid session.create op with optional fields", () => {
   test("rejects a payload missing equipmentId", () => {
     const op = { ...validCreate, payload: { ...validCreate.payload, equipmentId: undefined } };
     assert.throws(() => diagnosticOfflineSessionCreateOp.parse(op));
+  });
+
+  test("accepts a valid job.status op with a base status guard", () => {
+    const op = {
+      opId: "op-job-1",
+      kind: "job.status",
+      payload: { jobId: validCreate.payload.jobId, toStatus: "in_progress", baseStatus: "scheduled" },
+    } as const;
+    const parsed = diagnosticOfflineJobStatusOp.parse(op);
+    assert.equal(parsed.kind, "job.status");
+    assert.equal(parsed.payload.toStatus, "in_progress");
+    assert.equal(parsed.payload.baseStatus, "scheduled");
+  });
+
+  test("rejects a job.status op with an unknown status", () => {
+    const op = {
+      opId: "op-job-2",
+      kind: "job.status",
+      payload: { jobId: validCreate.payload.jobId, toStatus: "magical", baseStatus: "scheduled" },
+    } as const;
+    assert.throws(() => diagnosticOfflineJobStatusOp.parse(op));
   });
 
   test("batch schema accepts a mixed batch including session.create", () => {
@@ -78,10 +100,20 @@ test("accepts a valid session.create op with optional fields", () => {
             description: "wrong unit",
           },
         },
+        {
+          opId: "op-job-3",
+          kind: "job.status",
+          payload: {
+            jobId: validCreate.payload.jobId,
+            toStatus: "completed",
+            baseStatus: "in_progress",
+          },
+        },
       ],
     };
     const parsed = diagnosticOfflineBatchSchema.parse(batch);
-    assert.equal(parsed.ops.length, 4);
+    assert.equal(parsed.ops.length, 5);
     assert.equal(parsed.ops[0].kind, "session.create");
     assert.equal(parsed.ops[1].kind, "session.patch");
+    assert.equal(parsed.ops[4].kind, "job.status");
   });
