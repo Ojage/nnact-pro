@@ -10,6 +10,7 @@ import {
   type DiagnosticWorkflow,
   type EquipmentRow,
 } from "../field-api";
+import type { SyncService } from "../sync";
 import { EmptyState, HeroBanner, LoadingScreen, PrimaryButton, SectionHeader } from "../components/ui";
 import { fonts, spacing, type Palette } from "../theme";
 
@@ -20,6 +21,8 @@ export function StartDiagnosticScreen({
   jobTitle,
   customerId,
   defaultComplaint,
+  offline,
+  syncService,
   onBack,
   onStarted,
 }: {
@@ -29,6 +32,8 @@ export function StartDiagnosticScreen({
   jobTitle: string;
   customerId: string;
   defaultComplaint?: string | null;
+  offline: boolean;
+  syncService: SyncService | null;
   onBack: () => void;
   onStarted: (sessionId: string) => void;
 }) {
@@ -36,10 +41,13 @@ export function StartDiagnosticScreen({
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [offlineMode, setOfflineMode] = useState(offline);
   const [equipment, setEquipment] = useState<EquipmentRow[]>([]);
   const [workflows, setWorkflows] = useState<DiagnosticWorkflow[]>([]);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>("");
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
+
+  const isOffline = offline || offlineMode;
 
   useEffect(() => {
     void (async () => {
@@ -56,13 +64,26 @@ export function StartDiagnosticScreen({
         else if (rows[0]) setSelectedEquipmentId(rows[0].id);
         const firstWorkflow = workflowRows.find((row) => row.supportStatus === "validated");
         if (firstWorkflow) setSelectedWorkflowId(firstWorkflow.id);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load equipment or workflows");
+      } catch {
+        // Network unavailable — fall back to the job's cached field package.
+        setOfflineMode(true);
+        const pkg = syncService ? await syncService.getCachedPackage(jobId) : null;
+        if (pkg) {
+          const equipmentRow = pkg.equipment as unknown as EquipmentRow | null;
+          const workflowRow = pkg.workflow as unknown as DiagnosticWorkflow | null;
+          const rows = equipmentRow ? [equipmentRow] : [];
+          setEquipment(rows);
+          if (workflowRow) {
+            setWorkflows([workflowRow]);
+            setSelectedWorkflowId(workflowRow.id);
+          }
+          if (equipmentRow) setSelectedEquipmentId(equipmentRow.id);
+        }
       } finally {
         setLoading(false);
       }
     })();
-  }, [customerId, jobId, staffSession]);
+  }, [customerId, jobId, staffSession, syncService]);
 
   async function startSession() {
     if (!selectedEquipmentId || !selectedWorkflowId) {
@@ -72,13 +93,37 @@ export function StartDiagnosticScreen({
     setStarting(true);
     setError(null);
     try {
-      const session = await createDiagnosticSession(staffSession, {
-        jobId,
-        equipmentId: selectedEquipmentId,
-        workflowId: selectedWorkflowId,
-        customerComplaint: defaultComplaint ?? undefined,
-      });
-      onStarted(session.id);
+      if (isOffline && syncService) {
+        const sessionId = await syncService.queueSessionCreate({
+          jobId,
+          equipmentId: selectedEquipmentId,
+          workflowId: selectedWorkflowId,
+          customerComplaint: defaultComplaint ?? undefined,
+        });
+        onStarted(sessionId);
+      } else {
+        try {
+          const session = await createDiagnosticSession(staffSession, {
+            jobId,
+            equipmentId: selectedEquipmentId,
+            workflowId: selectedWorkflowId,
+            customerComplaint: defaultComplaint ?? undefined,
+          });
+          onStarted(session.id);
+        } catch (err) {
+          if (syncService) {
+            const sessionId = await syncService.queueSessionCreate({
+              jobId,
+              equipmentId: selectedEquipmentId,
+              workflowId: selectedWorkflowId,
+              customerComplaint: defaultComplaint ?? undefined,
+            });
+            onStarted(sessionId);
+          } else {
+            throw err;
+          }
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start diagnostic session");
     } finally {
@@ -109,6 +154,14 @@ export function StartDiagnosticScreen({
         {error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        {isOffline ? (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineText}>
+              Offline — the session will be created locally and synced automatically when connectivity returns.
+            </Text>
           </View>
         ) : null}
 
@@ -162,7 +215,7 @@ export function StartDiagnosticScreen({
         <View style={styles.section}>
           <PrimaryButton
             colors={colors}
-            label="Start diagnostic session"
+            label={isOffline ? "Queue diagnostic session" : "Start diagnostic session"}
             onPress={() => void startSession()}
             loading={starting}
             disabled={!selectedEquipmentId || !selectedWorkflowId}
@@ -196,6 +249,14 @@ const createStyles = (colors: Palette) =>
       padding: spacing.md,
     },
     errorText: { color: colors.danger, fontSize: 13, fontFamily: fonts.medium },
+    offlineBanner: {
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.warningAlpha,
+      borderRadius: 12,
+      padding: spacing.md,
+    },
+    offlineText: { color: colors.warning, fontSize: 13, fontFamily: fonts.medium },
     section: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
     muted: { color: colors.mutedForeground, fontSize: 13, fontFamily: fonts.regular },
     option: {

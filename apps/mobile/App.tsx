@@ -396,6 +396,8 @@ function FieldApp({
             jobTitle={startDiagnostic.title}
             customerId={startDiagnostic.customerId}
             defaultComplaint={startDiagnostic.description}
+            offline={field.offline}
+            syncService={field.getSyncService()}
             onBack={closeStartDiagnostic}
             onStarted={(sessionId) => {
               setPendingSessionId(sessionId);

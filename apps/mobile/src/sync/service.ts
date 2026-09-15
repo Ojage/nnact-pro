@@ -25,6 +25,7 @@ export interface SyncServiceOptions {
 
 export type OfflineOpKind =
   | "measurement.create"
+  | "session.create"
   | "session.patch"
   | "correction.create";
 
@@ -201,12 +202,112 @@ export class SyncService {
     });
   }
 
+  /**
+   * Resolve a diagnostic session for offline viewing.
+   *
+   * Prefers a downloaded field package whose session matches. When a session
+   * was created offline (a queued `session.create` op that has not synced yet),
+   * synthesizes a session view from that op plus the job's cached package so a
+   * technician can keep recording readings with no connectivity.
+   */
+  async getCachedSessionDetail(sessionId: string): Promise<FieldPackage | null> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<PackageRow>(
+      "SELECT payload_json FROM field_packages",
+    );
+    const packages = rows.flatMap((row) => {
+      try {
+        return [JSON.parse(row.payload_json) as FieldPackage];
+      } catch {
+        return [];
+      }
+    });
+
+    const existing = packages.find((pkg) => pkg.session?.id === sessionId);
+    if (existing) return existing;
+
+    const createOp = await this.findQueuedOp("session.create", (payload) => payload.id === sessionId);
+    if (createOp) {
+      const payload = createOp.payload as {
+        id: string;
+        jobId: string;
+        equipmentId: string;
+        workflowId: string;
+        customerComplaint?: string;
+        technicianObservation?: string;
+      };
+      const jobPackage = packages.find((pkg) => pkg.job && pkg.job.id === createOp.payload.jobId);
+      if (jobPackage) {
+        return {
+          ...jobPackage,
+          session: {
+            id: payload.id,
+            jobId: payload.jobId,
+            equipmentId: payload.equipmentId,
+            workflowId: payload.workflowId,
+            status: "workflow_ready",
+            customerComplaint: payload.customerComplaint ?? null,
+            technicianObservation: payload.technicianObservation ?? null,
+            version: 1,
+            updatedAt: new Date().toISOString(),
+          },
+          measurements: [],
+        };
+      }
+    }
+
+    return null;
+  }
+
   async queuedCount(): Promise<number> {
     const database = await this.database();
     const row = await database.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) AS count FROM diagnostic_outbox",
     );
     return row?.count ?? 0;
+  }
+
+  /** Queued offline ops for a session (measurements, then patches). */
+  async listQueuedSessionOps(sessionId: string): Promise<{
+    measurements: Array<Record<string, unknown>>;
+    patches: Array<Record<string, unknown>>;
+  }> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<OutboxRow>(
+      "SELECT kind, payload_json FROM diagnostic_outbox ORDER BY created_at ASC",
+    );
+    const measurements: Array<Record<string, unknown>> = [];
+    const patches: Array<Record<string, unknown>> = [];
+    for (const row of rows) {
+      try {
+        const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+        if (payload.sessionId !== sessionId) continue;
+        if (row.kind === "measurement.create") measurements.push(payload);
+        else if (row.kind === "session.patch") patches.push(payload);
+      } catch {
+        // skip malformed rows
+      }
+    }
+    return { measurements, patches };
+  }
+
+  private async findQueuedOp(
+    kind: OfflineOpKind,
+    predicate: (payload: Record<string, unknown>) => boolean,
+  ): Promise<{ kind: OfflineOpKind; payload: Record<string, unknown> } | null> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<OutboxRow>(
+      "SELECT kind, payload_json FROM diagnostic_outbox",
+    );
+    for (const row of rows) {
+      try {
+        const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+        if (row.kind === kind && predicate(payload)) return { kind: row.kind, payload };
+      } catch {
+        // skip malformed rows
+      }
+    }
+    return null;
   }
 
   async countCachedPackages(): Promise<number> {
@@ -252,6 +353,22 @@ export class SyncService {
       opId: `measurement:${id}`,
       kind: "measurement.create",
       payload: { id, ...input, recordedAt: new Date().toISOString() },
+    });
+    return id;
+  }
+
+  async queueSessionCreate(input: {
+    jobId: string;
+    equipmentId: string;
+    workflowId: string;
+    customerComplaint?: string;
+    technicianObservation?: string;
+  }): Promise<string> {
+    const id = makeId();
+    await this.queueOperation({
+      opId: `session-create:${id}`,
+      kind: "session.create",
+      payload: { id, ...input },
     });
     return id;
   }

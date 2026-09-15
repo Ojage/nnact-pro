@@ -13,7 +13,12 @@ import {
   jobs,
   traceRoutes,
 } from "@nnact/db";
-import { deriveStatusAfterMeasurement, shouldSuspendWorkflow, type DiagnosticSessionStatus } from "../diagnostics.js";
+import {
+  deriveInitialDiagnosticStatus,
+  deriveStatusAfterMeasurement,
+  shouldSuspendWorkflow,
+  type DiagnosticSessionStatus,
+} from "../diagnostics.js";
 import { resolveOrgId } from "./org.js";
 
 const measurementOp = z.object({
@@ -63,6 +68,19 @@ const sessionPatchOp = z.object({
   }),
 });
 
+const sessionCreateOp = z.object({
+  opId: z.string().min(1).max(100),
+  kind: z.literal("session.create"),
+  payload: z.object({
+    id: z.string().uuid(),
+    jobId: z.string().uuid(),
+    equipmentId: z.string().uuid(),
+    workflowId: z.string().uuid(),
+    customerComplaint: z.string().optional(),
+    technicianObservation: z.string().optional(),
+  }),
+});
+
 const correctionOp = z.object({
   opId: z.string().min(1).max(100),
   kind: z.literal("correction.create"),
@@ -79,8 +97,14 @@ const correctionOp = z.object({
 });
 
 const batchSchema = z.object({
-  ops: z.array(z.discriminatedUnion("kind", [measurementOp, sessionPatchOp, correctionOp])).min(1).max(200),
+  ops: z
+    .array(z.discriminatedUnion("kind", [measurementOp, sessionPatchOp, sessionCreateOp, correctionOp]))
+    .min(1)
+    .max(200),
 });
+
+export const diagnosticOfflineBatchSchema = batchSchema;
+export const diagnosticOfflineSessionCreateOp = sessionCreateOp;
 
 type OfflineOp = z.infer<typeof batchSchema>["ops"][number];
 
@@ -282,6 +306,55 @@ async function applyOfflineOp(orgId: string, op: OfflineOp): Promise<OfflineResu
         updatedAt: new Date(),
       })
       .where(eq(diagnosticSessions.id, session.id));
+
+    return { opId: op.opId, ok: true };
+  }
+
+  if (op.kind === "session.create") {
+    const { id, jobId, equipmentId, workflowId, customerComplaint, technicianObservation } = op.payload;
+
+    const [jobRow] = await db
+      .select({ id: jobs.id })
+      .from(jobs)
+      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+    if (!jobRow) return { opId: op.opId, ok: false, error: "job not found" };
+
+    const [equipmentRow] = await db
+      .select({ id: equipment.id })
+      .from(equipment)
+      .where(and(eq(equipment.orgId, orgId), eq(equipment.id, equipmentId)));
+    if (!equipmentRow) return { opId: op.opId, ok: false, error: "equipment not found" };
+
+    const [workflowRow] = await db
+      .select({ id: diagnosticWorkflows.id, versionNumber: diagnosticWorkflows.versionNumber })
+      .from(diagnosticWorkflows)
+      .where(and(eq(diagnosticWorkflows.orgId, orgId), eq(diagnosticWorkflows.id, workflowId)));
+    if (!workflowRow) return { opId: op.opId, ok: false, error: "workflow not found" };
+
+    await db
+      .insert(jobEquipmentLinks)
+      .values({ orgId, jobId, equipmentId })
+      .onConflictDoUpdate({
+        target: jobEquipmentLinks.jobId,
+        set: { equipmentId },
+      });
+
+    const status = deriveInitialDiagnosticStatus({ equipmentResolved: true, workflowId });
+
+    await db
+      .insert(diagnosticSessions)
+      .values({
+        id,
+        orgId,
+        jobId,
+        equipmentId,
+        workflowId,
+        workflowVersion: workflowRow.versionNumber,
+        status,
+        customerComplaint: customerComplaint ?? null,
+        technicianObservation: technicianObservation ?? null,
+      })
+      .onConflictDoNothing({ target: diagnosticSessions.id });
 
     return { opId: op.opId, ok: true };
   }

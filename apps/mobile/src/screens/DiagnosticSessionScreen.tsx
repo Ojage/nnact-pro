@@ -10,15 +10,18 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BackButton } from "@nnact/mobile-ui";
+import type { JobDTO } from "@nnact/shared";
 import type { StoredStaffSession } from "../auth-storage";
 import {
   fetchDiagnosticSession,
   patchDiagnosticSession,
   recordMeasurement,
+  type DiagnosticMeasurement,
+  type DiagnosticSession,
   type DiagnosticSessionDetail,
   type MeasurementResult,
 } from "../field-api";
-import type { SyncService } from "../sync";
+import type { FieldPackage, SyncService } from "../sync";
 import {
   Card,
   EmptyState,
@@ -41,6 +44,52 @@ const RESULT_OPTIONS: MeasurementResult[] = [
 
 function measurementFor(detail: DiagnosticSessionDetail, stepId: string) {
   return [...detail.measurements].reverse().find((item) => item.stepId === stepId);
+}
+
+const SESSION_PATCH_FIELDS: Array<keyof DiagnosticSession> = [
+  "status",
+  "customerComplaint",
+  "technicianObservation",
+  "disposition",
+  "summary",
+];
+
+function toSessionPatch(patch: Record<string, unknown>): Partial<DiagnosticSession> {
+  const out: Record<string, unknown> = {};
+  for (const key of SESSION_PATCH_FIELDS) {
+    if (patch[key] !== undefined) out[key] = patch[key];
+  }
+  return out as Partial<DiagnosticSession>;
+}
+
+/** Build a session detail from a cached field package plus queued offline ops. */
+function buildOfflineDetail(
+  pkg: FieldPackage,
+  sessionId: string,
+  queuedMeasurements: Array<Record<string, unknown>>,
+  queuedPatches: Array<Record<string, unknown>>,
+): DiagnosticSessionDetail | null {
+  const session = pkg.session as unknown as DiagnosticSessionDetail["session"] | null;
+  const equipment = pkg.equipment as unknown as DiagnosticSessionDetail["equipment"] | null;
+  if (!session || !equipment) return null;
+  const job = pkg.job as Partial<JobDTO>;
+  const latestPatch = queuedPatches.length ? toSessionPatch(queuedPatches[queuedPatches.length - 1]) : null;
+  return {
+    session: latestPatch ? { ...session, ...latestPatch } : session,
+    equipment,
+    workflow: pkg.workflow as unknown as DiagnosticSessionDetail["workflow"] | null,
+    job: {
+      id: job.id ?? "",
+      title: job.title ?? "Service job",
+      status: job.status ?? "scheduled",
+      scheduledAt: job.scheduledAt ?? null,
+    },
+    measurements: [
+      ...((pkg.measurements as unknown as DiagnosticMeasurement[]) ?? []),
+      ...(queuedMeasurements as unknown as DiagnosticMeasurement[]),
+    ],
+    steps: (pkg.steps as unknown as DiagnosticSessionDetail["steps"]) ?? [],
+  };
 }
 
 export function DiagnosticSessionScreen({
@@ -71,7 +120,10 @@ export function DiagnosticSessionScreen({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [offlineMode, setOfflineMode] = useState(offline);
+  const [pendingOps, setPendingOps] = useState(0);
 
+  const isOffline = offline || offlineMode;
   const steps = useMemo(
     () =>
       detail?.steps.filter((step) => step.mode === "both" || step.mode === "field") ?? [],
@@ -80,23 +132,58 @@ export function DiagnosticSessionScreen({
 
   const activeStep = steps.find((step) => step.id === activeStepId) ?? steps[0];
 
-  const load = useCallback(async () => {
-    setError(null);
+  const applyFirstIncomplete = useCallback((row: DiagnosticSessionDetail) => {
+    const fieldSteps = row.steps.filter((step) => step.mode === "both" || step.mode === "field");
+    setActiveStepId((current) => {
+      if (current) return current;
+      const firstIncomplete = fieldSteps.find((step) => !measurementFor(row, step.id));
+      return firstIncomplete?.id ?? fieldSteps[0]?.id ?? "";
+    });
+  }, []);
+
+  const restoreFromCache = useCallback(async (): Promise<DiagnosticSessionDetail | null> => {
+    if (!syncService) return null;
     try {
-      const row = await fetchDiagnosticSession(staffSession, sessionId);
-      setDetail(row);
-      if (!activeStepId && row.steps.length > 0) {
-        const fieldSteps = row.steps.filter((step) => step.mode === "both" || step.mode === "field");
-        const firstIncomplete = fieldSteps.find((step) => !measurementFor(row, step.id));
-        setActiveStepId(firstIncomplete?.id ?? fieldSteps[0]?.id ?? "");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load diagnostic session");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      const pkg = await syncService.getCachedSessionDetail(sessionId);
+      if (!pkg) return null;
+      const queued = await syncService.listQueuedSessionOps(sessionId);
+      const restored = buildOfflineDetail(pkg, sessionId, queued.measurements, queued.patches);
+      setPendingOps(queued.measurements.length + queued.patches.length);
+      return restored ?? null;
+    } catch {
+      return null;
     }
-  }, [activeStepId, sessionId, staffSession]);
+  }, [sessionId, syncService]);
+
+  const load = useCallback(
+    async (forceOffline = false) => {
+      if (!forceOffline && !offline) {
+        try {
+          const row = await fetchDiagnosticSession(staffSession, sessionId);
+          setDetail(row);
+          setOfflineMode(false);
+          setPendingOps(0);
+          applyFirstIncomplete(row);
+          setError(null);
+          return;
+        } catch {
+          // network unavailable — fall through to the cached copy below
+        }
+      }
+
+      setOfflineMode(true);
+      const restored = await restoreFromCache();
+      if (restored) {
+        setDetail(restored);
+        applyFirstIncomplete(restored);
+        setError(null);
+      } else {
+        setDetail(null);
+        setError("Could not load this session offline — no cached copy is available.");
+      }
+    },
+    [applyFirstIncomplete, offline, restoreFromCache, sessionId, staffSession],
+  );
 
   useEffect(() => {
     void load();
@@ -108,7 +195,7 @@ export function DiagnosticSessionScreen({
     setMessage(null);
     setError(null);
     try {
-      if (offline && syncService) {
+      if (isOffline && syncService) {
         await syncService.queueMeasurement({
           sessionId: detail.session.id,
           stepId: activeStep.id,
@@ -119,6 +206,7 @@ export function DiagnosticSessionScreen({
           unableReason: result === "unable" ? note || "Could not access test point" : undefined,
         });
         setMessage("Reading queued — will sync when back online.");
+        await load(true);
       } else {
         await recordMeasurement(staffSession, detail.session.id, {
           stepId: activeStep.id,
@@ -129,10 +217,10 @@ export function DiagnosticSessionScreen({
           unableReason: result === "unable" ? note || "Could not access test point" : undefined,
         });
         setMessage("Reading recorded.");
+        await load();
       }
       setValueText("");
       setNote("");
-      await load();
       const currentIndex = steps.findIndex((step) => step.id === activeStep.id);
       const nextStep = steps[currentIndex + 1];
       if (nextStep && !measurementFor(detail, nextStep.id)) setActiveStepId(nextStep.id);
@@ -147,19 +235,30 @@ export function DiagnosticSessionScreen({
     if (!detail) return;
     setSaving(true);
     try {
-      await patchDiagnosticSession(staffSession, detail.session.id, {
-        status,
-        disposition:
-          status === "diagnosed"
-            ? "Repair recommendation supported by recorded diagnostic evidence"
-            : status === "inconclusive"
-              ? "Condition could not be isolated responsibly"
-              : status === "escalated"
-                ? "Technical escalation required"
-                : detail.session.disposition,
-      });
-      await load();
-      onCompleted?.();
+      const disposition =
+        status === "diagnosed"
+          ? "Repair recommendation supported by recorded diagnostic evidence"
+          : status === "inconclusive"
+            ? "Condition could not be isolated responsibly"
+            : status === "escalated"
+              ? "Technical escalation required"
+              : detail.session.disposition;
+
+      if (isOffline && syncService) {
+        await syncService.queueSessionPatch({
+          sessionId: detail.session.id,
+          baseVersion: detail.session.version,
+          status,
+          disposition,
+        });
+        setDetail((prev) => (prev ? { ...prev, session: { ...prev.session, status } } : prev));
+        setMessage("Session status queued — will sync when back online.");
+        onCompleted?.();
+      } else {
+        await patchDiagnosticSession(staffSession, detail.session.id, { status, disposition });
+        await load();
+        onCompleted?.();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update session");
     } finally {
@@ -218,9 +317,13 @@ export function DiagnosticSessionScreen({
           </View>
         </HeroBanner>
 
-        {offline ? (
+        {isOffline ? (
           <View style={styles.offlineBanner}>
-            <Text style={styles.offlineText}>Offline — readings queue locally until sync.</Text>
+            <Text style={styles.offlineText}>
+              {pendingOps > 0
+                ? `Offline — ${pendingOps} change${pendingOps !== 1 ? "s" : ""} queued; will sync when back online.`
+                : "Offline — readings queue locally until sync."}
+            </Text>
           </View>
         ) : null}
 
@@ -313,7 +416,7 @@ export function DiagnosticSessionScreen({
 
                 <PrimaryButton
                   colors={colors}
-                  label={offline ? "Queue reading" : "Record reading"}
+                  label={isOffline ? "Queue reading" : "Record reading"}
                   onPress={() => void saveReading()}
                   loading={saving}
                 />
