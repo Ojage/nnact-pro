@@ -13,6 +13,8 @@ import {
   jobEquipmentLinks,
   jobStatusHistory,
   jobs,
+  lineItems,
+  activities,
   traceRoutes,
 } from "@nnact/db";
 import {
@@ -158,6 +160,30 @@ async function loadPackage(orgId: string, jobId: string) {
       }
     : null;
 
+  const [lineItemsRows, statusHistoryRows, activityRows] = await Promise.all([
+    db
+      .select()
+      .from(lineItems)
+      .where(and(eq(lineItems.orgId, orgId), eq(lineItems.jobId, jobId))),
+    db
+      .select()
+      .from(jobStatusHistory)
+      .where(and(eq(jobStatusHistory.orgId, orgId), eq(jobStatusHistory.jobId, jobId)))
+      .orderBy(desc(jobStatusHistory.createdAt)),
+    db
+      .select()
+      .from(activities)
+      .where(and(eq(activities.orgId, orgId), eq(activities.jobId, jobId)))
+      .orderBy(desc(activities.createdAt))
+      .limit(50),
+  ]);
+
+  const shared = {
+    lineItems: lineItemsRows,
+    statusHistory: statusHistoryRows,
+    activity: activityRows,
+  };
+
   const [link] = await db
     .select({ link: jobEquipmentLinks, equipment })
     .from(jobEquipmentLinks)
@@ -175,6 +201,7 @@ async function loadPackage(orgId: string, jobId: string) {
       workflow: null,
       steps: [],
       measurements: [],
+      ...shared,
       supportState: "identification_required" as const,
       downloadReady: false,
     };
@@ -198,6 +225,7 @@ async function loadPackage(orgId: string, jobId: string) {
       workflow: null,
       steps: [],
       measurements: [],
+      ...shared,
       supportState: "workflow_selection_required" as const,
       downloadReady: false,
     };
@@ -239,6 +267,7 @@ async function loadPackage(orgId: string, jobId: string) {
       workflow: null,
       steps: [],
       measurements,
+      ...shared,
       supportState: "unsupported" as const,
       downloadReady: false,
     };
@@ -292,6 +321,7 @@ async function loadPackage(orgId: string, jobId: string) {
       routes: routes.filter((route) => route.stepId === step.id),
     })),
     measurements,
+    ...shared,
     supportState,
     downloadReady:
       workflow.lifecycleStatus !== "suspended" &&

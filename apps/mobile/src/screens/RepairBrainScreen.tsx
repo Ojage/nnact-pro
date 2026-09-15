@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { StoredStaffSession } from "../auth-storage";
 import { Chip, EmptyState, HeroBanner, ProgressBar, StatCard } from "../components/ui";
 import { listRepairBrainModels, type RepairBrainModel } from "../field-api";
+import type { SyncService } from "../sync";
 import { fonts, radius, spacing, type Palette } from "../theme";
 
 const REPAIR_BRAIN_IMAGE = require("../../assets/photos/repair-brain.png");
@@ -22,11 +23,15 @@ const ALL = "all";
 export function RepairBrainScreen({
   colors,
   session,
+  offline,
+  syncService,
   onBack,
   onOpenModel,
 }: {
   colors: Palette;
   session: StoredStaffSession;
+  offline: boolean;
+  syncService: SyncService | null;
   onBack: () => void;
   onOpenModel: (modelId: string) => void;
 }) {
@@ -37,23 +42,43 @@ export function RepairBrainScreen({
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>(ALL);
   const [refreshing, setRefreshing] = useState(false);
+  const [offlineLens, setOfflineLens] = useState(false);
 
   const load = useCallback(
     async (refresh?: boolean) => {
       if (refresh) setRefreshing(true);
       else setLoading(true);
       try {
+        if (offline && syncService) {
+          const cached = await syncService.getCachedRepairBrainModels();
+          if (cached.length > 0) {
+            setModels(cached);
+            setOfflineLens(true);
+            setError(null);
+          } else {
+            setError("Offline and no cached library yet. Connect once to download your knowledge base.");
+          }
+          return;
+        }
         const data = await listRepairBrainModels(session);
         setModels(data);
+        setOfflineLens(false);
         setError(null);
+        void syncService?.cacheRepairBrainModels(data);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load repair brain");
+        const cached = await syncService?.getCachedRepairBrainModels();
+        if (cached && cached.length > 0) {
+          setModels(cached);
+          setOfflineLens(true);
+        } else {
+          setError(e instanceof Error ? e.message : "Failed to load repair brain");
+        }
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [session],
+    [offline, session, syncService],
   );
 
   useEffect(() => {
@@ -105,8 +130,17 @@ export function RepairBrainScreen({
         back={{ onPress: onBack }}
       />
 
+      {offlineLens ? (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color={colors.warning} />
+          <Text style={styles.offlineText}>
+            Offline library — showing the last cached copy. Open models while connected to keep them fresh.
+          </Text>
+        </View>
+      ) : null}
+
       {models.length > 0 ? (
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, offlineLens && styles.statsRowInset]}>
           <StatCard colors={colors} label="Models" value={String(models.length)} />
           <StatCard colors={colors} label="Makes" value={String(makes)} />
           <StatCard colors={colors} label="Categories" value={String(categories.length)} />
@@ -263,6 +297,18 @@ const createStyles = (colors: Palette) =>
       marginTop: -spacing.md,
       marginBottom: spacing.md,
     },
+    statsRowInset: { marginTop: spacing.md },
+    offlineBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.warningAlpha,
+      borderRadius: 12,
+      padding: spacing.md,
+    },
+    offlineText: { color: colors.warning, fontSize: 13, fontFamily: fonts.medium, flex: 1 },
     coverageRow: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
     categoryRow: { marginBottom: spacing.sm },
     categoryContent: { paddingHorizontal: spacing.lg, gap: spacing.sm },

@@ -1,8 +1,14 @@
 import * as SQLite from "expo-sqlite";
 import { Directory, File, Paths } from "expo-file-system";
+import type {
+  RepairBrainModel,
+  RepairBrainModelProfile,
+  RepairBrainSearchResults,
+} from "../field-api";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 const MEDIA_FLUSH_LIMIT = 10;
+const RB_CATALOG_REFRESH_MS = 30 * 60 * 1000;
 
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -48,6 +54,9 @@ export interface FieldPackage {
   workflow: Record<string, unknown> | null;
   steps: Array<Record<string, unknown>>;
   measurements: Array<Record<string, unknown>>;
+  lineItems: Array<Record<string, unknown>>;
+  statusHistory: Array<Record<string, unknown>>;
+  activity: Array<Record<string, unknown>>;
   supportState: string;
   downloadReady: boolean;
 }
@@ -71,6 +80,7 @@ export interface FieldSyncResult {
   mediaFailed: number;
   queuedMedia: number;
   cachedJobs: string[];
+  rbModels: number;
 }
 
 interface OutboxRow {
@@ -93,6 +103,18 @@ interface MediaOutboxRow {
   attempts: number;
   last_error: string | null;
   created_at: string;
+}
+
+interface JsonRow {
+  payload_json: string;
+}
+
+interface CachedAtRow {
+  cached_at: string;
+}
+
+interface CountRow {
+  count: number;
 }
 
 function makeId(): string {
@@ -132,6 +154,16 @@ const SCHEMA_SQL = `
       attempts INTEGER NOT NULL DEFAULT 0,
       last_error TEXT,
       created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS rb_models (
+      model_id TEXT PRIMARY KEY NOT NULL,
+      payload_json TEXT NOT NULL,
+      cached_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS rb_profiles (
+      model_id TEXT PRIMARY KEY NOT NULL,
+      payload_json TEXT NOT NULL,
+      cached_at TEXT NOT NULL
     );
   `;
 
@@ -747,6 +779,162 @@ export class SyncService {
     }
   }
 
+  /** Replace the locally cached repair-brain catalog with a fresh copy. */
+  async cacheRepairBrainModels(models: RepairBrainModel[]): Promise<void> {
+    const database = await this.database();
+    const cachedAt = new Date().toISOString();
+    for (const model of models) {
+      await database.runAsync(
+        "INSERT OR REPLACE INTO rb_models (model_id, payload_json, cached_at) VALUES (?, ?, ?)",
+        model.id,
+        JSON.stringify(model),
+        cachedAt,
+      );
+    }
+  }
+
+  /** Best-effort refresh of the offline repair-brain catalog (throttled). */
+  async syncRepairBrainCatalog(): Promise<number> {
+    const database = await this.database();
+    const fresh = await database.getFirstAsync<CachedAtRow>(
+      "SELECT cached_at FROM rb_models ORDER BY cached_at DESC LIMIT 1",
+    );
+    const last = fresh?.cached_at ? new Date(fresh.cached_at).getTime() : 0;
+    if (Date.now() - last < RB_CATALOG_REFRESH_MS) return await this.countCachedRepairBrainModels();
+
+    const response = await fetchWithTimeout(`${this.opts.apiUrl}/api/repair-brain/models`, {
+      headers: this.headers(),
+    });
+    if (!response.ok) return await this.countCachedRepairBrainModels();
+    const models = (await response.json()) as RepairBrainModel[];
+    await this.cacheRepairBrainModels(models);
+    return models.length;
+  }
+
+  async getCachedRepairBrainModels(): Promise<RepairBrainModel[]> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<JsonRow>(
+      "SELECT payload_json FROM rb_models ORDER BY cached_at DESC LIMIT 200",
+    );
+    return rows.flatMap((row) => {
+      try {
+        return [JSON.parse(row.payload_json) as RepairBrainModel];
+      } catch {
+        return [];
+      }
+    });
+  }
+
+  async countCachedRepairBrainModels(): Promise<number> {
+    const database = await this.database();
+    const row = await database.getFirstAsync<CountRow>("SELECT COUNT(*) AS count FROM rb_models");
+    return row?.count ?? 0;
+  }
+
+  /** Persist a freshly-viewed model profile so it is available offline. */
+  async cacheRepairBrainProfile(profile: RepairBrainModelProfile): Promise<void> {
+    const database = await this.database();
+    await database.runAsync(
+      "INSERT OR REPLACE INTO rb_profiles (model_id, payload_json, cached_at) VALUES (?, ?, ?)",
+      profile.model.id,
+      JSON.stringify(profile),
+      new Date().toISOString(),
+    );
+  }
+
+  async getCachedRepairBrainProfile(modelId: string): Promise<RepairBrainModelProfile | null> {
+    const database = await this.database();
+    const row = await database.getFirstAsync<JsonRow>(
+      "SELECT payload_json FROM rb_profiles WHERE model_id = ? LIMIT 1",
+      modelId,
+    );
+    if (!row) return null;
+    try {
+      return JSON.parse(row.payload_json) as RepairBrainModelProfile;
+    } catch {
+      return null;
+    }
+  }
+
+  async listCachedRepairBrainProfiles(): Promise<RepairBrainModelProfile[]> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<JsonRow>(
+      "SELECT payload_json FROM rb_profiles ORDER BY cached_at DESC",
+    );
+    return rows.flatMap((row) => {
+      try {
+        return [JSON.parse(row.payload_json) as RepairBrainModelProfile];
+      } catch {
+        return [];
+      }
+    });
+  }
+
+  /** Local search over the cached catalog and any viewed model profiles. */
+  async searchRepairBrainLocal(query: string): Promise<RepairBrainSearchResults> {
+    const q = query.trim().toLowerCase();
+    const models = await this.getCachedRepairBrainModels();
+    const matched = models.filter((m) =>
+      [m.manufacturer, m.brand, m.modelNumber, m.modelName, m.category]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    );
+
+    const searchModels = matched.map((m) => ({
+      id: m.id,
+      manufacturer: m.manufacturer,
+      modelNumber: m.modelNumber,
+      modelName: m.modelName ?? null,
+      category: m.category,
+    }));
+
+    const faults: RepairBrainSearchResults["faults"] = [];
+    const parts: RepairBrainSearchResults["parts"] = [];
+    const procedures: RepairBrainSearchResults["procedures"] = [];
+    const documents: RepairBrainSearchResults["documents"] = [];
+
+    for (const model of matched) {
+      const profile = await this.getCachedRepairBrainProfile(model.id);
+      if (!profile) continue;
+      for (const fault of profile.faults) {
+        if (
+          [fault.title, fault.faultCode, ...(fault.probableCauses ?? [])]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(q))
+        ) {
+          faults.push({ id: fault.id, equipmentModelId: model.id, title: fault.title, faultCode: fault.faultCode ?? null });
+        }
+      }
+      for (const part of profile.parts) {
+        if (
+          part.partName.toLowerCase().includes(q) ||
+          (part.oemPartNumber ?? "").toLowerCase().includes(q)
+        ) {
+          parts.push({ id: part.id, equipmentModelId: model.id, partName: part.partName, oemPartNumber: part.oemPartNumber ?? null });
+        }
+      }
+      for (const procedure of profile.repairProcedures) {
+        if (procedure.title.toLowerCase().includes(q)) {
+          procedures.push({ id: procedure.id, equipmentModelId: model.id, title: procedure.title, type: "cached" });
+        }
+      }
+      for (const doc of profile.documents) {
+        if ((doc.title ?? "").toLowerCase().includes(q)) {
+          documents.push({ id: doc.id, title: doc.title, documentType: doc.documentType, equipmentModelId: model.id });
+        }
+      }
+    }
+
+    return {
+      models: searchModels,
+      faults,
+      parts,
+      procedures,
+      documents,
+      repairHistory: [],
+    };
+  }
+
   /**
    * Synchronize field work as coherent job/appliance/diagnostic packages.
    * This replaces the former empty generic sync request, which could not
@@ -799,6 +987,8 @@ export class SyncService {
       }
     }
 
+    const rbModels = await this.syncRepairBrainCatalog().catch(() => 0);
+
     return {
       downloaded,
       queuedBeforeFlush,
@@ -808,6 +998,7 @@ export class SyncService {
       mediaFailed: flushMedia.failed,
       queuedMedia: await this.queuedMediaCount(),
       cachedJobs: [...jobIds],
+      rbModels,
     };
   }
 }

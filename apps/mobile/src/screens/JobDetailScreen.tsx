@@ -157,9 +157,9 @@ export function JobDetailScreen({
       if (!pkg || !pkg.job) return false;
       setJob(pkg.job as unknown as JobDTO);
       setCustomer((pkg.customer as unknown as CustomerDTO | null) ?? null);
-      setLineItems([]);
-      setActivities([]);
-      setHistory([]);
+      setLineItems((pkg.lineItems ?? []) as unknown as LineItem[]);
+      setActivities((pkg.activity ?? []) as unknown as ActivityDTO[]);
+      setHistory((pkg.statusHistory ?? []) as unknown as StatusHistoryRow[]);
       setPhotos([]);
       setVoiceNotes([]);
       setDiagnostics([]);

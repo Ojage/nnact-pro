@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { StoredStaffSession } from "../auth-storage";
 import { StatCard, ScreenHeader, SectionHeader, EmptyState } from "../components/ui";
 import { getRepairBrainModelProfile, type RepairBrainModelProfile } from "../field-api";
+import type { SyncService } from "../sync";
 import { fonts, spacing, type Palette } from "../theme";
 
 type Section = "overview" | "procedures" | "faults" | "parts" | "testpoints";
@@ -12,30 +13,55 @@ export function RepairBrainModelScreen({
   colors,
   session,
   modelId,
+  offline,
+  syncService,
   onBack,
 }: {
   colors: Palette;
   session: StoredStaffSession;
   modelId: string;
+  offline: boolean;
+  syncService: SyncService | null;
   onBack: () => void;
 }) {
   const styles = createStyles(colors);
   const [profile, setProfile] = useState<RepairBrainModelProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [section, setSection] = useState<Section>("overview");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setProfile(await getRepairBrainModelProfile(session, modelId));
+      if (offline && syncService) {
+        const cached = await syncService.getCachedRepairBrainProfile(modelId);
+        if (cached) {
+          setProfile(cached);
+          setFromCache(true);
+          setError(null);
+        } else {
+          setError("This model isn't cached on this device yet. Connect once and open it to make it available offline.");
+        }
+        return;
+      }
+      const fresh = await getRepairBrainModelProfile(session, modelId);
+      setProfile(fresh);
+      setFromCache(false);
       setError(null);
+      void syncService?.cacheRepairBrainProfile(fresh);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load model");
+      const cached = await syncService?.getCachedRepairBrainProfile(modelId);
+      if (cached) {
+        setProfile(cached);
+        setFromCache(true);
+      } else {
+        setError(e instanceof Error ? e.message : "Failed to load model");
+      }
     } finally {
       setLoading(false);
     }
-  }, [session, modelId]);
+  }, [modelId, offline, session, syncService]);
 
   useEffect(() => {
     void load();
@@ -73,6 +99,15 @@ export function RepairBrainModelScreen({
   return (
     <View style={styles.root}>
       <ScreenHeader colors={colors} eyebrow="Repair Brain" title={modelTitle} subtitle={model.modelName ?? model.category} onBack={onBack} />
+
+      {fromCache ? (
+        <View style={styles.cachedBanner}>
+          <Ionicons name="cloud-offline-outline" size={15} color={colors.warning} />
+          <Text style={styles.cachedBannerText}>
+            Offline copy — showing the profile saved when you last viewed this model while connected.
+          </Text>
+        </View>
+      ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabsRow}>
         {SECTIONS.map((s) => (
@@ -238,6 +273,17 @@ const createStyles = (colors: Palette) =>
     center: { alignItems: "center", justifyContent: "center", gap: spacing.md },
     centerText: { color: colors.mutedForeground, fontSize: 14, fontFamily: fonts.regular },
     tabsScroll: { flexGrow: 0 },
+    cachedBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.warningAlpha,
+      borderRadius: 12,
+      padding: spacing.sm,
+    },
+    cachedBannerText: { color: colors.warning, fontSize: 12, fontFamily: fonts.medium, flex: 1 },
     tabsRow: { paddingHorizontal: spacing.lg, gap: spacing.sm, marginBottom: spacing.md },
     tab: { paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: 24, backgroundColor: colors.surfaceMuted, marginRight: spacing.sm },
     tabActive: { backgroundColor: colors.primary },

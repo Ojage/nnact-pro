@@ -4,16 +4,21 @@ import { Ionicons } from "@expo/vector-icons";
 import type { StoredStaffSession } from "../auth-storage";
 import { EmptyState, ScreenHeader } from "../components/ui";
 import { searchRepairBrain, type RepairBrainSearchResults } from "../field-api";
+import type { SyncService } from "../sync";
 import { fonts, radius, spacing, type Palette } from "../theme";
 
 export function RepairBrainSearchScreen({
   colors,
   session,
+  offline,
+  syncService,
   onBack,
   onOpenModel,
 }: {
   colors: Palette;
   session: StoredStaffSession;
+  offline: boolean;
+  syncService: SyncService | null;
   onBack: () => void;
   onOpenModel: (modelId: string) => void;
 }) {
@@ -21,6 +26,16 @@ export function RepairBrainSearchScreen({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<RepairBrainSearchResults | null>(null);
   const [searching, setSearching] = useState(false);
+  const [offlineSearch, setOfflineSearch] = useState(false);
+
+  const emptyResults: RepairBrainSearchResults = {
+    models: [],
+    faults: [],
+    parts: [],
+    procedures: [],
+    documents: [],
+    repairHistory: [],
+  };
 
   const runSearch = useCallback(
     async (q: string) => {
@@ -30,21 +45,25 @@ export function RepairBrainSearchScreen({
       }
       setSearching(true);
       try {
-        setResults(await searchRepairBrain(session, q));
+        if (offline && syncService) {
+          setOfflineSearch(true);
+          setResults(await syncService.searchRepairBrainLocal(q));
+        } else {
+          setOfflineSearch(false);
+          setResults(await searchRepairBrain(session, q));
+        }
       } catch {
-        setResults({
-          models: [],
-          faults: [],
-          parts: [],
-          procedures: [],
-          documents: [],
-          repairHistory: [],
-        });
+        if (syncService) {
+          setOfflineSearch(true);
+          setResults(await syncService.searchRepairBrainLocal(q));
+        } else {
+          setResults(emptyResults);
+        }
       } finally {
         setSearching(false);
       }
     },
-    [session],
+    [offline, session, syncService],
   );
 
   useEffect(() => {
@@ -73,6 +92,15 @@ export function RepairBrainSearchScreen({
         />
         {searching ? <ActivityIndicator size="small" color={colors.primary} /> : null}
       </View>
+
+      {offlineSearch ? (
+        <View style={styles.offlineHint}>
+          <Ionicons name="cloud-offline-outline" size={14} color={colors.warning} />
+          <Text style={styles.offlineHintText}>
+            Offline — searching your cached library. Only models you've browsed are fully searchable.
+          </Text>
+        </View>
+      ) : null}
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {!query.trim() ? (
@@ -216,6 +244,17 @@ const createStyles = (colors: Palette) =>
       paddingHorizontal: spacing.md,
     },
     searchInput: { flex: 1, color: colors.foreground, fontSize: 14, fontFamily: fonts.regular, paddingVertical: 12 },
+    offlineHint: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.warningAlpha,
+      borderRadius: 12,
+      padding: spacing.sm,
+    },
+    offlineHintText: { color: colors.warning, fontSize: 12, fontFamily: fonts.medium, flex: 1 },
     center: { alignItems: "center", paddingVertical: spacing.xxl },
     group: { marginBottom: spacing.lg },
     groupTitle: { color: colors.foreground, fontSize: 15, fontFamily: fonts.bold, marginBottom: spacing.sm },

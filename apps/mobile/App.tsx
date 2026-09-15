@@ -449,6 +449,8 @@ function FieldApp({
             <RepairBrainScreen
               colors={colors}
               session={session}
+              offline={field.offline}
+              syncService={field.getSyncService()}
               onBack={closeRepairBrain}
               onOpenModel={openRepairBrainModel}
             />
@@ -456,6 +458,8 @@ function FieldApp({
             <RepairBrainSearchScreen
               colors={colors}
               session={session}
+              offline={field.offline}
+              syncService={field.getSyncService()}
               onBack={closeRepairBrain}
               onOpenModel={openRepairBrainModel}
             />
@@ -473,6 +477,8 @@ function FieldApp({
             colors={colors}
             session={session}
             modelId={rbModelId}
+            offline={field.offline}
+            syncService={field.getSyncService()}
             onBack={closeRepairBrainModel}
           />
         </AnimatedScreen>
