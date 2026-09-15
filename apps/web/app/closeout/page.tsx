@@ -104,7 +104,7 @@ export default function CloseoutPage() {
     return (
       <div>
         <PageHeader title="Job closeout" description="Move completed field work into billing without losing the handoff." />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+<div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-xl" />)}
         </div>
         <div className="mt-6 grid gap-6 xl:grid-cols-2">
@@ -134,7 +134,7 @@ export default function CloseoutPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-tour="closeout-stats">
         {[
           ["Awaiting start", scheduled.length, "text-blue"],
           ["In progress", inProgress.length, "text-yellow"],
@@ -197,13 +197,15 @@ export default function CloseoutPage() {
           ))}
         </QueueCard>
 
-        <QueueCard title="Needs pricing" description="Completed jobs that cannot be invoiced because their total is still zero." empty="No completed jobs are missing pricing.">
-          {needsPricing.map((job) => (
-            <JobCard key={job.id} job={job} customer={customerName(job, customerMap)} tone="warning">
-              <Link href={`/jobs/${job.id}`}><Button variant="secondary" size="sm">Add line items</Button></Link>
-            </JobCard>
-          ))}
-        </QueueCard>
+        <div data-tour="closeout-needs-pricing">
+          <QueueCard title="Needs pricing" description="Completed jobs that cannot be invoiced because their total is still zero." empty="No completed jobs are missing pricing.">
+            {needsPricing.map((job) => (
+              <JobCard key={job.id} job={job} customer={customerName(job, customerMap)} tone="warning">
+                <Link href={`/jobs/${job.id}`}><Button variant="secondary" size="sm">Add line items</Button></Link>
+              </JobCard>
+            ))}
+          </QueueCard>
+        </div>
       </div>
 
       <Card className="mt-6">

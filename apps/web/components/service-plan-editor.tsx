@@ -345,7 +345,7 @@ export function PlanEditor({ plan, categories, checklists, onCancel, onSaved }: 
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <Card className="p-6">
+      <Card className="p-6" data-tour="plan-editor-form">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-fg">

@@ -117,7 +117,7 @@ export default function PipelinePage() {
       )}
 
       {jobs.length === 0 && !error ? (
-        <Card>
+        <Card data-tour="pipeline-board">
           <EmptyState
             title="No jobs yet"
             description="Your pipeline will show here once you create jobs."
@@ -129,6 +129,7 @@ export default function PipelinePage() {
           <div className="mb-4">
             <Input
               type="search"
+              data-tour="pipeline-search"
               placeholder="Search by job title or customer..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -137,7 +138,7 @@ export default function PipelinePage() {
           </div>
 
           {/* Kanban columns - horizontal scroll on mobile */}
-          <div className="overflow-x-auto pb-4 -mx-1 px-1">
+          <div className="overflow-x-auto pb-4 -mx-1 px-1" data-tour="pipeline-board">
             <div className="flex gap-3 min-w-[800px] lg:min-w-0 lg:grid lg:grid-cols-5">
               {COLUMNS.map((col) => {
                 const colJobs = grouped.get(col.status) ?? [];

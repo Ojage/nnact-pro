@@ -88,7 +88,7 @@ export default function AgreementsPage() {
           </span>
         }
         actions={
-          <Button size="sm" onClick={() => router.push("/agreements/new")}>
+          <Button size="sm" onClick={() => router.push("/agreements/new")} data-tour="agreements-add">
             ⊕ New Agreement
           </Button>
         }

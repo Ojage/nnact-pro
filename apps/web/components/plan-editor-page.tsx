@@ -11,6 +11,8 @@ import type {
   ServiceCategoryDTO,
   ServiceChecklistDTO,
 } from "@nnact/shared";
+import { ADVANCE_TAG } from "@nnact/shared";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 import { PlanEditor } from "@/components/service-plan-editor";
 
 export function PlanEditorPage({ planId }: { planId?: string }) {
@@ -75,7 +77,10 @@ export function PlanEditorPage({ planId }: { planId?: string }) {
         categories={categories}
         checklists={checklists}
         onCancel={() => router.push("/service-plans")}
-        onSaved={(saved) => router.push(`/service-plans/${saved.id}`)}
+        onSaved={(saved) => {
+          if (!planId) emitWalkthroughDone(ADVANCE_TAG.servicePlanCreated);
+          router.push(`/service-plans/${saved.id}`);
+        }}
       />
     </div>
   );

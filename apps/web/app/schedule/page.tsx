@@ -182,7 +182,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div>
+    <div data-tour="schedule-board">
       <PageHeader
         title="Schedule"
         description={`${appointments.length} appointment${appointments.length !== 1 ? "s" : ""}${search.trim() ? ` · ${filtered.length} match` : ""}`}
@@ -235,6 +235,7 @@ export default function SchedulePage() {
             <div
               role="tablist"
               aria-label="Schedule view"
+              data-tour="schedule-view-toggle"
               className="w-fit overflow-hidden rounded-lg border border-border bg-surface-300"
             >
               {(["day", "week", "month"] as const).map((mode) => (

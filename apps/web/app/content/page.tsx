@@ -55,7 +55,7 @@ export default function ContentPage() {
   const totalPages = Math.ceil(total / take);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="content-item-list">
       <PageHeader
         title="Content Studio"
         description="Create, approve, and publish content across all your marketing channels"
@@ -65,7 +65,7 @@ export default function ContentPage() {
           {total} {total === 1 ? "item" : "items"}
         </p>
         <Link href="/content/new">
-          <Button>＋ New Content</Button>
+          <Button data-tour="content-add">＋ New Content</Button>
         </Link>
       </div>
 

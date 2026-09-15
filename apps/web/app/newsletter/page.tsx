@@ -79,7 +79,7 @@ export default function NewsletterPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="newsletter-list">
 <PageHeader
         title="Newsletter Subscribers"
         description="Manage newsletter subscribers, filter by status, and export lists for marketing campaigns"

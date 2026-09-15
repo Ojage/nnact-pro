@@ -123,7 +123,7 @@ export default function IntegrationsPage() {
     <div>
       <PageHeader title="Integrations" description="Connect NNACT Pro to the tools you already use — open plugin architecture, not a closed store." />
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2" data-tour="integrations-catalog">
         {catalog.map((p) => (
           <Card key={p.id} className="overflow-hidden">
             <CardContent className="p-4 space-y-3">
@@ -193,7 +193,7 @@ export default function IntegrationsPage() {
 
       {/* Recent outbound deliveries */}
       <h2 className="text-sm font-semibold text-fg mt-8 mb-3">Recent deliveries</h2>
-      <Card>
+      <Card data-tour="integrations-deliveries">
         <CardContent className="p-0">
           {events.length === 0 ? (
             <p className="text-sm text-fg-muted p-6 text-center">No events delivered yet. Create a job or take a payment to fire one.</p>

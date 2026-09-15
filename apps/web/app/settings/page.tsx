@@ -83,7 +83,7 @@ export default function SettingsPage() {
       />
 
       <div className="grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-border bg-surface-200 p-2">
+        <aside className="rounded-xl border border-border bg-surface-200 p-2" data-tour="settings-navigation">
           <nav aria-label="Business settings" className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
             {TAB_GROUPS.map((group) => (
               <div key={group.label}>

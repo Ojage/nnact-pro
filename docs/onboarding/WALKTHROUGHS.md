@@ -84,7 +84,8 @@ Tags: `customer.created`, `equipment.created`, `job.created`,
 `technician.assigned`, `visit.started`, `visit.completed`,
 `diagnosis.recorded`, `knowledge.contributed`, `knowledge.reviewed`,
 `estimate.sent`, `invoice.sent`, `payment.recorded`,
-`catalog.item.created`, `comeback.created`.
+`catalog.item.created`, `comeback.created`, `service.plan.created`,
+`agreement.created`.
 
 ## Targets already wired (P0)
 
@@ -106,6 +107,18 @@ Tags: `customer.created`, `equipment.created`, `job.created`,
 | track-comeback | `cb-add`, `cb-form` (comeback board + intake) |
 | finance-essentials | `finance-overview`, `finance-expenses` |
 | read-reports | `reports-kpis`, `reports-csv` |
+| schedule-jobs | `schedule-board`, `schedule-view-toggle` |
+| manage-pipeline | `pipeline-board`, `pipeline-search` |
+| closeout-workflow | `closeout-stats`, `closeout-needs-pricing` |
+| create-service-plan | `service-plans-add`, `plan-editor-form`, `plan-save` |
+| create-agreement | `agreements-add`, `agreement-form`, `agreement-create` |
+| manage-documents | `documents-branding`, `documents-library` |
+| content-publishing | `content-item-list`, `content-add`, `publications-list`, `newsletter-list` |
+| ai-content-automation | `ai-schedule`, `ai-providers` |
+| configure-settings | `settings-navigation` |
+| connect-integrations | `integrations-catalog`, `integrations-deliveries` |
+| browse-diagnostic-library | `diagnostic-library-workflows`, `diagnostic-library-readiness` |
+| coverage-quality | `coverage-hero`, `coverage-families` |
 
 ## Progress model & reconciliation
 

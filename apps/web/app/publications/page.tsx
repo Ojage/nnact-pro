@@ -47,7 +47,7 @@ export default function PublicationsPage() {
   const totalPages = Math.ceil(total / take);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="publications-list">
       <PageHeader
         title="Publications"
         description="Monitor content distribution across every connected channel"

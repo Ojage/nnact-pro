@@ -77,7 +77,7 @@ export default async function CoveragePage() {
       )}
 
       {/* --- Hero stats --- */}
-      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-6">
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-6" data-tour="coverage-hero">
         {[
           ["Validated workflows", validated, "text-green"],
           ["Pilot / experimental", coverage.workflows.length - validated - held, "text-yellow"],
@@ -97,7 +97,7 @@ export default async function CoveragePage() {
 
       <div className="space-y-8">
         {/* --- Coverage gaps by product family --- */}
-        <Card>
+        <Card data-tour="coverage-families">
           <CardHeader>
             <CardTitle>
               Coverage by product family

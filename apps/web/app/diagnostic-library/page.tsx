@@ -917,7 +917,7 @@ function ReadinessPanel({ readiness, loading, onPublish }: { readiness: Readines
   }
 
   return (
-    <Card className="border-border">
+    <Card className="border-border" data-tour="diagnostic-library-readiness">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -1265,7 +1265,7 @@ export default function DiagnosticLibraryPage() {
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         {/* ── Workflow library ── */}
         <div className="space-y-4">
-          <Card className="border-border">
+          <Card className="border-border" data-tour="diagnostic-library-workflows">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-sm">

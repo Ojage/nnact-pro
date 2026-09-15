@@ -11,7 +11,9 @@ import { FormSelect } from "@/components/ui/form-select";
 import { Switch } from "@/components/ui/switch";
 import { InfoTip } from "@/components/ui/info-tip";
 import { api } from "@/lib/api";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 import {
+  ADVANCE_TAG,
   BILLING_FREQUENCIES,
   MAINTENANCE_FREQUENCIES,
   formatMoney,
@@ -128,6 +130,7 @@ export default function NewAgreementPage() {
     setError(null);
     try {
       const created = await api.createServiceAgreement(payload);
+      emitWalkthroughDone(ADVANCE_TAG.agreementCreated);
       router.push(`/agreements/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create agreement");
@@ -166,7 +169,7 @@ export default function NewAgreementPage() {
         </Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <Card className="p-6">
+          <Card className="p-6" data-tour="agreement-form">
             <div className="grid gap-5">
               <div className="grid items-center gap-4 sm:grid-cols-2">
                 <label className="block">
@@ -290,7 +293,7 @@ export default function NewAgreementPage() {
               </label>
 
               <div className="flex justify-end">
-                <Button onClick={create} disabled={saving}>
+                <Button onClick={create} disabled={saving} data-tour="agreement-create">
                   {saving ? "Creating…" : "Create agreement"}
                 </Button>
               </div>

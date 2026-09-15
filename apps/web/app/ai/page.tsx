@@ -141,7 +141,7 @@ export default function AiPage() {
   if (!settings) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="ai-studio">
       <PageHeader
         title="AI Content Automation"
         description="Autonomous NNACT content: plan → generate → review → publish (blog + LinkedIn) twice a day with guardrails"
@@ -175,7 +175,7 @@ export default function AiPage() {
       )}
 
       {settings && (
-        <Card>
+        <Card data-tour="ai-schedule">
           <CardContent className="p-5 space-y-5">
             <div className="flex items-center justify-between">
               <div>
@@ -274,7 +274,7 @@ export default function AiPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card data-tour="ai-providers">
           <CardContent className="p-5 space-y-3">
             <h3 className="text-sm font-semibold text-fg">Providers</h3>
             {PROVIDERS.map((provider) => {

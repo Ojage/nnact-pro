@@ -237,7 +237,7 @@ export function DocumentsHub() {
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_.95fr]">
-        <Card>
+        <Card data-tour="documents-branding">
           <CardHeader>
             <CardTitle className="inline-flex items-center gap-1.5">
               Branding preview
@@ -309,7 +309,7 @@ export function DocumentsHub() {
         </Card>
       </div>
 
-      <Card>
+      <Card data-tour="documents-library">
         <CardHeader>
           <CardTitle className="inline-flex items-center gap-1.5">
             Document library

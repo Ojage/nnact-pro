@@ -98,7 +98,7 @@ export default function ServicePlansPage() {
           </span>
         }
         actions={
-          <Button size="sm" onClick={() => router.push("/service-plans/new")}>
+          <Button size="sm" onClick={() => router.push("/service-plans/new")} data-tour="service-plans-add">
             ⊕ New Plan
           </Button>
         }
