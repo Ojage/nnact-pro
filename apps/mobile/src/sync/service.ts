@@ -5,6 +5,8 @@ import type {
   RepairBrainModelProfile,
   RepairBrainSearchResults,
 } from "../field-api";
+import type { JobPhoto } from "../field-api";
+import type { JobVoiceNoteDTO, NotificationDTO } from "@nnact/shared";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 const MEDIA_FLUSH_LIMIT = 10;
@@ -117,6 +119,26 @@ interface CountRow {
   count: number;
 }
 
+interface NotificationRow {
+  id: string;
+  payload_json: string;
+  read: number;
+  flushed: number;
+}
+
+interface NotificationIdRow {
+  id: string;
+}
+
+interface MediaCacheRow {
+  file_key: string;
+  local_uri: string;
+}
+
+interface MediaIndexRow {
+  payload_json: string;
+}
+
 function makeId(): string {
   const cryptoLike = globalThis.crypto as { randomUUID?: () => string } | undefined;
   if (cryptoLike?.randomUUID) return cryptoLike.randomUUID();
@@ -162,6 +184,25 @@ const SCHEMA_SQL = `
     );
     CREATE TABLE IF NOT EXISTS rb_profiles (
       model_id TEXT PRIMARY KEY NOT NULL,
+      payload_json TEXT NOT NULL,
+      cached_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS notification_cache (
+      id TEXT PRIMARY KEY NOT NULL,
+      payload_json TEXT NOT NULL,
+      read INTEGER NOT NULL DEFAULT 0,
+      flushed INTEGER NOT NULL DEFAULT 0,
+      cached_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS media_cache (
+      file_key TEXT PRIMARY KEY NOT NULL,
+      kind TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      local_uri TEXT NOT NULL,
+      cached_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS job_media_index (
+      job_id TEXT PRIMARY KEY NOT NULL,
       payload_json TEXT NOT NULL,
       cached_at TEXT NOT NULL
     );
@@ -935,6 +976,213 @@ export class SyncService {
     };
   }
 
+  /** Persist the most recent inbox so it renders offline. */
+  async cacheNotifications(list: NotificationDTO[]): Promise<void> {
+    const database = await this.database();
+    const now = new Date().toISOString();
+    for (const row of list) {
+      await database.runAsync(
+        `INSERT INTO notification_cache (id, payload_json, read, flushed, cached_at)
+         VALUES (?, ?, ?, 0, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           payload_json = excluded.payload_json,
+           read = MAX(notification_cache.read, excluded.read),
+           flushed = notification_cache.flushed,
+           cached_at = excluded.cached_at`,
+        row.id,
+        JSON.stringify(row),
+        row.read ? 1 : 0,
+        now,
+      );
+    }
+  }
+
+  async getCachedNotifications(): Promise<NotificationDTO[]> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<NotificationRow>(
+      "SELECT payload_json, read FROM notification_cache ORDER BY cached_at DESC LIMIT 100",
+    );
+    return rows.flatMap((row) => {
+      try {
+        const dto = JSON.parse(row.payload_json) as NotificationDTO;
+        dto.read = dto.read || row.read === 1;
+        return [dto];
+      } catch {
+        return [];
+      }
+    });
+  }
+
+  async markNotificationReadLocal(id: string): Promise<void> {
+    const database = await this.database();
+    await database.runAsync("UPDATE notification_cache SET read = 1 WHERE id = ?", id);
+  }
+
+  async markNotificationReadFlushed(id: string): Promise<void> {
+    const database = await this.database();
+    await database.runAsync(
+      "UPDATE notification_cache SET read = 1, flushed = 1 WHERE id = ?",
+      id,
+    );
+  }
+
+  async markAllNotificationsReadLocal(): Promise<void> {
+    const database = await this.database();
+    await database.runAsync("UPDATE notification_cache SET read = 1");
+  }
+
+  async markAllNotificationsReadFlushed(): Promise<void> {
+    const database = await this.database();
+    await database.runAsync("UPDATE notification_cache SET read = 1, flushed = 1");
+  }
+
+  /** Best-effort push of reads captured while offline. */
+  async flushNotificationReads(): Promise<number> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<NotificationIdRow>(
+      "SELECT id FROM notification_cache WHERE read = 1 AND flushed = 0 LIMIT 20",
+    );
+    let pushed = 0;
+    for (const { id } of rows) {
+      try {
+        const response = await fetchWithTimeout(
+          `${this.opts.apiUrl}/api/notifications/${id}/read`,
+          { method: "PATCH", headers: this.headers() },
+        );
+        if (response.ok || response.status === 404) {
+          await database.runAsync(
+            "UPDATE notification_cache SET flushed = 1 WHERE id = ?",
+            id,
+          );
+          pushed += 1;
+        }
+      } catch {
+        // leave for the next flush
+      }
+    }
+    return pushed;
+  }
+
+  /**
+   * Cache a job's photo/voice-note metadata plus (bounded) media bytes so the
+   * job detail renders evidence offline. Best-effort: failures keep the remote
+   * URL as the fallback.
+   */
+  async primeJobMedia(
+    jobId: string,
+    photos: JobPhoto[],
+    voiceNotes: JobVoiceNoteDTO[],
+  ): Promise<Record<string, string>> {
+    const database = await this.database();
+    await database.runAsync(
+      `INSERT OR REPLACE INTO job_media_index (job_id, payload_json, cached_at)
+       VALUES (?, ?, ?)`,
+      jobId,
+      JSON.stringify({ photos, voiceNotes }),
+      new Date().toISOString(),
+    );
+
+    const cached = await this.listCachedMediaForJob(jobId);
+    const tasks: Array<{ fileKey: string; kind: "photo" | "voice_note"; url: string }> = [];
+    for (const photo of photos.slice(0, 12)) {
+      const fileKey = `photo:${photo.id}`;
+      if (!cached[fileKey]) {
+        tasks.push({
+          fileKey,
+          kind: "photo",
+          url: this.fileUrl(`/api/photos/${photo.id}/file`),
+        });
+      }
+    }
+    for (const note of voiceNotes.slice(0, 20)) {
+      const fileKey = `voice:${note.id}`;
+      if (!cached[fileKey]) {
+        tasks.push({
+          fileKey,
+          kind: "voice_note",
+          url: this.fileUrl(`/api/voice-notes/${note.id}/file`),
+        });
+      }
+    }
+
+    let index = 0;
+    const workers = Array.from({ length: Math.min(3, tasks.length) }, async () => {
+      while (index < tasks.length) {
+        const task = tasks[index++];
+        try {
+          const uri = await this.cacheRemoteMedia(task.fileKey, task.kind, jobId, task.url);
+          cached[task.fileKey] = uri;
+        } catch {
+          // skip; the remote URL remains the fallback
+        }
+      }
+    });
+    await Promise.all(workers);
+    return cached;
+  }
+
+  async getJobMediaIndex(jobId: string): Promise<{ photos: unknown[]; voiceNotes: unknown[] } | null> {
+    const database = await this.database();
+    const row = await database.getFirstAsync<MediaIndexRow>(
+      "SELECT payload_json FROM job_media_index WHERE job_id = ? LIMIT 1",
+      jobId,
+    );
+    if (!row) return null;
+    try {
+      const parsed = JSON.parse(row.payload_json) as { photos: unknown[]; voiceNotes: unknown[] };
+      return { photos: parsed.photos ?? [], voiceNotes: parsed.voiceNotes ?? [] };
+    } catch {
+      return null;
+    }
+  }
+
+  async getCachedMediaUri(fileKey: string): Promise<string | null> {
+    const database = await this.database();
+    const row = await database.getFirstAsync<MediaCacheRow>(
+      "SELECT local_uri FROM media_cache WHERE file_key = ? LIMIT 1",
+      fileKey,
+    );
+    return row?.local_uri ?? null;
+  }
+
+  async listCachedMediaForJob(jobId: string): Promise<Record<string, string>> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<MediaCacheRow>(
+      "SELECT file_key, local_uri FROM media_cache WHERE job_id = ?",
+      jobId,
+    );
+    return Object.fromEntries(rows.map((row) => [row.file_key, row.local_uri]));
+  }
+
+  private fileUrl(path: string): string {
+    const base = `${this.opts.apiUrl}${path}`;
+    return this.opts.token ? `${base}?token=${encodeURIComponent(this.opts.token)}` : base;
+  }
+
+  private async cacheRemoteMedia(
+    fileKey: string,
+    kind: "photo" | "voice_note",
+    jobId: string,
+    sourceUrl: string,
+  ): Promise<string> {
+    const dir = new Directory(Paths.document, "nnact-media", "cache");
+    await dir.create({ intermediates: true, idempotent: true });
+    const name = `${fileKey.replace(/[^a-zA-Z0-9-]/g, "-")}.${kind === "photo" ? "jpg" : "bin"}`;
+    const destination = new File(dir, name);
+    const downloaded = await File.downloadFileAsync(sourceUrl, destination, { idempotent: true });
+    const database = await this.database();
+    await database.runAsync(
+      `INSERT OR REPLACE INTO media_cache (file_key, kind, job_id, local_uri, cached_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      fileKey,
+      kind,
+      jobId,
+      downloaded.uri,
+      new Date().toISOString(),
+    );
+    return downloaded.uri;
+  }
+
   /**
    * Synchronize field work as coherent job/appliance/diagnostic packages.
    * This replaces the former empty generic sync request, which could not
@@ -988,6 +1236,7 @@ export class SyncService {
     }
 
     const rbModels = await this.syncRepairBrainCatalog().catch(() => 0);
+    await this.flushNotificationReads().catch(() => 0);
 
     return {
       downloaded,

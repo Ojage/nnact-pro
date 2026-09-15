@@ -7,6 +7,7 @@ import type { StoredStaffSession } from "../auth-storage";
 import { staffFetch } from "../auth-api";
 import { EmptyState, HeroBanner, LoadingScreen, PrimaryButton, SectionHeader } from "../components/ui";
 import type { AppSearchFonts } from "@nnact/mobile-ui";
+import type { SyncService } from "../sync";
 import { fonts, spacing, type Palette } from "../theme";
 
 function formatTimeAgo(iso: string): string {
@@ -22,6 +23,8 @@ function formatTimeAgo(iso: string): string {
 export function NotificationsScreen({
   colors,
   session,
+  offline,
+  syncService,
   onBack,
   onOpenJob,
   onOpenSearch,
@@ -30,6 +33,8 @@ export function NotificationsScreen({
 }: {
   colors: Palette;
   session: StoredStaffSession;
+  offline: boolean;
+  syncService: SyncService | null;
   onBack?: () => void;
   onOpenJob?: (jobId: string) => void;
   onOpenSearch?: () => void;
@@ -40,29 +45,54 @@ export function NotificationsScreen({
   const [rows, setRows] = useState<NotificationDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offlineLens, setOfflineLens] = useState(false);
 
   const load = useCallback(async () => {
     try {
+      if (offline && syncService) {
+        setRows(await syncService.getCachedNotifications());
+        setOfflineLens(true);
+        return;
+      }
       const list = await staffFetch<NotificationDTO[]>(session, "/api/notifications/all");
       setRows(list);
+      setOfflineLens(false);
+      void syncService?.cacheNotifications(list);
+      void syncService?.flushNotificationReads();
+    } catch {
+      const cached = await syncService?.getCachedNotifications();
+      if (cached && cached.length > 0) {
+        setRows(cached);
+        setOfflineLens(true);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [session]);
+  }, [offline, session, syncService]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   async function markRead(id: string) {
-    await staffFetch(session, `/api/notifications/${id}/read`, { method: "PATCH" });
     setRows((prev) => prev.map((row) => (row.id === id ? { ...row, read: true } : row)));
+    try {
+      await staffFetch(session, `/api/notifications/${id}/read`, { method: "PATCH" });
+      await syncService?.markNotificationReadFlushed(id);
+    } catch {
+      await syncService?.markNotificationReadLocal(id);
+    }
   }
 
   async function markAllRead() {
-    await staffFetch(session, "/api/notifications/read-all", { method: "POST" });
     setRows((prev) => prev.map((row) => ({ ...row, read: true })));
+    try {
+      await staffFetch(session, "/api/notifications/read-all", { method: "POST" });
+      await syncService?.markAllNotificationsReadFlushed();
+    } catch {
+      await syncService?.markAllNotificationsReadLocal();
+    }
   }
 
   function openRow(row: NotificationDTO) {
@@ -108,6 +138,16 @@ export function NotificationsScreen({
         searchFonts={searchFonts}
       />
 
+      {offlineLens && rows.length > 0 ? (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color={colors.warning} />
+          <Text style={styles.offlineText}>
+            Cached inbox — {rows.length} message{rows.length === 1 ? "" : "s"} from your last sync.
+            New messages and read states sync when you reconnect.
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.section}>
         {rows.some((row) => !row.read) ? (
           <PrimaryButton colors={colors} label="Mark all read" onPress={() => void markAllRead()} variant="ghost" size="sm" fullWidth={false} />
@@ -117,7 +157,7 @@ export function NotificationsScreen({
       <SectionHeader colors={colors} title={`${rows.length} message${rows.length === 1 ? "" : "s"}`} />
       <View style={styles.section}>
         {rows.length === 0 ? (
-          <EmptyState colors={colors} icon="" title="No notifications" description="Assignments and dispatch updates appear here instantly." />
+          <EmptyState colors={colors} icon="" title="No notifications" description={offlineLens ? "Nothing cached on this device yet. Connect once to download your inbox." : "Assignments and dispatch updates appear here instantly."} />
         ) : (
           rows.map((row) => (
             <TouchableOpacity
@@ -161,6 +201,17 @@ const createStyles = (colors: Palette) =>
       paddingTop: spacing.md,
       marginBottom: -spacing.sm,
     },
+    offlineBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      backgroundColor: colors.warningAlpha,
+      borderRadius: 12,
+      padding: spacing.md,
+    },
+    offlineText: { color: colors.warning, fontSize: 13, fontFamily: fonts.medium, flex: 1 },
     section: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
     card: {
       backgroundColor: colors.card,

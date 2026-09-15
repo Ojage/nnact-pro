@@ -331,6 +331,8 @@ function FieldApp({
           <NotificationsScreen
             colors={colors}
             session={session}
+            offline={field.offline}
+            syncService={field.getSyncService()}
             onBack={closeNotifications}
             onOpenJob={(jobId) => {
               setPendingJobId(jobId);

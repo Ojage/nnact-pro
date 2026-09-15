@@ -27,17 +27,22 @@ export function VoiceNoteList({
   colors,
   accessToken,
   notes,
+  cachedUris,
 }: {
   colors: Palette;
   accessToken: string;
   notes: JobVoiceNoteDTO[];
+  cachedUris?: Record<string, string>;
 }) {
   const styles = createStyles(colors);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const source = playingId ? { uri: voiceNoteFileUrl(playingId, accessToken) } : null;
+  const playingUri = playingId
+    ? cachedUris?.[`voice:${playingId}`] ?? voiceNoteFileUrl(playingId, accessToken)
+    : null;
+  const source = playingUri ? { uri: playingUri } : null;
   const player = useAudioPlayer(source);
   const status = useAudioPlayerStatus(player);
 

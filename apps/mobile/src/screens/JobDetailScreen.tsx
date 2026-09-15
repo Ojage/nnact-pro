@@ -120,6 +120,7 @@ export function JobDetailScreen({
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [pendingPhotos, setPendingPhotos] = useState<MediaOutboxItem[]>([]);
+  const [mediaUris, setMediaUris] = useState<Record<string, string>>({});
   const [voiceNotes, setVoiceNotes] = useState<JobVoiceNoteDTO[]>([]);
   const [viewerPhoto, setViewerPhoto] = useState<JobPhoto | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -160,8 +161,10 @@ export function JobDetailScreen({
       setLineItems((pkg.lineItems ?? []) as unknown as LineItem[]);
       setActivities((pkg.activity ?? []) as unknown as ActivityDTO[]);
       setHistory((pkg.statusHistory ?? []) as unknown as StatusHistoryRow[]);
-      setPhotos([]);
-      setVoiceNotes([]);
+      const mediaIndex = await syncService.getJobMediaIndex(jobId);
+      setPhotos((mediaIndex?.photos ?? []) as unknown as JobPhoto[]);
+      setVoiceNotes((mediaIndex?.voiceNotes ?? []) as unknown as JobVoiceNoteDTO[]);
+      setMediaUris(await syncService.listCachedMediaForJob(jobId));
       setDiagnostics([]);
       setPendingPhotos(await syncService.listQueuedMedia(jobId));
       setOfflineMode(true);
@@ -193,6 +196,12 @@ export function JobDetailScreen({
         setDiagnostics(diagnosticRows);
         setPhotos(photoRows);
         setVoiceNotes(voiceRows);
+        try {
+          const media = await (syncService?.primeJobMedia(jobId, photoRows, voiceRows) ?? Promise.resolve({}));
+          setMediaUris(media);
+        } catch {
+          // media warming is best-effort; remote URLs remain the fallback
+        }
         setPendingPhotos((await syncService?.listQueuedMedia(jobId)) ?? []);
         setOfflineMode(false);
 
@@ -651,7 +660,7 @@ export function JobDetailScreen({
             syncService={syncService}
             onUploaded={() => void load(true)}
           />
-          <VoiceNoteList colors={colors} accessToken={session.accessToken} notes={voiceNotes} />
+          <VoiceNoteList colors={colors} accessToken={session.accessToken} notes={voiceNotes} cachedUris={mediaUris} />
         </View>
 
         <SectionHeader colors={colors} title="Field photos" action="Gallery" onAction={() => void pickPhoto()} />
@@ -668,7 +677,7 @@ export function JobDetailScreen({
                   style={styles.photoCell}
                 >
                   <Image
-                    source={{ uri: jobPhotoFileUrl(photo.id, session.accessToken) }}
+                    source={{ uri: mediaUris[`photo:${photo.id}`] ?? jobPhotoFileUrl(photo.id, session.accessToken) }}
                     style={styles.photoThumb}
                     resizeMode="cover"
                   />
@@ -817,7 +826,7 @@ export function JobDetailScreen({
           <View style={styles.viewerBody}>
             {viewerPhoto ? (
               <Image
-                source={{ uri: jobPhotoFileUrl(viewerPhoto.id, session.accessToken) }}
+                source={{ uri: mediaUris[`photo:${viewerPhoto.id}`] ?? jobPhotoFileUrl(viewerPhoto.id, session.accessToken) }}
                 style={styles.viewerImage}
                 resizeMode="contain"
               />
