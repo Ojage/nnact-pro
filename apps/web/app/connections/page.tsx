@@ -85,7 +85,7 @@ export default function ConnectionsPage() {
 
       {message && <Card className="border-border bg-surface-300/50"><CardContent className="p-3"><p className="text-sm text-fg">{message}</p></CardContent></Card>}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2" data-tour="channels-grid">
         {data.channels.map((channel) => {
           const info = CHANNEL_INFO[channel] ?? { label: channel, blurb: "" };
           const conn = data.connections.find((c) => c.channel === channel);

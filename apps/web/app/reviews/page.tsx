@@ -164,7 +164,7 @@ export default function ReviewsPage() {
         <>
           {/* Rating summary + search */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
-            <Card>
+            <Card data-tour="reviews-rating">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="text-3xl font-bold text-fg tabular-nums">
                   {data.average.toFixed(1)}
@@ -178,6 +178,7 @@ export default function ReviewsPage() {
             <div className="flex-1 flex items-center gap-3">
               <Input
                 type="search"
+                data-tour="reviews-search"
                 placeholder="Search by comment, job, or customer..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -216,7 +217,7 @@ export default function ReviewsPage() {
               </div>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-tour="reviews-list">
               {filteredSorted.map((r) => {
                 const job = jobMap.get(r.jobId);
                 const cust = job ? customerMap.get(job.customerId) : null;

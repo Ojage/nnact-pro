@@ -95,7 +95,7 @@ export default function ProfilePage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr]">
-        <Card>
+        <Card data-tour="profile-avatar">
           <CardHeader>
             <CardTitle>Profile photo</CardTitle>
           </CardHeader>
@@ -128,7 +128,7 @@ export default function ProfilePage() {
         </Card>
 
         <div className="grid gap-6">
-          <Card>
+          <Card data-tour="profile-about">
             <CardHeader>
               <CardTitle>About you</CardTitle>
             </CardHeader>
@@ -160,7 +160,7 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="profile-identity">
             <CardHeader>
               <CardTitle>Identity</CardTitle>
               <p className="text-sm text-fg-muted">Managed by an owner in Settings → Team.</p>

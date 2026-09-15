@@ -119,6 +119,9 @@ Tags: `customer.created`, `equipment.created`, `job.created`,
 | connect-integrations | `integrations-catalog`, `integrations-deliveries` |
 | browse-diagnostic-library | `diagnostic-library-workflows`, `diagnostic-library-readiness` |
 | coverage-quality | `coverage-hero`, `coverage-families` |
+| manage-connections | `channels-grid` |
+| manage-reviews | `reviews-rating`, `reviews-search`, `reviews-list` |
+| edit-profile | `profile-avatar`, `profile-about`, `profile-identity` |
 
 ## Progress model & reconciliation
 
