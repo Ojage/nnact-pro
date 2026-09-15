@@ -5,11 +5,13 @@ import { Check, PackageSearch, Pencil, Plus, Search, Trash2, TriangleAlert } fro
 import {
   CURRENCY_CATALOG,
   DEFAULT_CURRENCY,
+  ADVANCE_TAG,
   formatMoney,
   isCurrencyCode,
   type CurrencyCode,
 } from "@nnact/shared";
 import { api } from "@/lib/api";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -210,6 +212,7 @@ export default function PriceBookPage() {
           taxable: true,
           active: true,
         });
+        emitWalkthroughDone(ADVANCE_TAG.catalogItemCreated);
         showNotice("Service added to the price book.");
       }
       closeForm();
@@ -258,7 +261,7 @@ export default function PriceBookPage() {
         title="Price Book"
         description={`${items.length} service${items.length === 1 ? "" : "s"} · ${categories.length} categor${categories.length === 1 ? "y" : "ies"}`}
         actions={
-          <Button onClick={openNew} size="sm">
+          <Button onClick={openNew} size="sm" data-tour="pb-add">
             <Plus aria-hidden /> Add service
           </Button>
         }
@@ -319,7 +322,7 @@ export default function PriceBookPage() {
       )}
 
       {formOpen && (
-        <Card className="mb-4 border-accent/30">
+        <Card className="mb-4 border-accent/30" data-tour="pb-form">
           <CardContent className="p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -344,6 +347,7 @@ export default function PriceBookPage() {
                 </Label>
                 <Input
                   id="svc-name"
+                  data-tour="pb-name"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. Split AC diagnostic + top-up"
@@ -433,7 +437,7 @@ export default function PriceBookPage() {
             )}
 
             <div className="mt-5 flex flex-wrap items-center gap-2">
-              <Button onClick={() => void handleSave()} loading={saving}>
+              <Button onClick={() => void handleSave()} loading={saving} data-tour="pb-save">
                 {editing ? "Save changes" : "Add service"}
               </Button>
               <Button variant="secondary" onClick={closeForm}>
@@ -450,7 +454,7 @@ export default function PriceBookPage() {
             title="No services yet"
             description="Add your first service to build your price book — it's shared with your whole org."
             actions={
-              <Button size="sm" onClick={openNew}>
+              <Button size="sm" onClick={openNew} data-tour="pb-add">
                 <Plus aria-hidden /> Add service
               </Button>
             }

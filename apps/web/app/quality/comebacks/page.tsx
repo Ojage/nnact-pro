@@ -39,7 +39,7 @@ export default function ComebacksPage() {
         description={`${open} open case${open === 1 ? "" : "s"} · ${comebacks.length} total`}
         actions={
           <Link href="/quality/comebacks/new">
-            <Button>New comeback</Button>
+            <Button data-tour="cb-add">New comeback</Button>
           </Link>
         }
       />

@@ -151,7 +151,7 @@ export default function ReportsPage() {
       {data && (
         <>
           {/* Top-level KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" data-tour="reports-kpis">
             <StatCard
               title="Revenue Collected"
               value={formatMoney(data.revenueCollectedCents)}
@@ -286,7 +286,7 @@ export default function ReportsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle>Accounts Receivable Aging</CardTitle>
-                  <Button size="sm" variant="secondary" onClick={() => void downloadCsv("ar-aging").catch(() => {})}>Download CSV</Button>
+                  <Button size="sm" variant="secondary" onClick={() => void downloadCsv("ar-aging").catch(() => {})} data-tour="reports-csv">Download CSV</Button>
                 </div>
               </CardHeader>
               <CardContent>

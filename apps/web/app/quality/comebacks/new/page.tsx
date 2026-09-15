@@ -20,8 +20,9 @@ import {
   useCreateComebackMutation,
   useCreateComebackFromJobMutation,
 } from "@/lib/redux/api";
-import { COMEBACK_INTAKE_REASON, COMEBACK_INTAKE_REASON_LABEL, COMEBACK_SEVERITY_LABEL } from "@nnact/shared";
+import { COMEBACK_INTAKE_REASON, COMEBACK_INTAKE_REASON_LABEL, COMEBACK_SEVERITY_LABEL, ADVANCE_TAG } from "@nnact/shared";
 import type { ComebackIntakeReason, ComebackSeverity } from "@nnact/shared";
+import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 
 export default function NewComebackPage() {
   const router = useRouter();
@@ -55,6 +56,7 @@ export default function NewComebackPage() {
         ...(severity && { severity }),
       };
       const result = await createFromJob(payload).unwrap();
+      emitWalkthroughDone(ADVANCE_TAG.comebackCreated);
       router.push(`/quality/comebacks/${result.id}`);
     } catch (err) {
       setError(String(err));
@@ -67,7 +69,7 @@ export default function NewComebackPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Report a Comeback" description="Flag a completed job as a comeback for investigation." />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" data-tour="cb-form">
         {error && (
           <div className="rounded-xl border border-red/30 bg-red/5 p-3 text-sm text-red">{error}</div>
         )}

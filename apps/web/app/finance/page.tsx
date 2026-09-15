@@ -96,7 +96,7 @@ export default function FinancePage() {
   }
 
   return (
-    <div>
+    <div data-tour="finance-overview">
       <PageHeader
         title="Finance"
         description={

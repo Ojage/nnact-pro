@@ -104,7 +104,7 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div>
+    <div data-tour="finance-expenses">
       <PageHeader
         title="Expenses"
         description={expenses.length > 0 ? `${filtered.length} of ${expenses.length} · ${pending} awaiting action` : undefined}

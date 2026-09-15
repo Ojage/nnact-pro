@@ -13,9 +13,12 @@ pick up later — including across the native and mobile clients later.
 2. **Targets** are stable `data-tour="<target-id>"` attributes on real elements.
    No positional maths, no brittle selectors. Pages never know a tour is
    running — they only hold targets and fire completion events.
-3. **Engine** (`apps/web/components/walkthroughs/walkthrough-provider.tsx`)
-   listens for events, resolves targets, positions the spotlight/coachmark, and
-   advances as the user works.
+3. **Engine/Presentation** (`apps/web/components/walkthroughs/`) — the
+   provider listens for events, resolves targets, and advances as the user
+   works. The bubble is rendered by **React Joyride** (Floating UI floater:
+   auto-flip, scroll-to-target) via a custom shadcn tooltip, with a non-blocking
+   Spotlight dim; navigation/resolving states fall back to a bottom-sheet
+   coachmark.
 4. **Progress** is stored server-side (`users.walkthrough_progress` JSONB, via
    `GET/PATCH /api/me/walkthrough-progress`) with a localStorage cache for
    instant boot + offline tolerance.
@@ -80,7 +83,8 @@ emitWalkthroughDone(ADVANCE_TAG.jobCreated);
 Tags: `customer.created`, `equipment.created`, `job.created`,
 `technician.assigned`, `visit.started`, `visit.completed`,
 `diagnosis.recorded`, `knowledge.contributed`, `knowledge.reviewed`,
-`estimate.sent`, `invoice.sent`, `payment.recorded`.
+`estimate.sent`, `invoice.sent`, `payment.recorded`,
+`catalog.item.created`, `comeback.created`.
 
 ## Targets already wired (P0)
 
@@ -98,6 +102,10 @@ Tags: `customer.created`, `equipment.created`, `job.created`,
 | create-quotation | `estimates-add`, `estimates-form`, `estimates-send` |
 | issue-invoice | `invoices-add`, `invoices-form`, `invoices-send`, `invoices-list` |
 | record-payment | `invoices-add`, `invoices-list`, `invoices-pay` |
+| build-price-book | `pb-add`, `pb-form`, `pb-name` (price book catalog) |
+| track-comeback | `cb-add`, `cb-form` (comeback board + intake) |
+| finance-essentials | `finance-overview`, `finance-expenses` |
+| read-reports | `reports-kpis`, `reports-csv` |
 
 ## Progress model & reconciliation
 
@@ -136,6 +144,6 @@ Tags: `customer.created`, `equipment.created`, `job.created`,
 
 - `packages/shared/src/walkthroughs.ts` — definitions, roles, `ADVANCE_TAG`
 - `apps/web/lib/walkthroughs/{runtime,events,target,progress}.ts` — pure logic
-- `apps/web/components/walkthroughs/{walkthrough-provider,coachmark,spotlight,learn-center,welcome-dialog}.tsx` — engine + UI
+- `apps/web/components/walkthroughs/{walkthrough-provider,tour-stage,tour-tooltip,coachmark,spotlight,learn-center,welcome-dialog}.tsx` — engine + UI (Joyride + shadcn)
 - `apps/api/src/routes/walkthroughs.ts` — progress persistence
 - `packages/db/drizzle/0021_walkthrough_progress.sql` — `users.walkthrough_progress`
