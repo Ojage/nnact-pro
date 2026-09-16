@@ -542,8 +542,9 @@ async function snapshotWarrantyForOriginalJob(
   orgId: string,
   originalJobId: string | null,
   equipmentId: string | null,
+  businessSettings: Awaited<ReturnType<typeof orgSettings>>,
 ): Promise<{ warrantyStatus: ComebackWarrantyStatus; workmanshipWarrantyEndsAt: Date | null; partsWarrantyEndsAt: Date | null }> {
-  const settings = await orgComebackSettings(orgId);
+  const settings = businessSettings.comeback ?? DEFAULT_COMEBACK_SETTINGS;
   let completedAt: Date | null = null;
   let equipmentExpiry: Date | null = null;
   if (originalJobId) {
@@ -571,19 +572,41 @@ async function snapshotWarrantyForOriginalJob(
   };
 }
 
-/** Create a comeback case (shared by POST / and POST /jobs/:jobId/comeback). */
-async function createCase(
-  req: FastifyRequest,
-  reply: Reply,
+/** HTTP-like error raised by write helpers so route/offline layers map statuses. */
+export class HttpError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Create a comeback case (shared by POST /, POST /jobs/:jobId/comeback, and
+ * the mobile offline batch). Runs the full intake pipeline — policy gate,
+ * technician permission, duplicate guard, repeat number, warranty snapshot,
+ * org-scoped numbering, status history, and office notification — and returns
+ * the inserted row plus any duplicate warning. Throws HttpError for policy,
+ * permission, and not-found failures so callers can map statuses themselves.
+ */
+export async function createComebackCaseCore(
   orgId: string,
-  claims: Claims,
+  claims: { userId: string; role: string },
   body: z.infer<typeof createCaseBody>,
-  lockedOriginalJobId: string,
-): Promise<ReturnType<typeof reply.send>> {
-  const settings = await orgSettings(orgId);
+  options: { orgSettingsCache?: Map<string, Awaited<ReturnType<typeof orgSettings>>> } = {},
+): Promise<{ result: CaseRow; duplicates: string[] }> {
+  let settings: Awaited<ReturnType<typeof orgSettings>>;
+  const cached = options.orgSettingsCache?.get(orgId);
+  if (cached) {
+    settings = cached;
+  } else {
+    settings = await orgSettings(orgId);
+    options.orgSettingsCache?.set(orgId, settings);
+  }
   const comebackSettings = settings.comeback ?? DEFAULT_COMEBACK_SETTINGS;
   if (!comebackSettings.enabled) {
-    return reply.code(403).send({ error: "comeback intake is disabled for this organization" });
+    throw new HttpError(403, "comeback intake is disabled for this organization");
   }
 
   const [originalJob] = await db
@@ -601,43 +624,45 @@ async function createCase(
       source: jobs.source,
     })
     .from(jobs)
-    .where(and(eq(jobs.orgId, orgId), eq(jobs.id, lockedOriginalJobId)))
+    .where(and(eq(jobs.orgId, orgId), eq(jobs.id, body.originalJobId)))
     .limit(1);
   if (!originalJob) {
-    return reply.code(404).send({ error: "original job not found in this organization" });
+    throw new HttpError(404, "original job not found in this organization");
   }
   if (!isOfficeRole(claims.role)) {
     const allowed = comebackSettings.allowTechnicianSelfReport && originalJob.assignedTo === claims.userId;
     if (!allowed) {
-      return reply.code(403).send({ error: "technicians may only report comebacks from jobs assigned to them" });
+      throw new HttpError(403, "technicians may only report comebacks from jobs assigned to them");
     }
   }
 
   // Duplicate guard: warn (never block) on an open, recent case for the same job.
-  const openRecentCases = await db
-    .select({ id: comebackCases.id, caseNumber: comebackCases.caseNumber, originalJobId: comebackCases.originalJobId, complaintSummary: comebackCases.complaintSummary, createdAt: comebackCases.createdAt })
-    .from(comebackCases)
-    .where(
-      and(
-        eq(comebackCases.orgId, orgId),
-        eq(comebackCases.originalJobId, originalJob.id),
-        inArray(comebackCases.status, COMEBACK_STATUS.filter((s) => isOpenComeback(s))),
+  // Open-case scan and full-case count are independent reads — fetch in parallel.
+  const [openRecentCases, priorCount] = await Promise.all([
+    db
+      .select({ id: comebackCases.id, caseNumber: comebackCases.caseNumber, originalJobId: comebackCases.originalJobId, complaintSummary: comebackCases.complaintSummary, createdAt: comebackCases.createdAt })
+      .from(comebackCases)
+      .where(
+        and(
+          eq(comebackCases.orgId, orgId),
+          eq(comebackCases.originalJobId, originalJob.id),
+          inArray(comebackCases.status, COMEBACK_STATUS.filter((s) => isOpenComeback(s))),
+        ),
       ),
-    );
+    db
+      .select({ id: comebackCases.id })
+      .from(comebackCases)
+      .where(and(eq(comebackCases.orgId, orgId), eq(comebackCases.originalJobId, originalJob.id)))
+      .then((rows) => rows.length),
+  ]);
   const duplicate = findComebackDuplicate(openRecentCases as never, originalJob.id, body.complaintSummary ?? originalJob.title, {
     duplicateWindowDays: comebackSettings.duplicateWindowDays,
   });
   const duplicates = duplicate ? [duplicate.caseNumber] : [];
-
-  const priorCount = await db
-    .select({ id: comebackCases.id })
-    .from(comebackCases)
-    .where(and(eq(comebackCases.orgId, orgId), eq(comebackCases.originalJobId, originalJob.id)))
-    .then((rows) => rows.length);
   const repeatNumber = priorCount + 1;
 
   const equipmentId = body.equipmentId ?? null;
-  const warranty = await snapshotWarrantyForOriginalJob(orgId, originalJob.id, equipmentId);
+  const warranty = await snapshotWarrantyForOriginalJob(orgId, originalJob.id, equipmentId, settings);
 
   const result = await withComebackNumber(orgId, originalJob.id, async (tx) => {
     const count = await tx
@@ -705,8 +730,29 @@ async function createCase(
   void safeEmitEvent(orgId, "comeback.reported", { id: result.id, caseNumber: result.caseNumber, originalJobId: result.originalJobId });
   void notifyComebackReportedToOffice(orgId, claims.userId, claims.userId, result.caseNumber, result.complaintSummary);
 
-  const detail = await assembleDetail(orgId, result);
-  return reply.code(201).send({ case: detail, duplicateWarning: duplicates });
+  return { result, duplicates };
+}
+
+/** Route wrapper: create a comeback case (POST / and POST /jobs/:jobId/comeback). */
+async function createCase(
+  req: FastifyRequest,
+  reply: Reply,
+  orgId: string,
+  claims: Claims,
+  body: z.infer<typeof createCaseBody>,
+  lockedOriginalJobId: string,
+): Promise<ReturnType<typeof reply.send>> {
+  try {
+    const { result, duplicates } = await createComebackCaseCore(orgId, claims, { ...body, originalJobId: lockedOriginalJobId });
+    const detail = await assembleDetail(orgId, result);
+    return reply.code(201).send({ case: detail, duplicateWarning: duplicates });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return reply.code(error.statusCode).send({ error: error.message });
+    }
+    req.log.error({ err: error }, "comeback case create failed");
+    return reply.code(500).send({ error: "could not create comeback case" });
+  }
 }
 
 /** Create a comeback work-order (visit) under the case. */
@@ -1665,7 +1711,6 @@ export async function comebackRoutes(app: FastifyInstance) {
 
     const techIds = [...new Set([...cases.map((c) => c.assignedTechnicianId).filter(Boolean), ...history.map((h) => h.changedBy).filter(Boolean)])] as string[];
     const names = await loadNames(orgId, techIds);
-    const techNames = await loadNames(orgId, cases.map((c) => c.assignedTechnicianId));
 
     const stats = new Map<string, { assigned: number; resolved: number; reopened: number; resMs: number; nRes: number; internal: number; billable: number }>();
     const caseMap = new Map(cases.map((c) => [c.id, c]));
@@ -1702,7 +1747,7 @@ export async function comebackRoutes(app: FastifyInstance) {
 
     const metrics: ComebackTechnicianMetricDTO[] = [...stats.entries()].map(([userId, s]) => ({
       userId,
-      name: techNames.get(userId) ?? names.get(userId) ?? "Unknown",
+      name: names.get(userId) ?? "Unknown",
       casesAssignedCount: s.assigned,
       casesResolvedOwnCount: s.resolved,
       reopenedInPeriodCount: s.reopened,

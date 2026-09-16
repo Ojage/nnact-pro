@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { COMEBACK_INTAKE_REASON, COMEBACK_SEVERITY, type BusinessSettings } from "@nnact/shared";
 import {
   correctionReports,
   customers,
@@ -24,6 +25,7 @@ import {
   type DiagnosticSessionStatus,
 } from "../diagnostics.js";
 import { resolveOrgId } from "./org.js";
+import { createComebackCaseCore } from "./comebacks.js";
 
 const measurementOp = z.object({
   opId: z.string().min(1).max(100),
@@ -110,6 +112,19 @@ const jobStatusOp = z.object({
   }),
 });
 
+const comebackCreateOp = z.object({
+  opId: z.string().min(1).max(100),
+  kind: z.literal("comeback.create"),
+  payload: z.object({
+    jobId: z.string().uuid(),
+    complaintSummary: z.string().trim().min(1).max(500).optional(),
+    complaintDetails: z.string().trim().max(5000).optional(),
+    intakeReason: z.enum(COMEBACK_INTAKE_REASON).optional(),
+    severity: z.enum(COMEBACK_SEVERITY).optional(),
+    reportedAt: z.string().datetime().optional(),
+  }),
+});
+
 const batchSchema = z.object({
   ops: z
     .array(
@@ -119,6 +134,7 @@ const batchSchema = z.object({
         sessionCreateOp,
         correctionOp,
         jobStatusOp,
+        comebackCreateOp,
       ]),
     )
     .min(1)
@@ -128,6 +144,7 @@ const batchSchema = z.object({
 export const diagnosticOfflineBatchSchema = batchSchema;
 export const diagnosticOfflineSessionCreateOp = sessionCreateOp;
 export const diagnosticOfflineJobStatusOp = jobStatusOp;
+export const diagnosticOfflineComebackCreateOp = comebackCreateOp;
 
 type OfflineOp = z.infer<typeof batchSchema>["ops"][number];
 
@@ -332,29 +349,32 @@ async function loadPackage(orgId: string, jobId: string) {
 async function applyOfflineOp(
   orgId: string,
   op: OfflineOp,
-  changedBy: string | null = null,
+  actor: { userId: string | null; role?: string } = { userId: null },
+  settingsCache?: Map<string, BusinessSettings>,
 ): Promise<OfflineResult> {
+  const changedBy = actor.userId;
   if (op.kind === "measurement.create") {
-    const [session] = await db
-      .select()
-      .from(diagnosticSessions)
-      .where(
-        and(
-          eq(diagnosticSessions.orgId, orgId),
-          eq(diagnosticSessions.id, op.payload.sessionId),
+    const [[session], [step]] = await Promise.all([
+      db
+        .select()
+        .from(diagnosticSessions)
+        .where(
+          and(
+            eq(diagnosticSessions.orgId, orgId),
+            eq(diagnosticSessions.id, op.payload.sessionId),
+          ),
         ),
-      );
+      db
+        .select({ id: diagnosticSteps.id, workflowId: diagnosticSteps.workflowId })
+        .from(diagnosticSteps)
+        .where(
+          and(
+            eq(diagnosticSteps.orgId, orgId),
+            eq(diagnosticSteps.id, op.payload.stepId),
+          ),
+        ),
+    ]);
     if (!session) return { opId: op.opId, ok: false, error: "session not found" };
-
-    const [step] = await db
-      .select({ id: diagnosticSteps.id, workflowId: diagnosticSteps.workflowId })
-      .from(diagnosticSteps)
-      .where(
-        and(
-          eq(diagnosticSteps.orgId, orgId),
-          eq(diagnosticSteps.id, op.payload.stepId),
-        ),
-      );
     if (!step || step.workflowId !== session.workflowId) {
       return { opId: op.opId, ok: false, error: "step does not belong to session workflow" };
     }
@@ -387,22 +407,22 @@ async function applyOfflineOp(
   if (op.kind === "session.create") {
     const { id, jobId, equipmentId, workflowId, customerComplaint, technicianObservation } = op.payload;
 
-    const [jobRow] = await db
-      .select({ id: jobs.id })
-      .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+    const [[jobRow], [equipmentRow], [workflowRow]] = await Promise.all([
+      db
+        .select({ id: jobs.id })
+        .from(jobs)
+        .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))),
+      db
+        .select({ id: equipment.id })
+        .from(equipment)
+        .where(and(eq(equipment.orgId, orgId), eq(equipment.id, equipmentId))),
+      db
+        .select({ id: diagnosticWorkflows.id, versionNumber: diagnosticWorkflows.versionNumber })
+        .from(diagnosticWorkflows)
+        .where(and(eq(diagnosticWorkflows.orgId, orgId), eq(diagnosticWorkflows.id, workflowId))),
+    ]);
     if (!jobRow) return { opId: op.opId, ok: false, error: "job not found" };
-
-    const [equipmentRow] = await db
-      .select({ id: equipment.id })
-      .from(equipment)
-      .where(and(eq(equipment.orgId, orgId), eq(equipment.id, equipmentId)));
     if (!equipmentRow) return { opId: op.opId, ok: false, error: "equipment not found" };
-
-    const [workflowRow] = await db
-      .select({ id: diagnosticWorkflows.id, versionNumber: diagnosticWorkflows.versionNumber })
-      .from(diagnosticWorkflows)
-      .where(and(eq(diagnosticWorkflows.orgId, orgId), eq(diagnosticWorkflows.id, workflowId)));
     if (!workflowRow) return { opId: op.opId, ok: false, error: "workflow not found" };
 
     await db
@@ -497,6 +517,29 @@ async function applyOfflineOp(
     return { opId: op.opId, ok: true };
   }
 
+  if (op.kind === "comeback.create") {
+    if (!changedBy) {
+      return { opId: op.opId, ok: false, error: "unauthenticated comeback report" };
+    }
+    try {
+      await createComebackCaseCore(orgId, { userId: changedBy, role: actor.role ?? "technician" }, {
+        originalJobId: op.payload.jobId,
+        complaintSummary: op.payload.complaintSummary,
+        complaintDetails: op.payload.complaintDetails,
+        intakeReason: op.payload.intakeReason,
+        severity: op.payload.severity,
+        reportedAt: op.payload.reportedAt,
+      }, { orgSettingsCache: settingsCache });
+      return { opId: op.opId, ok: true };
+    } catch (error) {
+      return {
+        opId: op.opId,
+        ok: false,
+        error: error instanceof Error ? error.message : "could not create comeback",
+      };
+    }
+  }
+
   const [workflow] = await db
     .select({ id: diagnosticWorkflows.id })
     .from(diagnosticWorkflows)
@@ -534,17 +577,18 @@ export async function diagnosticOfflineRoutes(app: FastifyInstance) {
 
   app.post("/offline-batch", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const claims = req.user as { userId?: string } | undefined;
-    const changedBy = claims?.userId ?? null;
+    const claims = req.user as { userId?: string; role?: string } | undefined;
+    const actor = { userId: claims?.userId ?? null, role: claims?.role };
     const parsed = batchSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid offline batch", issues: parsed.error.issues });
     }
 
     const results: OfflineResult[] = [];
+    const settingsCache = new Map<string, BusinessSettings>();
     for (const op of parsed.data.ops) {
       try {
-        results.push(await applyOfflineOp(orgId, op, changedBy));
+        results.push(await applyOfflineOp(orgId, op, actor, settingsCache));
       } catch (error) {
         req.log.error({ err: error, opId: op.opId }, "offline diagnostic operation failed");
         results.push({

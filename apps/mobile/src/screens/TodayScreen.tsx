@@ -84,6 +84,7 @@ export function TodayScreen({
   onOpenRepairBrain,
   onOpenRepairBrainSearch,
   onOpenNotifications,
+  onOpenComebacks,
   onOpenSearch,
   searchPlaceholder,
   searchFonts,
@@ -112,6 +113,7 @@ export function TodayScreen({
   onOpenRepairBrain: () => void;
   onOpenRepairBrainSearch: () => void;
   onOpenNotifications: () => void;
+  onOpenComebacks: () => void;
   onOpenSearch?: () => void;
   searchPlaceholder?: string;
   searchFonts?: AppSearchFonts;
@@ -172,7 +174,7 @@ export function TodayScreen({
         )}
 
         <SectionHeader colors={colors} title="Field tools" />
-        <FieldToolsGrid colors={colors} styles={styles} activeDiagnostics={activeDiagnostics.length} jobs={jobs} isBooting={isBooting} onOpenDiagnostics={onOpenDiagnostics} onOpenRepairBrain={onOpenRepairBrain} onOpenRepairBrainSearch={onOpenRepairBrainSearch} onOpenJobs={onOpenJobs} />
+        <FieldToolsGrid colors={colors} styles={styles} activeDiagnostics={activeDiagnostics.length} jobs={jobs} isBooting={isBooting} onOpenDiagnostics={onOpenDiagnostics} onOpenRepairBrain={onOpenRepairBrain} onOpenRepairBrainSearch={onOpenRepairBrainSearch} onOpenJobs={onOpenJobs} onOpenComebacks={onOpenComebacks} />
 
         <RepairBrainCard colors={colors} styles={styles} activeDiagnostics={activeDiagnostics} onOpenRepairBrain={onOpenRepairBrain} onOpenDiagnosticSession={onOpenDiagnosticSession} />
 
@@ -673,6 +675,7 @@ function FieldToolsGrid({
   onOpenRepairBrain,
   onOpenRepairBrainSearch,
   onOpenJobs,
+  onOpenComebacks,
 }: {
   colors: Palette;
   styles: ReturnType<typeof createStyles>;
@@ -683,6 +686,7 @@ function FieldToolsGrid({
   onOpenRepairBrain: () => void;
   onOpenRepairBrainSearch: () => void;
   onOpenJobs: () => void;
+  onOpenComebacks: () => void;
 }) {
   const openJobs = jobs.filter((job) => job.status === "scheduled" || job.status === "in_progress" || job.status === "lead").length;
 
@@ -698,6 +702,7 @@ function FieldToolsGrid({
     { id: "repair-brain", icon: "bulb-outline", label: "Repair Brain", description: "Knowledge base", onPress: onOpenRepairBrain },
     { id: "knowledge", icon: "search-outline", label: "Search", description: "Faults, docs & parts", onPress: onOpenRepairBrainSearch },
     { id: "jobs", icon: "briefcase-outline", label: "Jobs", description: "Work orders", onPress: onOpenJobs, badge: openJobs },
+    { id: "comebacks", icon: "refresh-circle-outline", label: "Comebacks", description: "Quality follow-ups", onPress: onOpenComebacks },
   ];
 
   return (

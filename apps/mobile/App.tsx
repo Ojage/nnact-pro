@@ -25,6 +25,7 @@ import { JobDetailScreen } from "./src/screens/JobDetailScreen";
 import { DiagnosticSessionScreen } from "./src/screens/DiagnosticSessionScreen";
 import { StartDiagnosticScreen } from "./src/screens/StartDiagnosticScreen";
 import { NotificationsScreen } from "./src/screens/NotificationsScreen";
+import { ComebackScreen } from "./src/screens/ComebackScreen";
 import { addPushRefreshListener, registerFieldPush } from "./src/push-notifications";
 
 function FieldApp({
@@ -63,6 +64,9 @@ function FieldApp({
   const [rbBrowseVisible, setRbBrowseVisible] = useState(false);
   const [rbModelId, setRbModelId] = useState<string | null>(null);
   const [rbModelVisible, setRbModelVisible] = useState(false);
+  const [showComeback, setShowComeback] = useState(false);
+  const [comebackVisible, setComebackVisible] = useState(false);
+  const [comebackDefaultJobId, setComebackDefaultJobId] = useState<string | undefined>(undefined);
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [jobVisible, setJobVisible] = useState(false);
@@ -71,7 +75,7 @@ function FieldApp({
   const field = useFieldData(session, onSession);
 
   const overlayActive = Boolean(
-    showNotifications || changePasswordVisible || selectedSessionId || startDiagnostic || selectedJobId || rbBrowse || rbModelId,
+    showNotifications || changePasswordVisible || selectedSessionId || startDiagnostic || selectedJobId || rbBrowse || rbModelId || showComeback,
   );
 
   useEffect(() => {
@@ -160,6 +164,18 @@ function FieldApp({
 
   function closeRepairBrainModel() {
     setRbModelVisible(false);
+  }
+
+  function openComeback(defaultJobId?: string) {
+    setSelectedJobId(null);
+    setJobVisible(false);
+    setComebackDefaultJobId(defaultJobId);
+    setShowComeback(true);
+    setComebackVisible(true);
+  }
+
+  function closeComeback() {
+    setComebackVisible(false);
   }
 
   const TAB_ORDER: TabId[] = ["today", "jobs", "diagnostics", "office", "account"];
@@ -256,6 +272,7 @@ function FieldApp({
             onOpenRepairBrain={() => openRepairBrain("browser")}
             onOpenRepairBrainSearch={() => openRepairBrain("search")}
             onOpenNotifications={openNotifications}
+            onOpenComebacks={() => openComeback()}
             {...searchProps}
           />
         ) : null}
@@ -431,6 +448,7 @@ function FieldApp({
                 description: payload.description ?? job?.description,
               });
             }}
+            onReportComeback={() => openComeback(selectedJobId ?? undefined)}
             initialJob={field.jobs.find((job) => job.id === selectedJobId)}
             cachedAppointments={field.appointments}
             cachedDiagnostics={field.diagnostics}
@@ -482,6 +500,24 @@ function FieldApp({
             offline={field.offline}
             syncService={field.getSyncService()}
             onBack={closeRepairBrainModel}
+          />
+        </AnimatedScreen>
+      ) : null}
+
+      {showComeback ? (
+        <AnimatedScreen
+          visible={comebackVisible}
+          onDismiss={closeComeback}
+          onExited={() => {
+            setShowComeback(false);
+            setComebackDefaultJobId(undefined);
+          }}
+        >
+          <ComebackScreen
+            colors={colors}
+            session={session}
+            jobs={field.jobs}
+            defaultJobId={comebackDefaultJobId}
           />
         </AnimatedScreen>
       ) : null}

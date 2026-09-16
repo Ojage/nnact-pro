@@ -6,7 +6,12 @@ import type {
   RepairBrainSearchResults,
 } from "../field-api";
 import type { JobPhoto } from "../field-api";
-import type { JobVoiceNoteDTO, NotificationDTO } from "@nnact/shared";
+import type {
+  ComebackCaseDetailDTO,
+  ComebackCaseListItemDTO,
+  JobVoiceNoteDTO,
+  NotificationDTO,
+} from "@nnact/shared";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 const MEDIA_FLUSH_LIMIT = 10;
@@ -38,7 +43,8 @@ export type OfflineOpKind =
   | "session.create"
   | "session.patch"
   | "correction.create"
-  | "job.status";
+  | "job.status"
+  | "comeback.create";
 
 export interface OfflineOperation {
   opId: string;
@@ -83,6 +89,7 @@ export interface FieldSyncResult {
   queuedMedia: number;
   cachedJobs: string[];
   rbModels: number;
+  cachedComebacks: number;
 }
 
 interface OutboxRow {
@@ -137,6 +144,18 @@ interface MediaCacheRow {
 
 interface MediaIndexRow {
   payload_json: string;
+}
+
+interface ComebackCacheRow {
+  id: string;
+  payload_json: string;
+  cached_at: string;
+}
+
+interface ComebackDetailCacheRow {
+  id: string;
+  payload_json: string;
+  cached_at: string;
 }
 
 function makeId(): string {
@@ -203,6 +222,16 @@ const SCHEMA_SQL = `
     );
     CREATE TABLE IF NOT EXISTS job_media_index (
       job_id TEXT PRIMARY KEY NOT NULL,
+      payload_json TEXT NOT NULL,
+      cached_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS comeback_cache (
+      id TEXT PRIMARY KEY NOT NULL,
+      payload_json TEXT NOT NULL,
+      cached_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS comeback_detail_cache (
+      id TEXT PRIMARY KEY NOT NULL,
       payload_json TEXT NOT NULL,
       cached_at TEXT NOT NULL
     );
@@ -552,6 +581,22 @@ export class SyncService {
       payload: input,
     });
     return id;
+  }
+
+  async queueComebackReport(input: {
+    jobId: string;
+    complaintSummary?: string;
+    complaintDetails?: string;
+    intakeReason?: string;
+    severity?: string;
+    reportedAt?: string;
+  }): Promise<void> {
+    const id = makeId();
+    await this.queueOperation({
+      opId: `comeback:${id}`,
+      kind: "comeback.create",
+      payload: input,
+    });
   }
 
   /** Session summaries for sessions created offline (queued `session.create` ops). */
@@ -1063,6 +1108,118 @@ export class SyncService {
     return pushed;
   }
 
+  // ── Comeback cache ────────────────────────────────────────────────────────
+
+  /** Persist a fetched comeback list into the offline cache. */
+  async cacheComebacks(list: ComebackCaseListItemDTO[]): Promise<void> {
+    const database = await this.database();
+    const cachedAt = new Date().toISOString();
+    for (const item of list) {
+      await database.runAsync(
+        "INSERT OR REPLACE INTO comeback_cache (id, payload_json, cached_at) VALUES (?, ?, ?)",
+        item.id,
+        JSON.stringify(item),
+        cachedAt,
+      );
+    }
+  }
+
+  /** Retrieve the cached comeback list (screen renders offline from this). */
+  async getCachedComebacks(): Promise<ComebackCaseListItemDTO[]> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<ComebackCacheRow>(
+      "SELECT payload_json FROM comeback_cache ORDER BY cached_at DESC LIMIT 200",
+    );
+    return rows.flatMap((row) => {
+      try {
+        return [JSON.parse(row.payload_json) as ComebackCaseListItemDTO];
+      } catch {
+        return [];
+      }
+    });
+  }
+
+  /** Persist a fetched comeback detail into the offline cache. */
+  async cacheComebackDetail(detail: ComebackCaseDetailDTO): Promise<void> {
+    const database = await this.database();
+    await database.runAsync(
+      "INSERT OR REPLACE INTO comeback_detail_cache (id, payload_json, cached_at) VALUES (?, ?, ?)",
+      detail.id,
+      JSON.stringify(detail),
+      new Date().toISOString(),
+    );
+  }
+
+  /** Retrieve a single cached comeback detail by id. */
+  async getCachedComebackDetail(id: string): Promise<ComebackCaseDetailDTO | null> {
+    const database = await this.database();
+    const row = await database.getFirstAsync<ComebackDetailCacheRow>(
+      "SELECT payload_json FROM comeback_detail_cache WHERE id = ? LIMIT 1",
+      id,
+    );
+    if (!row) return null;
+    try {
+      return JSON.parse(row.payload_json) as ComebackCaseDetailDTO;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Cached comeback list enriched with any queued offline create ops. */
+  async getCachedComebackState(): Promise<{
+    cached: ComebackCaseListItemDTO[];
+    pendingCreates: Array<{
+      jobId: string;
+      complaintSummary?: string;
+      complaintDetails?: string;
+      intakeReason?: string;
+      severity?: string;
+      reportedAt?: string;
+    }>;
+  }> {
+    const cached = await this.getCachedComebacks();
+    const pendingCreates = await this.listQueuedComebackCreates();
+    return { cached, pendingCreates };
+  }
+
+  /** Cached comeback cases for a single original job. */
+  async listCachedComebackCases(jobId: string): Promise<ComebackCaseListItemDTO[]> {
+    const cached = await this.getCachedComebacks();
+    return cached.filter((item) => item.originalJobId === jobId);
+  }
+
+  /** Queued comeback.create ops (offline stubs not yet synced). */
+  async listQueuedComebackCreates(): Promise<Array<{
+    jobId: string;
+    complaintSummary?: string;
+    complaintDetails?: string;
+    intakeReason?: string;
+    severity?: string;
+    reportedAt?: string;
+  }>> {
+    const database = await this.database();
+    const rows = await database.getAllAsync<OutboxRow>(
+      "SELECT payload_json FROM diagnostic_outbox WHERE kind = ?",
+      "comeback.create",
+    );
+    return rows.flatMap((row) => {
+      try {
+        const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+        if (typeof payload.jobId !== "string") return [];
+        return [{
+          jobId: payload.jobId,
+          complaintSummary: typeof payload.complaintSummary === "string" ? payload.complaintSummary : undefined,
+          complaintDetails: typeof payload.complaintDetails === "string" ? payload.complaintDetails : undefined,
+          intakeReason: typeof payload.intakeReason === "string" ? payload.intakeReason : undefined,
+          severity: typeof payload.severity === "string" ? payload.severity : undefined,
+          reportedAt: typeof payload.reportedAt === "string" ? payload.reportedAt : undefined,
+        }];
+      } catch {
+        return [];
+      }
+    });
+  }
+
   /**
    * Cache a job's photo/voice-note metadata plus (bounded) media bytes so the
    * job detail renders evidence offline. Best-effort: failures keep the remote
@@ -1238,6 +1395,8 @@ export class SyncService {
     const rbModels = await this.syncRepairBrainCatalog().catch(() => 0);
     await this.flushNotificationReads().catch(() => 0);
 
+    const cachedComebacks = await this.syncComebackCache().catch(() => 0);
+
     return {
       downloaded,
       queuedBeforeFlush,
@@ -1248,6 +1407,18 @@ export class SyncService {
       queuedMedia: await this.queuedMediaCount(),
       cachedJobs: [...jobIds],
       rbModels,
+      cachedComebacks,
     };
+  }
+
+  /** Best-effort refresh of the offline comeback list cache. */
+  private async syncComebackCache(): Promise<number> {
+    const response = await fetchWithTimeout(`${this.opts.apiUrl}/api/comebacks`, {
+      headers: this.headers(),
+    });
+    if (!response.ok) return 0;
+    const list = (await response.json()) as ComebackCaseListItemDTO[];
+    await this.cacheComebacks(list);
+    return list.length;
   }
 }

@@ -34,6 +34,7 @@ import {
   jobPhotoFileUrl,
   type JobPhoto,
 } from "../field-api";
+import { createComebackFromJob } from "../comeback-api";
 import type { SyncService, MediaOutboxItem } from "../sync";
 import type { JobVoiceNoteDTO } from "@nnact/shared";
 import { VoiceNoteRecorder } from "../components/VoiceNoteRecorder";
@@ -86,6 +87,7 @@ export function JobDetailScreen({
   onBack,
   onOpenDiagnosticSession,
   onStartDiagnostic,
+  onReportComeback,
   initialJob,
   cachedAppointments,
   cachedDiagnostics,
@@ -100,6 +102,7 @@ export function JobDetailScreen({
   onBack: () => void;
   onOpenDiagnosticSession: (sessionId: string) => void;
   onStartDiagnostic: (payload: { customerId: string; description?: string | null }) => void;
+  onReportComeback: (job: JobDTO) => void;
   initialJob?: JobDTO;
   cachedAppointments?: Appointment[];
   cachedDiagnostics?: DiagnosticListItem[];
@@ -118,6 +121,7 @@ export function JobDetailScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [comebackRecording, setComebackRecording] = useState(false);
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [pendingPhotos, setPendingPhotos] = useState<MediaOutboxItem[]>([]);
   const [mediaUris, setMediaUris] = useState<Record<string, string>>({});
@@ -349,6 +353,27 @@ export function JobDetailScreen({
     void load(true);
   }
 
+  async function reportComeback() {
+    if (!job) return;
+    setComebackRecording(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (isOffline && syncService) {
+        await syncService.queueComebackReport({ jobId: job.id });
+        setNotice("Comeback queued — will sync when back online.");
+      } else {
+        await createComebackFromJob(session, { jobId: job.id });
+        setNotice("Comeback recorded.");
+      }
+      onReportComeback(job);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not record the comeback");
+    } finally {
+      setComebackRecording(false);
+    }
+  }
+
   if (loading && !job) {
     return (
       <View style={styles.root}>
@@ -484,6 +509,17 @@ export function JobDetailScreen({
             size="sm"
             fullWidth={false}
           />
+          {job.status === "completed" ? (
+            <PrimaryButton
+              colors={colors}
+              label="Report comeback"
+              onPress={() => void reportComeback()}
+              loading={comebackRecording}
+              variant="secondary"
+              size="sm"
+              fullWidth={false}
+            />
+          ) : null}
         </View>
 
         <SectionHeader colors={colors} title="Overview" />
