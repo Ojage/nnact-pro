@@ -55,6 +55,7 @@ const ROUTE_ROLES: ReadonlyArray<readonly [string, readonly NavRole[]]> = [
   ["/reviews", ["owner", "dispatcher"]],
   ["/reports", ["owner", "dispatcher"]],
   ["/quality/comebacks", ["owner", "dispatcher"]],
+  ["/growth", ["owner", "dispatcher", "secretary"]],
 ];
 
 export function rolesForRoute(pathname: string): readonly NavRole[] {
@@ -147,6 +148,14 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/quality/comebacks", label: "Comebacks", icon: "↩" },
       { href: "/reviews", label: "Reviews", icon: "★" },
       { href: "/reports", label: "Reports", icon: "◫" },
+    ],
+  },
+  {
+    label: "Growth",
+    links: [
+      { href: "/growth", label: "Prospects", icon: "◈" },
+      { href: "/growth/senders", label: "Sender Registry", icon: "✉" },
+      { href: "/growth/suppressions", label: "Suppression List", icon: "⊘" },
     ],
   },
   {

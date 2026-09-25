@@ -159,9 +159,16 @@ export interface GrowthSuppressionDTO {
 
 /** Result of the duplicate check run before a prospect is created. */
 export interface GrowthDuplicateMatchDTO {
-  prospectId: string;
+  /** Id of the existing prospect that matched. */
+  id: string;
   companyName: string;
   websiteDomain?: string | null;
   /** Which normalized field matched, e.g. "EMAIL", "DOMAIN", "PHONE", "COMPANY". */
-  matchedOn: string;
+  matchedOn: GrowthDuplicateField;
+  /** 0–100; higher is stronger evidence that both records are the same entity. */
+  score: number;
 }
+
+/** Fields the duplicate check can match on. */
+export const GROWTH_DUPLICATE_FIELDS = ["EMAIL", "DOMAIN", "PHONE", "COMPANY"] as const;
+export type GrowthDuplicateField = (typeof GROWTH_DUPLICATE_FIELDS)[number];

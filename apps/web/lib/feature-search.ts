@@ -42,6 +42,9 @@ export const FEATURE_COMMANDS: FeatureCommand[] = [
   { id: "coverage", title: "Coverage & Quality", group: "Quality", href: "/coverage", icon: "◇", description: "Service area coverage and quality", keywords: ["service coverage", "field coverage", "territory", "quality"] },
   { id: "reviews", title: "Reviews", group: "Quality", href: "/reviews", icon: "★", description: "Customer ratings and feedback", keywords: ["ratings", "feedback", "testimonials", "stars"] },
   { id: "reports", title: "Reports", group: "Quality", href: "/reports", icon: "◫", description: "Analytics, exports and KPIs", keywords: ["analytics", "exports", "kpis", "metrics", "charts"] },
+  { id: "growthProspects", title: "Prospects", group: "Growth", href: "/growth", icon: "◈", description: "Researched companies and contact details", keywords: ["prospects", "leads", "outreach", "sales", "new business", "companies"] },
+  { id: "growthSenders", title: "Sender Registry", group: "Growth", href: "/growth/senders", icon: "✉", description: "Verified sender identities for outreach", keywords: ["sender", "identity", "from address", "verified inbox", "cold approval"] },
+  { id: "growthSuppressions", title: "Suppression List", group: "Growth", href: "/growth/suppressions", icon: "⊘", description: "Opt-outs, bounces and blocked contacts", keywords: ["suppression", "opt out", "unsubscribe", "block", "bounce", "do not contact"] },
   { id: "integrations", title: "Integrations", group: "System", href: "/integrations", icon: "⧉", description: "Third-party integrations", keywords: ["apps", "connect", "webhooks", "plugins"] },
   { id: "settings", title: "Settings", group: "System", href: "/settings", icon: "⚙", description: "Company, team and account settings", keywords: ["company", "profile", "team", "members", "users", "account", "preferences"] },
 

@@ -90,6 +90,27 @@ import type {
   OperatingSequenceDTO,
   ServiceModeDTO,
 } from "@nnact/shared";
+import type {
+  GrowthContactDetailDTO,
+  GrowthDuplicateMatchDTO,
+  GrowthProspectDTO,
+  GrowthProspectLifecycle,
+  GrowthProspectSource,
+  GrowthSenderIdentityDTO,
+  GrowthSuppressionDTO,
+} from "@nnact/shared";
+
+/** Query parameters accepted by GET /api/growth/prospects. */
+export interface GrowthProspectListParams {
+  q?: string;
+  lifecycle?: GrowthProspectLifecycle;
+  source?: GrowthProspectSource;
+  assignedTo?: string;
+  city?: string;
+  includeMerged?: boolean;
+  limit?: number;
+  offset?: number;
+}
 import type { DiagnosticSessionListItem } from "@/lib/diagnostics-api";
 import type { PortalLinkDTO, PortalLinkScope, DocumentHubEntryDTO } from "@/lib/api";
 
@@ -312,6 +333,9 @@ export const apiSlice = createApi({
     "Ai",
     "Finance",
     "Comeback",
+    "GrowthProspect",
+    "GrowthSender",
+    "GrowthSuppression",
     "Invoice",
     "Estimate",
     "ServiceAgreement",
@@ -1616,8 +1640,82 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       query: ({ id, body }) => ({ url: `/api/comebacks/${id}/knowledge-proposal`, method: "POST", body }),
       invalidatesTags: (_result, _error, arg) => [{ type: "Comeback", id: arg.id }],
     }),
+
+    // ── Growth & outreach ──
+    growthProspects: builder.query<GrowthProspectDTO[], GrowthProspectListParams>({
+      query: (params) => ({ url: "/api/growth/prospects", params: params as Record<string, unknown> }),
+      providesTags: (result) => Array.isArray(result)
+        ? ["GrowthProspect", ...result.map(({ id }) => ({ type: "GrowthProspect" as const, id }))]
+        : ["GrowthProspect"],
+    }),
+    growthProspect: builder.query<GrowthProspectDTO, string>({
+      query: (id) => `/api/growth/prospects/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "GrowthProspect", id }],
+    }),
+    growthDuplicateCheck: builder.query<GrowthDuplicateCheckDTO, { company?: string; email?: string; phone?: string; domain?: string; countryCallingCode?: string }>({
+      query: (params) => ({ url: "/api/growth/prospects/duplicates/check", params: params as Record<string, unknown> }),
+    }),
+    createGrowthProspect: builder.mutation<GrowthProspectDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/growth/prospects", method: "POST", body }),
+      invalidatesTags: ["GrowthProspect"],
+    }),
+    updateGrowthProspect: builder.mutation<GrowthProspectDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/growth/prospects/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "GrowthProspect", id: arg.id }],
+    }),
+    addGrowthContact: builder.mutation<GrowthContactDetailDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/growth/prospects/${id}/contacts`, method: "POST", body: data }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "GrowthProspect", id: arg.id }],
+    }),
+    mergeGrowthProspect: builder.mutation<{ merged: string; into: string }, { id: string; intoId: string }>({
+      query: ({ id, intoId }) => ({ url: `/api/growth/prospects/${id}/merge`, method: "POST", body: { intoId } }),
+      invalidatesTags: ["GrowthProspect"],
+    }),
+    growthSenders: builder.query<GrowthSenderIdentityDTO[], void>({
+      query: () => "/api/growth/senders",
+      providesTags: ["GrowthSender"],
+    }),
+    createGrowthSender: builder.mutation<GrowthSenderIdentityDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/growth/senders", method: "POST", body }),
+      invalidatesTags: ["GrowthSender"],
+    }),
+    updateGrowthSender: builder.mutation<GrowthSenderIdentityDTO, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/growth/senders/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "GrowthSender", id: arg.id }],
+    }),
+    verifyGrowthSender: builder.mutation<GrowthSenderIdentityDTO, { id: string; method: string }>({
+      query: ({ id, method }) => ({ url: `/api/growth/senders/${id}/verify`, method: "POST", body: { method } }),
+      invalidatesTags: ["GrowthSender"],
+    }),
+    approveGrowthSenderCold: builder.mutation<GrowthSenderIdentityDTO, { id: string }>({
+      query: ({ id }) => ({ url: `/api/growth/senders/${id}/approve-cold`, method: "POST" }),
+      invalidatesTags: ["GrowthSender"],
+    }),
+    revokeGrowthSenderCold: builder.mutation<GrowthSenderIdentityDTO, { id: string }>({
+      query: ({ id }) => ({ url: `/api/growth/senders/${id}/revoke-cold`, method: "POST" }),
+      invalidatesTags: ["GrowthSender"],
+    }),
+    growthSuppressions: builder.query<GrowthSuppressionDTO[], { scope?: string; reason?: string } | void>({
+      query: (params) => ({ url: "/api/growth/suppressions", params: (params ?? {}) as Record<string, unknown> }),
+      providesTags: ["GrowthSuppression"],
+    }),
+    createGrowthSuppression: builder.mutation<GrowthSuppressionDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/growth/suppressions", method: "POST", body }),
+      invalidatesTags: ["GrowthSuppression"],
+    }),
+    deleteGrowthSuppression: builder.mutation<{ deleted: string }, string>({
+      query: (id) => ({ url: `/api/growth/suppressions/${id}`, method: "DELETE" }),
+      invalidatesTags: ["GrowthSuppression"],
+    }),
   }),
 });
+
+/** Response of GET /api/growth/prospects/duplicates/check. */
+export interface GrowthDuplicateCheckDTO {
+  matches: GrowthDuplicateMatchDTO[];
+  /** True when a match rests on a shared identifier, not just a similar name. */
+  blocking: boolean;
+}
 
 export const {
   useJobsQuery,
@@ -1866,6 +1964,22 @@ export const {
   useComebackAddCorrectiveActionMutation,
   useComebackAddCommunicationMutation,
   useComebackKnowledgeProposalMutation,
+  useGrowthProspectsQuery,
+  useGrowthProspectQuery,
+  useGrowthDuplicateCheckQuery,
+  useCreateGrowthProspectMutation,
+  useUpdateGrowthProspectMutation,
+  useAddGrowthContactMutation,
+  useMergeGrowthProspectMutation,
+  useGrowthSendersQuery,
+  useCreateGrowthSenderMutation,
+  useUpdateGrowthSenderMutation,
+  useVerifyGrowthSenderMutation,
+  useApproveGrowthSenderColdMutation,
+  useRevokeGrowthSenderColdMutation,
+  useGrowthSuppressionsQuery,
+  useCreateGrowthSuppressionMutation,
+  useDeleteGrowthSuppressionMutation,
 } = apiSlice;
 
 /** Extract a readable message from an RTK Query / fetchBaseQuery error. */
