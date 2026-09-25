@@ -85,6 +85,15 @@ export function createSmtpTransport(config: SmtpConfig): Transporter {
     host: config.host,
     port: config.port,
     secure: config.secure,
+    // Submission ports (587) negotiate STARTTLS opportunistically by default,
+    // which would silently fall back to cleartext if a server failed to
+    // advertise it. Require it so credentials and message bodies are never
+    // transmitted unencrypted. Implicit-TLS ports (465) are already encrypted
+    // by the connection itself, so requireTLS does not apply there.
+    ...(config.secure ? {} : { requireTLS: true }),
+    // Verify the server certificate. Node defaults this to true, but pinning it
+    // explicitly keeps the guarantee from drifting if transport options change.
+    tls: { rejectUnauthorized: true },
     auth: { user: config.user, pass: config.pass },
   });
 }

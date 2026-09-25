@@ -29,6 +29,7 @@ const OFFICE_WRITE_PREFIXES = [
   "/api/reviews",
   "/api/content",
   "/api/equipment",
+  "/api/growth",
 ];
 
 const SECRETARY_WRITE_PREFIXES = [

@@ -5,6 +5,7 @@ import * as coreSchema from "./schema.js";
 import * as servicePlanSchema from "./service-plans.js";
 import * as diagnosticSchema from "./diagnostics.js";
 import * as financeSchema from "./finance.js";
+import * as growthSchema from "./growth.js";
 
 const url = process.env.DATABASE_URL?.trim();
 if (!url) throw new Error("DATABASE_URL is required for schema parity checks");
@@ -24,7 +25,7 @@ try {
     where table_schema = 'public'
   `;
   const actualColumns = new Map(actual.map((row) => [`${row.table_name}.${row.column_name}`, row.udt_name]));
-  const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...financeSchema };
+  const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...financeSchema, ...growthSchema };
   const tables = Object.values(schema).filter((value): value is PgTable => is(value, PgTable));
   const problems: string[] = [];
 

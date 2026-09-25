@@ -14,6 +14,7 @@ export * from "./currency.js";
 export * from "./repair-brain.js";
 export * from "./finance.js";
 export * from "./comeback.js";
+export * from "./growth.js";
 export * from "./mobile-search.js";
 export * from "./walkthroughs.js";
 export * from "./content.js";

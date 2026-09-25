@@ -112,3 +112,16 @@ test("technicians can only sync assigned field-shaped operations", () => {
     false,
   );
 });
+
+test("growth and outreach writes are restricted to owner and dispatcher", () => {
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/growth/prospects"), ["owner", "dispatcher"]);
+  assert.deepEqual(requiredRolesForRequest("PATCH", "/api/growth/prospects/prospect-1"), ["owner", "dispatcher"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/growth/senders"), ["owner", "dispatcher"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/growth/suppressions"), ["owner", "dispatcher"]);
+  // Same guards on the versioned prefix.
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/v1/growth/prospects"), ["owner", "dispatcher"]);
+  // Query strings must not bypass the prefix match.
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/growth/prospects?force=true"), ["owner", "dispatcher"]);
+  // Reads are gated in the route handlers (growth/access.ts), not here.
+  assert.equal(requiredRolesForRequest("GET", "/api/growth/prospects"), null);
+});

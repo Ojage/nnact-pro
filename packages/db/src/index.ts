@@ -7,6 +7,7 @@ import * as diagnosticSchema from "./diagnostics.js";
 import * as repairBrainSchema from "./repair-brain.js";
 import * as financeSchema from "./finance.js";
 import * as comebackSchema from "./comeback.js";
+import * as growthSchema from "./growth.js";
 
 import * as authAccountsSchema from "./auth-accounts.js";
 import * as contentSchema from "./content.js";
@@ -19,7 +20,7 @@ const url = process.env.DATABASE_URL ?? "postgres://ofp:ofp@localhost:5432/ofp";
 // product foundation; raise it only after measuring real concurrency.
 const client = postgres(url, { max: 10 });
 
-export const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...repairBrainSchema, ...financeSchema, ...comebackSchema, ...authAccountsSchema, ...contentSchema, ...aiSchema, ...etechKeysSchema };
+export const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...repairBrainSchema, ...financeSchema, ...comebackSchema, ...growthSchema, ...authAccountsSchema, ...contentSchema, ...aiSchema, ...etechKeysSchema };
 export const db = drizzle(client, { schema });
 export * from "./schema.js";
 export * from "./service-plans.js";
@@ -27,6 +28,7 @@ export * from "./diagnostics.js";
 export * from "./repair-brain.js";
 export * from "./finance.js";
 export * from "./comeback.js";
+export * from "./growth.js";
 export * from "./auth-accounts.js";
 export * from "./content.js";
 export * from "./ai.js";

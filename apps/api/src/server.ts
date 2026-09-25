@@ -48,6 +48,7 @@ import { financeReportRoutes } from "./routes/finance-reports.js";
 import { financeReceiptRoutes } from "./finance-files.js";
 import { aiRoutes } from "./ai/index.js";
 import { comebackRoutes } from "./routes/comebacks.js";
+import { growthRoutes } from "./routes/growth.js";
 import { operationRoutes } from "./routes/operations.js";
 import { diagnosticRoutes } from "./routes/diagnostics.js";
 import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
@@ -305,6 +306,7 @@ export function buildServer(
   app.register(financeReportRoutes, { prefix: withVersion("") });
   app.register(financeReceiptRoutes, { prefix: withVersion("") });
   app.register(comebackRoutes, { prefix: withVersion("/comebacks") });
+  app.register(growthRoutes, { prefix: withVersion("/growth") });
   app.register(aiRoutes, { prefix: withVersion("/ai") });
   app.register(operationRoutes, {
     prefix: withVersion("/operations"),
@@ -378,6 +380,7 @@ export function buildServer(
   app.register(financeReportRoutes, { prefix: withLegacy("") });
   app.register(financeReceiptRoutes, { prefix: withLegacy("") });
   app.register(comebackRoutes, { prefix: withLegacy("/comebacks") });
+  app.register(growthRoutes, { prefix: withLegacy("/growth") });
   app.register(aiRoutes, { prefix: withLegacy("/ai") });
   app.register(operationRoutes, {
     prefix: withLegacy("/operations"),
