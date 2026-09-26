@@ -50,6 +50,7 @@ import { aiRoutes } from "./ai/index.js";
 import { comebackRoutes } from "./routes/comebacks.js";
 import { growthRoutes } from "./routes/growth.js";
 import { growthCampaignRoutes } from "./routes/growth-campaigns.js";
+import { startGrowthScheduler } from "./growth/scheduler.js";
 import { operationRoutes } from "./routes/operations.js";
 import { diagnosticRoutes } from "./routes/diagnostics.js";
 import { diagnosticOfflineRoutes } from "./routes/diagnostic-offline.js";
@@ -105,12 +106,21 @@ export function buildServer(
     maintenanceReader?: MaintenanceReader;
   } = {},
 ) {
+  // Scheduled outreach. Off unless GROWTH_SCHEDULER_ENABLED is explicitly set,
+  // so a deploy cannot start sending on its own. The tick takes a Postgres
+  // advisory lock, so running it on several replicas is safe.
+  const growthScheduler =
+    process.env.GROWTH_SCHEDULER_ENABLED === "true"
+      ? startGrowthScheduler(Number(process.env.GROWTH_SCHEDULER_INTERVAL_MS ?? 60_000))
+      : null;
+
   const app = Fastify({
     logger: true,
     bodyLimit: 1_048_576,
     trustProxy: process.env.TRUST_PROXY === "true",
   });
   app.addHook("onClose", async () => {
+    growthScheduler?.stop();
     await closeRedis();
   });
   app.register(cors, {
