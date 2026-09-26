@@ -5,18 +5,11 @@ import * as coreSchema from "./schema.js";
 import * as servicePlanSchema from "./service-plans.js";
 import * as diagnosticSchema from "./diagnostics.js";
 import * as financeSchema from "./finance.js";
+import { expectedUdtName } from "./udt-name.js";
 import * as growthSchema from "./growth.js";
 
 const url = process.env.DATABASE_URL?.trim();
 if (!url) throw new Error("DATABASE_URL is required for schema parity checks");
-
-const expectedTypeToUdt: Record<string, string> = {
-  boolean: "bool",
-  integer: "int4",
-  "timestamp with time zone": "timestamptz",
-  "text[]": "_text",
-};
-
 const sql = postgres(url, { max: 1 });
 try {
   const actual = await sql<{ table_name: string; column_name: string; udt_name: string }[]>`
@@ -39,7 +32,7 @@ try {
         continue;
       }
       const expectedSqlType = column.getSQLType();
-      const expectedType = expectedTypeToUdt[expectedSqlType] ?? expectedSqlType;
+      const expectedType = expectedUdtName(expectedSqlType);
       if (actualType !== expectedType) problems.push(`${key} is ${actualType}; expected ${expectedType}`);
     }
   }
