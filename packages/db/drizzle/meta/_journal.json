@@ -309,6 +309,13 @@
       "when": 1790000009900,
       "tag": "0045_growth_campaigns",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1790000010900,
+      "tag": "0046_growth_intelligence",
+      "breakpoints": true
     }
   ]
 }

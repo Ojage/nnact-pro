@@ -42,6 +42,7 @@ import {
 } from "./campaign-policy.js";
 import type { SenderIdentity, SuppressionEntry } from "./send-policy.js";
 import { sendGrowthEmail } from "./delivery.js";
+import { isOrgGrowthSendingPaused } from "./pause.js";
 
 const HOUR_MS = 3_600_000;
 
@@ -160,6 +161,16 @@ export async function runCampaignSend(input: RunCampaignInput): Promise<{
 
   if (!campaignRow) {
     return { ...summary, refusal: { code: "not_found", message: "campaign not found" } };
+  }
+
+  if (await isOrgGrowthSendingPaused(orgId)) {
+    return {
+      ...summary,
+      refusal: {
+        code: "growth_paused",
+        message: "Growth Autopilot is paused; queued campaign and follow-up sends are blocked.",
+      },
+    };
   }
 
   // A campaign-level refusal stops the whole run and is reported, not thrown.

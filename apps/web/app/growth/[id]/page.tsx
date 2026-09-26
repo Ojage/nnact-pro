@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/select";
 import {
   useAddGrowthContactMutation,
+  useAddGrowthCampaignRecipientsMutation,
+  useGrowthCampaignsQuery,
   useGrowthProspectQuery,
   useMergeGrowthProspectMutation,
   useUpdateGrowthProspectMutation,
@@ -40,6 +42,11 @@ export default function GrowthProspectDetailPage() {
   const [updateProspect] = useUpdateGrowthProspectMutation();
   const [addContact] = useAddGrowthContactMutation();
   const [mergeProspect] = useMergeGrowthProspectMutation();
+  const { data: campaigns } = useGrowthCampaignsQuery(
+    { status: "DRAFT" },
+    { skip: !canWrite },
+  );
+  const [addRecipients] = useAddGrowthCampaignRecipientsMutation();
 
   const [kind, setKind] = useState<GrowthContactDetailKind>("EMAIL");
   const [value, setValue] = useState("");
@@ -47,6 +54,33 @@ export default function GrowthProspectDetailPage() {
   const [source, setSource] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [mergeInto, setMergeInto] = useState("");
+  const [enrolCampaignId, setEnrolCampaignId] = useState("");
+
+  // Only email or WhatsApp contacts can be mailed by a campaign.
+  const mailableContacts = (prospect?.contacts ?? []).filter(
+    (c) => c.kind === "EMAIL" || c.kind === "WHATSAPP",
+  );
+
+  async function enrol() {
+    if (!enrolCampaignId) {
+      toast.error("Choose a draft campaign");
+      return;
+    }
+    if (mailableContacts.length === 0) {
+      toast.error("Add an email or WhatsApp contact first");
+      return;
+    }
+    try {
+      const result = await addRecipients({
+        id: enrolCampaignId,
+        items: mailableContacts.map((c) => ({ prospectId: prospect!.id, contactDetailId: c.id })),
+      }).unwrap();
+      toast.success(`Enrolled ${result.inserted}, skipped ${result.skipped}`);
+      setEnrolCampaignId("");
+    } catch (error) {
+      toast.error(explainRtkError(error, "Could not enrol this prospect"));
+    }
+  }
 
   if (isLoading) {
     return (
@@ -243,6 +277,42 @@ export default function GrowthProspectDetailPage() {
             ) : null}
           </CardContent>
         </Card>
+
+        {canWrite ? (
+          <Card>
+            <CardContent className="space-y-3 p-4">
+              <h2 className="text-sm font-semibold text-fg">Add to a campaign</h2>
+              <p className="text-xs text-fg-muted">
+                Enrols the {mailableContacts.length} email or WhatsApp contact
+                {mailableContacts.length === 1 ? "" : "s"} on this prospect. Suppression is still checked
+                at send time, so enrolling someone who has opted out changes nothing.
+              </p>
+              {mailableContacts.length === 0 ? (
+                <p className="text-xs text-fg-dim">No mailable contact on this prospect yet.</p>
+              ) : null}
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-64 flex-1">
+                  <Label htmlFor="enrolCampaign">Draft campaign</Label>
+                  <Select value={enrolCampaignId} onValueChange={setEnrolCampaignId}>
+                    <SelectTrigger id="enrolCampaign">
+                      <SelectValue placeholder="Choose a draft" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(campaigns ?? []).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button variant="outline" onClick={enrol} disabled={!enrolCampaignId}>
+                  Enrol
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {canWrite ? (
           <Card>

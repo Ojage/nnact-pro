@@ -30,6 +30,24 @@ export function canManageSenderIdentities(role: string): boolean {
   return role === "owner";
 }
 
+/** Knowledge approval, Autopilot mode changes and project pause are owner-only. */
+export function canManageGrowthIntelligence(role: string): boolean {
+  return role === "owner";
+}
+
+export async function requireGrowthOwner(
+  request: Parameters<typeof verifiedClaims>[0],
+  reply: FastifyReply,
+): Promise<JwtClaims | null> {
+  const claims = await requireGrowthRead(request, reply);
+  if (!claims) return null;
+  if (!canManageGrowthIntelligence(claims.role)) {
+    await reply.code(403).send({ error: "growth intelligence administration requires an owner" });
+    return null;
+  }
+  return claims;
+}
+
 export async function requireGrowthRead(
   request: Parameters<typeof verifiedClaims>[0],
   reply: FastifyReply,

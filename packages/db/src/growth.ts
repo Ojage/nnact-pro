@@ -22,6 +22,7 @@ import {
   boolean,
   index,
   uniqueIndex,
+  jsonb,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { orgs, users, customers } from "./schema.js";
@@ -300,6 +301,10 @@ export const growthCampaigns = pgTable(
     id: id(),
     orgId: orgId(),
     name: text("name").notNull(),
+    /** When set, outcomes roll up to sector intelligence and Autopilot allocation. */
+    sectorId: uuid("sector_id"),
+    /** True when Autopilot created or manages this campaign. */
+    autopilotManaged: boolean("autopilot_managed").default(false).notNull(),
     /** Drives transport selection. See growth/transport-policy.ts. */
     purpose: growthCampaignPurpose("purpose").default("COLD_OUTREACH").notNull(),
     status: growthCampaignStatus("status").default("DRAFT").notNull(),
@@ -445,5 +450,402 @@ export const growthOutboundMessages = pgTable(
     campaignIdx: index("growth_outbound_messages_campaign_idx").on(t.orgId, t.campaignId),
     statusIdx: index("growth_outbound_messages_status_idx").on(t.orgId, t.status),
     sentAtIdx: index("growth_outbound_messages_sent_at_idx").on(t.orgId, t.sentAt),
+  }),
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Stage 2 — Project Knowledge
+//
+// Facts are append-only proposals with an explicit review lifecycle. A refresh
+// never overwrites a fact a human touched: `growth_knowledge_fact_revisions`
+// records every change, and `manually_corrected` marks a fact whose wording a
+// human owns, so re-ingestion proposes a new fact instead of clobbering it.
+//
+// The contract that matters for outreach: a fact is quotable only when
+// `status = 'APPROVED'`. Anything else (PENDING, REJECTED, OBSOLETE) exists for
+// review and audit and must never reach campaign copy — see
+// growth/knowledge.ts for the gate that enforces this.
+// ────────────────────────────────────────────────────────────────────────────
+
+export const growthKnowledgeFacts = pgTable(
+  "growth_knowledge_facts",
+  {
+    id: id(),
+    orgId: orgId(),
+    /** Stable identity across refreshes: category + normalized subject. */
+    factKey: text("fact_key").notNull(),
+    category: text("category").notNull(),
+    /** The short, quotable statement, e.g. "24/7 emergency call-out in Buea". */
+    subject: text("subject").notNull(),
+    /** The passage from the source that supports `subject`. */
+    supportingPassage: text("supporting_passage"),
+    sourceType: text("source_type").notNull(),
+    /** Public page URL, or "file:<id>" for internal material. */
+    sourceUrl: text("source_url"),
+    sourceDocumentId: uuid("source_document_id"),
+    sourceTitle: text("source_title"),
+    extractedAt: timestamp("extracted_at", { withTimezone: true }),
+    /** 0–1. How strongly the passage supports the claim. */
+    confidence: integer("confidence").default(0).notNull(),
+    provenance: text("provenance").notNull(),
+    status: text("status").default("PENDING").notNull(),
+    /** True once a human edits or approves: refresh must not overwrite it. */
+    manuallyCorrected: boolean("manually_corrected").default(false).notNull(),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    rejectedReason: text("rejected_reason"),
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+    /** Grouped key when two sources disagree; resolution is a human action. */
+    contradictionGroup: text("contradiction_group"),
+    supersededById: uuid("superseded_by_id"),
+    createdBy: createdBy(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    orgFactUnique: uniqueIndex("growth_knowledge_facts_org_fact_key_uq").on(t.orgId, t.factKey),
+    orgStatusIdx: index("growth_knowledge_facts_org_status_idx").on(t.orgId, t.status),
+    orgCategoryIdx: index("growth_knowledge_facts_org_category_idx").on(t.orgId, t.category),
+    contradictionIdx: index("growth_knowledge_facts_contradiction_idx").on(
+      t.orgId,
+      t.contradictionGroup,
+    ),
+  }),
+);
+
+/** One ingestion pass, so refreshes are auditable and failures are visible. */
+export const growthKnowledgeIngestRuns = pgTable(
+  "growth_knowledge_ingest_runs",
+  {
+    id: id(),
+    orgId: orgId(),
+    sourceType: text("source_type").notNull(),
+    sourceUrl: text("source_url"),
+    sourceTitle: text("source_title"),
+    status: text("status").notNull(),
+    /** Which extractor produced the facts: deterministic, or the AI provider. */
+    extractor: text("extractor").notNull(),
+    factsSeen: integer("facts_seen").default(0).notNull(),
+    factsCreated: integer("facts_created").default(0).notNull(),
+    factsSkipped: integer("facts_skipped").default(0).notNull(),
+    /** Facts the source did not yield, so the UI can prompt for manual entry. */
+    missingCategories: text("missing_categories").array().default([]).notNull(),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdBy: createdBy(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgIdx: index("growth_knowledge_ingest_runs_org_idx").on(t.orgId, t.startedAt),
+  }),
+);
+
+/** Full change history for a fact: who changed the wording, when, and to what. */
+export const growthKnowledgeFactRevisions = pgTable(
+  "growth_knowledge_fact_revisions",
+  {
+    id: id(),
+    orgId: orgId(),
+    factId: uuid("fact_id")
+      .notNull()
+      .references(() => growthKnowledgeFacts.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    previousSubject: text("previous_subject"),
+    newSubject: text("new_subject"),
+    previousStatus: text("previous_status"),
+    newStatus: text("new_status"),
+    note: text("note"),
+    changedBy: uuid("changed_by").references(() => users.id, { onDelete: "set null" }),
+    changedAt: timestamp("changed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    factIdx: index("growth_knowledge_fact_revisions_fact_idx").on(t.factId, t.changedAt),
+  }),
+);
+
+/** Administrator-approved internal files eligible for knowledge extraction. */
+export const growthKnowledgeDocuments = pgTable(
+  "growth_knowledge_documents",
+  {
+    id: id(),
+    orgId: orgId(),
+    title: text("title").notNull(),
+    filename: text("filename").notNull(),
+    mime: text("mime").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    /** Optional link to the shared documents blob store (`documents` table). */
+    blobDocumentId: uuid("blob_document_id"),
+    /** Plain-text extract used for ingestion when no blob is stored. */
+    textContent: text("text_content"),
+    approvedForKnowledge: boolean("approved_for_knowledge").default(false).notNull(),
+    createdBy: createdBy(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    orgIdx: index("growth_knowledge_documents_org_idx").on(t.orgId),
+  }),
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Stage 3 — Competitors & market intelligence
+// ────────────────────────────────────────────────────────────────────────────
+
+export const growthCompetitorClassification = pgEnum("growth_competitor_classification", [
+  "DIRECT_LOCAL",
+  "REGIONAL",
+  "INTERNATIONAL_REFERENCE",
+  "UNRELATED",
+]);
+
+export const growthCompetitorReviewStatus = pgEnum("growth_competitor_review_status", [
+  "SUGGESTED",
+  "APPROVED",
+  "REJECTED",
+  "EXCLUDED",
+]);
+
+export const growthCompetitors = pgTable(
+  "growth_competitors",
+  {
+    id: id(),
+    orgId: orgId(),
+    name: text("name").notNull(),
+    websiteDomain: text("website_domain"),
+    classification: growthCompetitorClassification("classification").default("REGIONAL").notNull(),
+    reviewStatus: growthCompetitorReviewStatus("review_status").default("SUGGESTED").notNull(),
+    geography: text("geography"),
+    services: text("services"),
+    targetCustomers: text("target_customers"),
+    positioning: text("positioning"),
+    visibleOffers: text("visible_offers"),
+    /** Why this business is considered relevant — must cite geography or category overlap. */
+    evidenceSummary: text("evidence_summary"),
+    sourceUrls: text("source_urls").array().default([]).notNull(),
+    reviewNotes: text("review_notes"),
+    createdBy: createdBy(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    orgIdx: index("growth_competitors_org_idx").on(t.orgId),
+    domainIdx: index("growth_competitors_domain_idx").on(t.orgId, t.websiteDomain),
+    statusIdx: index("growth_competitors_status_idx").on(t.orgId, t.reviewStatus),
+  }),
+);
+
+/** Versioned comparison snapshots; earlier versions are retained for audit. */
+export const growthCompetitorAnalyses = pgTable(
+  "growth_competitor_analyses",
+  {
+    id: id(),
+    orgId: orgId(),
+    version: integer("version").notNull(),
+    /** Plain-language comparison for managers. */
+    summary: text("summary").notNull(),
+    /** Structured comparison: advantages, gaps, offers to strengthen. */
+    comparison: jsonb("comparison").notNull(),
+    sourceCompetitorIds: uuid("source_competitor_ids").array().default([]).notNull(),
+    generatedBy: text("generated_by").notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgVersionIdx: uniqueIndex("growth_competitor_analyses_org_version_uq").on(t.orgId, t.version),
+    orgIdx: index("growth_competitor_analyses_org_idx").on(t.orgId, t.createdAt),
+  }),
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Stage 3 — Sector opportunities
+// ────────────────────────────────────────────────────────────────────────────
+
+export const growthSectors = pgTable(
+  "growth_sectors",
+  {
+    id: id(),
+    orgId: orgId(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    /** Administrator pin: allocation never drops below floor while pinned. */
+    pinned: boolean("pinned").default(false).notNull(),
+    excluded: boolean("excluded").default(false).notNull(),
+    paused: boolean("paused").default(false).notNull(),
+    services: text("services").array().default([]).notNull(),
+    equipmentTypes: text("equipment_types").array().default([]).notNull(),
+    /** Hypotheses are labelled until backed by sector evidence rows. */
+    hypotheses: jsonb("hypotheses").default([]).notNull(),
+    decisionMakers: text("decision_makers"),
+    prospectCriteria: text("prospect_criteria"),
+    offerTemplate: text("offer_template"),
+    callToAction: text("call_to_action"),
+    /** 0–100 relative weight used by allocation (may be overridden by Autopilot). */
+    allocationWeight: integer("allocation_weight").default(100).notNull(),
+    manualAllocationOverride: integer("manual_allocation_override"),
+    minSampleSize: integer("min_sample_size").default(30).notNull(),
+    observationDays: integer("observation_days").default(14).notNull(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    orgSlugUnique: uniqueIndex("growth_sectors_org_slug_uq").on(t.orgId, t.slug),
+    orgIdx: index("growth_sectors_org_idx").on(t.orgId),
+  }),
+);
+
+export const growthSectorEvidence = pgTable(
+  "growth_sector_evidence",
+  {
+    id: id(),
+    orgId: orgId(),
+    sectorId: uuid("sector_id")
+      .notNull()
+      .references(() => growthSectors.id, { onDelete: "cascade" }),
+    evidenceType: text("evidence_type").notNull(),
+    prospectId: uuid("prospect_id").references(() => growthProspects.id, { onDelete: "set null" }),
+    campaignId: uuid("campaign_id").references(() => growthCampaigns.id, { onDelete: "set null" }),
+    recipientId: uuid("recipient_id").references(() => growthCampaignRecipients.id, {
+      onDelete: "set null",
+    }),
+    summary: text("summary").notNull(),
+    metadata: jsonb("metadata").default({}).notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    sectorIdx: index("growth_sector_evidence_sector_idx").on(t.orgId, t.sectorId, t.recordedAt),
+  }),
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Stage 3 — Autopilot settings & allocation audit
+// ────────────────────────────────────────────────────────────────────────────
+
+export const growthAutopilotMode = pgEnum("growth_autopilot_mode", ["OBSERVE", "ASSISTED", "AUTOPILOT"]);
+
+export const growthAutopilotSettings = pgTable(
+  "growth_autopilot_settings",
+  {
+    id: id(),
+    orgId: orgId(),
+    mode: growthAutopilotMode("mode").default("OBSERVE").notNull(),
+    /** Project-wide pause: blocks all campaign sends including queued follow-ups. */
+    paused: boolean("paused").default(false).notNull(),
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    pausedBy: uuid("paused_by").references(() => users.id, { onDelete: "set null" }),
+    dailySendCap: integer("daily_send_cap").default(50).notNull(),
+    dailyBudgetCents: integer("daily_budget_cents").default(0).notNull(),
+    /** Percent of daily capacity reserved for exploring new sectors (0–50). */
+    explorationPercent: integer("exploration_percent").default(20).notNull(),
+    approvedSectorIds: uuid("approved_sector_ids").array().default([]).notNull(),
+    approvedSenderIds: uuid("approved_sender_ids").array().default([]).notNull(),
+    lastCycleAt: timestamp("last_cycle_at", { withTimezone: true }),
+    updatedAt: updatedAt(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgUnique: uniqueIndex("growth_autopilot_settings_org_uq").on(t.orgId),
+  }),
+);
+
+export const growthAutopilotDecisions = pgTable(
+  "growth_autopilot_decisions",
+  {
+    id: id(),
+    orgId: orgId(),
+    sectorId: uuid("sector_id").references(() => growthSectors.id, { onDelete: "set null" }),
+    cycleId: uuid("cycle_id").notNull(),
+    previousAllocation: integer("previous_allocation").notNull(),
+    newAllocation: integer("new_allocation").notNull(),
+    /** Plain-language explanation shown on Autopilot Decisions. */
+    reasoning: text("reasoning").notNull(),
+    inputs: jsonb("inputs").notNull(),
+    rollbackOfId: uuid("rollback_of_id"),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgIdx: index("growth_autopilot_decisions_org_idx").on(t.orgId, t.createdAt),
+    cycleIdx: index("growth_autopilot_decisions_cycle_idx").on(t.orgId, t.cycleId),
+  }),
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Stage 3 — Unified inbox & AI-assisted replies
+// ────────────────────────────────────────────────────────────────────────────
+
+export const growthInboxThreads = pgTable(
+  "growth_inbox_threads",
+  {
+    id: id(),
+    orgId: orgId(),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => growthProspects.id, { onDelete: "cascade" }),
+    contactDetailId: uuid("contact_detail_id").references(() => growthContactDetails.id, {
+      onDelete: "set null",
+    }),
+    campaignId: uuid("campaign_id").references(() => growthCampaigns.id, { onDelete: "set null" }),
+    senderIdentityId: uuid("sender_identity_id").references(() => growthSenderIdentities.id, {
+      onDelete: "set null",
+    }),
+    subject: text("subject"),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).defaultNow().notNull(),
+    needsHumanReply: boolean("needs_human_reply").default(false).notNull(),
+    verificationRequestedAt: timestamp("verification_requested_at", { withTimezone: true }),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgIdx: index("growth_inbox_threads_org_idx").on(t.orgId, t.lastMessageAt),
+    prospectIdx: index("growth_inbox_threads_prospect_idx").on(t.orgId, t.prospectId),
+  }),
+);
+
+export const growthInboxMessages = pgTable(
+  "growth_inbox_messages",
+  {
+    id: id(),
+    orgId: orgId(),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => growthInboxThreads.id, { onDelete: "cascade" }),
+    direction: text("direction").notNull(),
+    fromEmail: text("from_email").notNull(),
+    toEmail: text("to_email").notNull(),
+    subject: text("subject"),
+    bodyText: text("body_text").notNull(),
+    intent: text("intent"),
+    classifiedAt: timestamp("classified_at", { withTimezone: true }),
+    providerMessageId: text("provider_message_id"),
+    createdAt: ts(),
+  },
+  (t) => ({
+    threadIdx: index("growth_inbox_messages_thread_idx").on(t.threadId, t.createdAt),
+  }),
+);
+
+export const growthReplyDrafts = pgTable(
+  "growth_reply_drafts",
+  {
+    id: id(),
+    orgId: orgId(),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => growthInboxThreads.id, { onDelete: "cascade" }),
+    inboundMessageId: uuid("inbound_message_id").references(() => growthInboxMessages.id, {
+      onDelete: "set null",
+    }),
+    language: text("language").default("EN").notNull(),
+    draftText: text("draft_text").notNull(),
+    contextSources: jsonb("context_sources").default([]).notNull(),
+    knowledgeFactIds: uuid("knowledge_fact_ids").array().default([]).notNull(),
+    requiresHuman: boolean("requires_human").default(false).notNull(),
+    humanRouteReason: text("human_route_reason"),
+    status: text("status").default("DRAFT").notNull(),
+    createdBy: createdBy(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    threadIdx: index("growth_reply_drafts_thread_idx").on(t.threadId, t.createdAt),
   }),
 );

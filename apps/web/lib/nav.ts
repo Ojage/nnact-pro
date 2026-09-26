@@ -56,6 +56,7 @@ const ROUTE_ROLES: ReadonlyArray<readonly [string, readonly NavRole[]]> = [
   ["/reports", ["owner", "dispatcher"]],
   ["/quality/comebacks", ["owner", "dispatcher"]],
   ["/growth", ["owner", "dispatcher", "secretary"]],
+  ["/growth/campaigns", ["owner", "dispatcher", "secretary"]],
 ];
 
 export function rolesForRoute(pathname: string): readonly NavRole[] {
@@ -153,7 +154,12 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Growth",
     links: [
+      { href: "/growth/intelligence", label: "Growth Intelligence", icon: "◎" },
+      { href: "/growth/knowledge", label: "Project Knowledge", icon: "▤" },
+      { href: "/growth/autopilot", label: "Autopilot", icon: "⟲" },
+      { href: "/growth/inbox", label: "Unified Inbox", icon: "✉" },
       { href: "/growth", label: "Prospects", icon: "◈" },
+      { href: "/growth/campaigns", label: "Campaigns", icon: "▤" },
       { href: "/growth/senders", label: "Sender Registry", icon: "✉" },
       { href: "/growth/suppressions", label: "Suppression List", icon: "⊘" },
     ],

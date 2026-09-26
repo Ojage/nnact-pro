@@ -371,3 +371,194 @@ export const GROWTH_INGEST_STATUS = [
   "BLOCKED",
 ] as const;
 export type GrowthIngestStatus = (typeof GROWTH_INGEST_STATUS)[number];
+
+export interface GrowthKnowledgeFactDTO {
+  id: string;
+  factKey: string;
+  category: GrowthKnowledgeCategory;
+  subject: string;
+  supportingPassage?: string | null;
+  sourceType: GrowthKnowledgeSourceType;
+  sourceUrl?: string | null;
+  sourceDocumentId?: string | null;
+  sourceTitle?: string | null;
+  extractedAt?: string | null;
+  /** 0–100 confidence that the passage supports the subject. */
+  confidence: number;
+  provenance: GrowthKnowledgeProvenance;
+  status: GrowthKnowledgeStatus;
+  manuallyCorrected: boolean;
+  approvedAt?: string | null;
+  rejectedReason?: string | null;
+  lastReviewedAt?: string | null;
+  contradictionGroup?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GrowthKnowledgeIngestRunDTO {
+  id: string;
+  sourceType: string;
+  sourceUrl?: string | null;
+  sourceTitle?: string | null;
+  status: GrowthIngestStatus;
+  extractor: string;
+  factsSeen: number;
+  factsCreated: number;
+  factsSkipped: number;
+  missingCategories: string[];
+  error?: string | null;
+  startedAt: string;
+  finishedAt?: string | null;
+}
+
+export const GROWTH_COMPETITOR_CLASSIFICATION = [
+  "DIRECT_LOCAL",
+  "REGIONAL",
+  "INTERNATIONAL_REFERENCE",
+  "UNRELATED",
+] as const;
+export type GrowthCompetitorClassification = (typeof GROWTH_COMPETITOR_CLASSIFICATION)[number];
+
+export const GROWTH_COMPETITOR_REVIEW_STATUS = [
+  "SUGGESTED",
+  "APPROVED",
+  "REJECTED",
+  "EXCLUDED",
+] as const;
+export type GrowthCompetitorReviewStatus = (typeof GROWTH_COMPETITOR_REVIEW_STATUS)[number];
+
+export interface GrowthCompetitorDTO {
+  id: string;
+  name: string;
+  websiteDomain?: string | null;
+  classification: GrowthCompetitorClassification;
+  reviewStatus: GrowthCompetitorReviewStatus;
+  geography?: string | null;
+  services?: string | null;
+  targetCustomers?: string | null;
+  positioning?: string | null;
+  visibleOffers?: string | null;
+  evidenceSummary?: string | null;
+  sourceUrls: string[];
+  reviewNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GrowthSectorDTO {
+  id: string;
+  slug: string;
+  name: string;
+  isActive: boolean;
+  pinned: boolean;
+  excluded: boolean;
+  paused: boolean;
+  services: string[];
+  equipmentTypes: string[];
+  hypotheses: { text: string; supported: boolean; evidenceIds?: string[] }[];
+  decisionMakers?: string | null;
+  prospectCriteria?: string | null;
+  offerTemplate?: string | null;
+  callToAction?: string | null;
+  allocationWeight: number;
+  manualAllocationOverride?: number | null;
+  minSampleSize: number;
+  observationDays: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const GROWTH_AUTOPILOT_MODES = ["OBSERVE", "ASSISTED", "AUTOPILOT"] as const;
+export type GrowthAutopilotMode = (typeof GROWTH_AUTOPILOT_MODES)[number];
+
+export interface GrowthAutopilotSettingsDTO {
+  mode: GrowthAutopilotMode;
+  paused: boolean;
+  pausedAt?: string | null;
+  dailySendCap: number;
+  dailyBudgetCents: number;
+  explorationPercent: number;
+  approvedSectorIds: string[];
+  approvedSenderIds: string[];
+  lastCycleAt?: string | null;
+  /** Whether cold transport is configured and permitted for cold campaigns. */
+  coldTransportReady: boolean;
+}
+
+export interface GrowthAutopilotDecisionDTO {
+  id: string;
+  sectorId?: string | null;
+  sectorName?: string | null;
+  cycleId: string;
+  previousAllocation: number;
+  newAllocation: number;
+  reasoning: string;
+  inputs: Record<string, unknown>;
+  createdAt: string;
+}
+
+export const GROWTH_REPLY_INTENTS = [
+  "INTERESTED",
+  "PRICING",
+  "VERIFICATION",
+  "SCHEDULING",
+  "NOT_INTERESTED",
+  "UNSUBSCRIBE",
+  "COMPLAINT",
+  "AUTO_REPLY",
+  "OTHER",
+] as const;
+export type GrowthReplyIntent = (typeof GROWTH_REPLY_INTENTS)[number];
+
+export interface GrowthInboxThreadDTO {
+  id: string;
+  prospectId: string;
+  companyName?: string;
+  contactDetailId?: string | null;
+  campaignId?: string | null;
+  senderIdentityId?: string | null;
+  senderDisplayName?: string | null;
+  senderEmail?: string | null;
+  subject?: string | null;
+  lastMessageAt: string;
+  needsHumanReply: boolean;
+  verificationRequestedAt?: string | null;
+}
+
+export interface GrowthInboxMessageDTO {
+  id: string;
+  threadId: string;
+  direction: "INBOUND" | "OUTBOUND";
+  fromEmail: string;
+  toEmail: string;
+  subject?: string | null;
+  bodyText: string;
+  intent?: GrowthReplyIntent | null;
+  createdAt: string;
+}
+
+export interface GrowthReplyDraftDTO {
+  id: string;
+  threadId: string;
+  language: string;
+  draftText: string;
+  contextSources: unknown[];
+  knowledgeFactIds: string[];
+  requiresHuman: boolean;
+  humanRouteReason?: string | null;
+  status: string;
+  createdAt: string;
+}
+
+/** Growth intelligence overview for the dashboard. */
+export interface GrowthIntelligenceOverviewDTO {
+  pendingKnowledgeFacts: number;
+  contradictions: number;
+  suggestedCompetitors: number;
+  autopilotMode: GrowthAutopilotMode;
+  autopilotPaused: boolean;
+  sectorsActive: number;
+  threadsNeedingHuman: number;
+  coldTransportReady: boolean;
+}

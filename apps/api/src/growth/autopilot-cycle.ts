@@ -1,0 +1,169 @@
+// Autopilot observe/assist/autopilot cycle — allocation and campaign proposals.
+
+import { randomUUID } from "node:crypto";
+import { and, eq, sql } from "drizzle-orm";
+import {
+  db,
+  growthAutopilotDecisions,
+  growthAutopilotSettings,
+  growthCampaignRecipients,
+  growthCampaigns,
+  growthSectors,
+} from "@nnact/db";
+import { computeSectorAllocations, type SectorAllocationInput } from "./allocation.js";
+import { isColdSendingEnabled } from "./transport-policy.js";
+
+export interface AutopilotCycleResult {
+  cycleId: string;
+  mode: string;
+  decisions: number;
+  coldBlocked: boolean;
+  message: string;
+}
+
+export async function runAutopilotCycle(orgId: string): Promise<AutopilotCycleResult> {
+  const cycleId = randomUUID();
+  const [settings] = await db
+    .select()
+    .from(growthAutopilotSettings)
+    .where(eq(growthAutopilotSettings.orgId, orgId))
+    .limit(1);
+
+  const mode = settings?.mode ?? "OBSERVE";
+  const paused = settings?.paused ?? false;
+  const coldReady = isColdSendingEnabled(process.env);
+
+  if (paused) {
+    return { cycleId, mode, decisions: 0, coldBlocked: !coldReady, message: "Autopilot is paused; no sends scheduled." };
+  }
+
+  const sectors = await db.select().from(growthSectors).where(eq(growthSectors.orgId, orgId));
+  const inputs: SectorAllocationInput[] = [];
+
+  for (const sector of sectors) {
+    const metrics = await loadSectorMetrics(orgId, sector.id);
+    inputs.push({
+      sectorId: sector.id,
+      name: sector.name,
+      pinned: sector.pinned,
+      excluded: sector.excluded,
+      paused: sector.paused,
+      manualOverride: sector.manualAllocationOverride,
+      contacts: metrics.contacts,
+      minSampleSize: sector.minSampleSize,
+      observationDays: sector.observationDays,
+      daysObserved: metrics.daysObserved,
+      qualifiedMeetings: metrics.meetings,
+      assessments: metrics.assessments,
+      acceptedEstimates: metrics.estimates,
+      wonRevenueCents: metrics.wonRevenueCents,
+      positiveReplies: metrics.positiveReplies,
+      objections: metrics.objections,
+      unsubscribes: metrics.unsubscribes,
+      bounces: metrics.bounces,
+      complaints: metrics.complaints,
+      currentWeight: sector.allocationWeight,
+    });
+  }
+
+  const dailyCap = settings?.dailySendCap ?? 50;
+  const exploration = settings?.explorationPercent ?? 20;
+  const allocations = computeSectorAllocations(inputs, { dailyCapacity: dailyCap, explorationPercent: exploration });
+
+  let decisions = 0;
+  for (const row of allocations) {
+    if (row.newAllocation === row.previousAllocation) continue;
+    await db.insert(growthAutopilotDecisions).values({
+      orgId,
+      sectorId: row.sectorId,
+      cycleId,
+      previousAllocation: row.previousAllocation,
+      newAllocation: row.newAllocation,
+      reasoning: row.reasoning,
+      inputs: { dailyCap, exploration, coldTransportReady: coldReady, mode },
+    });
+    await db
+      .update(growthSectors)
+      .set({ allocationWeight: row.newAllocation, updatedAt: new Date() })
+      .where(and(eq(growthSectors.orgId, orgId), eq(growthSectors.id, row.sectorId)));
+    decisions += 1;
+  }
+
+  await db
+    .update(growthAutopilotSettings)
+    .set({ lastCycleAt: new Date(), updatedAt: new Date() })
+    .where(eq(growthAutopilotSettings.orgId, orgId));
+
+  if (mode === "AUTOPILOT" && !coldReady) {
+    return {
+      cycleId,
+      mode,
+      decisions,
+      coldBlocked: true,
+      message: "Allocation updated, but cold campaigns cannot activate until cold transport is configured.",
+    };
+  }
+
+  if (mode === "OBSERVE") {
+    return {
+      cycleId,
+      mode,
+      decisions,
+      coldBlocked: !coldReady,
+      message: "Observe mode: recommendations recorded; no campaigns scheduled.",
+    };
+  }
+
+  return {
+    cycleId,
+    mode,
+    decisions,
+    coldBlocked: !coldReady,
+    message: mode === "ASSISTED" ? "Assisted mode: review proposed allocations before activation." : "Autopilot cycle completed.",
+  };
+}
+
+async function loadSectorMetrics(orgId: string, sectorId: string) {
+  const rows = await db.execute<{
+    contacts: number;
+    meetings: number;
+    assessments: number;
+    estimates: number;
+    positive_replies: number;
+    objections: number;
+    unsubscribes: number;
+    bounces: number;
+    complaints: number;
+    days_observed: number;
+  }>(sql`
+    select
+      count(distinct r.id)::int as contacts,
+      count(distinct r.id) filter (where r.meeting_booked_at is not null)::int as meetings,
+      count(distinct r.id) filter (where r.status = 'CONVERTED')::int as assessments,
+      count(distinct r.id) filter (where p.lifecycle = 'QUOTED')::int as estimates,
+      count(distinct r.id) filter (where r.replied_at is not null)::int as positive_replies,
+      0::int as objections,
+      count(distinct r.id) filter (where r.opted_out_at is not null)::int as unsubscribes,
+      count(distinct r.id) filter (where r.bounced_at is not null)::int as bounces,
+      0::int as complaints,
+      greatest(1, extract(day from now() - min(c.created_at)))::int as days_observed
+    from growth_campaigns c
+    left join growth_campaign_recipients r on r.campaign_id = c.id
+    left join growth_prospects p on p.id = r.prospect_id
+    where c.org_id = ${orgId} and c.sector_id = ${sectorId}
+  `);
+  const m = (rows as unknown as Record<string, number>[])[0] ?? {};
+  return {
+    contacts: Number(m.contacts ?? 0),
+    meetings: Number(m.meetings ?? 0),
+    assessments: Number(m.assessments ?? 0),
+    estimates: Number(m.estimates ?? 0),
+    wonRevenueCents: 0,
+    positiveReplies: Number(m.positive_replies ?? 0),
+    objections: Number(m.objections ?? 0),
+    unsubscribes: Number(m.unsubscribes ?? 0),
+    bounces: Number(m.bounces ?? 0),
+    complaints: Number(m.complaints ?? 0),
+    daysObserved: Number(m.days_observed ?? 1),
+  };
+}

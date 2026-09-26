@@ -91,13 +91,25 @@ import type {
   ServiceModeDTO,
 } from "@nnact/shared";
 import type {
+  GrowthCampaignPurpose,
+  GrowthCampaignStatus,
   GrowthContactDetailDTO,
   GrowthDuplicateMatchDTO,
+  GrowthOutboundStatus,
   GrowthProspectDTO,
   GrowthProspectLifecycle,
   GrowthProspectSource,
+  GrowthRecipientStatus,
   GrowthSenderIdentityDTO,
   GrowthSuppressionDTO,
+  GrowthKnowledgeFactDTO,
+  GrowthIntelligenceOverviewDTO,
+  GrowthCompetitorDTO,
+  GrowthSectorDTO,
+  GrowthAutopilotSettingsDTO,
+  GrowthAutopilotDecisionDTO,
+  GrowthInboxThreadDTO,
+  GrowthInboxMessageDTO,
 } from "@nnact/shared";
 
 /** Query parameters accepted by GET /api/growth/prospects. */
@@ -336,6 +348,10 @@ export const apiSlice = createApi({
     "GrowthProspect",
     "GrowthSender",
     "GrowthSuppression",
+    "GrowthCampaign",
+    "GrowthCampaignRecipient",
+    "GrowthOutbound",
+    "GrowthIntelligence",
     "Invoice",
     "Estimate",
     "ServiceAgreement",
@@ -1707,6 +1723,148 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       query: (id) => ({ url: `/api/growth/suppressions/${id}`, method: "DELETE" }),
       invalidatesTags: ["GrowthSuppression"],
     }),
+
+    growthIntelligenceOverview: builder.query<GrowthIntelligenceOverviewDTO, void>({
+      query: () => "/api/growth/intelligence/overview",
+      providesTags: ["GrowthIntelligence"],
+    }),
+    growthKnowledgeFacts: builder.query<GrowthKnowledgeFactDTO[], { status?: string } | void>({
+      query: (params) => ({ url: "/api/growth/knowledge/facts", params: (params ?? {}) as Record<string, unknown> }),
+      providesTags: ["GrowthIntelligence"],
+    }),
+    ingestGrowthWebsite: builder.mutation<
+      { runId: string; factsCreated: number; missingCategories: string[]; competitorsSuggested: number },
+      { website: string }
+    >({
+      query: (body) => ({ url: "/api/growth/knowledge/ingest/website", method: "POST", body }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    reviewGrowthKnowledgeFact: builder.mutation<
+      GrowthKnowledgeFactDTO,
+      { id: string; action: "APPROVE" | "EDIT" | "REJECT" | "OBSOLETE"; subject?: string; rejectedReason?: string }
+    >({
+      query: ({ id, ...body }) => ({ url: `/api/growth/knowledge/facts/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    growthCompetitors: builder.query<GrowthCompetitorDTO[], void>({
+      query: () => "/api/growth/competitors",
+      providesTags: ["GrowthIntelligence"],
+    }),
+    reviewGrowthCompetitor: builder.mutation<
+      GrowthCompetitorDTO,
+      { id: string; reviewStatus?: string; classification?: string; reviewNotes?: string }
+    >({
+      query: ({ id, ...body }) => ({ url: `/api/growth/competitors/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    growthSectors: builder.query<GrowthSectorDTO[], void>({
+      query: () => "/api/growth/sectors",
+      providesTags: ["GrowthIntelligence"],
+    }),
+    growthAutopilotSettings: builder.query<GrowthAutopilotSettingsDTO, void>({
+      query: () => "/api/growth/autopilot/settings",
+      providesTags: ["GrowthIntelligence"],
+    }),
+    updateGrowthAutopilotSettings: builder.mutation<GrowthAutopilotSettingsDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/growth/autopilot/settings", method: "PATCH", body }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    pauseGrowthAutopilot: builder.mutation<GrowthAutopilotSettingsDTO, void>({
+      query: () => ({ url: "/api/growth/autopilot/pause", method: "POST" }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    resumeGrowthAutopilot: builder.mutation<GrowthAutopilotSettingsDTO, void>({
+      query: () => ({ url: "/api/growth/autopilot/resume", method: "POST" }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    runGrowthAutopilotCycle: builder.mutation<
+      { cycleId: string; mode: string; decisions: number; coldBlocked: boolean; message: string },
+      void
+    >({
+      query: () => ({ url: "/api/growth/autopilot/run-cycle", method: "POST" }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    growthAutopilotDecisions: builder.query<GrowthAutopilotDecisionDTO[], void>({
+      query: () => "/api/growth/autopilot/decisions",
+      providesTags: ["GrowthIntelligence"],
+    }),
+    growthInboxThreads: builder.query<GrowthInboxThreadDTO[], void>({
+      query: () => "/api/growth/inbox/threads",
+      providesTags: ["GrowthIntelligence"],
+    }),
+    growthInboxMessages: builder.query<GrowthInboxMessageDTO[], string>({
+      query: (id) => `/api/growth/inbox/threads/${id}`,
+      providesTags: ["GrowthIntelligence"],
+    }),
+
+    // ── Campaigns ────────────────────────────────────────────────────────
+    growthCampaigns: builder.query<GrowthCampaignDTO[], { status?: GrowthCampaignStatus; purpose?: GrowthCampaignPurpose; limit?: number; offset?: number } | void>({
+      query: (params) => ({ url: "/api/growth/campaigns", params: (params ?? {}) as Record<string, unknown> }),
+      providesTags: ["GrowthCampaign"],
+    }),
+    growthCampaign: builder.query<GrowthCampaignDetailDTO, string>({
+      query: (id) => `/api/growth/campaigns/${id}`,
+      providesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
+    }),
+    createGrowthCampaign: builder.mutation<{ campaign: GrowthCampaignDTO }, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/growth/campaigns", method: "POST", body }),
+      invalidatesTags: ["GrowthCampaign"],
+    }),
+    updateGrowthCampaign: builder.mutation<{ campaign: GrowthCampaignDTO }, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/growth/campaigns/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: "GrowthCampaign", id }],
+    }),
+    saveGrowthCampaignStep: builder.mutation<{ step: GrowthCampaignStepDTO }, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/growth/campaigns/${id}/steps`, method: "POST", body: data }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: "GrowthCampaign", id }],
+    }),
+    addGrowthCampaignRecipients: builder.mutation<{ inserted: number; skipped: number }, { id: string; items: { prospectId: string; contactDetailId: string }[] }>({
+      query: ({ id, items }) => ({ url: `/api/growth/campaigns/${id}/recipients`, method: "POST", body: { items } }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "GrowthCampaign", id },
+        { type: "GrowthCampaignRecipient", id },
+      ],
+    }),
+    growthCampaignRecipients: builder.query<GrowthCampaignRecipientRowDTO[], { id: string; limit?: number; offset?: number }>({
+      query: ({ id, ...params }) => ({ url: `/api/growth/campaigns/${id}/recipients`, params: params as Record<string, unknown> }),
+      providesTags: (_r, _e, { id }) => [{ type: "GrowthCampaignRecipient", id }],
+    }),
+    stopGrowthRecipient: builder.mutation<{ recipient: { id: string } }, { id: string }>({
+      query: ({ id }) => ({ url: `/api/growth/recipients/${id}/stop`, method: "POST" }),
+      invalidatesTags: ["GrowthCampaignRecipient", "GrowthCampaign"],
+    }),
+    submitGrowthCampaignReview: builder.mutation<{ campaign: GrowthCampaignDTO }, string>({
+      query: (id) => ({ url: `/api/growth/campaigns/${id}/submit-review`, method: "POST" }),
+      invalidatesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
+    }),
+    approveGrowthCampaign: builder.mutation<{ campaign: GrowthCampaignDTO }, string>({
+      query: (id) => ({ url: `/api/growth/campaigns/${id}/approve`, method: "POST" }),
+      invalidatesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
+    }),
+    scheduleGrowthCampaign: builder.mutation<{ campaign: GrowthCampaignDTO }, { id: string; scheduledStartAt?: string }>({
+      query: ({ id, scheduledStartAt }) => ({
+        url: `/api/growth/campaigns/${id}/schedule`,
+        method: "POST",
+        body: scheduledStartAt ? { scheduledStartAt } : {},
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: "GrowthCampaign", id }],
+    }),
+    pauseGrowthCampaign: builder.mutation<{ campaign: GrowthCampaignDTO }, string>({
+      query: (id) => ({ url: `/api/growth/campaigns/${id}/pause`, method: "POST" }),
+      invalidatesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
+    }),
+    runGrowthCampaign: builder.mutation<GrowthCampaignRunDTO, { id: string; limit?: number }>({
+      query: ({ id, limit }) => ({ url: `/api/growth/campaigns/${id}/run`, method: "POST", body: limit ? { limit } : {} }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "GrowthCampaign", id },
+        { type: "GrowthCampaignRecipient", id },
+        "GrowthOutbound",
+      ],
+    }),
+    growthOutboundLog: builder.query<GrowthOutboundMessageDTO[], { id: string; status?: GrowthOutboundStatus; limit?: number; offset?: number }>({
+      query: ({ id, ...params }) => ({ url: `/api/growth/campaigns/${id}/outbound`, params: params as Record<string, unknown> }),
+      providesTags: ["GrowthOutbound"],
+    }),
   }),
 });
 
@@ -1715,6 +1873,109 @@ export interface GrowthDuplicateCheckDTO {
   matches: GrowthDuplicateMatchDTO[];
   /** True when a match rests on a shared identifier, not just a similar name. */
   blocking: boolean;
+}
+
+// ── Campaigns ─────────────────────────────────────────────────────────────
+
+export interface GrowthCampaignDTO {
+  id: string;
+  orgId: string;
+  name: string;
+  purpose: GrowthCampaignPurpose;
+  status: GrowthCampaignStatus;
+  senderIdentityId: string;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  scheduledStartAt: string | null;
+  quietHoursStart: number | null;
+  quietHoursEnd: number | null;
+  timezone: string;
+  dailyLimit: number;
+  maxFollowUps: number;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GrowthCampaignStepDTO {
+  id: string;
+  campaignId: string;
+  stepNumber: number;
+  delayDays: number;
+  subject: string;
+  bodyText: string;
+  bodyHtml: string | null;
+  createdAt: string;
+}
+
+export interface GrowthCampaignRecipientSummaryDTO {
+  total: number;
+  pending: number;
+  sent: number;
+  suppressed: number;
+  blocked: number;
+  replied: number;
+}
+
+export interface GrowthCampaignDetailDTO {
+  campaign: GrowthCampaignDTO;
+  steps: GrowthCampaignStepDTO[];
+  sender: {
+    id: string;
+    displayName: string;
+    email: string;
+    verificationState: string;
+    coldApproved: boolean;
+  } | null;
+  recipients: GrowthCampaignRecipientSummaryDTO;
+  sentToday: number;
+  dailyLimit: number;
+  dailyLimitReached: boolean;
+}
+
+export interface GrowthCampaignRecipientRowDTO {
+  id: string;
+  status: GrowthRecipientStatus;
+  currentStep: number;
+  followUpsSent: number;
+  lastSentAt: string | null;
+  repliedAt: string | null;
+  companyName: string;
+  contactKind: string;
+  contactValue: string;
+}
+
+export interface GrowthOutboundMessageDTO {
+  id: string;
+  campaignId: string;
+  recipientId: string;
+  stepId: string;
+  toEmail: string;
+  subject: string;
+  purpose: GrowthCampaignPurpose;
+  transportId: string;
+  status: GrowthOutboundStatus;
+  providerMessageId: string | null;
+  /** Why a send was refused, e.g. "suppressed (EMAIL: OPT_OUT)". */
+  blockedReason: string | null;
+  error: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+export interface GrowthCampaignRunDTO {
+  campaignId: string;
+  processed: number;
+  sent: number;
+  suppressed: number;
+  blocked: number;
+  skipped: number;
+  failed: number;
+  duplicates: number;
+  outcomes: { recipientId: string; stepNumber: number; status: string; reason?: string }[];
+  /** Present when the campaign could not run at all. */
+  refusal?: { code: string; message: string };
 }
 
 export const {
@@ -1978,7 +2239,36 @@ export const {
   useApproveGrowthSenderColdMutation,
   useRevokeGrowthSenderColdMutation,
   useGrowthSuppressionsQuery,
+  useGrowthCampaignsQuery,
+  useGrowthCampaignQuery,
+  useCreateGrowthCampaignMutation,
+  useUpdateGrowthCampaignMutation,
+  useSaveGrowthCampaignStepMutation,
+  useAddGrowthCampaignRecipientsMutation,
+  useGrowthCampaignRecipientsQuery,
+  useStopGrowthRecipientMutation,
+  useSubmitGrowthCampaignReviewMutation,
+  useApproveGrowthCampaignMutation,
+  useScheduleGrowthCampaignMutation,
+  usePauseGrowthCampaignMutation,
+  useRunGrowthCampaignMutation,
+  useGrowthOutboundLogQuery,
   useCreateGrowthSuppressionMutation,
+  useGrowthIntelligenceOverviewQuery,
+  useGrowthKnowledgeFactsQuery,
+  useIngestGrowthWebsiteMutation,
+  useReviewGrowthKnowledgeFactMutation,
+  useGrowthCompetitorsQuery,
+  useReviewGrowthCompetitorMutation,
+  useGrowthSectorsQuery,
+  useGrowthAutopilotSettingsQuery,
+  useUpdateGrowthAutopilotSettingsMutation,
+  usePauseGrowthAutopilotMutation,
+  useResumeGrowthAutopilotMutation,
+  useRunGrowthAutopilotCycleMutation,
+  useGrowthAutopilotDecisionsQuery,
+  useGrowthInboxThreadsQuery,
+  useGrowthInboxMessagesQuery,
   useDeleteGrowthSuppressionMutation,
 } = apiSlice;
 

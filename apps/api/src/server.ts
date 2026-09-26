@@ -50,6 +50,7 @@ import { aiRoutes } from "./ai/index.js";
 import { comebackRoutes } from "./routes/comebacks.js";
 import { growthRoutes } from "./routes/growth.js";
 import { growthCampaignRoutes } from "./routes/growth-campaigns.js";
+import { growthIntelligenceRoutes } from "./routes/growth-intelligence.js";
 import { startGrowthScheduler } from "./growth/scheduler.js";
 import { operationRoutes } from "./routes/operations.js";
 import { diagnosticRoutes } from "./routes/diagnostics.js";
@@ -319,6 +320,7 @@ export function buildServer(
   app.register(comebackRoutes, { prefix: withVersion("/comebacks") });
   app.register(growthRoutes, { prefix: withVersion("/growth") });
   app.register(growthCampaignRoutes, { prefix: withVersion("/growth") });
+  app.register(growthIntelligenceRoutes, { prefix: withVersion("/growth") });
   app.register(aiRoutes, { prefix: withVersion("/ai") });
   app.register(operationRoutes, {
     prefix: withVersion("/operations"),
@@ -394,6 +396,7 @@ export function buildServer(
   app.register(comebackRoutes, { prefix: withLegacy("/comebacks") });
   app.register(growthRoutes, { prefix: withLegacy("/growth") });
   app.register(growthCampaignRoutes, { prefix: withLegacy("/growth") });
+  app.register(growthIntelligenceRoutes, { prefix: withLegacy("/growth") });
   app.register(aiRoutes, { prefix: withLegacy("/ai") });
   app.register(operationRoutes, {
     prefix: withLegacy("/operations"),
