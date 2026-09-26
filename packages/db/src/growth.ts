@@ -246,3 +246,204 @@ export const growthSuppressions = pgTable(
     lookupIdx: index("growth_suppressions_lookup_idx").on(t.orgId, t.normalizedValue),
   }),
 );
+
+// ────────────────────────────────────────────────────────────────────────────
+// Campaigns
+//
+// A campaign is a sequence of steps sent from ONE real sender identity. The
+// `purpose` column is the reason the transport policy exists: it decides which
+// outbound transport may carry the campaign, and a COLD_OUTREACH campaign is
+// refused outright until a compliant cold transport is configured.
+// ────────────────────────────────────────────────────────────────────────────
+
+export const growthCampaignPurpose = pgEnum("growth_campaign_purpose", [
+  "COLD_OUTREACH",
+  "PERMISSION_MARKETING",
+  "EXISTING_CUSTOMER",
+]);
+
+export const growthCampaignStatus = pgEnum("growth_campaign_status", [
+  "DRAFT",
+  "IN_REVIEW",
+  "APPROVED",
+  "SCHEDULED",
+  "RUNNING",
+  "PAUSED",
+  "COMPLETED",
+  "CANCELLED",
+]);
+
+export const growthCampaignRecipientStatus = pgEnum("growth_campaign_recipient_status", [
+  "PENDING",
+  "QUEUED",
+  "SENT",
+  "REPLIED",
+  "OPTED_OUT",
+  "BOUNCED",
+  "SUPPRESSED",
+  "BLOCKED",
+  "SKIPPED",
+  "CONVERTED",
+]);
+
+export const growthOutboundStatus = pgEnum("growth_outbound_status", [
+  "QUEUED",
+  "SENT",
+  "FAILED",
+  "SUPPRESSED",
+  "BLOCKED",
+]);
+
+export const growthCampaigns = pgTable(
+  "growth_campaigns",
+  {
+    id: id(),
+    orgId: orgId(),
+    name: text("name").notNull(),
+    /** Drives transport selection. See growth/transport-policy.ts. */
+    purpose: growthCampaignPurpose("purpose").default("COLD_OUTREACH").notNull(),
+    status: growthCampaignStatus("status").default("DRAFT").notNull(),
+    /** The real, verified identity this campaign sends from. */
+    senderIdentityId: uuid("sender_identity_id")
+      .notNull()
+      .references(() => growthSenderIdentities.id, { onDelete: "restrict" }),
+    /** Recorded owner approval, required before any send. */
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    scheduledStartAt: timestamp("scheduled_start_at", { withTimezone: true }),
+    /** Hour (0–23) in `timezone` used to decide when a send is due. */
+    quietHoursStart: integer("quiet_hours_start").default(20),
+    quietHoursEnd: integer("quiet_hours_end").default(8),
+    timezone: text("timezone").default("UTC").notNull(),
+    /** Maximum messages sent per day across the campaign. */
+    dailyLimit: integer("daily_limit").default(50).notNull(),
+    /** Maximum follow-up steps per recipient, on top of the first step. */
+    maxFollowUps: integer("max_follow_ups").default(2).notNull(),
+    notes: text("notes"),
+    createdBy: createdBy(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    orgIdx: index("growth_campaigns_org_idx").on(t.orgId),
+    statusIdx: index("growth_campaigns_status_idx").on(t.orgId, t.status),
+    senderIdx: index("growth_campaigns_sender_idx").on(t.orgId, t.senderIdentityId),
+  }),
+);
+
+export const growthCampaignSteps = pgTable(
+  "growth_campaign_steps",
+  {
+    id: id(),
+    orgId: orgId(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => growthCampaigns.id, { onDelete: "cascade" }),
+    /** 1-based position in the sequence. */
+    stepNumber: integer("step_number").notNull(),
+    /** Days to wait after the previous step was sent. */
+    delayDays: integer("delay_days").default(0).notNull(),
+    subject: text("subject").notNull(),
+    bodyText: text("body_text").notNull(),
+    bodyHtml: text("body_html"),
+    createdBy: createdBy(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    campaignIdx: index("growth_campaign_steps_campaign_idx").on(t.orgId, t.campaignId),
+    stepNumberUnique: uniqueIndex("growth_campaign_steps_number_uq").on(t.campaignId, t.stepNumber),
+  }),
+);
+
+/**
+ * Recipients. The stop signals (replied, opted out, bounced, meeting booked,
+ * manually stopped) are stored on the recipient row so a follow-up decision
+ * never depends on reconstructing a timeline.
+ */
+export const growthCampaignRecipients = pgTable(
+  "growth_campaign_recipients",
+  {
+    id: id(),
+    orgId: orgId(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => growthCampaigns.id, { onDelete: "cascade" }),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => growthProspects.id, { onDelete: "cascade" }),
+    /** The exact contact detail this campaign addresses. */
+    contactDetailId: uuid("contact_detail_id")
+      .notNull()
+      .references(() => growthContactDetails.id, { onDelete: "cascade" }),
+    status: growthCampaignRecipientStatus("status").default("PENDING").notNull(),
+    /** Highest step number sent so far; 0 before the first send. */
+    currentStep: integer("current_step").default(0).notNull(),
+    followUpsSent: integer("follow_ups_sent").default(0).notNull(),
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    optedOutAt: timestamp("opted_out_at", { withTimezone: true }),
+    bouncedAt: timestamp("bounced_at", { withTimezone: true }),
+    meetingBookedAt: timestamp("meeting_booked_at", { withTimezone: true }),
+    manuallyStoppedAt: timestamp("manually_stopped_at", { withTimezone: true }),
+    convertedAt: timestamp("converted_at", { withTimezone: true }),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    campaignIdx: index("growth_campaign_recipients_campaign_idx").on(t.orgId, t.campaignId),
+    statusIdx: index("growth_campaign_recipients_status_idx").on(t.orgId, t.status),
+    // One row per contact detail per campaign, so a re-run cannot double-enrol.
+    contactUnique: uniqueIndex("growth_campaign_recipients_contact_uq").on(t.campaignId, t.contactDetailId),
+  }),
+);
+
+/**
+ * Outbound event log. Every attempt is recorded, including refusals, so a
+ * blocked send is auditable rather than silent. `idempotency_key` is unique per
+ * org: a retried or re-run send for the same recipient+step is recorded as a
+ * duplicate and never delivered twice.
+ */
+export const growthOutboundMessages = pgTable(
+  "growth_outbound_messages",
+  {
+    id: id(),
+    orgId: orgId(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => growthCampaigns.id, { onDelete: "cascade" }),
+    stepId: uuid("step_id")
+      .notNull()
+      .references(() => growthCampaignSteps.id, { onDelete: "cascade" }),
+    recipientId: uuid("recipient_id")
+      .notNull()
+      .references(() => growthCampaignRecipients.id, { onDelete: "cascade" }),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => growthProspects.id, { onDelete: "cascade" }),
+    /** `${campaignId}:${recipientId}:${stepNumber}` — unique per org. */
+    idempotencyKey: text("idempotency_key").notNull(),
+    purpose: growthCampaignPurpose("purpose").notNull(),
+    transportId: text("transport_id").notNull(),
+    senderIdentityId: uuid("sender_identity_id")
+      .notNull()
+      .references(() => growthSenderIdentities.id, { onDelete: "restrict" }),
+    toEmail: text("to_email").notNull(),
+    subject: text("subject").notNull(),
+    status: growthOutboundStatus("status").default("QUEUED").notNull(),
+    providerMessageId: text("provider_message_id"),
+    /** Machine-readable refusal code, e.g. "suppressed" or "cold_transport_not_configured". */
+    blockedReason: text("blocked_reason"),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: ts(),
+  },
+  (t) => ({
+    idempotencyUnique: uniqueIndex("growth_outbound_messages_idempotency_uq").on(
+      t.orgId,
+      t.idempotencyKey,
+    ),
+    campaignIdx: index("growth_outbound_messages_campaign_idx").on(t.orgId, t.campaignId),
+    statusIdx: index("growth_outbound_messages_status_idx").on(t.orgId, t.status),
+    sentAtIdx: index("growth_outbound_messages_sent_at_idx").on(t.orgId, t.sentAt),
+  }),
+);
