@@ -172,3 +172,202 @@ export interface GrowthDuplicateMatchDTO {
 /** Fields the duplicate check can match on. */
 export const GROWTH_DUPLICATE_FIELDS = ["EMAIL", "DOMAIN", "PHONE", "COMPANY"] as const;
 export type GrowthDuplicateField = (typeof GROWTH_DUPLICATE_FIELDS)[number];
+
+/** Campaign taxonomy. Mirrors growth_campaign_purpose in the database. */
+export const GROWTH_CAMPAIGN_PURPOSE = [
+  "COLD_OUTREACH",
+  "PERMISSION_MARKETING",
+  "EXISTING_CUSTOMER",
+] as const;
+export type GrowthCampaignPurpose = (typeof GROWTH_CAMPAIGN_PURPOSE)[number];
+
+export const GROWTH_CAMPAIGN_PURPOSE_LABELS: Record<GrowthCampaignPurpose, string> = {
+  COLD_OUTREACH: "Cold outreach",
+  PERMISSION_MARKETING: "Permission marketing",
+  EXISTING_CUSTOMER: "Existing customer",
+};
+
+/** Mirrors growth_campaign_status in the database. */
+export const GROWTH_CAMPAIGN_STATUS = [
+  "DRAFT",
+  "IN_REVIEW",
+  "APPROVED",
+  "SCHEDULED",
+  "RUNNING",
+  "PAUSED",
+  "COMPLETED",
+  "CANCELLED",
+] as const;
+export type GrowthCampaignStatus = (typeof GROWTH_CAMPAIGN_STATUS)[number];
+
+export const GROWTH_CAMPAIGN_STATUS_LABELS: Record<GrowthCampaignStatus, string> = {
+  DRAFT: "Draft",
+  IN_REVIEW: "In review",
+  APPROVED: "Approved",
+  SCHEDULED: "Scheduled",
+  RUNNING: "Running",
+  PAUSED: "Paused",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+};
+
+/** Mirrors growth_campaign_recipient_status in the database. */
+export const GROWTH_RECIPIENT_STATUS = [
+  "PENDING",
+  "QUEUED",
+  "SENT",
+  "REPLIED",
+  "OPTED_OUT",
+  "BOUNCED",
+  "SUPPRESSED",
+  "BLOCKED",
+  "SKIPPED",
+  "CONVERTED",
+] as const;
+export type GrowthRecipientStatus = (typeof GROWTH_RECIPIENT_STATUS)[number];
+
+/** Mirrors growth_outbound_status in the database. */
+export const GROWTH_OUTBOUND_STATUS = [
+  "QUEUED",
+  "SENT",
+  "FAILED",
+  "SUPPRESSED",
+  "BLOCKED",
+] as const;
+export type GrowthOutboundStatus = (typeof GROWTH_OUTBOUND_STATUS)[number];
+
+export const GROWTH_OUTBOUND_STATUS_LABELS: Record<GrowthOutboundStatus, string> = {
+  QUEUED: "Queued",
+  SENT: "Sent",
+  FAILED: "Failed",
+  SUPPRESSED: "Suppressed",
+  BLOCKED: "Blocked",
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// Stage 2 — Project Knowledge (company intelligence)
+//
+// A knowledge fact is only usable in outreach once a human has approved it, and
+// it always carries the passage and location it came from. The vocabulary below
+// keeps "where did this come from", "how sure are we" and "may we say it" as
+// separate, explicit fields, because conflating them is how a private
+// operational record silently becomes a public sales claim.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** What kind of material a fact was extracted from. */
+export const GROWTH_KNOWLEDGE_SOURCE_TYPE = [
+  "WEBSITE",
+  "INTERNAL_DOCUMENT",
+  "MANUAL_ENTRY",
+  "AI_INFERENCE",
+] as const;
+export type GrowthKnowledgeSourceType = (typeof GROWTH_KNOWLEDGE_SOURCE_TYPE)[number];
+
+/**
+ * Approval lifecycle. Only APPROVED facts may be used in campaign copy; PENDING
+ * is what a human reviews, REJECTED/OBSOLETE are retained for audit but are
+ * never quotable.
+ */
+export const GROWTH_KNOWLEDGE_STATUS = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "OBSOLETE",
+] as const;
+export type GrowthKnowledgeStatus = (typeof GROWTH_KNOWLEDGE_STATUS)[number];
+
+/** How a fact was established, independent of approval. */
+export const GROWTH_KNOWLEDGE_PROVENANCE = [
+  /** Quoted or directly stated in the source; safe to attribute. */
+  "SOURCED",
+  /** Reasonable reading of a source passage; a human must confirm wording. */
+  "INFERRED",
+  /** Typed by a person. Authoritative, but still attributable to them. */
+  "MANUAL",
+] as const;
+export type GrowthKnowledgeProvenance = (typeof GROWTH_KNOWLEDGE_PROVENANCE)[number];
+
+/** What the fact is about, used to group review and to gate campaign claims. */
+export const GROWTH_KNOWLEDGE_CATEGORY = [
+  "COMPANY_IDENTITY",
+  "CONTACT_DETAILS",
+  "SERVICE_AREA",
+  "SERVICES",
+  "EQUIPMENT_TYPES",
+  "INDUSTRIES_SERVED",
+  "POSITIONING",
+  "CREDENTIALS",
+  "GUARANTEES",
+  "CASE_STUDIES",
+  "CUSTOMER_REFERENCES",
+  "PRICING",
+  "CALL_TO_ACTION",
+  "SALES_MATERIALS",
+] as const;
+export type GrowthKnowledgeCategory = (typeof GROWTH_KNOWLEDGE_CATEGORY)[number];
+
+/** Human labels for the knowledge review queue. */
+export const GROWTH_KNOWLEDGE_CATEGORY_LABELS: Record<GrowthKnowledgeCategory, string> = {
+  COMPANY_IDENTITY: "Company identity",
+  CONTACT_DETAILS: "Contact details",
+  SERVICE_AREA: "Service area",
+  SERVICES: "Services",
+  EQUIPMENT_TYPES: "Equipment types",
+  INDUSTRIES_SERVED: "Industries served",
+  POSITIONING: "Positioning",
+  CREDENTIALS: "Credentials",
+  GUARANTEES: "Guarantees",
+  CASE_STUDIES: "Case studies",
+  CUSTOMER_REFERENCES: "Customer references",
+  PRICING: "Pricing",
+  CALL_TO_ACTION: "Call to action",
+  SALES_MATERIALS: "Sales materials",
+};
+
+export const GROWTH_KNOWLEDGE_STATUS_LABELS: Record<GrowthKnowledgeStatus, string> = {
+  PENDING: "Awaiting review",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  OBSOLETE: "Obsolete",
+};
+
+export const GROWTH_KNOWLEDGE_PROVENANCE_LABELS: Record<GrowthKnowledgeProvenance, string> = {
+  SOURCED: "Sourced",
+  INFERRED: "Inferred",
+  MANUAL: "Manual entry",
+};
+
+export const GROWTH_KNOWLEDGE_SOURCE_TYPE_LABELS: Record<GrowthKnowledgeSourceType, string> = {
+  WEBSITE: "Website",
+  INTERNAL_DOCUMENT: "Internal document",
+  MANUAL_ENTRY: "Manual entry",
+  AI_INFERENCE: "AI proposal",
+};
+
+/** Only these categories may be quoted in outreach copy. */
+export const GROWTH_CAMPAIGN_SAFE_CATEGORIES: readonly GrowthKnowledgeCategory[] = [
+  "COMPANY_IDENTITY",
+  "CONTACT_DETAILS",
+  "SERVICE_AREA",
+  "SERVICES",
+  "EQUIPMENT_TYPES",
+  "INDUSTRIES_SERVED",
+  "POSITIONING",
+  "CREDENTIALS",
+  "GUARANTEES",
+  "CASE_STUDIES",
+  "CUSTOMER_REFERENCES",
+  "CALL_TO_ACTION",
+];
+
+/** Categories that are internal-only: quoting them externally is not a sales claim. */
+export const GROWTH_INTERNAL_ONLY_CATEGORIES: readonly GrowthKnowledgeCategory[] = ["PRICING"];
+
+/** Result of one ingestion pass over a source. */
+export const GROWTH_INGEST_STATUS = [
+  "COMPLETED",
+  "PARTIAL",
+  "FAILED",
+  "BLOCKED",
+] as const;
+export type GrowthIngestStatus = (typeof GROWTH_INGEST_STATUS)[number];
