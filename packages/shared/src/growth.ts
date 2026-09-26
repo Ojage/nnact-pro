@@ -190,6 +190,8 @@ export const GROWTH_CAMPAIGN_PURPOSE_LABELS: Record<GrowthCampaignPurpose, strin
 /** Mirrors growth_campaign_status in the database. */
 export const GROWTH_CAMPAIGN_STATUS = [
   "DRAFT",
+  "RESEARCHING",
+  "READY_FOR_REVIEW",
   "IN_REVIEW",
   "APPROVED",
   "SCHEDULED",
@@ -202,6 +204,8 @@ export type GrowthCampaignStatus = (typeof GROWTH_CAMPAIGN_STATUS)[number];
 
 export const GROWTH_CAMPAIGN_STATUS_LABELS: Record<GrowthCampaignStatus, string> = {
   DRAFT: "Draft",
+  RESEARCHING: "Researching",
+  READY_FOR_REVIEW: "Ready for review",
   IN_REVIEW: "In review",
   APPROVED: "Approved",
   SCHEDULED: "Scheduled",
@@ -511,6 +515,19 @@ export const GROWTH_REPLY_INTENTS = [
 ] as const;
 export type GrowthReplyIntent = (typeof GROWTH_REPLY_INTENTS)[number];
 
+export const GROWTH_INBOX_VIEWS = [
+  "all",
+  "needs_reply",
+  "all_replies",
+  "sent",
+  "interested",
+  "meeting",
+  "unsubscribe",
+  "complaint",
+  "failed",
+] as const;
+export type GrowthInboxView = (typeof GROWTH_INBOX_VIEWS)[number];
+
 export interface GrowthInboxThreadDTO {
   id: string;
   prospectId: string;
@@ -524,6 +541,7 @@ export interface GrowthInboxThreadDTO {
   lastMessageAt: string;
   needsHumanReply: boolean;
   verificationRequestedAt?: string | null;
+  lastIntent?: GrowthReplyIntent | null;
 }
 
 export interface GrowthInboxMessageDTO {
@@ -549,6 +567,49 @@ export interface GrowthReplyDraftDTO {
   humanRouteReason?: string | null;
   status: string;
   createdAt: string;
+}
+
+export const GROWTH_OPPORTUNITY_STAGES = [
+  "LEAD",
+  "QUALIFIED",
+  "MEETING_SCHEDULED",
+  "SITE_ASSESSMENT",
+  "ESTIMATE_SENT",
+  "NEGOTIATION",
+  "WON",
+  "LOST",
+] as const;
+export type GrowthOpportunityStage = (typeof GROWTH_OPPORTUNITY_STAGES)[number];
+
+export interface GrowthOpportunityDTO {
+  id: string;
+  prospectId: string;
+  companyName?: string;
+  stage: GrowthOpportunityStage;
+  title: string;
+  notes?: string | null;
+  linkedCustomerId?: string | null;
+  linkedJobId?: string | null;
+  linkedEstimateId?: string | null;
+  linkedServiceAgreementId?: string | null;
+  lostReason?: string | null;
+  wonAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GrowthAnalyticsOverviewDTO {
+  periodDays: number;
+  sent: number;
+  replied: number;
+  meetings: number;
+  opportunitiesOpen: number;
+  won: number;
+  suppressed: number;
+  blocked: number;
+  qualifiedRecipientIds: string[];
+  coldTransportNote: string;
+  coldTransportReady: boolean;
 }
 
 /** Growth intelligence overview for the dashboard. */

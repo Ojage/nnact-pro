@@ -43,6 +43,7 @@ import {
 import type { SenderIdentity, SuppressionEntry } from "./send-policy.js";
 import { sendGrowthEmail } from "./delivery.js";
 import { isOrgGrowthSendingPaused } from "./pause.js";
+import { mirrorOutboundToConversation } from "./conversations.js";
 
 const HOUR_MS = 3_600_000;
 
@@ -364,6 +365,10 @@ export async function runCampaignSend(input: RunCampaignInput): Promise<{
           senderIdentityId: campaignRow.senderIdentityId,
           toEmail: contactRow.value,
           subject: step.subject,
+          subjectSnapshot: step.subject,
+          bodyTextSnapshot: step.bodyText,
+          fromEmail: identity!.email,
+          fromDisplayName: identity!.displayName,
           status: "QUEUED",
         })
         .returning({ id: growthOutboundMessages.id });
@@ -406,6 +411,20 @@ export async function runCampaignSend(input: RunCampaignInput): Promise<{
         budget -= 1;
         summary.processed += 1;
         summary.outcomes.push({ recipientId: recipientRow.id, stepNumber: nextStepNumber, status: "SENT" });
+        void mirrorOutboundToConversation({
+          orgId,
+          outboundMessageId: outboundId,
+          campaignId: input.campaignId,
+          recipientId: recipientRow.id,
+          prospectId: recipientRow.prospectId,
+          senderIdentityId: campaignRow.senderIdentityId,
+          toEmail: contactRow.value,
+          subject: step.subject,
+          bodyText: step.bodyText,
+          providerMessageId: result.providerMessageId,
+        }).catch((err: unknown) => {
+          console.error("[growth] mirror outbound to conversation failed", err);
+        });
       } else {
         await db
           .update(growthOutboundMessages)

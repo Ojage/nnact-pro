@@ -35,6 +35,8 @@ import {
 export type CampaignPurpose = "COLD_OUTREACH" | "PERMISSION_MARKETING" | "EXISTING_CUSTOMER";
 export type CampaignStatus =
   | "DRAFT"
+  | "RESEARCHING"
+  | "READY_FOR_REVIEW"
   | "IN_REVIEW"
   | "APPROVED"
   | "SCHEDULED"

@@ -14,12 +14,15 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   db,
+  growthCampaignAuditLog,
   growthCampaignRecipients,
   growthCampaigns,
   growthCampaignSteps,
   growthContactDetails,
+  growthKnowledgeFacts,
   growthOutboundMessages,
   growthProspects,
+  growthSectors,
   growthSenderIdentities,
   users,
 } from "@nnact/db";
@@ -38,6 +41,22 @@ import { SendPolicyError } from "../growth/send-policy.js";
 import { TransportPolicyError } from "../growth/transport-policy.js";
 import { assertCampaignSendable, isTerminalStatus } from "../growth/campaign-policy.js";
 import { runCampaignSend } from "../growth/outbound.js";
+import { logCampaignTransition } from "../growth/campaign-audit.js";
+import { filterQuotableFacts } from "../growth/knowledge.js";
+import { isColdSendingEnabled } from "../growth/transport-policy.js";
+import {
+  enrollProspectsFromRules,
+  parseProspectSelectionRules,
+} from "../growth/campaign-enrollment.js";
+
+const EDITABLE_CAMPAIGN_STATUSES = new Set([
+  "DRAFT",
+  "RESEARCHING",
+  "READY_FOR_REVIEW",
+  "IN_REVIEW",
+]);
+
+const REVIEW_STATUSES = new Set(["READY_FOR_REVIEW", "IN_REVIEW"]);
 
 const uuid = z.string().uuid();
 const trimmed = z.string().trim().min(1);
@@ -54,10 +73,26 @@ const createCampaignBody = z.object({
   notes: z.string().trim().max(4000).nullish(),
 });
 
+const prospectRulesBody = z.object({
+  sectorSlug: z.string().trim().max(80).optional(),
+  cities: z.array(z.string().trim().max(120)).max(20).optional(),
+  minFitScore: z.number().int().min(0).max(100).optional(),
+  equipmentKeywords: z.array(z.string().trim().max(80)).max(20).optional(),
+  excludeRejected: z.boolean().optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+});
+
 const updateCampaignBody = createCampaignBody
   .omit({ purpose: true, senderIdentityId: true })
   .partial()
-  .extend({ scheduledStartAt: z.string().datetime().nullish() });
+  .extend({
+    scheduledStartAt: z.string().datetime().nullish(),
+    sectorId: uuid.nullish(),
+    language: z.enum(["EN", "FR"]).optional(),
+    offerSummary: z.string().trim().max(4000).nullish(),
+    businessGoal: z.string().trim().max(2000).nullish(),
+    prospectSelectionRules: prospectRulesBody.optional(),
+  });
 
 const createStepBody = z.object({
   stepNumber: z.number().int().min(1).max(50),
@@ -181,7 +216,7 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/campaigns", { schema: { body: createCampaignBody } }, async (req, reply) => {
+  app.post("/campaigns", async (req, reply) => {
     const claims = await requireGrowthWrite(req, reply);
     if (!claims) return;
     const orgId = await resolveOrgId(req);
@@ -211,7 +246,7 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
         name: body.name,
         purpose: body.purpose ?? "COLD_OUTREACH",
         senderIdentityId: body.senderIdentityId,
-        timezone: body.timezone ?? "UTC",
+        timezone: body.timezone ?? "Africa/Douala",
         quietHoursStart: body.quietHoursStart ?? 20,
         quietHoursEnd: body.quietHoursEnd ?? 8,
         dailyLimit: body.dailyLimit ?? 50,
@@ -225,7 +260,7 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
 
   // Purpose and sender are immutable once created: changing either after
   // approval would let an approved cold campaign become a Resend campaign.
-  app.patch("/campaigns/:id", { schema: { body: updateCampaignBody } }, async (req, reply) => {
+  app.patch("/campaigns/:id", async (req, reply) => {
     const claims = await requireGrowthWrite(req, reply);
     if (!claims) return;
     const orgId = await resolveOrgId(req);
@@ -243,11 +278,21 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: `campaign is ${existing.status}` });
     }
 
-    const { scheduledStartAt, ...rest } = parsed.data;
+    const { scheduledStartAt, prospectSelectionRules, ...rest } = parsed.data;
     const [campaign] = await db
       .update(growthCampaigns)
       .set({
         ...rest,
+        ...(prospectSelectionRules !== undefined
+          ? {
+              prospectSelectionRules: {
+                ...(typeof existing.prospectSelectionRules === "object" && existing.prospectSelectionRules
+                  ? (existing.prospectSelectionRules as Record<string, unknown>)
+                  : {}),
+                ...prospectSelectionRules,
+              },
+            }
+          : {}),
         ...(scheduledStartAt !== undefined
           ? { scheduledStartAt: scheduledStartAt ? new Date(scheduledStartAt) : null }
           : {}),
@@ -258,9 +303,78 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
     return { campaign };
   });
 
+  app.post("/campaigns/:id/start-research", async (req, reply) => {
+    const claims = await requireGrowthWrite(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+
+    const [existing] = await db
+      .select()
+      .from(growthCampaigns)
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .limit(1);
+    if (!existing) return reply.code(404).send({ error: "campaign not found" });
+    if (existing.status !== "DRAFT") {
+      return reply.code(409).send({ error: "only a draft campaign can enter research" });
+    }
+
+    const [campaign] = await db
+      .update(growthCampaigns)
+      .set({ status: "RESEARCHING", updatedAt: new Date() })
+      .where(eq(growthCampaigns.id, id))
+      .returning();
+    await logCampaignTransition({
+      orgId,
+      campaignId: id,
+      action: "start_research",
+      previousStatus: "DRAFT",
+      newStatus: "RESEARCHING",
+      changedBy: claims.userId,
+    });
+    return { campaign };
+  });
+
+  app.post("/campaigns/:id/enroll-from-rules", async (req, reply) => {
+    const claims = await requireGrowthWrite(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+
+    const [campaign] = await db
+      .select()
+      .from(growthCampaigns)
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .limit(1);
+    if (!campaign) return reply.code(404).send({ error: "campaign not found" });
+    if (!EDITABLE_CAMPAIGN_STATUSES.has(campaign.status)) {
+      return reply.code(409).send({ error: "prospect enrollment is only allowed before the campaign is approved" });
+    }
+
+    const rules = parseProspectSelectionRules(campaign.prospectSelectionRules);
+    if (campaign.sectorId && !rules.sectorSlug) {
+      const [sector] = await db
+        .select({ slug: growthSectors.slug })
+        .from(growthSectors)
+        .where(and(eq(growthSectors.orgId, orgId), eq(growthSectors.id, campaign.sectorId)))
+        .limit(1);
+      if (sector?.slug) rules.sectorSlug = sector.slug;
+    }
+
+    const result = await enrollProspectsFromRules(orgId, id, rules);
+    return {
+      ...result,
+      rules,
+      message:
+        result.withEmail === 0
+          ? "No prospects with email matched the rules. Adjust sector, city, or fit score, or import prospects first."
+          : `Enrolled ${result.inserted} recipient(s); ${result.skipped} already on the campaign.`,
+    };
+  });
+
   // ── Steps ────────────────────────────────────────────────────────────────
   // Upsert on (campaign, stepNumber) so editing step 2 replaces it in place.
-  app.post("/campaigns/:id/steps", { schema: { body: createStepBody } }, async (req, reply) => {
+  app.post("/campaigns/:id/steps", async (req, reply) => {
     const claims = await requireGrowthWrite(req, reply);
     if (!claims) return;
     const orgId = await resolveOrgId(req);
@@ -275,7 +389,7 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
       .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
       .limit(1);
     if (!campaign) return reply.code(404).send({ error: "campaign not found" });
-    if (campaign.status !== "DRAFT" && campaign.status !== "IN_REVIEW") {
+    if (!EDITABLE_CAMPAIGN_STATUSES.has(campaign.status)) {
       return reply.code(409).send({
         error: "steps can only be edited while the campaign is a draft or in review",
       });
@@ -307,7 +421,7 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
   });
 
   // ── Recipients ───────────────────────────────────────────────────────────
-  app.post("/campaigns/:id/recipients", { schema: { body: addRecipientsBody } }, async (req, reply) => {
+  app.post("/campaigns/:id/recipients", async (req, reply) => {
     const claims = await requireGrowthWrite(req, reply);
     if (!claims) return;
     const orgId = await resolveOrgId(req);
@@ -427,20 +541,29 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const { id } = req.params as { id: string };
 
+    const [existing] = await db
+      .select()
+      .from(growthCampaigns)
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .limit(1);
+    if (!existing) return reply.code(404).send({ error: "campaign not found" });
+    if (existing.status !== "DRAFT" && existing.status !== "RESEARCHING") {
+      return reply.code(409).send({ error: "only a draft or researching campaign can be submitted for review" });
+    }
+
     const [campaign] = await db
       .update(growthCampaigns)
-      .set({ status: "IN_REVIEW", updatedAt: new Date() })
-      .where(
-        and(
-          eq(growthCampaigns.id, id),
-          eq(growthCampaigns.orgId, orgId),
-          eq(growthCampaigns.status, "DRAFT"),
-        ),
-      )
+      .set({ status: "READY_FOR_REVIEW", updatedAt: new Date() })
+      .where(eq(growthCampaigns.id, id))
       .returning();
-    if (!campaign) {
-      return reply.code(409).send({ error: "only a draft can be submitted for review" });
-    }
+    await logCampaignTransition({
+      orgId,
+      campaignId: id,
+      action: "submit_review",
+      previousStatus: existing.status,
+      newStatus: "READY_FOR_REVIEW",
+      changedBy: claims.userId,
+    });
     return { campaign };
   });
 
@@ -461,8 +584,8 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
       .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
       .limit(1);
     if (!campaign) return reply.code(404).send({ error: "campaign not found" });
-    if (campaign.status !== "IN_REVIEW" && campaign.status !== "APPROVED") {
-      return reply.code(409).send({ error: "a campaign must be in review before it can be approved" });
+    if (!REVIEW_STATUSES.has(campaign.status) && campaign.status !== "APPROVED") {
+      return reply.code(409).send({ error: "a campaign must be ready for review before it can be approved" });
     }
 
     if (campaign.purpose === "COLD_OUTREACH") {
@@ -498,12 +621,20 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
       })
       .where(eq(growthCampaigns.id, id))
       .returning();
+    await logCampaignTransition({
+      orgId,
+      campaignId: id,
+      action: "approve",
+      previousStatus: campaign.status,
+      newStatus: "APPROVED",
+      changedBy: claims.userId,
+    });
     return { campaign: updated };
   });
 
   // Scheduling runs the same policy the executor will run, so an operator
   // learns here that cold outreach is not configured.
-  app.post("/campaigns/:id/schedule", { schema: { body: scheduleBody } }, async (req, reply) => {
+  app.post("/campaigns/:id/schedule", async (req, reply) => {
     const claims = await requireGrowthWrite(req, reply);
     if (!claims) return;
     const orgId = await resolveOrgId(req);
@@ -543,7 +674,136 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
       })
       .where(eq(growthCampaigns.id, id))
       .returning();
+    await logCampaignTransition({
+      orgId,
+      campaignId: id,
+      action: "schedule",
+      previousStatus: campaign.status,
+      newStatus: "SCHEDULED",
+      changedBy: claims.userId,
+    });
     return { campaign: updated };
+  });
+
+  app.get("/campaigns/:id/preview", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    if (!uuid.safeParse(id).success) return reply.code(404).send({ error: "campaign not found" });
+
+    const [campaign] = await db
+      .select()
+      .from(growthCampaigns)
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .limit(1);
+    if (!campaign) return reply.code(404).send({ error: "campaign not found" });
+
+    const steps = await db
+      .select()
+      .from(growthCampaignSteps)
+      .where(and(eq(growthCampaignSteps.campaignId, id), eq(growthCampaignSteps.orgId, orgId)))
+      .orderBy(asc(growthCampaignSteps.stepNumber));
+
+    const [sender] = await db
+      .select()
+      .from(growthSenderIdentities)
+      .where(and(eq(growthSenderIdentities.id, campaign.senderIdentityId), eq(growthSenderIdentities.orgId, orgId)))
+      .limit(1);
+
+    const sampleRecipients = await db
+      .select({
+        recipientId: growthCampaignRecipients.id,
+        companyName: growthProspects.companyName,
+        city: growthProspects.city,
+        fitSummary: growthProspects.fitSummary,
+        fitEvidence: growthProspects.fitEvidence,
+        contactValue: growthContactDetails.value,
+        contactKind: growthContactDetails.kind,
+      })
+      .from(growthCampaignRecipients)
+      .innerJoin(growthProspects, eq(growthProspects.id, growthCampaignRecipients.prospectId))
+      .innerJoin(growthContactDetails, eq(growthContactDetails.id, growthCampaignRecipients.contactDetailId))
+      .where(and(eq(growthCampaignRecipients.campaignId, id), eq(growthCampaignRecipients.orgId, orgId)))
+      .orderBy(asc(growthCampaignRecipients.createdAt))
+      .limit(5);
+
+    const facts = await db
+      .select()
+      .from(growthKnowledgeFacts)
+      .where(and(eq(growthKnowledgeFacts.orgId, orgId), eq(growthKnowledgeFacts.status, "APPROVED")));
+    const quotableFacts = filterQuotableFacts(facts);
+
+    const firstStep = steps[0];
+    const samples = sampleRecipients.map((r) => ({
+      recipientId: r.recipientId,
+      companyName: r.companyName,
+      city: r.city,
+      to: r.contactKind === "EMAIL" ? r.contactValue : null,
+      fitSummary: r.fitSummary,
+      fitEvidence: r.fitEvidence,
+      rendered:
+        firstStep && r.contactKind === "EMAIL"
+          ? {
+              from: sender ? `${sender.displayName} <${sender.email}>` : null,
+              replyTo: sender?.replyToEmail ?? sender?.email ?? null,
+              subject: firstStep.subject,
+              bodyText: firstStep.bodyText,
+            }
+          : null,
+      warning: r.contactKind !== "EMAIL" ? "Recipient has no email contact on file" : null,
+    }));
+
+    return {
+      campaign: {
+        id: campaign.id,
+        name: campaign.name,
+        status: campaign.status,
+        purpose: campaign.purpose,
+        timezone: campaign.timezone,
+        language: campaign.language,
+      },
+      sender: sender
+        ? {
+            displayName: sender.displayName,
+            email: sender.email,
+            roleTitle: sender.roleTitle,
+            verificationState: sender.verificationState,
+            coldApproved: sender.coldApproved,
+            replyToEmail: sender.replyToEmail,
+          }
+        : null,
+      coldTransportReady: isColdSendingEnabled(process.env),
+      approvedFactCount: quotableFacts.length,
+      steps: steps.map((s) => ({
+        stepNumber: s.stepNumber,
+        delayDays: s.delayDays,
+        subject: s.subject,
+        bodyText: s.bodyText,
+      })),
+      samples,
+      auditAvailable: true,
+    };
+  });
+
+  app.get("/campaigns/:id/audit", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    const rows = await db
+      .select({
+        id: growthCampaignAuditLog.id,
+        action: growthCampaignAuditLog.action,
+        previousStatus: growthCampaignAuditLog.previousStatus,
+        newStatus: growthCampaignAuditLog.newStatus,
+        note: growthCampaignAuditLog.note,
+        changedBy: growthCampaignAuditLog.changedBy,
+        changedAt: growthCampaignAuditLog.changedAt,
+        changedByName: users.name,
+      })
+      .from(growthCampaignAuditLog)
+      .leftJoin(users, eq(users.id, growthCampaignAuditLog.changedBy))
+      .where(and(eq(growthCampaignAuditLog.campaignId, id), eq(growthCampaignAuditLog.orgId, orgId)))
+      .orderBy(desc(growthCampaignAuditLog.changedAt))
+      .limit(100);
+    return { entries: rows };
   });
 
   app.post("/campaigns/:id/pause", async (req, reply) => {
@@ -552,12 +812,26 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const { id } = req.params as { id: string };
 
+    const [before] = await db
+      .select({ status: growthCampaigns.status })
+      .from(growthCampaigns)
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .limit(1);
+    if (!before) return reply.code(404).send({ error: "campaign not found" });
+
     const [updated] = await db
       .update(growthCampaigns)
       .set({ status: "PAUSED", updatedAt: new Date() })
-      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .where(eq(growthCampaigns.id, id))
       .returning();
-    if (!updated) return reply.code(404).send({ error: "campaign not found" });
+    await logCampaignTransition({
+      orgId,
+      campaignId: id,
+      action: "pause",
+      previousStatus: before.status,
+      newStatus: "PAUSED",
+      changedBy: claims.userId,
+    });
     return { campaign: updated };
   });
 
@@ -565,7 +839,7 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
   // Shared by the manual button and the worker. The executor enforces the
   // daily cap, quiet hours, idempotency and every recipient-level gate, so this
   // handler stays a thin pass-through.
-  app.post("/campaigns/:id/run", { schema: { body: runCampaignBody } }, async (req, reply) => {
+  app.post("/campaigns/:id/run", async (req, reply) => {
     const claims = await requireGrowthWrite(req, reply);
     if (!claims) return;
     const orgId = await resolveOrgId(req);

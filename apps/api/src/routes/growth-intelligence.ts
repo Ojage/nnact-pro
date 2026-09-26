@@ -10,6 +10,7 @@ import {
   growthCompetitorAnalyses,
   growthCompetitors,
   growthInboxMessages,
+  growthInboxThreadNotes,
   growthInboxThreads,
   growthKnowledgeDocuments,
   growthKnowledgeFacts,
@@ -18,6 +19,7 @@ import {
   growthReplyDrafts,
   growthSectors,
   growthSenderIdentities,
+  users,
 } from "@nnact/db";
 import {
   GROWTH_AUTOPILOT_MODES,
@@ -32,6 +34,7 @@ import {
   requireGrowthWrite,
 } from "../growth/access.js";
 import { runAutopilotCycle } from "../growth/autopilot-cycle.js";
+import { runAutopilotSimulation } from "../growth/autopilot-sim.js";
 import {
   buildComparisonSummary,
   suggestCompetitorsFromWebsite,
@@ -584,6 +587,17 @@ export async function growthIntelligenceRoutes(app: FastifyInstance) {
     return runAutopilotCycle(orgId);
   });
 
+  app.post("/autopilot/simulate", async (req, reply) => {
+    const claims = await requireGrowthOwner(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    await ensureDefaultSectors(orgId);
+    const body = z
+      .object({ dailyCapacity: z.number().int().min(1).max(5000).optional() })
+      .safeParse(req.body ?? {});
+    return runAutopilotSimulation(orgId, claims.userId, body.success ? body.data.dailyCapacity : undefined);
+  });
+
   app.get("/autopilot/decisions", async (req, reply) => {
     const claims = await requireGrowthRead(req, reply);
     if (!claims) return;
@@ -835,5 +849,94 @@ export async function growthIntelligenceRoutes(app: FastifyInstance) {
       .values({ orgId, ...body })
       .returning();
     return thread;
+  });
+
+  app.patch("/inbox/threads/:id", async (req, reply) => {
+    const claims = await requireGrowthWrite(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    const id = uuid.parse((req.params as { id: string }).id);
+    const body = z
+      .object({
+        needsHumanReply: z.boolean().optional(),
+        subject: z.string().trim().max(500).optional(),
+      })
+      .parse(req.body ?? {});
+    const [thread] = await db
+      .update(growthInboxThreads)
+      .set({
+        ...(body.needsHumanReply !== undefined ? { needsHumanReply: body.needsHumanReply } : {}),
+        ...(body.subject !== undefined ? { subject: body.subject } : {}),
+      })
+      .where(and(eq(growthInboxThreads.orgId, orgId), eq(growthInboxThreads.id, id)))
+      .returning();
+    if (!thread) return reply.code(404).send({ error: "thread not found" });
+    return thread;
+  });
+
+  app.get("/inbox/threads/:id/notes", async (req, reply) => {
+    const claims = await requireGrowthRead(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    const threadId = uuid.parse((req.params as { id: string }).id);
+    const rows = await db
+      .select({
+        id: growthInboxThreadNotes.id,
+        body: growthInboxThreadNotes.body,
+        assignedTo: growthInboxThreadNotes.assignedTo,
+        createdBy: growthInboxThreadNotes.createdBy,
+        createdAt: growthInboxThreadNotes.createdAt,
+        authorName: users.name,
+      })
+      .from(growthInboxThreadNotes)
+      .leftJoin(users, eq(users.id, growthInboxThreadNotes.createdBy))
+      .where(and(eq(growthInboxThreadNotes.orgId, orgId), eq(growthInboxThreadNotes.threadId, threadId)))
+      .orderBy(desc(growthInboxThreadNotes.createdAt))
+      .limit(100);
+    return rows.map((r) => ({
+      id: r.id,
+      body: r.body,
+      assignedTo: r.assignedTo,
+      createdBy: r.createdBy,
+      authorName: r.authorName,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  });
+
+  app.post("/inbox/threads/:id/notes", async (req, reply) => {
+    const claims = await requireGrowthWrite(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    const threadId = uuid.parse((req.params as { id: string }).id);
+    const body = z
+      .object({
+        body: trimmed.max(4000),
+        assignedTo: uuid.optional(),
+      })
+      .parse(req.body);
+
+    const [thread] = await db
+      .select({ id: growthInboxThreads.id })
+      .from(growthInboxThreads)
+      .where(and(eq(growthInboxThreads.orgId, orgId), eq(growthInboxThreads.id, threadId)))
+      .limit(1);
+    if (!thread) return reply.code(404).send({ error: "thread not found" });
+
+    const [note] = await db
+      .insert(growthInboxThreadNotes)
+      .values({
+        orgId,
+        threadId,
+        body: body.body,
+        assignedTo: body.assignedTo ?? null,
+        createdBy: claims.userId,
+      })
+      .returning();
+    return reply.code(201).send({
+      id: note!.id,
+      body: note!.body,
+      assignedTo: note!.assignedTo,
+      createdAt: note!.createdAt.toISOString(),
+    });
   });
 }

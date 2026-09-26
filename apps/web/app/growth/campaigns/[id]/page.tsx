@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useApproveGrowthCampaignMutation,
+  useGrowthCampaignPreviewQuery,
   useGrowthCampaignQuery,
   useGrowthCampaignRecipientsQuery,
   useGrowthOutboundLogQuery,
@@ -39,6 +40,7 @@ export default function GrowthCampaignDetailPage() {
   const canWrite = isOwner || user?.role === "dispatcher";
 
   const { data, isLoading } = useGrowthCampaignQuery(id ?? "");
+  const { data: preview } = useGrowthCampaignPreviewQuery(id ?? "", { skip: !id });
   const { data: recipients } = useGrowthCampaignRecipientsQuery({ id: id ?? "" }, { skip: !id });
   const { data: outbound } = useGrowthOutboundLogQuery({ id: id ?? "" }, { skip: !id });
 
@@ -80,7 +82,11 @@ export default function GrowthCampaignDetailPage() {
   const senderReady = data.sender?.verificationState === "VERIFIED";
   const coldSenderReady = senderReady && data.sender?.coldApproved === true;
   const isCold = campaign.purpose === "COLD_OUTREACH";
-  const editable = campaign.status === "DRAFT" || campaign.status === "IN_REVIEW";
+  const editable =
+    campaign.status === "DRAFT" ||
+    campaign.status === "RESEARCHING" ||
+    campaign.status === "READY_FOR_REVIEW" ||
+    campaign.status === "IN_REVIEW";
 
   async function act(label: string, fn: () => Promise<unknown>, after?: () => void) {
     setBusy(true);
@@ -126,7 +132,38 @@ export default function GrowthCampaignDetailPage() {
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300">
           Cold outreach. It will not run until a compliant cold transport is configured, and the sender
           identity needs owner approval for cold use. It never uses the Resend connection.
+          {preview ? ` Transport: ${preview.coldTransportReady ? "cold SMTP configured" : "not configured — sends blocked"}.` : ""}
         </p>
+      ) : null}
+
+      {preview?.samples?.length ? (
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <h2 className="text-sm font-semibold text-fg">Send preview (sample recipients)</h2>
+            <p className="text-xs text-fg-muted">
+              {preview.approvedFactCount} approved knowledge facts available for AI drafts · timezone{" "}
+              {preview.campaign.timezone}
+            </p>
+            {preview.samples.map((s) => (
+              <div key={s.recipientId} className="rounded-md border border-border p-3 text-sm">
+                <p className="font-medium">
+                  {s.companyName} {s.city ? `· ${s.city}` : ""}
+                </p>
+                {s.rendered ? (
+                  <>
+                    <p className="text-xs text-fg-muted">From: {s.rendered.from}</p>
+                    <p className="text-xs text-fg-muted">To: {s.to}</p>
+                    <p className="text-xs text-fg-muted">Reply-To: {s.rendered.replyTo}</p>
+                    <p className="mt-2 font-medium">{s.rendered.subject}</p>
+                    <pre className="mt-1 whitespace-pre-wrap text-xs text-fg-muted">{s.rendered.bodyText}</pre>
+                  </>
+                ) : (
+                  <p className="text-amber-700 dark:text-amber-400">{s.warning ?? "No preview"}</p>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       ) : null}
 
       <Card>
@@ -179,7 +216,7 @@ export default function GrowthCampaignDetailPage() {
           <CardContent className="space-y-3 p-4">
             <h2 className="text-sm font-semibold text-fg">Move it along</h2>
             <div className="flex flex-wrap gap-2">
-              {campaign.status === "DRAFT" ? (
+              {campaign.status === "DRAFT" || campaign.status === "RESEARCHING" ? (
                 <Button
                   size="sm"
                   variant="outline"

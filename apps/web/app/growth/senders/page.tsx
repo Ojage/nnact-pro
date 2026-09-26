@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/empty-state";
 import {
   useApproveGrowthSenderColdMutation,
   useCreateGrowthSenderMutation,
+  useGrowthSenderHealthQuery,
   useGrowthSendersQuery,
   useRevokeGrowthSenderColdMutation,
   useVerifyGrowthSenderMutation,
@@ -41,6 +42,7 @@ export default function GrowthSendersPage() {
   const { user } = useSessionUser();
   const isOwner = user?.role === "owner";
   const { data: senders = [], isLoading } = useGrowthSendersQuery();
+  const { data: health } = useGrowthSenderHealthQuery();
   const [showForm, setShowForm] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -110,6 +112,15 @@ export default function GrowthSendersPage() {
         }
       />
 
+      {health ? (
+        <p className="mb-4 text-sm text-fg-muted">
+          Sender health (30 days): cold transport{" "}
+          <span className={health.coldTransportReady ? "text-emerald-600" : "text-amber-600"}>
+            {health.coldTransportReady ? "configured" : "not configured"}
+          </span>
+        </p>
+      ) : null}
+
       {showForm ? (
         <Card className="mb-6">
           <CardContent className="space-y-3 p-4">
@@ -166,7 +177,9 @@ export default function GrowthSendersPage() {
         />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {senders.map((sender) => (
+          {senders.map((sender) => {
+            const healthRow = health?.senders.find((h) => h.senderId === sender.id);
+            return (
             <Card key={sender.id}>
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -230,9 +243,23 @@ export default function GrowthSendersPage() {
                     Cold outreach approval is an owner decision.
                   </p>
                 )}
+                {healthRow ? (
+                  <div className="border-t border-border pt-2 text-xs text-fg-muted">
+                    <p>
+                      30d: {healthRow.sent30d} sent · {healthRow.failed30d} failed · {healthRow.blocked30d}{" "}
+                      blocked
+                    </p>
+                    {healthRow.alerts.map((a) => (
+                      <p key={a} className="text-amber-700 dark:text-amber-400">
+                        {a}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -169,6 +169,17 @@ export const growthProspects = pgTable(
     /** When a human confirmed the details were real and researched. */
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
+    /** Target sector slug from discovery or campaign enrolment. */
+    sectorSlug: text("sector_slug"),
+    /** 0–100 fit score from discovery rules or human review. */
+    fitScore: integer("fit_score"),
+    fitSummary: text("fit_summary"),
+    /** Structured evidence: sources, hypotheses, reviewer notes. */
+    fitEvidence: jsonb("fit_evidence").default([]).notNull(),
+    emailVerificationStatus: text("email_verification_status"),
+    lastResearchedAt: timestamp("last_researched_at", { withTimezone: true }),
+    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+    rejectReason: text("reject_reason"),
     createdBy: createdBy(),
     createdAt: ts(),
     updatedAt: updatedAt(),
@@ -180,6 +191,8 @@ export const growthProspects = pgTable(
     domainIdx: index("growth_prospects_domain_idx").on(t.orgId, t.websiteDomain),
     companyIdx: index("growth_prospects_company_idx").on(t.orgId, t.companyName),
     assignedIdx: index("growth_prospects_assigned_idx").on(t.orgId, t.assignedTo),
+    sectorIdx: index("growth_prospects_sector_idx").on(t.orgId, t.sectorSlug),
+    fitIdx: index("growth_prospects_fit_idx").on(t.orgId, t.fitScore),
   }),
 );
 
@@ -265,6 +278,8 @@ export const growthCampaignPurpose = pgEnum("growth_campaign_purpose", [
 
 export const growthCampaignStatus = pgEnum("growth_campaign_status", [
   "DRAFT",
+  "RESEARCHING",
+  "READY_FOR_REVIEW",
   "IN_REVIEW",
   "APPROVED",
   "SCHEDULED",
@@ -319,7 +334,15 @@ export const growthCampaigns = pgTable(
     /** Hour (0–23) in `timezone` used to decide when a send is due. */
     quietHoursStart: integer("quiet_hours_start").default(20),
     quietHoursEnd: integer("quiet_hours_end").default(8),
-    timezone: text("timezone").default("UTC").notNull(),
+    timezone: text("timezone").default("Africa/Douala").notNull(),
+    language: text("language").default("EN").notNull(),
+    /** JSON rules: cities, sector slug, min fit score, equipment keywords. */
+    prospectSelectionRules: jsonb("prospect_selection_rules").default({}).notNull(),
+    offerSummary: text("offer_summary"),
+    businessGoal: text("business_goal"),
+    weeklyLimit: integer("weekly_limit"),
+    totalContactCap: integer("total_contact_cap"),
+    budgetCapCents: integer("budget_cap_cents"),
     /** Maximum messages sent per day across the campaign. */
     dailyLimit: integer("daily_limit").default(50).notNull(),
     /** Maximum follow-up steps per recipient, on top of the first step. */
@@ -384,6 +407,8 @@ export const growthCampaignRecipients = pgTable(
     /** Highest step number sent so far; 0 before the first send. */
     currentStep: integer("current_step").default(0).notNull(),
     followUpsSent: integer("follow_ups_sent").default(0).notNull(),
+    /** A/B variant label frozen after first send for this recipient. */
+    abVariant: text("ab_variant"),
     lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
     repliedAt: timestamp("replied_at", { withTimezone: true }),
     optedOutAt: timestamp("opted_out_at", { withTimezone: true }),
@@ -434,8 +459,15 @@ export const growthOutboundMessages = pgTable(
       .references(() => growthSenderIdentities.id, { onDelete: "restrict" }),
     toEmail: text("to_email").notNull(),
     subject: text("subject").notNull(),
+    /** Immutable copy of content at send time; step edits must not rewrite history. */
+    subjectSnapshot: text("subject_snapshot"),
+    bodyTextSnapshot: text("body_text_snapshot"),
+    fromEmail: text("from_email"),
+    fromDisplayName: text("from_display_name"),
     status: growthOutboundStatus("status").default("QUEUED").notNull(),
     providerMessageId: text("provider_message_id"),
+    /** Unified inbox thread when this send was mirrored into conversations. */
+    inboxThreadId: uuid("inbox_thread_id"),
     /** Machine-readable refusal code, e.g. "suppressed" or "cold_transport_not_configured". */
     blockedReason: text("blocked_reason"),
     error: text("error"),
@@ -817,10 +849,20 @@ export const growthInboxMessages = pgTable(
     intent: text("intent"),
     classifiedAt: timestamp("classified_at", { withTimezone: true }),
     providerMessageId: text("provider_message_id"),
+    /** Links an outbound mirror row to the auditable send log. */
+    outboundMessageId: uuid("outbound_message_id").references(() => growthOutboundMessages.id, {
+      onDelete: "set null",
+    }),
+    /** Provider event id for inbound deduplication (unique per org when set). */
+    inboundDedupeKey: text("inbound_dedupe_key"),
     createdAt: ts(),
   },
   (t) => ({
     threadIdx: index("growth_inbox_messages_thread_idx").on(t.threadId, t.createdAt),
+    inboundDedupeUnique: uniqueIndex("growth_inbox_messages_inbound_dedupe_uq").on(
+      t.orgId,
+      t.inboundDedupeKey,
+    ),
   }),
 );
 
@@ -847,5 +889,202 @@ export const growthReplyDrafts = pgTable(
   },
   (t) => ({
     threadIdx: index("growth_reply_drafts_thread_idx").on(t.threadId, t.createdAt),
+  }),
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Stage 3 — Inbound webhook dedup + Stage 4 pipeline + Stage 5 import audit
+// ────────────────────────────────────────────────────────────────────────────
+
+export const growthInboundWebhookEvents = pgTable(
+  "growth_inbound_webhook_events",
+  {
+    id: id(),
+    orgId: orgId(),
+    provider: text("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    payloadSha256: text("payload_sha256").notNull(),
+    status: text("status").default("PROCESSED").notNull(),
+    error: text("error"),
+    receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    dedupeUnique: uniqueIndex("growth_inbound_webhook_events_dedupe_uq").on(
+      t.orgId,
+      t.provider,
+      t.externalId,
+    ),
+    orgIdx: index("growth_inbound_webhook_events_org_idx").on(t.orgId, t.receivedAt),
+  }),
+);
+
+export const growthOpportunityStage = pgEnum("growth_opportunity_stage", [
+  "LEAD",
+  "QUALIFIED",
+  "MEETING_SCHEDULED",
+  "SITE_ASSESSMENT",
+  "ESTIMATE_SENT",
+  "NEGOTIATION",
+  "WON",
+  "LOST",
+]);
+
+export const growthMeetingStatus = pgEnum("growth_meeting_status", [
+  "SCHEDULED",
+  "COMPLETED",
+  "CANCELLED",
+  "NO_SHOW",
+]);
+
+export const growthOpportunities = pgTable(
+  "growth_opportunities",
+  {
+    id: id(),
+    orgId: orgId(),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => growthProspects.id, { onDelete: "cascade" }),
+    threadId: uuid("thread_id").references(() => growthInboxThreads.id, { onDelete: "set null" }),
+    campaignId: uuid("campaign_id").references(() => growthCampaigns.id, { onDelete: "set null" }),
+    recipientId: uuid("recipient_id").references(() => growthCampaignRecipients.id, {
+      onDelete: "set null",
+    }),
+    stage: growthOpportunityStage("stage").default("LEAD").notNull(),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    linkedCustomerId: uuid("linked_customer_id").references(() => customers.id, { onDelete: "set null" }),
+    linkedJobId: uuid("linked_job_id"),
+    linkedEstimateId: uuid("linked_estimate_id"),
+    linkedServiceAgreementId: uuid("linked_service_agreement_id"),
+    lostReason: text("lost_reason"),
+    wonAt: timestamp("won_at", { withTimezone: true }),
+    createdBy: createdBy(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    orgStageIdx: index("growth_opportunities_org_stage_idx").on(t.orgId, t.stage),
+    prospectIdx: index("growth_opportunities_prospect_idx").on(t.orgId, t.prospectId),
+  }),
+);
+
+export const growthMeetings = pgTable(
+  "growth_meetings",
+  {
+    id: id(),
+    orgId: orgId(),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => growthOpportunities.id, { onDelete: "cascade" }),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => growthProspects.id, { onDelete: "cascade" }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    location: text("location"),
+    status: growthMeetingStatus("status").default("SCHEDULED").notNull(),
+    notes: text("notes"),
+    createdBy: createdBy(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    orgIdx: index("growth_meetings_org_idx").on(t.orgId, t.scheduledAt),
+    opportunityIdx: index("growth_meetings_opportunity_idx").on(t.opportunityId),
+  }),
+);
+
+/** Read-only Explee import runs — audit only; no write-back to Explee. */
+export const growthProspectDiscoveryRuns = pgTable(
+  "growth_prospect_discovery_runs",
+  {
+    id: id(),
+    orgId: orgId(),
+    sectorSlug: text("sector_slug"),
+    city: text("city"),
+    country: text("country"),
+    status: text("status").notNull(),
+    prospectsSeen: integer("prospects_seen").default(0).notNull(),
+    prospectsCreated: integer("prospects_created").default(0).notNull(),
+    notes: text("notes"),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdBy: createdBy(),
+  },
+  (t) => ({
+    orgIdx: index("growth_prospect_discovery_runs_org_idx").on(t.orgId, t.startedAt),
+  }),
+);
+
+export const growthInboxThreadNotes = pgTable(
+  "growth_inbox_thread_notes",
+  {
+    id: id(),
+    orgId: orgId(),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => growthInboxThreads.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
+    createdBy: createdBy(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    threadIdx: index("growth_inbox_thread_notes_thread_idx").on(t.threadId, t.createdAt),
+  }),
+);
+
+export const growthAutopilotSimulationRuns = pgTable(
+  "growth_autopilot_simulation_runs",
+  {
+    id: id(),
+    orgId: orgId(),
+    inputs: jsonb("inputs").notNull(),
+    outputs: jsonb("outputs").notNull(),
+    summary: text("summary").notNull(),
+    createdBy: createdBy(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    orgIdx: index("growth_autopilot_simulation_runs_org_idx").on(t.orgId, t.createdAt),
+  }),
+);
+
+export const growthCampaignAuditLog = pgTable(
+  "growth_campaign_audit_log",
+  {
+    id: id(),
+    orgId: orgId(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => growthCampaigns.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    previousStatus: text("previous_status"),
+    newStatus: text("new_status"),
+    note: text("note"),
+    changedBy: uuid("changed_by").references(() => users.id, { onDelete: "set null" }),
+    changedAt: timestamp("changed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    campaignIdx: index("growth_campaign_audit_log_campaign_idx").on(t.campaignId, t.changedAt),
+  }),
+);
+
+export const growthExpleeImportRuns = pgTable(
+  "growth_explee_import_runs",
+  {
+    id: id(),
+    orgId: orgId(),
+    status: text("status").notNull(),
+    rowsSeen: integer("rows_seen").default(0).notNull(),
+    rowsImported: integer("rows_imported").default(0).notNull(),
+    rowsSkipped: integer("rows_skipped").default(0).notNull(),
+    previewOnly: boolean("preview_only").default(true).notNull(),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdBy: createdBy(),
+  },
+  (t) => ({
+    orgIdx: index("growth_explee_import_runs_org_idx").on(t.orgId, t.startedAt),
   }),
 );

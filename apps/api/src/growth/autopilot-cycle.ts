@@ -1,16 +1,15 @@
 // Autopilot observe/assist/autopilot cycle — allocation and campaign proposals.
 
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   db,
   growthAutopilotDecisions,
   growthAutopilotSettings,
-  growthCampaignRecipients,
-  growthCampaigns,
   growthSectors,
 } from "@nnact/db";
 import { computeSectorAllocations, type SectorAllocationInput } from "./allocation.js";
+import { loadSectorMetricsFromDb } from "./autopilot-cycle-metrics.js";
 import { isColdSendingEnabled } from "./transport-policy.js";
 
 export interface AutopilotCycleResult {
@@ -41,7 +40,7 @@ export async function runAutopilotCycle(orgId: string): Promise<AutopilotCycleRe
   const inputs: SectorAllocationInput[] = [];
 
   for (const sector of sectors) {
-    const metrics = await loadSectorMetrics(orgId, sector.id);
+    const metrics = await loadSectorMetricsFromDb(orgId, sector.id);
     inputs.push({
       sectorId: sector.id,
       name: sector.name,
@@ -120,50 +119,5 @@ export async function runAutopilotCycle(orgId: string): Promise<AutopilotCycleRe
     decisions,
     coldBlocked: !coldReady,
     message: mode === "ASSISTED" ? "Assisted mode: review proposed allocations before activation." : "Autopilot cycle completed.",
-  };
-}
-
-async function loadSectorMetrics(orgId: string, sectorId: string) {
-  const rows = await db.execute<{
-    contacts: number;
-    meetings: number;
-    assessments: number;
-    estimates: number;
-    positive_replies: number;
-    objections: number;
-    unsubscribes: number;
-    bounces: number;
-    complaints: number;
-    days_observed: number;
-  }>(sql`
-    select
-      count(distinct r.id)::int as contacts,
-      count(distinct r.id) filter (where r.meeting_booked_at is not null)::int as meetings,
-      count(distinct r.id) filter (where r.status = 'CONVERTED')::int as assessments,
-      count(distinct r.id) filter (where p.lifecycle = 'QUOTED')::int as estimates,
-      count(distinct r.id) filter (where r.replied_at is not null)::int as positive_replies,
-      0::int as objections,
-      count(distinct r.id) filter (where r.opted_out_at is not null)::int as unsubscribes,
-      count(distinct r.id) filter (where r.bounced_at is not null)::int as bounces,
-      0::int as complaints,
-      greatest(1, extract(day from now() - min(c.created_at)))::int as days_observed
-    from growth_campaigns c
-    left join growth_campaign_recipients r on r.campaign_id = c.id
-    left join growth_prospects p on p.id = r.prospect_id
-    where c.org_id = ${orgId} and c.sector_id = ${sectorId}
-  `);
-  const m = (rows as unknown as Record<string, number>[])[0] ?? {};
-  return {
-    contacts: Number(m.contacts ?? 0),
-    meetings: Number(m.meetings ?? 0),
-    assessments: Number(m.assessments ?? 0),
-    estimates: Number(m.estimates ?? 0),
-    wonRevenueCents: 0,
-    positiveReplies: Number(m.positive_replies ?? 0),
-    objections: Number(m.objections ?? 0),
-    unsubscribes: Number(m.unsubscribes ?? 0),
-    bounces: Number(m.bounces ?? 0),
-    complaints: Number(m.complaints ?? 0),
-    daysObserved: Number(m.days_observed ?? 1),
   };
 }

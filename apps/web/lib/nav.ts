@@ -158,6 +158,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/growth/knowledge", label: "Project Knowledge", icon: "▤" },
       { href: "/growth/autopilot", label: "Autopilot", icon: "⟲" },
       { href: "/growth/inbox", label: "Unified Inbox", icon: "✉" },
+      { href: "/growth/pipeline", label: "Pipeline", icon: "◆" },
+      { href: "/growth/analytics", label: "Growth Analytics", icon: "◩" },
       { href: "/growth", label: "Prospects", icon: "◈" },
       { href: "/growth/campaigns", label: "Campaigns", icon: "▤" },
       { href: "/growth/senders", label: "Sender Registry", icon: "✉" },

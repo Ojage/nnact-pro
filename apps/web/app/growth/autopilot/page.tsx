@@ -9,6 +9,7 @@ import {
   usePauseGrowthAutopilotMutation,
   useResumeGrowthAutopilotMutation,
   useRunGrowthAutopilotCycleMutation,
+  useSimulateGrowthAutopilotMutation,
   useUpdateGrowthAutopilotSettingsMutation,
 } from "@/lib/redux/api";
 
@@ -19,6 +20,7 @@ export default function AutopilotPage() {
   const [pause] = usePauseGrowthAutopilotMutation();
   const [resume] = useResumeGrowthAutopilotMutation();
   const [runCycle, { data: lastRun }] = useRunGrowthAutopilotCycleMutation();
+  const [simulate, { data: simResult, isLoading: simulating }] = useSimulateGrowthAutopilotMutation();
 
   return (
     <div className="space-y-6">
@@ -59,10 +61,26 @@ export default function AutopilotPage() {
             <Button size="sm" onClick={() => runCycle()}>
               Run cycle now
             </Button>
+            <Button size="sm" variant="secondary" disabled={simulating} onClick={() => simulate({})}>
+              Simulate allocation
+            </Button>
           </CardContent>
         </Card>
       ) : null}
       {lastRun ? <p className="text-sm text-fg-muted">{lastRun.message}</p> : null}
+      {simResult ? (
+        <Card>
+          <CardContent className="space-y-2 pt-4 text-sm">
+            <p className="font-medium">Simulation (no email sent)</p>
+            <p className="text-fg-muted">{simResult.summary}</p>
+            {simResult.allocations?.map((a) => (
+              <p key={a.sectorId}>
+                {a.name}: {a.previousAllocation} → {a.newAllocation} — {a.reasoning}
+              </p>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
       <div className="space-y-3">
         <h2 className="text-sm font-semibold">Autopilot decisions</h2>
         {decisions.map((d) => (

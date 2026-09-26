@@ -9,10 +9,14 @@ const LINKS = [
   { href: "/growth/knowledge", label: "Project Knowledge" },
   { href: "/growth/competitors", label: "Competitors" },
   { href: "/growth/sectors", label: "Sector Opportunities" },
+  { href: "/growth/prospects/search", label: "Prospect Search" },
+  { href: "/growth/campaigns", label: "Campaign Studio" },
   { href: "/growth/autopilot", label: "Autopilot" },
   { href: "/growth/inbox", label: "Unified Inbox" },
+  { href: "/growth/pipeline", label: "Pipeline" },
+  { href: "/growth/analytics", label: "Analytics" },
   { href: "/growth", label: "Prospects" },
-  { href: "/growth/senders", label: "Senders" },
+  { href: "/growth/senders", label: "Sender health" },
   { href: "/growth/suppressions", label: "Suppressions" },
 ];
 

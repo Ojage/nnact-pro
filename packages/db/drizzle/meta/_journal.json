@@ -316,6 +316,20 @@
       "when": 1790000010900,
       "tag": "0046_growth_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1790000011900,
+      "tag": "0047_growth_pipeline",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1790000012900,
+      "tag": "0048_growth_operating_system",
+      "breakpoints": true
     }
   ]
 }

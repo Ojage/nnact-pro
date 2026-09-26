@@ -110,6 +110,8 @@ import type {
   GrowthAutopilotDecisionDTO,
   GrowthInboxThreadDTO,
   GrowthInboxMessageDTO,
+  GrowthOpportunityDTO,
+  GrowthAnalyticsOverviewDTO,
 } from "@nnact/shared";
 
 /** Query parameters accepted by GET /api/growth/prospects. */
@@ -352,6 +354,8 @@ export const apiSlice = createApi({
     "GrowthCampaignRecipient",
     "GrowthOutbound",
     "GrowthIntelligence",
+    "GrowthPipeline",
+    "GrowthAnalytics",
     "Invoice",
     "Estimate",
     "ServiceAgreement",
@@ -1796,6 +1800,120 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       query: (id) => `/api/growth/inbox/threads/${id}`,
       providesTags: ["GrowthIntelligence"],
     }),
+    growthConversationsSearch: builder.query<
+      GrowthInboxThreadDTO[],
+      { q?: string; limit?: number; view?: string }
+    >({
+      query: (params) => ({ url: "/api/growth/conversations/search", params: params as Record<string, unknown> }),
+      providesTags: ["GrowthIntelligence"],
+    }),
+    growthInboxThreadNotes: builder.query<
+      { id: string; body: string; assignedTo: string | null; authorName: string | null; createdAt: string }[],
+      string
+    >({
+      query: (threadId) => `/api/growth/inbox/threads/${threadId}/notes`,
+      providesTags: ["GrowthIntelligence"],
+    }),
+    addGrowthInboxThreadNote: builder.mutation<
+      { id: string; body: string; assignedTo: string | null; createdAt: string },
+      { threadId: string; body: string; assignedTo?: string }
+    >({
+      query: ({ threadId, ...body }) => ({
+        url: `/api/growth/inbox/threads/${threadId}/notes`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    patchGrowthInboxThread: builder.mutation<
+      Record<string, unknown>,
+      { threadId: string; needsHumanReply?: boolean }
+    >({
+      query: ({ threadId, ...body }) => ({
+        url: `/api/growth/inbox/threads/${threadId}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
+    growthOpportunities: builder.query<GrowthOpportunityDTO[], { stage?: string } | void>({
+      query: (params) => ({ url: "/api/growth/opportunities", params: (params ?? {}) as Record<string, unknown> }),
+      providesTags: ["GrowthPipeline"],
+    }),
+    growthMeetings: builder.query<GrowthMeetingDTO[], void>({
+      query: () => "/api/growth/meetings",
+      providesTags: ["GrowthPipeline"],
+    }),
+    growthAnalyticsOverview: builder.query<GrowthAnalyticsOverviewDTO, { days?: number } | void>({
+      query: (params) => ({ url: "/api/growth/analytics/overview", params: (params ?? {}) as Record<string, unknown> }),
+      providesTags: ["GrowthAnalytics"],
+    }),
+    previewExpleeImport: builder.query<{ rows: unknown[]; source: string; readOnly: boolean }, void>({
+      query: () => "/api/growth/import/explee/preview",
+    }),
+    runExpleeImport: builder.mutation<
+      { runId: string; rowsSeen: number; rowsImported: number; previewOnly: boolean },
+      { commit?: boolean }
+    >({
+      query: (body) => ({ url: "/api/growth/import/explee/run", method: "POST", body }),
+      invalidatesTags: ["GrowthProspect", "GrowthPipeline"],
+    }),
+
+    growthProspectSearch: builder.query<
+      GrowthProspectSearchRowDTO[],
+      {
+        q?: string;
+        sectorSlug?: string;
+        city?: string;
+        minFitScore?: number;
+        excludeRejected?: boolean;
+        limit?: number;
+        offset?: number;
+      }
+    >({
+      query: (params) => ({ url: "/api/growth/prospects/search", params: params as Record<string, unknown> }),
+      providesTags: ["GrowthProspect"],
+    }),
+    rejectGrowthProspect: builder.mutation<Record<string, unknown>, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/api/growth/prospects/${id}/reject`, method: "POST", body: { reason } }),
+      invalidatesTags: ["GrowthProspect"],
+    }),
+    importGrowthProspectsCsv: builder.mutation<
+      { created: number; skipped: number; results: { companyName: string; status: string; reason?: string }[] },
+      { csv: string; countryCallingCode?: string }
+    >({
+      query: (body) => ({ url: "/api/growth/prospects/import/csv", method: "POST", body }),
+      invalidatesTags: ["GrowthProspect"],
+    }),
+    runGrowthDiscovery: builder.mutation<
+      { runId: string; prospectsSeen: number; prospectsRescored: number; message: string },
+      { sectorSlug: string; city?: string; country?: string }
+    >({
+      query: (body) => ({ url: "/api/growth/discovery/run", method: "POST", body }),
+      invalidatesTags: ["GrowthProspect"],
+    }),
+    growthAnalyticsFunnel: builder.query<
+      { periodDays: number; stages: { stage: string; count: number }[]; coldTransportReady: boolean },
+      { days?: number } | void
+    >({
+      query: (params) => ({ url: "/api/growth/analytics/funnel", params: (params ?? {}) as Record<string, unknown> }),
+    }),
+    growthSenderHealth: builder.query<
+      { senders: GrowthSenderHealthRowDTO[]; coldTransportReady: boolean },
+      void
+    >({
+      query: () => "/api/growth/analytics/sender-health",
+    }),
+    simulateGrowthAutopilot: builder.mutation<
+      {
+        simulationId: string;
+        summary: string;
+        allocations: { sectorId: string; name: string; previousAllocation: number; newAllocation: number; reasoning: string }[];
+      },
+      { dailyCapacity?: number } | void
+    >({
+      query: (body) => ({ url: "/api/growth/autopilot/simulate", method: "POST", body: body ?? {} }),
+    }),
 
     // ── Campaigns ────────────────────────────────────────────────────────
     growthCampaigns: builder.query<GrowthCampaignDTO[], { status?: GrowthCampaignStatus; purpose?: GrowthCampaignPurpose; limit?: number; offset?: number } | void>({
@@ -1833,6 +1951,26 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       query: ({ id }) => ({ url: `/api/growth/recipients/${id}/stop`, method: "POST" }),
       invalidatesTags: ["GrowthCampaignRecipient", "GrowthCampaign"],
     }),
+    startGrowthCampaignResearch: builder.mutation<{ campaign: GrowthCampaignDTO }, string>({
+      query: (id) => ({ url: `/api/growth/campaigns/${id}/start-research`, method: "POST" }),
+      invalidatesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
+    }),
+    enrollGrowthCampaignFromRules: builder.mutation<
+      {
+        inserted: number;
+        skipped: number;
+        prospectsMatched: number;
+        withEmail: number;
+        message: string;
+      },
+      string
+    >({
+      query: (id) => ({ url: `/api/growth/campaigns/${id}/enroll-from-rules`, method: "POST" }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: "GrowthCampaign", id },
+        { type: "GrowthCampaignRecipient", id },
+      ],
+    }),
     submitGrowthCampaignReview: builder.mutation<{ campaign: GrowthCampaignDTO }, string>({
       query: (id) => ({ url: `/api/growth/campaigns/${id}/submit-review`, method: "POST" }),
       invalidatesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
@@ -1865,14 +2003,88 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       query: ({ id, ...params }) => ({ url: `/api/growth/campaigns/${id}/outbound`, params: params as Record<string, unknown> }),
       providesTags: ["GrowthOutbound"],
     }),
+    growthCampaignPreview: builder.query<GrowthCampaignPreviewDTO, string>({
+      query: (id) => `/api/growth/campaigns/${id}/preview`,
+      providesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
+    }),
   }),
 });
+
+export interface GrowthProspectSearchRowDTO {
+  id: string;
+  companyName: string;
+  city: string | null;
+  country: string | null;
+  sectorSlug: string | null;
+  fitScore: number | null;
+  fitSummary: string | null;
+  fitEvidence: unknown;
+  emailVerificationStatus: string | null;
+  rejectedAt: string | null;
+  rejectReason: string | null;
+  lifecycle: string;
+  source: string;
+  createdAt: string;
+}
+
+export interface GrowthSenderHealthRowDTO {
+  senderId: string;
+  displayName: string;
+  email: string;
+  verificationState: string;
+  coldApproved: boolean;
+  sent30d: number;
+  failed30d: number;
+  blocked30d: number;
+  bounceSignals: number;
+  alerts: string[];
+}
+
+export interface GrowthCampaignPreviewDTO {
+  campaign: { id: string; name: string; status: string; purpose: string; timezone: string; language: string | null };
+  sender: {
+    displayName: string;
+    email: string;
+    roleTitle: string | null;
+    verificationState: string;
+    coldApproved: boolean;
+    replyToEmail: string | null;
+  } | null;
+  coldTransportReady: boolean;
+  approvedFactCount: number;
+  steps: { stepNumber: number; delayDays: number; subject: string; bodyText: string }[];
+  samples: {
+    recipientId: string;
+    companyName: string;
+    city: string | null;
+    to: string | null;
+    fitSummary: string | null;
+    fitEvidence: unknown;
+    rendered: { from: string | null; replyTo: string | null; subject: string; bodyText: string } | null;
+    warning: string | null;
+  }[];
+}
 
 /** Response of GET /api/growth/prospects/duplicates/check. */
 export interface GrowthDuplicateCheckDTO {
   matches: GrowthDuplicateMatchDTO[];
   /** True when a match rests on a shared identifier, not just a similar name. */
   blocking: boolean;
+}
+
+export interface GrowthMeetingDTO {
+  id: string;
+  orgId: string;
+  opportunityId: string | null;
+  prospectId: string | null;
+  /** ISO timestamp. */
+  scheduledAt: string;
+  location: string | null;
+  status: string;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ── Campaigns ─────────────────────────────────────────────────────────────
@@ -2266,9 +2478,28 @@ export const {
   usePauseGrowthAutopilotMutation,
   useResumeGrowthAutopilotMutation,
   useRunGrowthAutopilotCycleMutation,
+  useSimulateGrowthAutopilotMutation,
   useGrowthAutopilotDecisionsQuery,
+  useGrowthProspectSearchQuery,
+  useRejectGrowthProspectMutation,
+  useImportGrowthProspectsCsvMutation,
+  useRunGrowthDiscoveryMutation,
+  useGrowthAnalyticsFunnelQuery,
+  useGrowthSenderHealthQuery,
+  useGrowthCampaignPreviewQuery,
   useGrowthInboxThreadsQuery,
   useGrowthInboxMessagesQuery,
+  useGrowthConversationsSearchQuery,
+  useGrowthInboxThreadNotesQuery,
+  useAddGrowthInboxThreadNoteMutation,
+  usePatchGrowthInboxThreadMutation,
+  useStartGrowthCampaignResearchMutation,
+  useEnrollGrowthCampaignFromRulesMutation,
+  useGrowthOpportunitiesQuery,
+  useGrowthMeetingsQuery,
+  useGrowthAnalyticsOverviewQuery,
+  usePreviewExpleeImportQuery,
+  useRunExpleeImportMutation,
   useDeleteGrowthSuppressionMutation,
 } = apiSlice;
 
