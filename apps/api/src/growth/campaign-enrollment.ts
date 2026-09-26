@@ -16,7 +16,9 @@ export interface ProspectSelectionRules {
 }
 
 export function parseProspectSelectionRules(raw: unknown): ProspectSelectionRules {
-  if (!raw || typeof raw !== "object") return {};
+  if (!raw || typeof raw !== "object") {
+    return { excludeRejected: true, limit: 200 };
+  }
   const o = raw as Record<string, unknown>;
   return {
     sectorSlug: typeof o.sectorSlug === "string" ? o.sectorSlug : undefined,

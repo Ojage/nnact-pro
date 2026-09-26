@@ -572,21 +572,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    void loadStaffSession().then(async (stored) => {
+    void loadStaffSession().then((stored) => {
       if (!stored) {
         setBooting(false);
         return;
       }
-      try {
-        const me = await staffMe(stored.accessToken);
-        setSession({
-          ...stored,
-          user: { ...stored.user, ...me, mustChangePassword: Boolean(me.mustChangePassword) },
-        });
-      } catch {
-        setSession(stored);
-      }
+      setSession(stored);
       setBooting(false);
+      void staffMe(stored.accessToken)
+        .then((me) => {
+          setSession({
+            ...stored,
+            user: { ...stored.user, ...me, mustChangePassword: Boolean(me.mustChangePassword) },
+          });
+        })
+        .catch(() => {});
     });
   }, []);
 

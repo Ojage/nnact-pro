@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -21,7 +22,7 @@ import {
 } from "@nnact/shared";
 import { staffLogin, staffLoginWithPhone, staffRequestOtp, staffVerifyOtp, staffRequestPasswordReset, staffResetPassword } from "../auth-api";
 import type { StoredStaffSession } from "../auth-storage";
-import { Card, LoadingScreen, PrimaryButton, TextField } from "../components/ui";
+import { Card, PrimaryButton, TextField } from "../components/ui";
 import { HeroCarousel } from "../components/HeroCarousel";
 import { NNACT_BUEA_SLIDES } from "../content/field-carousels";
 import { formatNetworkError } from "../env";
@@ -573,7 +574,29 @@ export function LoginScreen({
 }
 
 export function AuthBootScreen({ colors }: { colors: Palette }) {
-  return <LoadingScreen colors={colors} message="Loading session…" />;
+  // Matches the native splash (app.config expo-splash-screen backgroundColor)
+  // so the launch image hands off straight into "Loading session…" with no
+  // flash of a different background while the stored session is read.
+  const bootBackground = "#0f172a";
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: spacing.lg,
+        backgroundColor: bootBackground,
+      }}
+      accessibilityLiveRegion="polite"
+      accessibilityLabel="Loading session"
+    >
+      <BrandLogo size={72} />
+      <ActivityIndicator size="large" color="#f2b705" />
+      <Text style={{ color: "rgba(250, 245, 238, 0.92)", fontSize: 14, fontFamily: fonts.regular }}>
+        Loading session…
+      </Text>
+    </View>
+  );
 }
 
 const createStyles = (colors: Palette) =>

@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useApproveGrowthCampaignMutation,
+  useEnrollGrowthCampaignFromRulesMutation,
   useGrowthCampaignPreviewQuery,
   useGrowthCampaignQuery,
   useGrowthCampaignRecipientsQuery,
@@ -26,8 +27,10 @@ import {
   useRunGrowthCampaignMutation,
   useSaveGrowthCampaignStepMutation,
   useScheduleGrowthCampaignMutation,
+  useStartGrowthCampaignResearchMutation,
   useStopGrowthRecipientMutation,
   useSubmitGrowthCampaignReviewMutation,
+  useUpdateGrowthCampaignMutation,
   explainRtkError,
 } from "@/lib/redux/api";
 import { useSessionUser } from "@/lib/use-session-user";
@@ -45,6 +48,9 @@ export default function GrowthCampaignDetailPage() {
   const { data: outbound } = useGrowthOutboundLogQuery({ id: id ?? "" }, { skip: !id });
 
   const [submitReview] = useSubmitGrowthCampaignReviewMutation();
+  const [startResearch] = useStartGrowthCampaignResearchMutation();
+  const [enrollFromRules] = useEnrollGrowthCampaignFromRulesMutation();
+  const [updateCampaign] = useUpdateGrowthCampaignMutation();
   const [approve] = useApproveGrowthCampaignMutation();
   const [schedule] = useScheduleGrowthCampaignMutation();
   const [pause] = usePauseGrowthCampaignMutation();
@@ -57,6 +63,9 @@ export default function GrowthCampaignDetailPage() {
   const [delayDays, setDelayDays] = useState("0");
   const [subject, setSubject] = useState("");
   const [bodyText, setBodyText] = useState("");
+  const [ruleSector, setRuleSector] = useState("hotels");
+  const [ruleCity, setRuleCity] = useState("Douala");
+  const [ruleMinFit, setRuleMinFit] = useState("60");
 
   if (isLoading) {
     return (
@@ -211,6 +220,76 @@ export default function GrowthCampaignDetailPage() {
         </CardContent>
       </Card>
 
+      {canWrite && editable ? (
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <h2 className="text-sm font-semibold text-fg">Prospect selection</h2>
+            <p className="text-xs text-fg-muted">
+              Rules pick from your existing prospect pool (sector, city, fit score). No emails are invented.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Input value={ruleSector} onChange={(e) => setRuleSector(e.target.value)} placeholder="Sector slug" />
+              <Input value={ruleCity} onChange={(e) => setRuleCity(e.target.value)} placeholder="City" />
+              <Input
+                value={ruleMinFit}
+                onChange={(e) => setRuleMinFit(e.target.value)}
+                type="number"
+                placeholder="Min fit"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {campaign.status === "DRAFT" ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() =>
+                    act("start research", () => startResearch(campaign.id).unwrap(), () =>
+                      toast.success("Campaign is researching prospects"),
+                    )
+                  }
+                >
+                  Start research
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  act("save rules", () =>
+                    updateCampaign({
+                      id: campaign.id,
+                      data: {
+                        prospectSelectionRules: {
+                          sectorSlug: ruleSector.trim() || undefined,
+                          cities: ruleCity.trim() ? [ruleCity.trim()] : undefined,
+                          minFitScore: ruleMinFit ? Number(ruleMinFit) : undefined,
+                        },
+                      },
+                    }).unwrap(),
+                  )
+                }
+              >
+                Save rules
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  act("enroll prospects", async () => {
+                    const r = await enrollFromRules(campaign.id).unwrap();
+                    toast.success(r.message);
+                  })
+                }
+              >
+                Enroll from rules
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {canWrite ? (
         <Card>
           <CardContent className="space-y-3 p-4">
@@ -231,7 +310,7 @@ export default function GrowthCampaignDetailPage() {
                 </Button>
               ) : null}
 
-              {campaign.status === "IN_REVIEW" ? (
+              {campaign.status === "IN_REVIEW" || campaign.status === "READY_FOR_REVIEW" ? (
                 <Button
                   size="sm"
                   disabled={busy || !isOwner}

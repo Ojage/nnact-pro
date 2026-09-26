@@ -76,6 +76,8 @@ for (const [name, value] of [["PUBLIC_WEB_URL", process.argv[2]], ["PUBLIC_API_U
 }
 NODE
 
+bash scripts/validate-production-env.sh
+
 export ALLOW_SCHEMA_PUSH=true
 "${COMPOSE[@]}" -f infra/compose.prod.yml config >/dev/null
 

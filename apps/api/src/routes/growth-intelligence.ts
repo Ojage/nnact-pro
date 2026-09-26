@@ -35,6 +35,7 @@ import {
 } from "../growth/access.js";
 import { runAutopilotCycle } from "../growth/autopilot-cycle.js";
 import { runAutopilotSimulation } from "../growth/autopilot-sim.js";
+import { getGrowthDeploymentReadiness, growthDeploymentReady } from "../growth/env-readiness.js";
 import {
   buildComparisonSummary,
   suggestCompetitorsFromWebsite,
@@ -57,6 +58,18 @@ const uuid = z.string().uuid();
 const trimmed = z.string().trim().min(1);
 
 export async function growthIntelligenceRoutes(app: FastifyInstance) {
+  app.get("/ops/deployment", async (req, reply) => {
+    const claims = await requireGrowthOwner(req, reply);
+    if (!claims) return;
+    const items = getGrowthDeploymentReadiness(process.env);
+    return {
+      ready: growthDeploymentReady(items),
+      items,
+      schedulerEnabled: process.env.GROWTH_SCHEDULER_ENABLED === "true",
+      inboundWebhookPath: "/api/v1/growth/webhooks/inbound/:orgId",
+    };
+  });
+
   app.get("/intelligence/overview", async (req, reply) => {
     const claims = await requireGrowthRead(req, reply);
     if (!claims) return;
