@@ -224,6 +224,10 @@ services:
       NNPAPI_ADDRESS: ${NNPAPI_ADDRESS:?Set the API domain, e.g. api.pro.nnact.com}
       NNPMARKETING_ADDRESS: ${NNPMARKETING_ADDRESS:?Set the marketing apex domain, e.g. nnact.com}
       NNPMARKETING_WWW: ${NNPMARKETING_WWW:-www.nnact.com}
+      # Separate project sharing this host. Left optional so a deploy that has
+      # not yet provisioned the portfolio root still brings Caddy up, rather
+      # than failing the whole stack on a missing mount.
+      OJAGE_PORTFOLIO_ADDRESS: ${OJAGE_PORTFOLIO_ADDRESS:-salathiel.ojage.org}
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -235,6 +239,7 @@ services:
       - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - ../landing:/srv/landing:ro
       - ${NNPMARKETING_ROOT:-../data/marketing/dist}:/srv/marketing:ro
+      - ${OJAGE_PORTFOLIO_ROOT:-../data/ojage-portfolio}:/srv/ojage-portfolio:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

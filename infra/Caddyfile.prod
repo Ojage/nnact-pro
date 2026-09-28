@@ -1,7 +1,12 @@
-# Production reverse proxy — three public surfaces on one VPS:
-#   pro.nnact.com       → NNACT Pro web app
-#   api.pro.nnact.com   → NNACT Pro API
-#   nnact.com (+ www)   → public marketing site (static Vite build)
+# Production reverse proxy — four public surfaces on one VPS:
+#   pro.nnact.com         → NNACT Pro web app
+#   api.pro.nnact.com     → NNACT Pro API
+#   nnact.com (+ www)     → public marketing site (static Vite build)
+#   salathiel.ojage.org   → Ojage portfolio (static CRA build)
+#
+# The portfolio is a separate project sharing this host, so it gets its own
+# vhost and its own document root. Nothing about NNACT Pro depends on it, and
+# removing it cannot affect the three surfaces above.
 
 (security_headers) {
 	encode zstd gzip
@@ -26,7 +31,7 @@
 {$NNPSITE_ADDRESS} {
 	import security_headers
 
-handle /welcome* {
+	handle /welcome* {
 		root * /srv/landing
 		try_files {path} /index.html
 		file_server
@@ -54,6 +59,25 @@ handle /welcome* {
 	@immutable path /assets/*
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
 	@html path *.html /en /fr /en/* /fr/*
+	header @html Cache-Control "no-cache"
+	file_server
+	log {
+		output stdout
+		format json
+	}
+}
+
+# Ojage portfolio. Static single-page app: every path resolves to index.html so
+# react-router client routes (/project/:slug) deep-link correctly on refresh.
+# Content-hashed assets are immutable; index.html must never be cached, or a
+# deploy would keep serving the previous bundle to returning visitors.
+{$OJAGE_PORTFOLIO_ADDRESS} {
+	import security_headers
+	root * /srv/ojage-portfolio
+	try_files {path}/index.html {path} /index.html
+	@immutable path /static/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	@html path *.html /
 	header @html Cache-Control "no-cache"
 	file_server
 	log {
