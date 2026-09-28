@@ -6,7 +6,12 @@ import type { ConnectionValidationResult, ContentValidationIssue, ProviderCapabi
 import { PROVIDER_CAPABILITIES } from "@nnact/shared";
 
 export interface WebsiteAdapterDeps {
-  websiteBaseUrl: string;
+  /**
+   * Public marketing/blog origin. Either a literal origin or a resolver, so a
+   * misconfigured origin is only reported when the Website channel is actually
+   * used rather than whenever the server registers its routes.
+   */
+  websiteBaseUrl: string | (() => string);
 }
 
 export class WebsitePublishingAdapter implements PublishingProviderPort {
@@ -15,9 +20,15 @@ export class WebsitePublishingAdapter implements PublishingProviderPort {
 
   constructor(private readonly deps: WebsiteAdapterDeps) {}
 
+  private baseUrl(): string {
+    return typeof this.deps.websiteBaseUrl === "function"
+      ? this.deps.websiteBaseUrl()
+      : this.deps.websiteBaseUrl;
+  }
+
   async validateConnection(_orgId: string): Promise<ConnectionValidationResult> {
     // Website is always "connected" — it's our own property.
-    return { valid: true, accountName: this.deps.websiteBaseUrl };
+    return { valid: true, accountName: this.baseUrl() };
   }
 
   validateContent(request: PublishRequest): ContentValidationIssue[] {
@@ -37,7 +48,7 @@ export class WebsitePublishingAdapter implements PublishingProviderPort {
     return {
       providerPublicationId: request.publicationId,
       // The marketing site only routes locale-prefixed blog URLs.
-      externalUrl: `${this.deps.websiteBaseUrl.replace(/\/$/, "")}/en/blog/${slug}`,
+      externalUrl: `${this.baseUrl().replace(/\/$/, "")}/en/blog/${slug}`,
       publishedAt: new Date(),
       providerStatus: "PUBLISHED",
       rawMetadata: { channel: "WEBSITE", slug },

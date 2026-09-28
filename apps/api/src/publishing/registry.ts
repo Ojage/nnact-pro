@@ -93,5 +93,10 @@ export function publicSiteUrl(env: NodeJS.ProcessEnv = process.env): string {
 /** Default registry wired to the real connection store (env-backed). */
 export function defaultRegistry(): PublishingProviderRegistry {
   const credentialStore = connectionStoreFor(process.env);
-  return new PublishingProviderRegistry({ credentialStore, website: { websiteBaseUrl: publicSiteUrl(process.env) } });
+  // Resolved lazily: a missing marketing origin must not stop the API from
+  // booting, it only matters once the Website channel is used.
+  return new PublishingProviderRegistry({
+    credentialStore,
+    website: { websiteBaseUrl: () => publicSiteUrl(process.env) },
+  });
 }
