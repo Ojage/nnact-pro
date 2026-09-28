@@ -34,6 +34,11 @@ const mockDeleteOrgSignature = mock.fn();
 const mockSaveOrgStamp = mock.fn();
 const mockGetOrgStamp = mock.fn();
 const mockDeleteOrgStamp = mock.fn();
+// public.ts imports the user-avatar helpers from the same module, so the mock
+// must expose them too or loading the server fails on a missing named export.
+const mockSaveUserAvatar = mock.fn();
+const mockGetUserAvatar = mock.fn();
+const mockDeleteUserAvatar = mock.fn();
 
 mock.module("../src/uploads.js", {
   namedExports: {
@@ -49,6 +54,9 @@ mock.module("../src/uploads.js", {
     saveOrgStamp: mockSaveOrgStamp,
     getOrgStamp: mockGetOrgStamp,
     deleteOrgStamp: mockDeleteOrgStamp,
+    saveUserAvatar: mockSaveUserAvatar,
+    getUserAvatar: mockGetUserAvatar,
+    deleteUserAvatar: mockDeleteUserAvatar,
   },
 });
 

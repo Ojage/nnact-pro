@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { after, before } from "node:test";
+import { eq } from "drizzle-orm";
+import { db, newsletterSubscribers, orgs } from "@nnact/db";
 import { buildServer } from "../src/server.js";
 
 const passingProbes = {
@@ -14,13 +16,80 @@ function buildTestApp() {
   });
 }
 
-const DEFAULT_ORG_ID = "default"; // tests use default org resolver
+// The public newsletter endpoints resolve the organization from DEFAULT_ORG_ID,
+// and newsletter_subscribers.org_id is a foreign key onto orgs, so the test
+// needs a real organization row rather than a placeholder identifier.
+const DEFAULT_ORG_ID = "11111111-1111-4111-8111-111111111111";
+
+// The newsletter rate limiter is a module-level fixed window (5 requests/hour)
+// keyed by request.ip. Every app.inject() would otherwise share the 127.0.0.1
+// bucket and trip the limit part way through this file, so each test is given
+// its own client IP. Fastify only honours x-forwarded-for when trustProxy is
+// enabled, hence the TRUST_PROXY override below.
+let ipCounter = 0;
+function clientIp(): string {
+  ipCounter += 1;
+  return `203.0.113.${ipCounter % 250}`;
+}
+
+type TestApp = ReturnType<typeof buildTestApp>;
+type InjectOptions = Parameters<TestApp["inject"]>[0];
+
+function injectNewsletter(app: TestApp, options: InjectOptions) {
+  return app.inject({
+    ...options,
+    headers: { ...options.headers, "x-forwarded-for": clientIp() },
+  });
+}
+
+// Subscribe fires a fire-and-forget confirmation email. Leaving ambient SMTP
+// credentials in place makes these tests dial a real mail server (and leaves the
+// connection open, so the test process never exits), so SMTP is disabled for the
+// duration of the file and restored afterwards.
+const SMTP_ENV_KEYS = [
+  "SMTP_HOST",
+  "SMTP_PORT",
+  "SMTP_SECURE",
+  "SMTP_USER",
+  "SMTP_PASS",
+  "SMTP_FROM",
+  "SMTP_FROM_NEWSLETTER",
+];
+const savedSmtpEnv = new Map<string, string | undefined>();
+
+before(async () => {
+  for (const key of SMTP_ENV_KEYS) {
+    savedSmtpEnv.set(key, process.env[key]);
+    delete process.env[key];
+  }
+  process.env.DEFAULT_ORG_ID = DEFAULT_ORG_ID;
+  process.env.TRUST_PROXY = "true";
+  await db
+    .insert(orgs)
+    .values({ id: DEFAULT_ORG_ID, name: "Newsletter Test Org" })
+    .onConflictDoNothing();
+});
+
+after(async () => {
+  await db.delete(newsletterSubscribers).where(eq(newsletterSubscribers.orgId, DEFAULT_ORG_ID));
+  await db.delete(orgs).where(eq(orgs.id, DEFAULT_ORG_ID));
+  // This file is the only one that talks to the real pool directly, and the
+  // Fastify onClose hook does not own it, so the client is closed here or the
+  // test process hangs on an open connection.
+  await db.$client.end();
+  for (const [key, value] of savedSmtpEnv) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  delete process.env.DEFAULT_ORG_ID;
+  delete process.env.TRUST_PROXY;
+});
 
 test("POST /api/v1/public/default/newsletter/subscribe returns 201 with valid email", async () => {
   const app = buildTestApp();
   await app.ready();
 
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/subscribe",
     payload: { email: "test@example.com", name: "Test User" },
@@ -40,7 +109,7 @@ test("POST /api/v1/public/default/newsletter/subscribe returns 201 with optional
   const app = buildTestApp();
   await app.ready();
 
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/subscribe",
     payload: { email: "test2@example.com", phone: "+237651385746", channels: ["email", "whatsapp"], source: "home_cta" },
@@ -59,7 +128,7 @@ test("POST /api/v1/public/default/newsletter/subscribe returns 400 with invalid 
   const app = buildTestApp();
   await app.ready();
 
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/subscribe",
     payload: { email: "not-an-email" },
@@ -73,7 +142,7 @@ test("POST /api/v1/public/default/newsletter/subscribe returns 400 when email is
   const app = buildTestApp();
   await app.ready();
 
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/subscribe",
     payload: { name: "Test User" },
@@ -88,7 +157,7 @@ test("POST /api/v1/public/default/newsletter/subscribe upserts existing subscrib
   await app.ready();
 
   // First subscribe
-  const first = await app.inject({
+  const first = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/subscribe",
     payload: { email: "upsert@example.com", name: "Original" },
@@ -97,7 +166,7 @@ test("POST /api/v1/public/default/newsletter/subscribe upserts existing subscrib
   const firstId = first.json().subscriberId;
 
   // Subscribe again with different name
-  const second = await app.inject({
+  const second = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/subscribe",
     payload: { email: "upsert@example.com", name: "Updated Name" },
@@ -114,14 +183,14 @@ test("POST /api/v1/public/default/newsletter/unsubscribe returns 200", async () 
   await app.ready();
 
   // First subscribe
-  await app.inject({
+  await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/subscribe",
     payload: { email: "unsub@example.com" },
   });
 
   // Then unsubscribe
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/unsubscribe",
     payload: { email: "unsub@example.com" },
@@ -138,7 +207,7 @@ test("POST /api/v1/public/default/newsletter/unsubscribe returns 200 even if ema
   const app = buildTestApp();
   await app.ready();
 
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/unsubscribe",
     payload: { email: "never-subscribed@example.com" },
@@ -155,7 +224,7 @@ test("POST /api/v1/public/default/newsletter/unsubscribe returns 400 with invali
   const app = buildTestApp();
   await app.ready();
 
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/unsubscribe",
     payload: { email: "not-an-email" },
@@ -169,7 +238,7 @@ test("POST /api/v1/public/default/newsletter/unsubscribe returns 400 when email 
   const app = buildTestApp();
   await app.ready();
 
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/unsubscribe",
     payload: {},
@@ -179,19 +248,17 @@ test("POST /api/v1/public/default/newsletter/unsubscribe returns 400 when email 
   await app.close();
 });
 
-test("POST /api/v1/public/default/newsletter/unsubscribe for unknown org", async () => {
+test("POST /api/v1/public/default/newsletter/unsubscribe uses the configured default organization", async () => {
   const app = buildTestApp();
   await app.ready();
 
-  // Test the default org route with a specific test - default org unsubscribe should work
-  const res = await app.inject({
+  const res = await injectNewsletter(app, {
     method: "POST",
     url: "/api/v1/public/default/newsletter/unsubscribe",
     payload: { email: "org-test@example.com" },
   });
 
-  // Default org resolves from env, so this should work
-  assert.ok([200, 404].includes(res.statusCode));
+  assert.equal(res.statusCode, 200);
   await app.close();
 });
 
@@ -199,16 +266,22 @@ test("newsletter rate limit is per-IP-per-org", async () => {
   const app = buildTestApp();
   await app.ready();
 
-  // Use unique org for rate limit isolation (since we use default org for all tests, 
-  // the rate limit key is IP:default:newsletter which is shared across tests)
-  // Just verify rate limiting works by making requests to a unique email
-  const res = await app.inject({
-    method: "POST",
-    url: "/api/v1/public/default/newsletter/subscribe",
-    payload: { email: `ratelimit-${Date.now()}@example.com` },
-  });
-  
-  // First request should succeed (201) or be rate limited (429) depending on test run order
-  assert.ok([201, 429].includes(res.statusCode));
+  // A single client IP gets its own 5-request/hour bucket; the sixth request
+  // from that IP is rejected regardless of the other tests in this file.
+  const headers = { "x-forwarded-for": clientIp() };
+  const statuses: number[] = [];
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/public/default/newsletter/subscribe",
+      headers,
+      payload: { email: `ratelimit-${attempt}-${Date.now()}@example.com` },
+    });
+    statuses.push(res.statusCode);
+  }
+
+  assert.deepEqual(statuses.slice(0, 5), [201, 201, 201, 201, 201]);
+  assert.equal(statuses[5], 429);
   await app.close();
 });

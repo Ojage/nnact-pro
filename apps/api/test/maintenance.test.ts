@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { after, before } from "node:test";
+import { eq } from "drizzle-orm";
+import { db, orgs, users } from "@nnact/db";
 import {
   FileMaintenanceReader,
   WorkerDrainTracker,
@@ -17,6 +19,35 @@ const passingProbes = {
   uploads: async () => {},
   migrations: async () => {},
 };
+
+// GET /api/auth/me reads the users row named by the token's userId, and both
+// users.id and users.org_id are uuid columns, so the maintenance read test needs
+// a real org and staff member rather than the literal "owner"/"org" strings.
+const ORG_ID = "22222222-2222-4222-8222-222222222222";
+const USER_ID = "33333333-3333-4333-8333-333333333333";
+
+before(async () => {
+  await db
+    .insert(orgs)
+    .values({ id: ORG_ID, name: "Maintenance Test Org" })
+    .onConflictDoNothing();
+  await db
+    .insert(users)
+    .values({
+      id: USER_ID,
+      orgId: ORG_ID,
+      name: "Maintenance Owner",
+      email: "maintenance-owner@example.com",
+      role: "owner",
+    })
+    .onConflictDoNothing();
+});
+
+after(async () => {
+  await db.delete(users).where(eq(users.id, USER_ID));
+  await db.delete(orgs).where(eq(orgs.id, ORG_ID));
+  await db.$client.end();
+});
 
 test("maintenance classifies every non-read HTTP method as mutating", () => {
   for (const method of ["GET", "HEAD", "OPTIONS"]) {
@@ -78,7 +109,7 @@ test("maintenance blocks writes but keeps reads, liveness, owner status, and rec
     maintenanceReader: { read: () => ({ active: true }) },
   });
   await app.ready();
-  const ownerToken = app.jwt.sign({ userId: "owner", orgId: "org", role: "owner" });
+  const ownerToken = app.jwt.sign({ userId: USER_ID, orgId: ORG_ID, role: "owner" });
   const auth = { authorization: `Bearer ${ownerToken}` };
 
   const live = await app.inject({ method: "GET", url: "/api/health/live" });
@@ -178,14 +209,14 @@ test("API drain status waits for a mutation that passed the gate before maintena
 
   maintenance = true;
   assert.deepEqual(
-    (await app.inject({ method: "GET", url: "/internal/drain" })).json(),
+    (await app.inject({ method: "GET", url: "/api/internal/drain" })).json(),
     { activeJobs: 1, drained: false, maintenance: true },
   );
 
   release();
   assert.equal((await request).statusCode, 202);
   assert.deepEqual(
-    (await app.inject({ method: "GET", url: "/internal/drain" })).json(),
+    (await app.inject({ method: "GET", url: "/api/internal/drain" })).json(),
     { activeJobs: 0, drained: true, maintenance: true },
   );
   await app.close();
