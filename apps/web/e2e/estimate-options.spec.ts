@@ -61,7 +61,9 @@ test("dispatcher reviews Good, Better, Best and marks the estimate sent", async 
   await expect(page.getByText("Best repair")).toBeVisible();
   await page.getByRole("button", { name: "Mark sent" }).click();
   await page.getByRole("button", { name: "Yes, mark sent" }).click();
-  await expect(page.getByText("sent", { exact: true })).toBeVisible();
+  // The status badge renders in both the page header and the details panel, so
+  // the "sent" label is intentionally ambiguous; assert the first one is shown.
+  await expect(page.getByText("sent", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("3 options")).toBeVisible();
 });
 
