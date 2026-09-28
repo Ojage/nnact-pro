@@ -73,7 +73,13 @@
 # deploy would keep serving the previous bundle to returning visitors.
 {$OJAGE_PORTFOLIO_ADDRESS} {
 	import security_headers
-	root * /srv/ojage-portfolio
+	# Root resolves through the "current" symlink rather than the mount point
+	# itself. A bind mount follows the inode it was created with, so a deploy
+	# that replaced this directory would leave Caddy serving the old, now-empty
+	# inode while the new build sat unreferenced on disk. Publishing into
+	# releases/ and re-pointing a symlink keeps the mount stable and still makes
+	# the swap atomic.
+	root * /srv/ojage-portfolio/current
 	try_files {path}/index.html {path} /index.html
 	@immutable path /static/*
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
