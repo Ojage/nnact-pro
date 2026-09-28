@@ -180,6 +180,17 @@ fi
 echo "Starting application stack..."
 "${COMPOSE[@]}" -f infra/compose.prod.yml up -d api web worker caddy --remove-orphans
 
+# `up -d` will not recreate Caddy for a config-only change: the image and the
+# mount spec are unchanged, so Docker considers the existing container current.
+# That matters more than it looks, because the deploy above ran
+# `git reset --hard`, which replaces Caddyfile.prod with a NEW inode, and a
+# file bind mount keeps serving the inode it was created with. Caddy would go
+# on running the previous config indefinitely, silently ignoring the change.
+# Recreating it re-binds the current file. `--no-deps` keeps this from touching
+# the API or worker, which were just started above.
+echo "Recreating Caddy to pick up the current configuration..."
+"${COMPOSE[@]}" -f infra/compose.prod.yml up -d --force-recreate --no-deps caddy
+
 echo "Waiting for services to become healthy..."
 healthy=false
 for _attempt in $(seq 1 60); do
