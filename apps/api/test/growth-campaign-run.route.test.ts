@@ -15,7 +15,9 @@ const CAMPAIGN = "33333333-3333-3333-3333-333333333333";
 const runCampaignSend = mock.fn();
 
 mock.module("../src/growth/outbound.js", {
-  exports: {
+  // namedExports rather than exports: the latter is only honoured by the Node 24
+  // module-mocks API, and CI runs Node 22 where it silently mocks nothing.
+  namedExports: {
     runCampaignSend: (...args: unknown[]) => runCampaignSend(...args),
     isWithinQuietHours: () => false,
     isStepDue: () => true,
