@@ -133,5 +133,14 @@
     "compensatingControl": "extract-zip is only invoked by Playwright during local development and CI e2e test runs to unpack browser downloads. It operates on trusted archives from official Playwright CDN endpoints. Production API and web services never load or execute extract-zip.",
     "owner": "Nikolas Marconcini",
     "expiresAt": "2027-03-04"
+  },
+  {
+    "ghsa": "GHSA-7pqw-9j4j-h8q3",
+    "package": "extract-zip",
+    "version": "2.0.1",
+    "rationale": "extract-zip allows arbitrary file writes through symlink archive entries. This is a second advisory against the same unfixed symlink-handling defect already tracked by GHSA-jmr9-qjv8-65gv; extract-zip@2.0.1 remains the latest and only maintained release, so no patched version exists. It is a transitive dependency of @puppeteer/browsers (used only for browser downloads during e2e test execution) and is not in any production runtime.",
+    "compensatingControl": "extract-zip is only invoked by Playwright and Puppeteer browser-download tooling during local development and CI e2e runs, to unpack archives fetched from official browser CDNs. Exploitation requires an attacker to supply the archive that is extracted, and no product code path extracts an untrusted or user-supplied zip. Production API, web, worker, and mobile services never load or execute extract-zip. CI runs in an ephemeral sandboxed filesystem.",
+    "owner": "Nikolas Marconcini",
+    "expiresAt": "2027-03-04"
   }
 ]
