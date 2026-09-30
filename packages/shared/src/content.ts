@@ -213,6 +213,35 @@ export interface ContentCategoryDTO {
   description?: string | null;
 }
 
+/**
+ * The post kinds the automation planner can actually emit.
+ *
+ * A strict subset of CONTENT_TYPES: the other kinds (PROJECT_SHOWCASE,
+ * ANNOUNCEMENT, …) are authored by hand in Content Studio and never scheduled,
+ * so an image labelled for one of those would never be selected. Defining this
+ * once and deriving the gallery's label taxonomy from it keeps the two from
+ * drifting apart.
+ */
+export const AI_BRIEF_CONTENT_TYPES = ["ARTICLE", "MAINTENANCE_TIP", "FIELD_STORY"] as const;
+export type AiBriefContentType = (typeof AI_BRIEF_CONTENT_TYPES)[number];
+
+/**
+ * What kind of automated post an asset is intended to illustrate.
+ *
+ * `ANY` is the catch-all for a generally useful asset, and is stored as NULL
+ * because every row uploaded before labelling existed is unlabelled but
+ * otherwise perfectly valid. See `ContentMediaDTO.useFor`.
+ */
+export const MEDIA_USE_FOR = ["ANY", ...AI_BRIEF_CONTENT_TYPES] as const;
+export type MediaUseFor = (typeof MEDIA_USE_FOR)[number];
+
+/** The subset that actually constrains selection. `ANY`/null never matches exactly. */
+export const SPECIFIC_MEDIA_USE_FOR = AI_BRIEF_CONTENT_TYPES;
+export type SpecificMediaUseFor = AiBriefContentType;
+
+export const MEDIA_SOURCES = ["manual", "ai_generated"] as const;
+export type MediaSource = (typeof MEDIA_SOURCES)[number];
+
 export interface ContentMediaDTO {
   id: string;
   orgId: string;
@@ -226,6 +255,40 @@ export interface ContentMediaDTO {
   photoId?: string | null;
   uploadedBy?: string | null;
   createdAt: string;
+  /** Absolute, publicly fetchable URL. The gallery renders this directly. */
+  url: string;
+  useFor?: MediaUseFor | null;
+  tags: string[];
+  archived: boolean;
+  /** Only set on `ai_generated` assets: the prompt the image was made from. */
+  aiPrompt?: string | null;
+  /** How many automated posts have used this asset. Drives least-used-first. */
+  aiUsageCount: number;
+  aiLastUsedAt?: string | null;
+}
+
+/** Query for the gallery grid. Every field is optional and they combine with AND. */
+export interface ContentMediaQuery {
+  /** `null` means "any label", `ANY` means "explicitly unlabelled or general". */
+  useFor?: MediaUseFor | null;
+  tags?: string[];
+  source?: MediaSource | null;
+  /** Text matched against file name, alt text, caption and tags. */
+  search?: string;
+  archived?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/** One row of the gallery filter bar, so the UI need not hardcode the taxonomy. */
+export interface ContentMediaFacetsDTO {
+  total: number;
+  byUseFor: Record<string, number>;
+  bySource: Record<string, number>;
+  byTag: { tag: string; count: number }[];
+  unlabelled: number;
+  /** How many assets the caller's *current* filter matches, for "showing N of M". */
+  filtered?: number;
 }
 
 export interface PublicContentItemDTO {

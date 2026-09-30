@@ -8,6 +8,11 @@ import type { CredentialStorePort } from "../ports/index.js";
 import { providerFetch, ProviderError } from "../infra/http.js";
 import { normalizeError } from "../domain/errors.js";
 
+/** LinkedIn rejects feedshare images over 10 MB. */
+const LINKEDIN_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+/** Reading our own media and PUTting it must not outlive the publication attempt. */
+const LINKEDIN_MEDIA_FETCH_TIMEOUT_MS = 30_000;
+
 interface LinkedInDeps {
   credentialStore: CredentialStorePort;
   /** Overridable in tests; defaults to the official API base. */
@@ -146,8 +151,19 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
     return { status: "PUBLISHED", externalUrl: this.postUrl(providerPublicationId) };
   }
 
+  /**
+   * Register an image upload, PUT the bytes, and return the asset URN.
+   *
+   * LinkedIn's flow is three calls, not one. The previous version performed
+   * only the `registerUpload` call and returned the asset, so the post was
+   * created referencing an asset that had no bytes behind it — LinkedIn accepts
+   * the post and then renders a broken image, which is worse than an explicit
+   * failure because nothing in the queue goes red.
+   *
+   * The bytes are read back from our own public media URL, which is the same
+   * URL already handed to Facebook, so no new trust boundary is introduced.
+   */
   private async uploadImage(token: string, orgId: string, media: { url: string; contentType: string }, urn: string) {
-    // Register an image upload and return the asset URN.
     void orgId;
     const res = await providerFetch(`${this.baseUrl}/v2/assets?action=registerUpload`, {
       method: "POST",
@@ -157,10 +173,39 @@ export class LinkedInPublishingAdapter implements PublishingProviderPort {
     if (res.status >= 400) throw new ProviderError(this.mapError(res.status, res.body, ""));
     const value = (res.body as { value?: { asset?: string; uploadUrl?: string } })?.value;
     if (!value?.asset) throw new ProviderError(normalizeError("INVALID_MEDIA", "LinkedIn did not return an upload asset", null));
-    // Note: the actual binary upload to value.uploadUrl is omitted here —
-    // requires streaming the media bytes. Surface as a domain validation error
-    // rather than silently skipping the image.
+    if (!value.uploadUrl) throw new ProviderError(normalizeError("INVALID_MEDIA", "LinkedIn did not return an image upload URL", null));
+    await this.putImageBytes(value.uploadUrl, media);
     return { asset: value.asset };
+  }
+
+  /**
+   * The pre-signed upload URL must be called with the raw bytes and no
+   * Authorization header — it carries its own signature, and sending the
+   * bearer token to a pre-signed host would leak the org credential.
+   */
+  private async putImageBytes(uploadUrl: string, media: { url: string; contentType: string }): Promise<void> {
+    const fetched = await fetch(media.url, { signal: AbortSignal.timeout(LINKEDIN_MEDIA_FETCH_TIMEOUT_MS) });
+    if (!fetched.ok) {
+      throw new ProviderError(normalizeError("INVALID_MEDIA", `could not read image bytes (HTTP ${fetched.status})`, null));
+    }
+    const bytes = Buffer.from(await fetched.arrayBuffer());
+    if (bytes.byteLength === 0) throw new ProviderError(normalizeError("INVALID_MEDIA", "image is empty", null));
+    // LinkedIn rejects anything over 10 MB for a feedshare image. Fail here
+    // rather than letting the upload return an opaque 422.
+    if (bytes.byteLength > LINKEDIN_MAX_IMAGE_BYTES) {
+      throw new ProviderError(
+        normalizeError("INVALID_MEDIA", `image is ${Math.round(bytes.byteLength / 1024 / 1024)} MB; LinkedIn allows 10 MB`, null),
+      );
+    }
+    const put = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": media.contentType },
+      body: bytes,
+      signal: AbortSignal.timeout(LINKEDIN_MEDIA_FETCH_TIMEOUT_MS),
+    });
+    if (!put.ok) {
+      throw new ProviderError(normalizeError("UNKNOWN_PROVIDER_ERROR", `LinkedIn rejected the image upload (HTTP ${put.status})`, null));
+    }
   }
 
   private postUrl(id: string): string {

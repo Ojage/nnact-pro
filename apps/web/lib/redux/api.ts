@@ -40,6 +40,9 @@ import type {
   ContentCategoryDTO,
   ContentItemDTO,
   ContentMediaDTO,
+  ContentMediaFacetsDTO,
+  ContentMediaQuery,
+  MediaUseFor,
   ContentVersionDTO,
   PublicationAttemptDTO,
   PublishingConnectionDTO,
@@ -1214,8 +1217,60 @@ export const apiSlice = createApi({
       },
       invalidatesTags: ["Content"],
     }),
-    patchContentMedia: builder.mutation<ContentMediaDTO, { id: string; data: { altText?: string | null; caption?: string | null; approvedForMarketing?: boolean } }>({
+    patchContentMedia: builder.mutation<ContentMediaDTO, { id: string; data: { altText?: string | null; caption?: string | null; approvedForMarketing?: boolean; useFor?: MediaUseFor; tags?: string[]; archived?: boolean } }>({
       query: ({ id, data }) => ({ url: `/api/content/media/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: (r, _e, arg) => [{ type: "Content", id: arg.id }, "Content"],
+    }),
+
+    // ── Image gallery ──
+    // Every gallery read is parameterised so the filter bar can drive the grid
+    // server-side. The old `contentMedia` query above stays for the small
+    // media strip inside the content editor, which wants everything at once.
+    mediaGallery: builder.query<ContentMediaDTO[], ContentMediaQuery>({
+      query: (q) => {
+        const params = new URLSearchParams();
+        if (q.useFor) params.set("useFor", q.useFor);
+        if (q.source) params.set("source", q.source);
+        if (q.tags?.length) params.set("tags", q.tags.join(","));
+        if (q.search) params.set("search", q.search);
+        if (q.archived !== undefined) params.set("archived", String(q.archived));
+        if (q.limit !== undefined) params.set("limit", String(q.limit));
+        if (q.offset !== undefined) params.set("offset", String(q.offset));
+        const qs = params.toString();
+        return { url: `/api/content/media${qs ? `?${qs}` : ""}` };
+      },
+      // The grid is a filtered view, so the id-based tag cannot keep it honest
+      // on its own — any label change has to refetch.
+      providesTags: ["Content"],
+    }),
+    mediaFacets: builder.query<ContentMediaFacetsDTO, Pick<ContentMediaQuery, "useFor" | "tags" | "search" | "source" | "archived">>({
+      query: (q) => {
+        const params = new URLSearchParams();
+        if (q.useFor) params.set("useFor", q.useFor);
+        if (q.source) params.set("source", q.source);
+        if (q.tags?.length) params.set("tags", q.tags.join(","));
+        if (q.search) params.set("search", q.search);
+        if (q.archived !== undefined) params.set("archived", String(q.archived));
+        const qs = params.toString();
+        return { url: `/api/content/media/facets${qs ? `?${qs}` : ""}` };
+      },
+      providesTags: ["Content"],
+    }),
+    /** Gallery dropzone: label while uploading so nothing lands unlabelled. */
+    uploadGalleryMedia: builder.mutation<ContentMediaDTO, { file: File; useFor?: MediaUseFor; tags?: string[]; altText?: string }>({
+      query: ({ file, useFor, tags, altText }) => {
+        const body = new FormData();
+        body.append("file", file);
+        if (useFor) body.append("useFor", useFor);
+        if (tags?.length) body.append("tags", tags.join(","));
+        if (altText) body.append("altText", altText);
+        return { url: "/api/content/media", method: "POST", body };
+      },
+      invalidatesTags: ["Content"],
+    }),
+    /** One labelling change applied to many assets — the gallery's multi-select. */
+    bulkLabelContentMedia: builder.mutation<{ updated: number; items: ContentMediaDTO[] }, { ids: string[]; useFor?: MediaUseFor; tags?: string[]; archived?: boolean }>({
+      query: ({ ids, ...data }) => ({ url: "/api/content/media", method: "PATCH", body: { ids, ...data } }),
       invalidatesTags: ["Content"],
     }),
 
@@ -2357,6 +2412,10 @@ export const {
   useContentMediaQuery,
   useUploadContentMediaMutation,
   usePatchContentMediaMutation,
+  useMediaGalleryQuery,
+  useMediaFacetsQuery,
+  useUploadGalleryMediaMutation,
+  useBulkLabelContentMediaMutation,
   useContentPublicationsQuery,
   useRetryPublicationMutation,
   usePublicationAttemptsQuery,

@@ -147,6 +147,10 @@ export interface AiCandidateMedia {
   altText: string | null;
   usageCount: number;
   lastUsed: string | null;
+  /** Which kind of automated post this asset was labelled for; null = any. */
+  useFor: string | null;
+  /** Free-form subject tags set by the operator in the gallery. */
+  tags: string[];
 }
 
 export interface MediaContext {
@@ -158,10 +162,13 @@ export interface MediaContext {
 export async function buildMediaContext(orgId: string, publicApiBaseUrl: string, imageGeneratorsAvailable: boolean): Promise<MediaContext> {
   const base = (publicApiBaseUrl ?? "").replace(/\/$/, "");
   const [org] = await db.select({ logoUrl: orgs.logoUrl }).from(orgs).where(eq(orgs.id, orgId)).limit(1);
+  // Archived assets are excluded here as well as in the gallery, so an operator
+  // who archives an asset stops the automation reaching for it on the very next
+  // slot rather than only noticing in the UI.
   const rows = await db
     .select()
     .from(contentMedia)
-    .where(and(eq(contentMedia.orgId, orgId), eq(contentMedia.approvedForMarketing, true)))
+    .where(and(eq(contentMedia.orgId, orgId), eq(contentMedia.approvedForMarketing, true), eq(contentMedia.archived, false)))
     .orderBy(desc(contentMedia.aiUsageCount), desc(contentMedia.createdAt))
     .limit(MAX_MEDIA_LIST);
   const approved: AiCandidateMedia[] = rows.map((row) => ({
@@ -172,6 +179,8 @@ export async function buildMediaContext(orgId: string, publicApiBaseUrl: string,
     altText: row.altText,
     usageCount: row.aiUsageCount ?? 0,
     lastUsed: row.aiLastUsedAt ? row.aiLastUsedAt.toISOString() : null,
+    useFor: row.useFor ?? null,
+    tags: row.tags ?? [],
   }));
   return { approved, logoUrl: (org?.logoUrl ?? null)?.replace(/^https?:\/\//, "") ?? null, canGenerateImages: imageGeneratorsAvailable };
 }

@@ -133,6 +133,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Marketing",
     links: [
       { href: "/content", label: "Content Studio", icon: "✎", tour: "nav-content" },
+      { href: "/content/gallery", label: "Image Gallery", icon: "▣", tour: "nav-gallery" },
       { href: "/publications", label: "Publications", icon: "⇪", tour: "nav-publications" },
       { href: "/connections", label: "Channels", icon: "⇄", tour: "nav-connections" },
       { href: "/ai", label: "AI Content Automation", icon: "✳", tour: "nav-ai" },

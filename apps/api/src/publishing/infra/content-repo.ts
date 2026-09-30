@@ -1,6 +1,7 @@
 // Content repository — DB access + DTO mapping for Content Studio.
 // All org-scoped. Mappers convert drizzle rows to the shared DTO shapes.
-import { and, asc, count, desc, eq, ilike, or } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { and, arrayContains, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@nnact/db";
 import {
   channelVariants,
@@ -11,7 +12,15 @@ import {
   contentTags,
   contentVersions,
 } from "@nnact/db";
-import type { ContentItemDTO, ContentMediaDTO, ContentVersionDTO, ChannelVariantDTO, ContentCategoryDTO } from "@nnact/shared";
+import type {
+  ContentItemDTO,
+  ContentMediaDTO,
+  ContentMediaFacetsDTO,
+  ContentMediaQuery,
+  ContentVersionDTO,
+  ChannelVariantDTO,
+  ContentCategoryDTO,
+} from "@nnact/shared";
 
 function iso(v: Date | null | undefined): string | undefined {
   return v ? v.toISOString() : undefined;
@@ -299,22 +308,130 @@ export async function listTags(orgId: string): Promise<{ id: string; orgId: stri
 }
 
 // ── Media ──
-export async function listMedia(orgId: string): Promise<ContentMediaDTO[]> {
-  const rows = await db.select().from(contentMedia).where(eq(contentMedia.orgId, orgId)).orderBy(desc(contentMedia.createdAt));
-  return rows.map((r) => ({
-    id: r.id,
-    orgId: r.orgId,
-    storageKey: r.storageKey,
-    contentType: r.contentType,
-    fileName: r.fileName,
-    altText: r.altText,
-    caption: r.caption,
-    approvedForMarketing: r.approvedForMarketing,
-    source: r.source,
-    photoId: r.photoId,
-    uploadedBy: r.uploadedBy,
-    createdAt: iso(r.createdAt) ?? "",
-  }));
+/**
+ * Public, unauthenticated URL for an asset. The gallery renders this directly
+ * and it is the same URL handed to social providers at publish time.
+ */
+export function mediaUrl(publicApiBaseUrl: string, mediaId: string): string {
+  return `${publicApiBaseUrl.replace(/\/$/, "")}/api/v1/public/media/${mediaId}`;
+}
+
+type MediaRow = typeof contentMedia.$inferSelect;
+
+/**
+ * The gallery needs an absolute URL, which the row does not carry, so the base
+ * has to be threaded in. Every media read goes through here rather than
+ * re-spelling the shape — the DTO previously had three copies of this mapper
+ * and they had already drifted.
+ */
+export function toMediaDTO(row: MediaRow, publicApiBaseUrl: string): ContentMediaDTO {
+  return {
+    id: row.id,
+    orgId: row.orgId,
+    storageKey: row.storageKey,
+    contentType: row.contentType,
+    fileName: row.fileName,
+    altText: row.altText,
+    caption: row.caption,
+    approvedForMarketing: row.approvedForMarketing,
+    source: row.source,
+    photoId: row.photoId,
+    uploadedBy: row.uploadedBy,
+    createdAt: iso(row.createdAt) ?? "",
+    url: mediaUrl(publicApiBaseUrl, row.id),
+    useFor: (row.useFor as ContentMediaDTO["useFor"]) ?? null,
+    tags: row.tags ?? [],
+    archived: row.archived,
+    aiPrompt: row.aiPrompt,
+    aiUsageCount: row.aiUsageCount ?? 0,
+    aiLastUsedAt: iso(row.aiLastUsedAt) ?? null,
+  };
+}
+
+const MEDIA_PAGE_MAX = 200;
+
+/**
+ * Build the WHERE clause for the gallery. Kept separate from the query so
+ * `mediaFacets` can count against the same org/scope without duplicating rules.
+ */
+function mediaFilters(orgId: string, query: ContentMediaQuery): SQL[] {
+  const clauses: SQL[] = [eq(contentMedia.orgId, orgId)];
+  if (query.archived !== undefined) clauses.push(eq(contentMedia.archived, query.archived));
+  else clauses.push(eq(contentMedia.archived, false)); // the gallery hides archived by default
+  if (query.source) clauses.push(eq(contentMedia.source, query.source));
+  if (query.useFor === "ANY") {
+    // "Any" is the unlabelled-but-general bucket, which is exactly a NULL label.
+    clauses.push(isNull(contentMedia.useFor));
+  } else if (query.useFor) {
+    clauses.push(eq(contentMedia.useFor, query.useFor));
+  }
+  if (query.tags?.length) {
+    // AND across the requested tags: an operator filtering on ["ac", "hvac"]
+    // wants assets carrying both subjects.
+    for (const tag of query.tags) clauses.push(arrayContains(contentMedia.tags, [tag]));
+  }
+  const search = query.search?.trim();
+  if (search) {
+    const needle = `%${search.toLowerCase()}%`;
+    const searchable = sql`lower(coalesce(${contentMedia.fileName}, '') || ' ' || coalesce(${contentMedia.altText}, '') || ' ' || coalesce(${contentMedia.caption}, '') || ' ' || coalesce(${contentMedia.aiPrompt}, ''))`;
+    clauses.push(sql`${searchable} like ${needle}`);
+  }
+  return clauses;
+}
+
+export async function listMedia(orgId: string, publicApiBaseUrl: string, query: ContentMediaQuery = {}): Promise<ContentMediaDTO[]> {
+  const limit = Math.min(Math.max(query.limit ?? 60, 1), MEDIA_PAGE_MAX);
+  const offset = Math.max(query.offset ?? 0, 0);
+  const rows = await db
+    .select()
+    .from(contentMedia)
+    .where(and(...mediaFilters(orgId, query)))
+    .orderBy(desc(contentMedia.createdAt))
+    .limit(limit)
+    .offset(offset);
+  return rows.map((r) => toMediaDTO(r, publicApiBaseUrl));
+}
+
+export async function countMedia(orgId: string, query: ContentMediaQuery = {}): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(contentMedia)
+    .where(and(...mediaFilters(orgId, query)));
+  return row?.n ?? 0;
+}
+
+/**
+ * Counts for the gallery filter bar. Computed over the whole non-archived org
+ * set so the counts stay stable while the operator narrows down, which is how
+ * Google Photos behaves — the chips do not renumber themselves mid-filter.
+ */
+export async function mediaFacets(orgId: string): Promise<ContentMediaFacetsDTO> {
+  const rows = await db
+    .select({
+      useFor: contentMedia.useFor,
+      source: contentMedia.source,
+      tags: contentMedia.tags,
+    })
+    .from(contentMedia)
+    .where(and(eq(contentMedia.orgId, orgId), eq(contentMedia.archived, false)));
+  const byUseFor: Record<string, number> = {};
+  const bySource: Record<string, number> = {};
+  const byTag = new Map<string, number>();
+  let unlabelled = 0;
+  for (const row of rows) {
+    const label = row.useFor ?? "ANY";
+    byUseFor[label] = (byUseFor[label] ?? 0) + 1;
+    if (!row.useFor) unlabelled += 1;
+    if (row.source) bySource[row.source] = (bySource[row.source] ?? 0) + 1;
+    for (const tag of row.tags ?? []) byTag.set(tag, (byTag.get(tag) ?? 0) + 1);
+  }
+  return {
+    total: rows.length,
+    byUseFor,
+    bySource,
+    byTag: [...byTag.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag)),
+    unlabelled,
+  };
 }
 
 export async function createMediaRecord(input: {
@@ -326,7 +443,10 @@ export async function createMediaRecord(input: {
   source?: string | null;
   approvedForMarketing?: boolean;
   photoId?: string | null;
-}): Promise<ContentMediaDTO> {
+  useFor?: string | null;
+  tags?: string[];
+  aiPrompt?: string | null;
+}, publicApiBaseUrl: string): Promise<ContentMediaDTO> {
   const [row] = await db
     .insert(contentMedia)
     .values({
@@ -338,45 +458,66 @@ export async function createMediaRecord(input: {
       source: input.source ?? null,
       approvedForMarketing: input.approvedForMarketing ?? false,
       photoId: input.photoId ?? null,
+      // "ANY" is a UI-facing spelling of "no specific label"; store NULL so the
+      // two stay distinguishable and the migration default needs no backfill.
+      useFor: input.useFor && input.useFor !== "ANY" ? input.useFor : null,
+      tags: input.tags ?? [],
+      aiPrompt: input.aiPrompt ?? null,
     })
     .returning();
-  return {
-    id: row.id,
-    orgId: row.orgId,
-    storageKey: row.storageKey,
-    contentType: row.contentType,
-    fileName: row.fileName,
-    altText: row.altText,
-    caption: row.caption,
-    approvedForMarketing: row.approvedForMarketing,
-    source: row.source,
-    photoId: row.photoId,
-    uploadedBy: row.uploadedBy,
-    createdAt: iso(row.createdAt) ?? "",
-  };
+  return toMediaDTO(row, publicApiBaseUrl);
 }
 
-export async function patchMediaMeta(orgId: string, id: string, input: { altText?: string | null; caption?: string | null; approvedForMarketing?: boolean }): Promise<ContentMediaDTO | null> {
+export async function patchMediaMeta(
+  orgId: string,
+  id: string,
+  input: {
+    altText?: string | null;
+    caption?: string | null;
+    approvedForMarketing?: boolean;
+    useFor?: string | null;
+    tags?: string[];
+    archived?: boolean;
+  },
+  publicApiBaseUrl: string,
+): Promise<ContentMediaDTO | null> {
+  const set: Partial<MediaRow> = { updatedAt: new Date() };
+  if (input.altText !== undefined) set.altText = input.altText;
+  if (input.caption !== undefined) set.caption = input.caption;
+  if (input.approvedForMarketing !== undefined) set.approvedForMarketing = input.approvedForMarketing;
+  if (input.useFor !== undefined) set.useFor = input.useFor && input.useFor !== "ANY" ? input.useFor : null;
+  if (input.tags !== undefined) set.tags = input.tags;
+  if (input.archived !== undefined) set.archived = input.archived;
   const [row] = await db
     .update(contentMedia)
-    .set({ ...input, updatedAt: new Date() })
+    .set(set)
     .where(and(eq(contentMedia.orgId, orgId), eq(contentMedia.id, id)))
     .returning();
-  if (!row) return null;
-  return {
-    id: row.id,
-    orgId: row.orgId,
-    storageKey: row.storageKey,
-    contentType: row.contentType,
-    fileName: row.fileName,
-    altText: row.altText,
-    caption: row.caption,
-    approvedForMarketing: row.approvedForMarketing,
-    source: row.source,
-    photoId: row.photoId,
-    uploadedBy: row.uploadedBy,
-    createdAt: iso(row.createdAt) ?? "",
-  };
+  return row ? toMediaDTO(row, publicApiBaseUrl) : null;
+}
+
+/**
+ * Apply one labelling change to many assets at once, for the gallery's
+ * multi-select. Labels only, deliberately: bulk-editing bytes or alt text is
+ * what makes an "apply to 40 items" action dangerous.
+ */
+export async function bulkLabelMedia(
+  orgId: string,
+  ids: string[],
+  input: { useFor?: string | null; tags?: string[]; archived?: boolean },
+  publicApiBaseUrl: string,
+): Promise<ContentMediaDTO[]> {
+  if (ids.length === 0) return [];
+  const set: Partial<MediaRow> = { updatedAt: new Date() };
+  if (input.useFor !== undefined) set.useFor = input.useFor && input.useFor !== "ANY" ? input.useFor : null;
+  if (input.tags !== undefined) set.tags = input.tags;
+  if (input.archived !== undefined) set.archived = input.archived;
+  const rows = await db
+    .update(contentMedia)
+    .set(set)
+    .where(and(eq(contentMedia.orgId, orgId), inArray(contentMedia.id, ids)))
+    .returning();
+  return rows.map((r) => toMediaDTO(r, publicApiBaseUrl));
 }
 
 // ── Channel variants ──

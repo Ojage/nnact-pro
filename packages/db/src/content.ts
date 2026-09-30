@@ -116,6 +116,19 @@ export const contentMedia = pgTable(
     caption: text("caption"),
     approvedForMarketing: boolean("approved_for_marketing").default(false).notNull(),
     source: text("source"),
+    // Gallery labels. `useFor` mirrors the content taxonomy the automation
+    // planner already emits (ARTICLE / MAINTENANCE_TIP / FIELD_STORY); NULL
+    // means "any post", which is also the state of every row uploaded before
+    // labelling existed. `tags` are free-form subject hints used as a second,
+    // weaker matching signal. `archived` removes an asset from the gallery and
+    // from automation selection without deleting bytes that published content
+    // may still reference.
+    useFor: text("use_for"),
+    tags: text("tags").array().default([]).notNull(),
+    archived: boolean("archived").default(false).notNull(),
+    // Retained for AI-generated assets so the gallery can show what an image
+    // was generated from. Previously the prompt was discarded after the call.
+    aiPrompt: text("ai_prompt"),
     photoId: uuid("photo_id"),
     uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
     aiUsageCount: integer("ai_usage_count").default(0).notNull(),
@@ -126,6 +139,11 @@ export const contentMedia = pgTable(
   },
   (t) => ({
     orgIdx: index("content_media_org_idx").on(t.orgId),
+    // Serves the gallery's default "newest, not archived" listing.
+    galleryIdx: index("content_media_gallery_idx").on(t.orgId, t.archived, t.createdAt),
+    useForIdx: index("content_media_use_for_idx").on(t.orgId, t.useFor),
+    // GIN so a subject-tag filter is a containment probe rather than a scan.
+    tagsIdx: index("content_media_tags_idx").using("gin", t.tags),
   }),
 );
 

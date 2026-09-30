@@ -49,6 +49,14 @@ export interface SaveContentMediaInput {
   source?: string | null;
   approvedForMarketing?: boolean;
   uploadedBy?: string | null;
+  /** Gallery label: which kind of automated post this asset illustrates. */
+  useFor?: string | null;
+  /** Alt text. Social platforms index it and Instagram has no caption field. */
+  altText?: string | null;
+  /** Free-form subject tags, lower-confidence matching signal. */
+  tags?: string[];
+  /** Only set for `ai_generated`: the prompt the image was built from. */
+  aiPrompt?: string | null;
 }
 
 export async function saveContentMedia(
@@ -111,6 +119,12 @@ export async function saveContentMedia(
         source: input.source ?? null,
         approvedForMarketing: input.approvedForMarketing ?? false,
         uploadedBy: input.uploadedBy ?? null,
+        // "ANY" is how the UI spells "no specific label"; store NULL so it stays
+        // distinguishable from a labelled asset and needs no backfill.
+        useFor: input.useFor && input.useFor !== "ANY" ? input.useFor : null,
+        tags: input.tags ?? [],
+        altText: input.altText ?? null,
+        aiPrompt: input.aiPrompt ?? null,
       })
       .returning();
     return record;

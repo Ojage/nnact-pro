@@ -6,7 +6,8 @@ import multipart from "@fastify/multipart";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, channelPublications, contentItems } from "@nnact/db";
-import { CONTENT_TYPES, CONTENT_VISIBILITY } from "@nnact/shared";
+import { CONTENT_TYPES, CONTENT_VISIBILITY, MEDIA_USE_FOR } from "@nnact/shared";
+import type { ContentMediaQuery } from "@nnact/shared";
 import type { JwtClaims, StaffJwtClaims } from "../auth.js";
 import { isStaffClaims } from "../auth.js";
 import { resolveOrgId } from "./org.js";
@@ -22,7 +23,9 @@ import {
   ensureTags,
   listTags,
   listMedia,
-  createMediaRecord,
+  countMedia,
+  mediaFacets,
+  bulkLabelMedia,
   patchMediaMeta,
   getVariants,
   upsertVariant,
@@ -41,6 +44,21 @@ import { saveContentMedia } from "../content-media.js";
 
 function publicApiBase() {
   return process.env.PUBLIC_API_URL ?? process.env.PUBLIC_WEB_URL ?? "http://localhost:3003";
+}
+
+/**
+ * Tags are free-form, so they arrive from an operator typing whatever they
+ * liked. Lower-case, trim, drop blanks and de-duplicate, so "AC", " ac " and
+ * "Ac" are one tag and the GIN containment filter in listMedia actually
+ * matches what the operator sees in the UI.
+ */
+function normaliseTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  for (const raw of tags) {
+    const tag = raw.trim().toLowerCase();
+    if (tag) seen.add(tag);
+  }
+  return [...seen].slice(0, 30);
 }
 
 /** Return the authenticated staff user id, or null (dev/compat). */
@@ -92,7 +110,9 @@ const publishSchema = z.object({
 
 export async function contentRoutes(app: FastifyInstance) {
   await app.register(multipart, {
-    limits: { files: 1, fileSize: 60 * 1024 * 1024, fields: 0 },
+    // files: 1 because the handler writes a single stream; fields is raised
+    // from 0 so the gallery can send useFor/tags/altText with the binary.
+    limits: { files: 1, fileSize: 60 * 1024 * 1024, fields: 8, fieldSize: 64 * 1024 },
   });
 
   const registry = defaultRegistry();
@@ -340,12 +360,24 @@ export async function contentRoutes(app: FastifyInstance) {
   });
 
   // ── Media ──
+  /**
+   * Accepts one file plus optional labelling fields. `fields: 0` in the
+   * multipart registration is raised to 8 because the gallery's dropzone sends
+   * `useFor` and `tags` alongside the binary so an operator can label during
+   * upload instead of having to open every asset afterwards.
+   */
   app.post("/media", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const actorId = await staffUser(req);
     try {
       const file = await req.file();
       if (!file) return reply.code(400).send({ error: "no file uploaded" });
+      const fields = file.fields as Record<string, { value?: unknown }>;
+      const tags = Array.isArray(fields.tags?.value)
+        ? (fields.tags.value as string[])
+        : typeof fields.tags?.value === "string" && fields.tags.value
+          ? [fields.tags.value]
+          : [];
       const record = await saveContentMedia({
         orgId,
         stream: file.file,
@@ -353,6 +385,9 @@ export async function contentRoutes(app: FastifyInstance) {
         source: "manual",
         approvedForMarketing: true,
         uploadedBy: actorId,
+        useFor: typeof fields.useFor?.value === "string" ? fields.useFor.value : null,
+        altText: typeof fields.altText?.value === "string" ? fields.altText.value : null,
+        tags: normaliseTags(tags),
       });
       return reply.code(201).send(record);
     } catch (err) {
@@ -363,17 +398,88 @@ export async function contentRoutes(app: FastifyInstance) {
 
   app.get("/media", async (req) => {
     const orgId = await resolveOrgId(req);
-    return listMedia(orgId);
+    const q = req.query as Record<string, string | undefined>;
+    return listMedia(orgId, publicApiBase(), {
+      useFor: (q.useFor as ContentMediaQuery["useFor"]) ?? undefined,
+      source: (q.source as ContentMediaQuery["source"]) ?? undefined,
+      // Comma-separated so the UI can pass a multi-tag filter without an array
+      // query-param convention that Fastify does not give us for free.
+      tags: q.tags ? q.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+      search: q.search,
+      archived: q.archived === undefined ? undefined : q.archived === "true",
+      limit: q.limit ? Number(q.limit) : undefined,
+      offset: q.offset ? Number(q.offset) : undefined,
+    });
+  });
+
+  /**
+   * Counts for the gallery filter bar, computed over the unfiltered set so the
+   * chips do not renumber themselves mid-filter, plus how many assets the
+   * caller's current filter actually matches for the "showing N of M" footer.
+   */
+  app.get("/media/facets", async (req) => {
+    const orgId = await resolveOrgId(req);
+    const q = req.query as Record<string, string | undefined>;
+    const query: ContentMediaQuery = {
+      useFor: (q.useFor as ContentMediaQuery["useFor"]) ?? undefined,
+      source: (q.source as ContentMediaQuery["source"]) ?? undefined,
+      tags: q.tags ? q.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+      search: q.search,
+      archived: q.archived === undefined ? undefined : q.archived === "true",
+    };
+    const [facets, filtered] = await Promise.all([mediaFacets(orgId), countMedia(orgId, query)]);
+    return { ...facets, filtered };
+  });
+
+  /** Apply one labelling change to many assets — the gallery's multi-select. */
+  app.patch("/media", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const body = z
+      .object({
+        ids: z.array(z.string().uuid()).min(1).max(500),
+        useFor: z.enum(MEDIA_USE_FOR).optional(),
+        tags: z.array(z.string().max(40)).max(30).optional(),
+        archived: z.boolean().optional(),
+      })
+      .parse(req.body);
+    const updated = await bulkLabelMedia(
+      orgId,
+      body.ids,
+      {
+        useFor: body.useFor === undefined ? undefined : body.useFor === "ANY" ? null : body.useFor,
+        tags: body.tags === undefined ? undefined : normaliseTags(body.tags),
+        archived: body.archived,
+      },
+      publicApiBase(),
+    );
+    return { updated: updated.length, items: updated };
   });
 
   app.patch<{ Params: { id: string } }>("/media/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const body = z.object({ altText: z.string().max(500).optional().nullable(), caption: z.string().max(1000).optional().nullable(), approvedForMarketing: z.boolean().optional() }).parse(req.body);
-    const updated = await patchMediaMeta(orgId, req.params.id, {
-      altText: body.altText,
-      caption: body.caption,
-      approvedForMarketing: body.approvedForMarketing,
-    });
+    const body = z
+      .object({
+        altText: z.string().max(500).optional().nullable(),
+        caption: z.string().max(1000).optional().nullable(),
+        approvedForMarketing: z.boolean().optional(),
+        useFor: z.enum(MEDIA_USE_FOR).optional(),
+        tags: z.array(z.string().max(40)).max(30).optional(),
+        archived: z.boolean().optional(),
+      })
+      .parse(req.body);
+    const updated = await patchMediaMeta(
+      orgId,
+      req.params.id,
+      {
+        altText: body.altText,
+        caption: body.caption,
+        approvedForMarketing: body.approvedForMarketing,
+        useFor: body.useFor === undefined ? undefined : body.useFor === "ANY" ? null : body.useFor,
+        tags: body.tags === undefined ? undefined : normaliseTags(body.tags),
+        archived: body.archived,
+      },
+      publicApiBase(),
+    );
     if (!updated) return reply.code(404).send({ error: "media not found" });
     return updated;
   });

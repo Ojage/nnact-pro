@@ -1,3 +1,5 @@
+import type { AiBriefContentType } from "./content.js";
+
 // Autonomous AI content automation — shared domain types.
 // These are deliberately thin DTOs: they cross the API boundary (admin UI) and
 // the worker boundary (state machine). Provider SDK DTOs never appear here.
@@ -187,7 +189,7 @@ export interface ContentBriefDTO {
   angle: string;
   audience: string;
   serviceCategory: string;
-  contentType: "ARTICLE" | "MAINTENANCE_TIP" | "FIELD_STORY";
+  contentType: AiBriefContentType;
   primaryMessage: string;
   cta: string;
   desiredLength: number;
