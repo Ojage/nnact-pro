@@ -42,6 +42,18 @@ const SECRETARY_WRITE_PREFIXES = [
   "/api/equipment",
 ];
 
+/**
+ * Content automation configuration and the subscriber list. These were absent
+ * from every list below, so any staff role — including technician — could write
+ * AI provider API keys, flip automation to AUTO_PUBLISH_WITH_GUARDRAILS,
+ * trigger runs, and export every subscriber's email, name and phone. The web nav
+ * already treated them as owner-only; this makes the API agree.
+ */
+const OWNER_AUTOMATION_WRITE_PREFIXES = [
+  "/api/ai",
+  "/api/newsletter",
+];
+
 export function requiredRolesForRequest(method: string, rawUrl: string): UserRole[] | null {
   const rawPath = rawUrl.split("?")[0] ?? rawUrl;
   // Normalize versioned prefixes so role guards apply identically to the
@@ -63,6 +75,9 @@ export function requiredRolesForRequest(method: string, rawUrl: string): UserRol
   }
 
   if (OWNER_ONLY_WRITE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+    return ["owner"];
+  }
+  if (OWNER_AUTOMATION_WRITE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
     return ["owner"];
   }
   if (SECRETARY_WRITE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {

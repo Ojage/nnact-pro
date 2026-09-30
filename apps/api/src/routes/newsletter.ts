@@ -1,8 +1,9 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { and, eq, desc, ilike, or, sql } from "drizzle-orm";
 import { db, newsletterSubscribers } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
+import { verifiedClaims } from "../operational-authorization.js";
 
 const querySchema = z.object({
   skip: z.string().optional().transform((v) => (v ? parseInt(v, 10) : 0)),
@@ -26,8 +27,22 @@ function buildConditions(orgId: string, search?: string, status?: string) {
 }
 
 export async function newsletterAdminRoutes(app: FastifyInstance) {
+  // Both reads below return subscriber PII (email, name, phone) and the nav
+  // treats /newsletter as owner-only, so they are gated explicitly here rather
+  // than relying on the blanket write guard, which skips GET requests.
+  const requireOwner = async (req: FastifyRequest, reply: FastifyReply) => {
+    const claims = await verifiedClaims(req, reply);
+    if (!claims) return null;
+    if (claims.role !== "owner") {
+      reply.code(403).send({ error: "only owners can manage newsletter subscribers" });
+      return null;
+    }
+    return claims;
+  };
+
   // List newsletter subscribers with pagination, search, and filter
-  app.get("/", async (req) => {
+  app.get("/", async (req, reply) => {
+    if (!(await requireOwner(req, reply)) || reply.sent) return;
     const orgId = await resolveOrgId(req);
     const { skip, take, search, status } = querySchema.parse(req.query);
     const where = buildConditions(orgId, search, status);
@@ -50,6 +65,7 @@ export async function newsletterAdminRoutes(app: FastifyInstance) {
 
   // Export all subscribers as CSV
   app.get("/export", async (req, reply) => {
+    if (!(await requireOwner(req, reply)) || reply.sent) return;
     const orgId = await resolveOrgId(req);
     const { search, status } = querySchema.parse(req.query);
     const where = buildConditions(orgId, search, status);

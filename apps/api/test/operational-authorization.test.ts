@@ -125,3 +125,34 @@ test("growth and outreach writes are restricted to owner and dispatcher", () => 
   // Reads are gated in the route handlers (growth/access.ts), not here.
   assert.equal(requiredRolesForRequest("GET", "/api/growth/prospects"), null);
 });
+
+test("content automation config and subscriber writes are owner-only", () => {
+  // AI provider credentials, automation mode, and manual triggers.
+  assert.deepEqual(requiredRolesForRequest("PUT", "/api/ai/settings"), ["owner"]);
+  assert.deepEqual(requiredRolesForRequest("PUT", "/api/ai/providers/openai"), ["owner"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/ai/providers/openai/probe"), ["owner"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/ai/trigger"), ["owner"]);
+  // Subscriber list and per-subscriber status changes.
+  assert.deepEqual(requiredRolesForRequest("PATCH", "/api/newsletter/sub-1"), ["owner"]);
+  // Same guards on the versioned prefix.
+  assert.deepEqual(requiredRolesForRequest("PUT", "/api/v1/ai/settings"), ["owner"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/v1/ai/trigger"), ["owner"]);
+  // Query strings must not bypass the prefix match.
+  assert.deepEqual(requiredRolesForRequest("PUT", "/api/ai/settings?force=true"), ["owner"]);
+});
+
+test("content pipeline writes keep their narrower owner/dispatcher role set", () => {
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/content"), ["owner", "dispatcher"]);
+  assert.deepEqual(requiredRolesForRequest("PATCH", "/api/content/content-1"), ["owner", "dispatcher"]);
+  assert.deepEqual(requiredRolesForRequest("POST", "/api/content/publications/pub-1/retry"), ["owner", "dispatcher"]);
+});
+
+test("read-only automation inspection is not blocked by the write guard", () => {
+  // Reads are authorized in the handlers / blanket guard, which skips GET, so a
+  // non-owner dispatcher may still see run history. Only mutation is restricted.
+  assert.equal(requiredRolesForRequest("GET", "/api/ai/runs"), null);
+  assert.equal(requiredRolesForRequest("GET", "/api/ai/settings"), null);
+  // The public newsletter subscribe endpoint is a different prefix and must
+  // stay open so site visitors are not required to be staff.
+  assert.equal(requiredRolesForRequest("POST", "/api/public/newsletter/subscribe"), null);
+});
