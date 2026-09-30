@@ -1,0 +1,31 @@
+diff -ruN package.orig/dist/commonjs/index.d.ts package/dist/commonjs/index.d.ts
+--- a/dist/commonjs/index.d.ts
++++ b/dist/commonjs/index.d.ts
+@@ -9,4 +9,5 @@
+     maxRewrites?: number;
+ };
+ export declare function expand(str: string, options?: BraceExpansionOptions): string[];
++export default expand;
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
+diff -ruN package.orig/dist/commonjs/index.js package/dist/commonjs/index.js
+--- a/dist/commonjs/index.js
++++ b/dist/commonjs/index.js
+@@ -330,4 +330,6 @@
+     }
+     return acc;
+ }
++// Preserve the callable CommonJS contract used by 1.x/2.x consumers.
++module.exports = Object.assign(expand, exports);
+ //# sourceMappingURL=index.js.map
+\ No newline at end of file
+diff -ruN package.orig/dist/esm/index.d.ts package/dist/esm/index.d.ts
+--- a/dist/esm/index.d.ts
++++ b/dist/esm/index.d.ts
+@@ -9,4 +9,5 @@
+     maxRewrites?: number;
+ };
+ export declare function expand(str: string, options?: BraceExpansionOptions): string[];
++export default expand;
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
