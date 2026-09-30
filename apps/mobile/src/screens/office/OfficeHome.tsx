@@ -46,9 +46,24 @@ export function OfficeHome({
   onRefresh: () => void;
   onOpenNotifications: () => void;
   onOpenJob: (jobId: string) => void;
-  nav: {
-    push: (route: { name: "dispatch" } | { name: "customers" } | { name: "billing" } | { name: "jobs" } | { name: "plans" } | { name: "finance" } | { name: "team" } | { name: "settings" } | { name: "reports" }) => void;
-  };
+    nav: {
+      push: (
+        route:
+          | { name: "dispatch" }
+          | { name: "customers" }
+          | { name: "billing" }
+          | { name: "jobs" }
+          | { name: "plans" }
+          | { name: "finance" }
+          | { name: "team" }
+          | { name: "settings" }
+          | { name: "reports" }
+          | { name: "content" }
+          | { name: "contentDeliveries" }
+          | { name: "contentAutomation" }
+          | { name: "newsletter" },
+      ) => void;
+    };
 }) {
   const styles = createStyles(colors);
   const [estimates, setEstimates] = useState<OfficeEstimate[]>([]);
@@ -219,6 +234,34 @@ export function OfficeHome({
               </View>
               <Text style={styles.areaTitle}>Reports</Text>
               <Text style={styles.areaSubtitle}>Revenue, AR, conversion & more</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.areaCard} onPress={() => nav.push({ name: "content" })} activeOpacity={0.85}>
+              <View style={[styles.areaIcon, { backgroundColor: colors.primaryAlpha }]}>
+                <Ionicons name="document-text-outline" size={22} color={colors.primary} />
+              </View>
+              <Text style={styles.areaTitle}>Content Studio</Text>
+              <Text style={styles.areaSubtitle}>Draft, approve & publish</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.areaCard} onPress={() => nav.push({ name: "contentDeliveries" })} activeOpacity={0.85}>
+              <View style={[styles.areaIcon, { backgroundColor: colors.primaryAlpha }]}>
+                <Ionicons name="send-outline" size={22} color={colors.primary} />
+              </View>
+              <Text style={styles.areaTitle}>Deliveries</Text>
+              <Text style={styles.areaSubtitle}>Channel status & retries</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.areaCard} onPress={() => nav.push({ name: "contentAutomation" })} activeOpacity={0.85}>
+              <View style={[styles.areaIcon, { backgroundColor: colors.primaryAlpha }]}>
+                <Ionicons name="sparkles-outline" size={22} color={colors.primary} />
+              </View>
+              <Text style={styles.areaTitle}>Automation</Text>
+              <Text style={styles.areaSubtitle}>AI guardrails & triggers</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.areaCard} onPress={() => nav.push({ name: "newsletter" })} activeOpacity={0.85}>
+              <View style={[styles.areaIcon, { backgroundColor: colors.primaryAlpha }]}>
+                <Ionicons name="mail-outline" size={22} color={colors.primary} />
+              </View>
+              <Text style={styles.areaTitle}>Subscribers</Text>
+              <Text style={styles.areaSubtitle}>Newsletter audience</Text>
             </TouchableOpacity>
           </View>
         </>

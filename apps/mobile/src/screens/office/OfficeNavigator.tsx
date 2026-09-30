@@ -15,6 +15,8 @@ import { FinanceScreen } from "./Finance";
 import { TeamScreen } from "./Team";
 import { BusinessSettingsScreen } from "./BusinessSettings";
 import { ReportsScreen } from "./Reports";
+import { ContentStudioScreen, ContentDetailScreen } from "./ContentStudio";
+import { ContentPublicationsScreen, ContentAutomationScreen, NewsletterScreen } from "./ContentOps";
 
 export type OfficeRoute =
   | { name: "home" }
@@ -30,7 +32,12 @@ export type OfficeRoute =
   | { name: "finance" }
   | { name: "team" }
   | { name: "settings" }
-  | { name: "reports" };
+  | { name: "reports" }
+  | { name: "content" }
+  | { name: "contentItem"; contentId: string }
+  | { name: "contentDeliveries" }
+  | { name: "contentAutomation" }
+  | { name: "newsletter" };
 
 export function OfficeNavigator({
   colors,
@@ -99,6 +106,17 @@ export function OfficeNavigator({
       {route.name === "team" ? <TeamScreen colors={colors} session={session} nav={nav} /> : null}
       {route.name === "settings" ? <BusinessSettingsScreen colors={colors} session={session} nav={nav} /> : null}
       {route.name === "reports" ? <ReportsScreen colors={colors} session={session} nav={nav} /> : null}
+      {route.name === "content" ? (
+        <ContentStudioScreen
+          colors={colors}
+          session={session}
+          nav={{ push: (next) => nav.push({ name: "contentItem", contentId: next.contentId }) }}
+        />
+      ) : null}
+      {route.name === "contentItem" ? <ContentDetailScreen colors={colors} session={session} contentId={route.contentId} nav={nav} /> : null}
+      {route.name === "contentDeliveries" ? <ContentPublicationsScreen colors={colors} session={session} nav={nav} /> : null}
+      {route.name === "contentAutomation" ? <ContentAutomationScreen colors={colors} session={session} nav={nav} /> : null}
+      {route.name === "newsletter" ? <NewsletterScreen colors={colors} session={session} nav={nav} /> : null}
     </View>
   );
 }

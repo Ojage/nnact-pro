@@ -27,6 +27,21 @@ import type {
   ReimbursementDTO,
   SupplierBillDTO,
 } from "@nnact/shared";
+import type {
+  AiAutomationSettingsDTO,
+  AiRunDTO,
+  AiSlot,
+  ChannelPublicationDTO,
+  ChannelPublicationStatus,
+  ChannelVariantDTO,
+  ContentItemDTO,
+  ContentSeoMetadata,
+  ContentStatus,
+  ContentType,
+  ContentVersionDTO,
+  ContentVisibility,
+  PublishingChannel,
+} from "@nnact/shared";
 
 // ── Local DTOs (mirror apps/web/lib/api.ts; kept out of shared intentionally) ──
 
@@ -618,6 +633,219 @@ export function reimbursementAction(
   return staffFetch<ReimbursementDTO>(session, `/api/finance/reimbursements/${id}/${action}`, {
     method: "POST",
     body: JSON.stringify(body ?? {}),
+  });
+}
+
+// ── Content automation (owner-managed) ──
+// Mirrors the web Content Studio (/content, /content/[id], /publications) and
+// the owner-only /newsletter and /ai surfaces. Rich-text authoring stays on the
+// web (BlockNote); mobile manages the lifecycle, per-channel copy, and delivery
+// status, which is what field owners actually need away from a desk.
+
+export interface ContentListResult {
+  items: ContentItemDTO[];
+  total: number;
+}
+
+export interface ContentDetailResult extends ContentItemDTO {
+  variants: ChannelVariantDTO[];
+  versions: ContentVersionDTO[];
+  publications: ChannelPublicationDTO[];
+}
+
+export interface ContentListFilters {
+  skip?: number;
+  take?: number;
+  status?: ContentStatus | "";
+  type?: ContentType | "";
+  search?: string;
+}
+
+export interface ContentWriteInput {
+  title?: string;
+  summary?: string | null;
+  body?: string;
+  type?: ContentType;
+  visibility?: ContentVisibility;
+  language?: string;
+  categoryId?: string | null;
+  tagIds?: string[];
+  seo?: Partial<ContentSeoMetadata>;
+}
+
+function contentQuery(filters: ContentListFilters): string {
+  const params = new URLSearchParams();
+  if (filters.skip !== undefined) params.set("skip", String(filters.skip));
+  if (filters.take !== undefined) params.set("take", String(filters.take));
+  if (filters.status) params.set("status", filters.status);
+  if (filters.type) params.set("type", filters.type);
+  if (filters.search) params.set("search", filters.search);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export function listContent(session: StoredStaffSession, filters: ContentListFilters = {}): Promise<ContentListResult> {
+  return staffFetch<ContentListResult>(session, `/api/content${contentQuery(filters)}`);
+}
+
+export function getContent(session: StoredStaffSession, id: string): Promise<ContentDetailResult> {
+  return staffFetch<ContentDetailResult>(session, `/api/content/${id}`);
+}
+
+export function createContent(session: StoredStaffSession, body: ContentWriteInput): Promise<ContentItemDTO> {
+  return staffFetch<ContentItemDTO>(session, "/api/content", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateContent(session: StoredStaffSession, id: string, body: ContentWriteInput): Promise<ContentItemDTO> {
+  return staffFetch<ContentItemDTO>(session, `/api/content/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+function contentAction(session: StoredStaffSession, id: string, action: string, body?: Record<string, unknown>) {
+  return staffFetch<ContentItemDTO>(session, `/api/content/${id}/${action}`, {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+/** DRAFT/REJECTED -> IN_REVIEW. */
+export function submitContentForReview(session: StoredStaffSession, id: string) {
+  return contentAction(session, id, "submit-review");
+}
+
+/** Owner-only. IN_REVIEW -> APPROVED. */
+export function approveContent(session: StoredStaffSession, id: string) {
+  return contentAction(session, id, "approve");
+}
+
+/** Owner-only. IN_REVIEW -> REJECTED, with an optional editor reason. */
+export function rejectContent(session: StoredStaffSession, id: string, reason?: string) {
+  return contentAction(session, id, "reject", reason ? { reason } : undefined);
+}
+
+/** Owner-only. Pass scheduledAt to queue instead of publishing immediately. */
+export function publishContent(session: StoredStaffSession, id: string, channels?: PublishingChannel[], scheduledAt?: string) {
+  return contentAction(session, id, "publish", {
+    channels,
+    scheduledAt: scheduledAt ?? null,
+  });
+}
+
+/** Owner-only. PUBLISHED/SCHEDULED -> ARCHIVED with an optional public notice. */
+export function unpublishContent(session: StoredStaffSession, id: string, reason?: string) {
+  return contentAction(session, id, "unpublish", reason ? { reason } : undefined);
+}
+
+/** Per-channel copy. Mobile is the natural place to author captions/hashtags. */
+export function saveChannelVariant(
+  session: StoredStaffSession,
+  id: string,
+  channel: PublishingChannel,
+  variant: {
+    enabled?: boolean;
+    titleOverride?: string | null;
+    bodyOverride?: string | null;
+    caption?: string | null;
+    linkBehavior?: string | null;
+    hashtags?: string[];
+  },
+): Promise<ChannelVariantDTO> {
+  return staffFetch<ChannelVariantDTO>(session, `/api/content/${id}/variants/${channel}`, {
+    method: "PUT",
+    body: JSON.stringify(variant),
+  });
+}
+
+export function listPublications(
+  session: StoredStaffSession,
+  filters: { skip?: number; take?: number; status?: ChannelPublicationStatus | "" } = {},
+): Promise<{ items: ChannelPublicationDTO[]; total: number }> {
+  const params = new URLSearchParams();
+  if (filters.skip !== undefined) params.set("skip", String(filters.skip));
+  if (filters.take !== undefined) params.set("take", String(filters.take));
+  if (filters.status) params.set("status", filters.status);
+  const qs = params.toString();
+  return staffFetch<{ items: ChannelPublicationDTO[]; total: number }>(session, `/api/content/publications${qs ? `?${qs}` : ""}`);
+}
+
+export function retryPublication(session: StoredStaffSession, publicationId: string): Promise<ChannelPublicationDTO> {
+  return staffFetch<ChannelPublicationDTO>(session, `/api/content/publications/${publicationId}/retry`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export interface NewsletterSubscriberDTO {
+  id: string;
+  email: string;
+  name?: string | null;
+  phone?: string | null;
+  status: "subscribed" | "unsubscribed" | "bounced";
+  source?: string | null;
+  channels?: string[] | null;
+  verifiedAt?: string | null;
+  unsubscribedAt?: string | null;
+  createdAt: string;
+}
+
+/** Owner-only: returns subscriber PII, so the API gates the read as well. */
+export function listNewsletterSubscribers(
+  session: StoredStaffSession,
+  filters: { skip?: number; take?: number; search?: string; status?: NewsletterSubscriberDTO["status"] | "" } = {},
+): Promise<{ subscribers: NewsletterSubscriberDTO[]; total: number }> {
+  const params = new URLSearchParams();
+  if (filters.skip !== undefined) params.set("skip", String(filters.skip));
+  if (filters.take !== undefined) params.set("take", String(filters.take));
+  if (filters.search) params.set("search", filters.search);
+  if (filters.status) params.set("status", filters.status);
+  const qs = params.toString();
+  return staffFetch<{ subscribers: NewsletterSubscriberDTO[]; total: number }>(session, `/api/newsletter${qs ? `?${qs}` : ""}`);
+}
+
+export function updateNewsletterSubscriber(
+  session: StoredStaffSession,
+  id: string,
+  status: NewsletterSubscriberDTO["status"],
+): Promise<NewsletterSubscriberDTO> {
+  return staffFetch<NewsletterSubscriberDTO>(session, `/api/newsletter/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+/** Owner-only: flip automation mode / kill switch. */
+export function getAiSettings(session: StoredStaffSession): Promise<AiAutomationSettingsDTO> {
+  return staffFetch<AiAutomationSettingsDTO>(session, "/api/ai/settings");
+}
+
+export function updateAiSettings(session: StoredStaffSession, body: Partial<AiAutomationSettingsDTO>): Promise<AiAutomationSettingsDTO> {
+  return staffFetch<AiAutomationSettingsDTO>(session, "/api/ai/settings", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listAiRuns(
+  session: StoredStaffSession,
+  filters: { take?: number; state?: string } = {},
+): Promise<{ items: AiRunDTO[]; total: number }> {
+  const params = new URLSearchParams();
+  if (filters.take !== undefined) params.set("take", String(filters.take));
+  if (filters.state) params.set("state", filters.state);
+  const qs = params.toString();
+  return staffFetch<{ items: AiRunDTO[]; total: number }>(session, `/api/ai/runs${qs ? `?${qs}` : ""}`);
+}
+
+/** Owner-only: run a slot now. */
+export function triggerAiRun(session: StoredStaffSession, slot: AiSlot): Promise<{ accepted: boolean; runId?: string }> {
+  return staffFetch<{ accepted: boolean; runId?: string }>(session, "/api/ai/trigger", {
+    method: "POST",
+    body: JSON.stringify({ slot }),
   });
 }
 

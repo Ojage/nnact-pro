@@ -14,7 +14,7 @@ export function OfficeHeader({
   colors: Palette;
   eyebrow?: string;
   title: string;
-  subtitle?: string;
+  subtitle?: string | null;
   onBack?: () => void;
 }) {
   const styles = createStyles(colors);
@@ -201,6 +201,7 @@ export function ActionButton({
   onPress,
   tone = "default",
   style,
+  disabled = false,
 }: {
   colors: Palette;
   label: string;
@@ -208,6 +209,7 @@ export function ActionButton({
   onPress: () => void;
   tone?: "default" | "primary" | "success" | "warning" | "danger";
   style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
 }) {
   const styles = createStyles(colors);
   const bg =
@@ -232,9 +234,10 @@ export function ActionButton({
             : colors.foreground;
   return (
     <TouchableOpacity
-      style={[styles.actionBtn, { backgroundColor: bg }, style]}
+      style={[styles.actionBtn, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }, style]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={disabled ? 1 : 0.8}
+      disabled={disabled}
     >
       {icon ? <Ionicons name={icon} size={15} color={fg} /> : null}
       <Text style={[styles.actionBtnText, { color: fg }]}>{label}</Text>
