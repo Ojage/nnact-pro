@@ -25,6 +25,7 @@ import type {
   VisionAnalysisResult,
   WeeklyDigestDTO,
 } from "@nnact/shared";
+import { AI_RUN_STATES } from "@nnact/shared";
 import type { DecryptedProviderConfig, SlotSchedule } from "./domain.js";
 
 /** Text completion provider (OpenAI/Anthropic-compatible or Grok). */
@@ -105,12 +106,41 @@ export interface AiRunStorePort {
   updateRun(orgId: string, runId: string, patch: Partial<AiRunDTO>): Promise<AiRunDTO>;
   /** Claim a run for execution; returns false if concurrently executing. */
   claimRun(orgId: string, runId: string): Promise<boolean>;
-  /** Bump the attempt counter + reset to PLANNING for resumed runs. */
-  markAttempt(orgId: string, runId: string): Promise<void>;
+  /**
+   * Bump the attempt counter + reset to PLANNING for a run whose slot was
+   * claimed synchronously by the request path. Returns false when the run is
+   * not in a claimable state, so it acts as the same gate as `claimRun` — an
+   * unconditional update here resurrects completed runs and lets two callers
+   * execute one slot.
+   */
+  markAttempt(orgId: string, runId: string): Promise<boolean>;
+  /**
+   * Force a run back to a claimable state. Backs the operator Cancel and Retry
+   * actions and the stale-run sweep, which is the only way out of a run stranded
+   * mid-flight by a process crash (see CLAIMABLE_RUN_STATES).
+   */
+  resetRun(orgId: string, runId: string, to: "NEEDS_ATTENTION" | "SCHEDULED" | "FAILED", error?: string | null): Promise<boolean>;
   listRuns(query: AiRunListQuery): Promise<{ items: AiRunDTO[]; total: number }>;
   listScheduledRuns(orgId: string): Promise<AiRunDTO[]>;
   recentRuns(orgId: string, since: Date): Promise<AiRunDTO[]>;
+  /** Runs stuck in a non-terminal state since before the cutoff (crash sweep). */
+  listStaleRuns(cutoff: Date): Promise<AiRunDTO[]>;
 }
+
+/** States a run never leaves on its own. */
+export const TERMINAL_RUN_STATES = ["PUBLISHED", "PARTIALLY_PUBLISHED", "FAILED", "CANCELLED"] as const;
+
+/** States that may be picked up for execution. Mirrors the claimRun WHERE clause. */
+export const CLAIMABLE_RUN_STATES = ["SCHEDULED", "NEEDS_ATTENTION", "FAILED"] as const;
+
+/**
+ * Work-in-progress states: a run only leaves one of these by finishing or by a
+ * crash. Derived from AI_RUN_STATES so a new pipeline stage cannot be added
+ * without the stale sweep and operator Cancel learning about it.
+ */
+export const WIP_RUN_STATES = AI_RUN_STATES.filter(
+  (s) => !TERMINAL_RUN_STATES.includes(s as never) && !CLAIMABLE_RUN_STATES.includes(s as never),
+);
 
 export interface AiUsageStorePort {
   record(orgId: string, input: {

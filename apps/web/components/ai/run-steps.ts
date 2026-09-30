@@ -19,18 +19,46 @@ export const AI_PIPELINE_STEPS: AiPipelineStep[] = [
   { state: "CREATING_CONTENT", label: "Saving to Content Studio" },
   { state: "PUBLISHING_WEBSITE", label: "Publishing to website" },
   { state: "PUBLISHING_LINKEDIN", label: "Publishing to LinkedIn" },
+  { state: "PUBLISHING_FACEBOOK", label: "Publishing to Facebook" },
 ];
 
-export const TERMINAL_STATES: AiRunState[] = ["PUBLISHED", "PARTIALLY_PUBLISHED", "NEEDS_ATTENTION", "FAILED"];
+export const TERMINAL_STATES: AiRunState[] = ["PUBLISHED", "PARTIALLY_PUBLISHED", "NEEDS_ATTENTION", "FAILED", "CANCELLED"];
 
 export const ACTIVE_RUN_STATES = new Set<AiRunState>(AI_PIPELINE_STEPS.map((s) => s.state));
+
+/**
+ * How long a run may sit in a pipeline state without advancing before the UI
+ * stops calling it "live". The backend sweeps these to FAILED after 20 minutes;
+ * this is deliberately shorter so the tray tells the truth sooner rather than
+ * showing a dead run as a live generation.
+ */
+export const STRANDED_AFTER_MS = 10 * 60_000;
 
 export function isActiveRun(run: AiRunDTO): boolean {
   return ACTIVE_RUN_STATES.has(run.state);
 }
 
+/** Active in state, but nothing has touched it long enough to be a lost worker. */
+export function isStrandedRun(run: AiRunDTO, now = Date.now()): boolean {
+  if (!isActiveRun(run)) return false;
+  const last = run.updatedAt ?? run.startedAt ?? run.createdAt;
+  if (!last) return true;
+  const ts = Date.parse(last);
+  if (!Number.isFinite(ts)) return true;
+  return now - ts > STRANDED_AFTER_MS;
+}
+
 export function isTerminalRun(run: AiRunDTO): boolean {
   return TERMINAL_STATES.includes(run.state);
+}
+
+/** Runs an operator can act on: stuck mid-flight, or finished unsuccessfully. */
+export function canCancelRun(run: AiRunDTO): boolean {
+  return isActiveRun(run);
+}
+
+export function canRetryRun(run: AiRunDTO): boolean {
+  return run.state === "FAILED" || run.state === "NEEDS_ATTENTION" || run.state === "CANCELLED";
 }
 
 export function pipelineStepIndex(state: AiRunState): number {
@@ -75,7 +103,9 @@ export function terminalMessage(run: AiRunDTO): string {
     case "NEEDS_ATTENTION":
       return "Needs attention — will retry on the next sweep";
     case "FAILED":
-      return "Failed after retries";
+      return run.error ?? "Failed after retries";
+    case "CANCELLED":
+      return "Cancelled";
     default:
       return run.state;
   }
@@ -83,7 +113,7 @@ export function terminalMessage(run: AiRunDTO): string {
 
 export function terminalTone(run: AiRunDTO): "ok" | "warn" | "err" {
   if (run.state === "PUBLISHED" || run.state === "PARTIALLY_PUBLISHED") return "ok";
-  if (run.state === "NEEDS_ATTENTION") return "warn";
+  if (run.state === "NEEDS_ATTENTION" || run.state === "CANCELLED") return "warn";
   return "err";
 }
 

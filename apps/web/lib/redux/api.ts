@@ -1306,6 +1306,14 @@ aiHealth: builder.query<Record<string, unknown>, void>({
       query: (body) => ({ url: "/api/ai/trigger", method: "POST", body }),
       invalidatesTags: ["Ai"],
     }),
+    cancelAiRun: builder.mutation<{ id: string; state: string }, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({ url: `/api/ai/runs/${id}/cancel`, method: "POST", body: { reason } }),
+      invalidatesTags: ["Ai"],
+    }),
+    retryAiRun: builder.mutation<{ runId: string; state: string }, string>({
+      query: (id) => ({ url: `/api/ai/runs/${id}/retry`, method: "POST" }),
+      invalidatesTags: ["Ai"],
+    }),
     aiUsage: builder.query<AiUsageAnalyticsPayload, void>({
       query: () => "/api/ai/usage",
       providesTags: ["Ai"],
@@ -2359,6 +2367,8 @@ export const {
   useValidateConnectionMutation,
   useSelectChannelPageMutation,
   useAiSettingsQuery,
+  useCancelAiRunMutation,
+  useRetryAiRunMutation,
   useUpdateAiSettingsMutation,
   useAiProvidersQuery,
   useSaveAiProviderMutation,

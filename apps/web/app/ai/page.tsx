@@ -10,6 +10,7 @@ import {
   useAiHealthQuery,
   useAiRunsQuery,
   useTriggerAiRunMutation,
+  useRetryAiRunMutation,
   useAiUsageQuery,
   usePublishingConnectionsQuery,
 } from "@/lib/redux/api";
@@ -25,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { FormSelect } from "@/components/ui/form-select";
 import { RunProgress } from "@/components/ai/run-progress";
-import { isActiveRun } from "@/components/ai/run-steps";
+import { canRetryRun, isActiveRun } from "@/components/ai/run-steps";
 import { BudgetMeter, UsageTrendChart } from "@/components/ai/usage/usage-charts";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -64,6 +65,7 @@ export default function AiPage() {
   const [saveProvider] = useSaveAiProviderMutation();
   const [probe, probeState] = useProbeAiProviderMutation();
   const [triggerRun, triggerState] = useTriggerAiRunMutation();
+  const [retryRun, retryState] = useRetryAiRunMutation();
 
   const [form, setForm] = useState<AiAutomationSettingsDTO | null>(null);
   const [keys, setKeys] = useState<Record<string, string>>({});
@@ -134,6 +136,16 @@ export default function AiPage() {
       setMessage({ kind: "ok", text: `Run ${res.runId.slice(0, 8)} queued — watch it live in the tray (bottom right).` });
     } catch (err) {
       setMessage({ kind: "err", text: explainRtkError(err, "Failed to trigger run") });
+    }
+  };
+
+  const onRetry = async (runId: string) => {
+    setMessage(null);
+    try {
+      const res = await retryRun(runId).unwrap();
+      setMessage({ kind: "ok", text: `Retrying run ${runId.slice(0, 8)} — now ${res.state}.` });
+    } catch (err) {
+      setMessage({ kind: "err", text: explainRtkError(err, "Failed to retry run") });
     }
   };
 
@@ -399,7 +411,12 @@ export default function AiPage() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {run.error && <p className="max-w-[240px] truncate text-xs text-red" title={run.error}>{run.error}</p>}
-                  <Badge className={cn("border-transparent", isActiveRun(run) ? "bg-blue/10 text-blue" : run.state === "PUBLISHED" || run.state === "PARTIALLY_PUBLISHED" ? "bg-green/10 text-green" : run.state === "NEEDS_ATTENTION" ? "bg-amber/10 text-amber" : "bg-red/10 text-red")}>{run.state}</Badge>
+                  {canRetryRun(run) && (
+                    <Button size="sm" variant="secondary" loading={retryState.isLoading} onClick={() => onRetry(run.id)}>
+                      Retry
+                    </Button>
+                  )}
+                  <Badge className={cn("border-transparent", isActiveRun(run) ? "bg-blue/10 text-blue" : run.state === "PUBLISHED" || run.state === "PARTIALLY_PUBLISHED" ? "bg-green/10 text-green" : run.state === "NEEDS_ATTENTION" || run.state === "CANCELLED" ? "bg-amber/10 text-amber" : "bg-red/10 text-red")}>{run.state}</Badge>
                 </div>
               </div>
             ))}

@@ -6,10 +6,11 @@
 // always attempted first; LinkedIn is best-effort and degrades to a partial.
 import { and, asc, eq } from "drizzle-orm";
 import { db, aiContentAutomation, users } from "@nnact/db";
-import type { AiAutomationSettingsDTO, AiSlot, AiProviderId, AiRunState } from "@nnact/shared";
+import type { AiAutomationSettingsDTO, AiSlot, AiProviderId, AiRunDTO, AiRunState } from "@nnact/shared";
 import { AI_PROVIDERS } from "@nnact/shared";
 import { AiProviderRegistry, settingsOrder } from "./registry.js";
 import type { AiAutomationRuntimePorts, AiRunStorePort, LogoCompositorPort } from "./ports.js";
+import { TERMINAL_RUN_STATES, WIP_RUN_STATES } from "./ports.js";
 import { dueSlots, nextSlot, hashValue, type SlotSchedule } from "./domain.js";
 import { buildArticlePrompt } from "./prompts.js";
 import { planSlot } from "./planner.js";
@@ -36,6 +37,13 @@ const SOCIAL_RUN_STATE: Record<AutomationSocialChannel, AiRunState> = {
   LINKEDIN: "PUBLISHING_LINKEDIN",
   FACEBOOK: "PUBLISHING_FACEBOOK",
 };
+
+/**
+ * How long a work-in-progress run may go untouched before it is presumed
+ * orphaned. Comfortably longer than a slow image generation, since a false
+ * positive would mark a healthy run FAILED underneath the worker.
+ */
+const STRANDED_RUN_MINUTES = 20;
 
 /**
  * Did this social channel actually publish?
@@ -202,8 +210,33 @@ export class AutomationEngine {
       await this.executeIteration(orgId, settings, schedule);
       executedCount += 1;
     }
+    await this.sweepStrandedRuns(orgId, now);
     await this.attemptCatchUp(orgId, settings, now);
     return { executedCount };
+  }
+
+  /**
+   * Rescue runs abandoned in a work-in-progress state.
+   *
+   * A run only leaves PLANNING/GENERATING_TEXT/… by finishing, so anything still
+   * in one long after its last update lost its executor — a crashed worker, a
+   * deploy mid-run, an OOM kill. Those rows were previously unclaimable *and*
+   * had no operator control, so they sat in the UI looking like live
+   * generations forever. FAILED is both terminal for the operator and in
+   * CLAIMABLE_RUN_STATES, which is what makes "Retry" work afterwards.
+   */
+  private async sweepStrandedRuns(orgId: string, now: Date): Promise<void> {
+    const cutoff = new Date(now.getTime() - STRANDED_RUN_MINUTES * 60_000);
+    for (const run of await this.deps.runs.listStaleRuns(cutoff)) {
+      if (run.orgId !== orgId) continue;
+      await this.deps.runs.resetRun(orgId, run.id, "FAILED", "worker stopped mid-run; the run was recovered automatically");
+      await this.deps.notifications.inform("slot_failed", {
+        slot: run.slot,
+        isoDate: run.scheduledDate ?? now.toISOString().slice(0, 10),
+        error: "worker stopped mid-run; recovered automatically",
+        level: "error",
+      });
+    }
   }
 
   private async budgetOK(orgId: string, settings: AiAutomationSettingsDTO): Promise<boolean> {
@@ -287,12 +320,70 @@ export class AutomationEngine {
     return { runId: run.id, state: run.state };
   }
 
+  /**
+   * Operator Cancel. Marks the run CANCELLED, which is terminal and *not*
+   * claimable, so neither the scheduler nor catch-up will pick it up again.
+   * Only meaningful while the run is in flight or stranded.
+   */
+  async cancelRun(orgId: string, runId: string, reason = "cancelled by operator"): Promise<AiRunDTO> {
+    const run = await this.deps.runs.getRun(orgId, runId);
+    if (!run) throw paramError("run not found");
+    if (run.state === "PUBLISHED" || run.state === "PARTIALLY_PUBLISHED") {
+      throw paramError("this run already published; disconnect the channel instead of cancelling");
+    }
+    if (TERMINAL_RUN_STATES.includes(run.state as never)) {
+      throw paramError(`run is already ${run.state.toLowerCase()}`);
+    }
+    await this.deps.runs.updateRun(orgId, runId, { state: "CANCELLED", error: reason, completedAt: this.deps.now().toISOString() });
+    await this.deps.notifications.inform("slot_failed", { slot: run.slot, isoDate: run.scheduledDate ?? "", error: reason, level: "error" });
+    return (await this.deps.runs.getRun(orgId, runId))!;
+  }
+
+  /**
+   * Operator Retry. Returns a failed/cancelled/stranded run to a claimable state
+   * and re-executes it through the same gate the scheduler uses, so it cannot
+   * double-run against a slot that is already in flight.
+   *
+   * Returns as soon as the run is re-armed; the pipeline continues on the event
+   * loop, exactly like `runNowQueued`. Awaiting a full generation here would
+   * hold the HTTP request open for minutes and time out the operator's click.
+   */
+  async retryRun(orgId: string, runId: string): Promise<{ runId: string; state: string }> {
+    const run = await this.deps.runs.getRun(orgId, runId);
+    if (!run) throw paramError("run not found");
+    if (run.state === "PUBLISHED" || run.state === "PARTIALLY_PUBLISHED") {
+      throw paramError("this run already published");
+    }
+    if (WIP_RUN_STATES.includes(run.state as never)) {
+      throw paramError("this run is still executing; cancel it first if it is stuck");
+    }
+    const settings = await this.deps.settings.get(orgId);
+    if (this.deps.settings.killSwitchActive()) throw paramError("global kill switch is active (AI_AUTOPUBLISH_DISABLED)");
+    if (!settings.enabled) throw paramError("AI automation is disabled in settings");
+    await this.deps.runs.resetRun(orgId, runId, "SCHEDULED", null);
+    const schedule: SlotSchedule = {
+      isoDate: run.scheduledDate ?? this.deps.now().toISOString().slice(0, 10),
+      slot: run.slot,
+      dueAt: this.deps.now(),
+    };
+    setImmediate(() => {
+      this.executeIteration(orgId, settings, schedule).catch(() => {
+        /* executeIteration persists the failure; the tray picks it up on poll */
+      });
+    });
+    return { runId, state: "SCHEDULED" };
+  }
+
   private async executeIteration(orgId: string, settings: AiAutomationSettingsDTO, schedule: SlotSchedule, preClaimedRun?: NonNullable<Awaited<ReturnType<AiRunStorePort["getRun"]>>>): Promise<void> {
     let run = preClaimedRun ?? (await this.deps.runs.ensureRun(orgId, schedule));
     if (preClaimedRun) {
-      await this.deps.runs.markAttempt(orgId, run.id);
-      const resumed = await this.deps.runs.getRun(orgId, run.id);
-      if (resumed) run = resumed;
+      // Same gate as claimRun. Returning early here is what stops a finished run
+      // being dragged back to PLANNING by a second "Generate now" or by the
+      // worker's catch-up sweep.
+      const resumed = await this.deps.runs.markAttempt(orgId, run.id);
+      if (!resumed) return;
+      const fresh = await this.deps.runs.getRun(orgId, run.id);
+      if (fresh) run = fresh;
     } else {
       const claimed = await this.deps.runs.claimRun(orgId, run.id);
       if (!claimed) return; // another process owns this slot

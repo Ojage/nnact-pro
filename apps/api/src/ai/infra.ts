@@ -2,7 +2,7 @@
 // rest), automation settings (auto-seeded defaults), generation runs, usage
 // metering, the reserve pool, and prompt templates. These are the only concrete
 // ports in the AI context that touch the database.
-import { and, asc, count, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { db } from "@nnact/db";
 import {
   aiContentAutomation,
@@ -38,6 +38,11 @@ import type {
   AiUsageStorePort,
   ReserveItemDTO,
 } from "./ports.js";
+import { CLAIMABLE_RUN_STATES, TERMINAL_RUN_STATES, WIP_RUN_STATES } from "./ports.js";
+
+function claimableState() {
+  return inArray(aiGenerationRuns.state, [...CLAIMABLE_RUN_STATES]);
+}
 
 function iso(v: Date | string | null | undefined): string | undefined {
   if (!v) return undefined;
@@ -335,16 +340,41 @@ export class DbRunStore implements AiRunStorePort {
     const [row] = await db
       .update(aiGenerationRuns)
       .set({ state: "PLANNING", startedAt: new Date(), attempts: sql`${aiGenerationRuns.attempts} + 1`, updatedAt: new Date() })
-      .where(and(eq(aiGenerationRuns.orgId, orgId), eq(aiGenerationRuns.id, runId), or(eq(aiGenerationRuns.state, "SCHEDULED"), eq(aiGenerationRuns.state, "NEEDS_ATTENTION"), eq(aiGenerationRuns.state, "FAILED"))))
+      .where(and(eq(aiGenerationRuns.orgId, orgId), eq(aiGenerationRuns.id, runId), claimableState()))
       .returning({ id: aiGenerationRuns.id });
     return Boolean(row);
   }
 
-  async markAttempt(orgId: string, runId: string): Promise<void> {
-    await db
+  async markAttempt(orgId: string, runId: string): Promise<boolean> {
+    // Same guard as claimRun. Without it this UPDATE matched on id alone, so it
+    // flipped finished runs back to PLANNING and let a second caller execute a
+    // slot that was already in flight — one production run reached 90 attempts
+    // this way and never reached a state the operator could clear.
+    const [row] = await db
       .update(aiGenerationRuns)
       .set({ state: "PLANNING", startedAt: new Date(), attempts: sql`${aiGenerationRuns.attempts} + 1`, updatedAt: new Date() })
-      .where(and(eq(aiGenerationRuns.orgId, orgId), eq(aiGenerationRuns.id, runId)));
+      .where(and(eq(aiGenerationRuns.orgId, orgId), eq(aiGenerationRuns.id, runId), claimableState()))
+      .returning({ id: aiGenerationRuns.id });
+    return Boolean(row);
+  }
+
+  async resetRun(orgId: string, runId: string, to: "NEEDS_ATTENTION" | "SCHEDULED" | "FAILED", error?: string | null): Promise<boolean> {
+    const [row] = await db
+      .update(aiGenerationRuns)
+      .set({ state: to, error: error ?? null, completedAt: null, updatedAt: new Date() })
+      .where(and(eq(aiGenerationRuns.orgId, orgId), eq(aiGenerationRuns.id, runId), inArray(aiGenerationRuns.state, [...TERMINAL_RUN_STATES, ...WIP_RUN_STATES])))
+      .returning({ id: aiGenerationRuns.id });
+    return Boolean(row);
+  }
+
+  async listStaleRuns(cutoff: Date): Promise<AiRunDTO[]> {
+    const rows = await db
+      .select()
+      .from(aiGenerationRuns)
+      .where(and(inArray(aiGenerationRuns.state, [...WIP_RUN_STATES]), lt(aiGenerationRuns.updatedAt, cutoff)))
+      .orderBy(asc(aiGenerationRuns.updatedAt))
+      .limit(50);
+    return rows.map(toRunDTO);
   }
 
   async listRuns(query: AiRunListQuery): Promise<{ items: AiRunDTO[]; total: number }> {

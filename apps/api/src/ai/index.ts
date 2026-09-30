@@ -122,6 +122,30 @@ export async function aiRoutes(app: FastifyInstance) {
     return run;
   });
 
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>("/runs/:id/cancel", async (req, reply) => {
+    if (!(await staffGate(req, reply))) return;
+    const orgId = await resolveOrgId(req);
+    try {
+      const run = await engine.cancelRun(orgId, req.params.id, req.body?.reason);
+      return reply.code(200).send({ id: run.id, state: run.state });
+    } catch (error) {
+      const err = error as Error & { statusCode?: number };
+      return reply.code(err.statusCode ?? 422).send({ error: err.message });
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/runs/:id/retry", async (req, reply) => {
+    if (!(await staffGate(req, reply))) return;
+    const orgId = await resolveOrgId(req);
+    try {
+      const outcome = await engine.retryRun(orgId, req.params.id);
+      return reply.code(202).send({ ...outcome, async: true });
+    } catch (error) {
+      const err = error as Error & { statusCode?: number };
+      return reply.code(err.statusCode ?? 422).send({ error: err.message });
+    }
+  });
+
   app.post("/trigger", async (req, reply) => {
     if (!(await staffGate(req, reply))) return;
     const orgId = await resolveOrgId(req);

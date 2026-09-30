@@ -169,6 +169,7 @@ export const AI_RUN_STATES = [
   "PARTIALLY_PUBLISHED",
   "NEEDS_ATTENTION",
   "FAILED",
+  "CANCELLED",
 ] as const;
 export type AiRunState = (typeof AI_RUN_STATES)[number];
 
