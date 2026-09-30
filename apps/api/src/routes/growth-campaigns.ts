@@ -140,14 +140,17 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
     const purpose = z.enum(GROWTH_CAMPAIGN_PURPOSE).safeParse(q.purpose);
     if (purpose.success) conditions.push(eq(growthCampaigns.purpose, purpose.data));
 
-    const campaigns = await db
+    // Bare array, not `{ campaigns }`: the web types this endpoint as
+    // GrowthCampaignDTO[] and every sibling list route (/prospects, /senders,
+    // /suppressions) already returns a bare array. The envelope here made
+    // `(campaigns ?? []).map` throw "map is not a function" on the list page.
+    return db
       .select()
       .from(growthCampaigns)
       .where(and(...conditions))
       .orderBy(desc(growthCampaigns.createdAt))
       .limit(limit)
       .offset(offset);
-    return { campaigns };
   });
 
   app.get("/campaigns/:id", async (req, reply) => {
@@ -495,7 +498,8 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
     const limit = Math.min(500, Math.max(1, Number(q.limit ?? 200)));
     const offset = Math.max(0, Number(q.offset ?? 0));
 
-    const recipients = await db
+    // Bare array: the web types this as GrowthCampaignRecipientRowDTO[].
+    return db
       .select({
         id: growthCampaignRecipients.id,
         status: growthCampaignRecipients.status,
@@ -514,7 +518,6 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
       .orderBy(asc(growthCampaignRecipients.createdAt))
       .limit(limit)
       .offset(offset);
-    return { recipients };
   });
 
   // Stop one thread without touching the whole campaign.
@@ -878,13 +881,13 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
     const status = z.enum(GROWTH_OUTBOUND_STATUS).safeParse(q.status);
     if (status.success) conditions.push(eq(growthOutboundMessages.status, status.data));
 
-    const messages = await db
+    // Bare array: the web types this as GrowthOutboundMessageDTO[].
+    return db
       .select()
       .from(growthOutboundMessages)
       .where(and(...conditions))
       .orderBy(desc(growthOutboundMessages.createdAt))
       .limit(limit)
       .offset(offset);
-    return { messages };
   });
 }
