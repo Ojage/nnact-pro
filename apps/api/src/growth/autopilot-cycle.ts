@@ -11,12 +11,23 @@ import {
 import { computeSectorAllocations, type SectorAllocationInput } from "./allocation.js";
 import { loadSectorMetricsFromDb } from "./autopilot-cycle-metrics.js";
 import { isColdSendingEnabled } from "./transport-policy.js";
+import { tickGrowthCampaigns } from "./scheduler.js";
 
 export interface AutopilotCycleResult {
   cycleId: string;
   mode: string;
   decisions: number;
   coldBlocked: boolean;
+  /** Populated only in AUTOPILOT mode, where the cycle dispatches sends. */
+  dispatched: {
+    ranCampaigns: number;
+    sent: number;
+    suppressed: number;
+    blocked: number;
+    skipped: number;
+    failed: number;
+  } | null;
+  refusals: { campaignId: string; code: string; message: string }[];
   message: string;
 }
 
@@ -33,7 +44,15 @@ export async function runAutopilotCycle(orgId: string): Promise<AutopilotCycleRe
   const coldReady = isColdSendingEnabled(process.env);
 
   if (paused) {
-    return { cycleId, mode, decisions: 0, coldBlocked: !coldReady, message: "Autopilot is paused; no sends scheduled." };
+    return {
+      cycleId,
+      mode,
+      decisions: 0,
+      coldBlocked: !coldReady,
+      dispatched: null,
+      refusals: [],
+      message: "Autopilot is paused; no sends scheduled.",
+    };
   }
 
   const sectors = await db.select().from(growthSectors).where(eq(growthSectors.orgId, orgId));
@@ -93,31 +112,71 @@ export async function runAutopilotCycle(orgId: string): Promise<AutopilotCycleRe
     .set({ lastCycleAt: new Date(), updatedAt: new Date() })
     .where(eq(growthAutopilotSettings.orgId, orgId));
 
-  if (mode === "AUTOPILOT" && !coldReady) {
-    return {
-      cycleId,
-      mode,
-      decisions,
-      coldBlocked: true,
-      message: "Allocation updated, but cold campaigns cannot activate until cold transport is configured.",
-    };
-  }
-
   if (mode === "OBSERVE") {
     return {
       cycleId,
       mode,
       decisions,
       coldBlocked: !coldReady,
+      dispatched: null,
+      refusals: [],
       message: "Observe mode: recommendations recorded; no campaigns scheduled.",
     };
   }
 
+  if (mode === "ASSISTED") {
+    return {
+      cycleId,
+      mode,
+      decisions,
+      coldBlocked: !coldReady,
+      dispatched: null,
+      refusals: [],
+      message: "Assisted mode: allocations recorded for review; a person starts each campaign.",
+    };
+  }
+
+  // AUTOPILOT. This is the mode whose entire promise is that allocation
+  // decisions turn into sends, and it previously only wrote weights to the
+  // database. Dispatch through the same scheduler tick the background worker
+  // uses, so there is exactly one send implementation and one set of guards:
+  // the org daily cap, the sector share, per-campaign daily limits, quiet hours,
+  // suppression and the advisory lock all apply unchanged.
+  if (!coldReady) {
+    return {
+      cycleId,
+      mode,
+      decisions,
+      coldBlocked: true,
+      dispatched: null,
+      refusals: [],
+      message: "Allocation updated, but cold campaigns cannot activate until cold transport is configured.",
+    };
+  }
+
+  const tick = await tickGrowthCampaigns({ now: new Date() });
   return {
     cycleId,
     mode,
     decisions,
     coldBlocked: !coldReady,
-    message: mode === "ASSISTED" ? "Assisted mode: review proposed allocations before activation." : "Autopilot cycle completed.",
+    dispatched: {
+      ranCampaigns: tick.ranCampaigns,
+      sent: tick.sent,
+      suppressed: tick.suppressed,
+      blocked: tick.blocked,
+      skipped: tick.skipped,
+      failed: tick.failed,
+    },
+    refusals: tick.refusals,
+    message:
+      tick.sent > 0
+        ? `Autopilot cycle completed: ${tick.sent} sent across ${tick.ranCampaigns} campaign(s).`
+        : tick.refusals.length > 0
+          ? `Autopilot cycle completed with no sends; ${tick.refusals.length} campaign(s) refused (${tick.refusals
+              .map((r) => r.code)
+              .slice(0, 3)
+              .join(", ")}).`
+          : "Autopilot cycle completed; no campaign had a send due right now.",
   };
 }

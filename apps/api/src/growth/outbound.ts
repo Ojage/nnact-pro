@@ -23,12 +23,14 @@
 import { and, count, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
+  growthAutopilotSettings,
   growthCampaignRecipients,
   growthCampaigns,
   growthCampaignSteps,
   growthContactDetails,
   growthOutboundMessages,
   growthProspects,
+  growthSectors,
   growthSenderIdentities,
   growthSuppressions,
 } from "@nnact/db";
@@ -126,6 +128,21 @@ async function loadSuppressions(orgId: string): Promise<SuppressionEntry[]> {
     .where(eq(growthSuppressions.orgId, orgId));
 }
 
+/**
+ * A sector's allowance for one day, in sends.
+ *
+ * Floors rather than rounds: a 3% weight of a 50/day cap must not be allowed to
+ * round up to 2 sends and let three sectors each overshoot the org cap. A
+ * sector whose floor is 0 simply does not send that day, which is the correct
+ * reading of "0% of today's effort" and is why the caller refuses with a
+ * distinct reason instead of silently sending nothing.
+ */
+export function sectorShareOfDailyCap(orgDailyCap: number, weight: number): number {
+  if (orgDailyCap <= 0) return 0;
+  const clamped = Math.min(100, Math.max(0, weight));
+  return Math.floor((orgDailyCap * clamped) / 100);
+}
+
 export async function runCampaignSend(input: RunCampaignInput): Promise<{
   campaignId: string;
   processed: number;
@@ -200,11 +217,97 @@ export async function runCampaignSend(input: RunCampaignInput): Promise<{
         sql`${growthOutboundMessages.sentAt} >= date_trunc('day', now())`,
       ),
     );
-  const sentTodayCount = sentToday?.count ?? 0;
+  const sentTodayCount = Number(sentToday?.count ?? 0);
   if (sentTodayCount >= campaignRow.dailyLimit) {
     return { ...summary, refusal: { code: "daily_limit_reached", message: `daily limit of ${campaignRow.dailyLimit} reached` } };
   }
-  const remainingToday = campaignRow.dailyLimit - sentTodayCount;
+  let remainingToday = campaignRow.dailyLimit - sentTodayCount;
+
+  // Org-wide daily send cap. `dailySendCap` used to be read only as an input to
+  // the allocation maths, so it never limited anything: many campaigns could
+  // each stay inside their own dailyLimit while the org sent several times the
+  // configured cap, and the cap shown in the Autopilot UI was fiction. Enforced
+  // here rather than in the Autopilot cycle so it binds manual sends, the
+  // scheduler and Autopilot alike.
+  const [autopilotRow] = await db
+    .select({ dailySendCap: growthAutopilotSettings.dailySendCap, paused: growthAutopilotSettings.paused })
+    .from(growthAutopilotSettings)
+    .where(eq(growthAutopilotSettings.orgId, orgId))
+    .limit(1);
+  if (autopilotRow?.paused) {
+    return { ...summary, refusal: { code: "autopilot_paused", message: "Autopilot is paused; no sends will be made." } };
+  }
+  const orgDailyCap = autopilotRow?.dailySendCap ?? null;
+  if (orgDailyCap !== null) {
+    const [orgSent] = await db
+      .select({ count: count() })
+      .from(growthOutboundMessages)
+      .where(
+        and(
+          eq(growthOutboundMessages.orgId, orgId),
+          eq(growthOutboundMessages.status, "SENT"),
+          sql`${growthOutboundMessages.sentAt} >= date_trunc('day', now())`,
+        ),
+      );
+    const orgSentCount = Number(orgSent?.count ?? 0);
+    if (orgSentCount >= orgDailyCap) {
+      return {
+        ...summary,
+        refusal: {
+          code: "org_daily_cap_reached",
+          message: `organisation daily send cap of ${orgDailyCap} reached (${orgSentCount} sent today)`,
+        },
+      };
+    }
+    remainingToday = Math.min(remainingToday, orgDailyCap - orgSentCount);
+  }
+
+  // Sector share of the org cap. This is what makes an allocation weight mean
+  // something: without it, a sector allocated 5% of daily effort could consume
+  // the whole org budget and the weights would only ever be a label.
+  if (orgDailyCap !== null && campaignRow.sectorId) {
+    const [sectorRow] = await db
+      .select({ weight: growthSectors.allocationWeight, excluded: growthSectors.excluded, paused: growthSectors.paused })
+      .from(growthSectors)
+      .where(and(eq(growthSectors.orgId, orgId), eq(growthSectors.id, campaignRow.sectorId)))
+      .limit(1);
+    if (sectorRow?.excluded) {
+      return { ...summary, refusal: { code: "sector_excluded", message: "sector is excluded from sending" } };
+    }
+    if (sectorRow?.paused) {
+      return { ...summary, refusal: { code: "sector_paused", message: "sector is paused" } };
+    }
+    const share = sectorShareOfDailyCap(orgDailyCap, sectorRow?.weight ?? 0);
+    if (share <= 0) {
+      return {
+        ...summary,
+        refusal: { code: "sector_share_exhausted", message: `sector allocation is 0 of the ${orgDailyCap}/day cap` },
+      };
+    }
+    const [sectorSent] = await db
+      .select({ count: count() })
+      .from(growthOutboundMessages)
+      .innerJoin(growthCampaigns, eq(growthOutboundMessages.campaignId, growthCampaigns.id))
+      .where(
+        and(
+          eq(growthOutboundMessages.orgId, orgId),
+          eq(growthOutboundMessages.status, "SENT"),
+          eq(growthCampaigns.sectorId, campaignRow.sectorId),
+          sql`${growthOutboundMessages.sentAt} >= date_trunc('day', now())`,
+        ),
+      );
+    const sectorSentCount = Number(sectorSent?.count ?? 0);
+    if (sectorSentCount >= share) {
+      return {
+        ...summary,
+        refusal: {
+          code: "sector_share_exhausted",
+          message: `sector has used its ${share}/day share of the ${orgDailyCap}/day cap`,
+        },
+      };
+    }
+    remainingToday = Math.min(remainingToday, share - sectorSentCount);
+  }
 
   if (isWithinQuietHours(campaignRow, now)) {
     return { ...summary, refusal: { code: "quiet_hours", message: `inside quiet hours for ${campaignRow.timezone}` } };
