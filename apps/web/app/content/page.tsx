@@ -44,11 +44,22 @@ export default function ContentPage() {
   const take = 50;
 
   const { data, isLoading, isError } = useContentItemsQuery({
-    skip: 0,
+    skip: page * take,
     take,
     status: statusFilter === "all" ? undefined : statusFilter,
     search: search || undefined,
   });
+
+  // Narrowing the set can leave the current page beyond the end, which would
+  // render an empty table. Any filter change returns to the first page.
+  const applySearch = (next: string) => {
+    setSearch(next);
+    setPage(0);
+  };
+  const applyStatus = (next: string) => {
+    setStatusFilter(next);
+    setPage(0);
+  };
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -75,10 +86,10 @@ export default function ContentPage() {
             <Input
               placeholder="Search title or slug..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => applySearch(e.target.value)}
               className="max-w-xs"
             />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={applyStatus}>
               <SelectTrigger className="w-44">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>

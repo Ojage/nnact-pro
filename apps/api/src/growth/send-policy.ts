@@ -255,7 +255,27 @@ export type FollowUpStopReason =
   | "HARD_BOUNCED"
   | "MEETING_BOOKED"
   | "MANUALLY_STOPPED"
-  | "CONVERTED";
+  | "CONVERTED"
+  | "FOLLOW_UP_LIMIT";
+
+/**
+ * Human phrasing for each stop reason, so the log explains itself.
+ * Wording is kept stable where the outbound log and tests match on
+ * "replied" and "meeting booked".
+ */
+const FOLLOW_UP_STOP_PHRASES: Record<FollowUpStopReason, string> = {
+  REPLIED: "the contact already replied",
+  OPTED_OUT: "the contact opted out",
+  HARD_BOUNCED: "the address hard bounced",
+  MEETING_BOOKED: "the recipient has a meeting booked",
+  MANUALLY_STOPPED: "a staff member stopped this thread",
+  CONVERTED: "the recipient is converted",
+  FOLLOW_UP_LIMIT: "this campaign's follow-up limit was reached",
+};
+
+export function followUpStopPhrase(reason: FollowUpStopReason): string {
+  return FOLLOW_UP_STOP_PHRASES[reason];
+}
 
 export interface FollowUpState {
   hasReplied: boolean;
@@ -280,18 +300,18 @@ export function followUpStopReason(state: FollowUpState): FollowUpStopReason | n
   }
   if (state.meetingBooked) return "MEETING_BOOKED";
   if (state.hasReplied) return "REPLIED";
-  if (state.followUpsSent >= state.maxFollowUps) return "CONVERTED";
+  // Reaching the follow-up cap is not a conversion. It previously reported
+  // "CONVERTED", so a normal, healthy end to a campaign sequence logged as
+  // though the recipient had won, and staff reading the outbound log had no
+  // way to tell the two apart.
+  if (state.followUpsSent >= state.maxFollowUps) return "FOLLOW_UP_LIMIT";
   return null;
 }
 
 export function assertFollowUpEligible(state: FollowUpState): void {
   const reason = followUpStopReason(state);
   if (!reason) return;
-  throw new SendPolicyError(
-    "follow_up_not_eligible",
-    `follow-up suppressed: thread is ${reason.toLowerCase().replace(/_/g, " ")}`,
-    409,
-  );
+  throw new SendPolicyError("follow_up_not_eligible", `follow-up suppressed: ${followUpStopPhrase(reason)}`, 409);
 }
 
 /**

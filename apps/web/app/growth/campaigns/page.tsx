@@ -53,7 +53,10 @@ export default function GrowthCampaignsPage() {
   const [name, setName] = useState("");
   const [purpose, setPurpose] = useState<GrowthCampaignPurpose>("PERMISSION_MARKETING");
   const [senderIdentityId, setSenderIdentityId] = useState("");
-  const [timezone, setTimezone] = useState("Africa/Johannesburg");
+  // Must match the API and DB default (Africa/Douala). This form previously
+  // pre-filled Africa/Johannesburg, so accepting the default quietly shifted
+  // quiet hours by an hour versus every other campaign in the org.
+  const [timezone, setTimezone] = useState("Africa/Douala");
   const [dailyLimit, setDailyLimit] = useState("50");
   const [maxFollowUps, setMaxFollowUps] = useState("2");
   const [saving, setSaving] = useState(false);
@@ -72,13 +75,28 @@ export default function GrowthCampaignsPage() {
     }
     setSaving(true);
     try {
+      // `Number(x) || fallback` silently rewrote an explicit 0 to the
+      // fallback, so a daily limit of 0 (pause sending, keep the campaign)
+      // became 50. Parse explicitly and let the API validate the range.
+      const limit = Number.parseInt(dailyLimit, 10);
+      const followUps = Number.parseInt(maxFollowUps, 10);
+      if (!Number.isFinite(limit) || limit < 1) {
+        toast.error("Daily limit must be at least 1");
+        setSaving(false);
+        return;
+      }
+      if (!Number.isFinite(followUps) || followUps < 0 || followUps > 10) {
+        toast.error("Follow-ups must be between 0 and 10");
+        setSaving(false);
+        return;
+      }
       await createCampaign({
         name: name.trim(),
         purpose,
         senderIdentityId,
-        timezone: timezone.trim() || "UTC",
-        dailyLimit: Number(dailyLimit) || 50,
-        maxFollowUps: Number(maxFollowUps) || 0,
+        timezone: timezone.trim() || "Africa/Douala",
+        dailyLimit: limit,
+        maxFollowUps: followUps,
       }).unwrap();
       toast.success("Draft created");
       setName("");
@@ -152,7 +170,7 @@ export default function GrowthCampaignsPage() {
                   id="timezone"
                   value={timezone}
                   onChange={(e) => setTimezone(e.target.value)}
-                  placeholder="Africa/Johannesburg"
+                  placeholder="Africa/Douala"
                 />
               </div>
               <div>

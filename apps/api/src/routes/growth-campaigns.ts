@@ -61,11 +61,35 @@ const REVIEW_STATUSES = new Set(["READY_FOR_REVIEW", "IN_REVIEW"]);
 const uuid = z.string().uuid();
 const trimmed = z.string().trim().min(1);
 
+/**
+ * True when `Intl` recognises the zone as a real IANA identifier.
+ * `Intl.DateTimeFormat` throws RangeError on an unknown zone, which makes it a
+ * dependency-free validity check.
+ */
+function isRealTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const timezoneField = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .refine(isRealTimeZone, "must be a valid IANA time zone, e.g. Africa/Douala");
+
 const createCampaignBody = z.object({
   name: trimmed.max(200),
   purpose: z.enum(GROWTH_CAMPAIGN_PURPOSE).optional(),
   senderIdentityId: uuid,
-  timezone: z.string().trim().min(1).max(64).optional(),
+  // Quiet hours are evaluated in this zone, so an unrecognised value would not
+  // throw anywhere — it would silently resolve to UTC and send outside the
+  // hours the user set.
+  timezone: timezoneField.optional(),
   quietHoursStart: z.number().int().min(0).max(23).nullish(),
   quietHoursEnd: z.number().int().min(0).max(23).nullish(),
   dailyLimit: z.number().int().min(1).max(5000).optional(),
@@ -833,6 +857,95 @@ export async function growthCampaignRoutes(app: FastifyInstance) {
       action: "pause",
       previousStatus: before.status,
       newStatus: "PAUSED",
+      changedBy: claims.userId,
+    });
+    return { campaign: updated };
+  });
+
+  /**
+   * Complete / cancel.
+   *
+   * COMPLETED and CANCELLED were declared in the status enum from the start but
+   * nothing ever assigned them, so a campaign that ran out of actionable
+   * recipients stayed RUNNING forever and the scheduler re-selected it on every
+   * tick indefinitely. A campaign also had no way to be stopped permanently —
+   * only paused, which still keeps it eligible for the daily cap and the
+   * scheduler query.
+   */
+  app.post("/campaigns/:id/complete", async (req, reply) => {
+    const claims = await requireGrowthWrite(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    if (!uuid.safeParse(id).success) return reply.code(404).send({ error: "campaign not found" });
+
+    const [before] = await db
+      .select({ status: growthCampaigns.status })
+      .from(growthCampaigns)
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .limit(1);
+    if (!before) return reply.code(404).send({ error: "campaign not found" });
+    if (isTerminalStatus(before.status)) {
+      return reply.code(409).send({ error: `campaign is already ${before.status.toLowerCase()}` });
+    }
+
+    const [updated] = await db
+      .update(growthCampaigns)
+      .set({ status: "COMPLETED", updatedAt: new Date() })
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .returning();
+    await logCampaignTransition({
+      orgId,
+      campaignId: id,
+      action: "complete",
+      previousStatus: before.status,
+      newStatus: "COMPLETED",
+      changedBy: claims.userId,
+    });
+    return { campaign: updated };
+  });
+
+  app.post("/campaigns/:id/cancel", async (req, reply) => {
+    const claims = await requireGrowthWrite(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    const { id } = req.params as { id: string };
+    if (!uuid.safeParse(id).success) return reply.code(404).send({ error: "campaign not found" });
+
+    const [before] = await db
+      .select({ status: growthCampaigns.status })
+      .from(growthCampaigns)
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .limit(1);
+    if (!before) return reply.code(404).send({ error: "campaign not found" });
+    if (isTerminalStatus(before.status)) {
+      return reply.code(409).send({ error: `campaign is already ${before.status.toLowerCase()}` });
+    }
+
+    // Stop any recipient still mid-sequence so nothing else goes out, which is
+    // the difference between cancel and pause.
+    await db
+      .update(growthCampaignRecipients)
+      .set({ manuallyStoppedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(growthCampaignRecipients.campaignId, id),
+          eq(growthCampaignRecipients.orgId, orgId),
+          inArray(growthCampaignRecipients.status, ["PENDING", "QUEUED", "SENT"]),
+        ),
+      );
+
+    const [updated] = await db
+      .update(growthCampaigns)
+      .set({ status: "CANCELLED", updatedAt: new Date() })
+      .where(and(eq(growthCampaigns.id, id), eq(growthCampaigns.orgId, orgId)))
+      .returning();
+    await logCampaignTransition({
+      orgId,
+      campaignId: id,
+      action: "cancel",
+      previousStatus: before.status,
+      newStatus: "CANCELLED",
       changedBy: claims.userId,
     });
     return { campaign: updated };

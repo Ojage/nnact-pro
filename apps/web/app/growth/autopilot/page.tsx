@@ -3,6 +3,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useSessionUser } from "@/lib/use-session-user";
 import {
   useGrowthAutopilotDecisionsQuery,
   useGrowthAutopilotSettingsQuery,
@@ -22,12 +23,21 @@ export default function AutopilotPage() {
   const [runCycle, { data: lastRun }] = useRunGrowthAutopilotCycleMutation();
   const [simulate, { data: simResult, isLoading: simulating }] = useSimulateGrowthAutopilotMutation();
 
+  // Reads (settings, decisions) are open to every Growth role, but every
+  // control below is requireGrowthOwner server-side. A dispatcher or secretary
+  // previously saw live controls that 403'd on click.
+  const { user } = useSessionUser();
+  const isOwner = user?.role === "owner";
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Autopilot"
         description="Observe by default. Pause stops all campaign and follow-up sends immediately."
       />
+      {!isOwner ? (
+        <p className="text-sm text-fg-muted">Autopilot settings are managed by an owner. You can view the current mode and decision log below.</p>
+      ) : null}
       {settings ? (
         <Card>
           <CardContent className="flex flex-wrap items-center gap-3 pt-4 text-sm">
@@ -40,30 +50,34 @@ export default function AutopilotPage() {
             <span className={settings.coldTransportReady ? "text-emerald-600" : "text-amber-600"}>
               Cold transport: {settings.coldTransportReady ? "ready" : "not configured"}
             </span>
-            <Button size="sm" variant="outline" onClick={() => updateSettings({ mode: "OBSERVE" })}>
-              Observe
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => updateSettings({ mode: "ASSISTED" })}>
-              Assisted
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => updateSettings({ mode: "AUTOPILOT" })}>
-              Autopilot
-            </Button>
-            {settings.paused ? (
-              <Button size="sm" onClick={() => resume()}>
-                Resume
-              </Button>
-            ) : (
-              <Button size="sm" variant="destructive" onClick={() => pause()}>
-                Pause all sends
-              </Button>
-            )}
-            <Button size="sm" onClick={() => runCycle()}>
-              Run cycle now
-            </Button>
-            <Button size="sm" variant="secondary" disabled={simulating} onClick={() => simulate({})}>
-              Simulate allocation
-            </Button>
+            {isOwner ? (
+              <>
+                <Button size="sm" variant="outline" onClick={() => updateSettings({ mode: "OBSERVE" })}>
+                  Observe
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => updateSettings({ mode: "ASSISTED" })}>
+                  Assisted
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => updateSettings({ mode: "AUTOPILOT" })}>
+                  Autopilot
+                </Button>
+                {settings.paused ? (
+                  <Button size="sm" onClick={() => resume()}>
+                    Resume
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="destructive" onClick={() => pause()}>
+                    Pause all sends
+                  </Button>
+                )}
+                <Button size="sm" onClick={() => runCycle()}>
+                  Run cycle now
+                </Button>
+                <Button size="sm" variant="secondary" disabled={simulating} onClick={() => simulate({})}>
+                  Simulate allocation
+                </Button>
+              </>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

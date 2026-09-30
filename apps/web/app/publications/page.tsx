@@ -36,10 +36,17 @@ export default function PublicationsPage() {
   const take = 50;
 
   const { data, isLoading, isError } = useContentPublicationsQuery({
-    skip: 0,
+    skip: page * take,
     take,
     status: statusFilter === "all" ? undefined : statusFilter,
   });
+
+  // Narrowing the set can leave the current page past the end and render an
+  // empty table, so any filter change returns to the first page.
+  const applyStatus = (next: string) => {
+    setStatusFilter(next);
+    setPage(0);
+  };
   const [retry, { isLoading: retrying }] = useRetryPublicationMutation();
 
   const items = data?.items ?? [];
@@ -55,7 +62,7 @@ export default function PublicationsPage() {
 
       <Card>
         <CardContent className="p-4">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={applyStatus}>
             <SelectTrigger className="w-44"><SelectValue placeholder="All statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>

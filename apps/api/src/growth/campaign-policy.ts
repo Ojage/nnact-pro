@@ -26,6 +26,7 @@ import {
   assertSenderIdentityUsable,
   findSuppressionMatch,
   followUpStopReason,
+  followUpStopPhrase,
   type FollowUpState,
   type SenderIdentity,
   type SuppressionEntry,
@@ -212,7 +213,7 @@ export function checkRecipientSendEligibility(input: {
     return {
       ok: false,
       code: "follow_up_not_eligible",
-      reason: `thread is ${stop.toLowerCase().replace(/_/g, " ")}`,
+      reason: followUpStopPhrase(stop),
       status: "SKIPPED",
     };
   }

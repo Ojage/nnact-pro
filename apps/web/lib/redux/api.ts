@@ -2062,6 +2062,18 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       query: (id) => ({ url: `/api/growth/campaigns/${id}/pause`, method: "POST" }),
       invalidatesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
     }),
+    completeGrowthCampaign: builder.mutation<{ campaign: GrowthCampaignDTO }, string>({
+      query: (id) => ({ url: `/api/growth/campaigns/${id}/complete`, method: "POST" }),
+      invalidatesTags: (_r, _e, id) => [{ type: "GrowthCampaign", id }],
+    }),
+    cancelGrowthCampaign: builder.mutation<{ campaign: GrowthCampaignDTO }, string>({
+      query: (id) => ({ url: `/api/growth/campaigns/${id}/cancel`, method: "POST" }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: "GrowthCampaign", id },
+        { type: "GrowthCampaignRecipient", id },
+        "GrowthOutbound",
+      ],
+    }),
     runGrowthCampaign: builder.mutation<GrowthCampaignRunDTO, { id: string; limit?: number }>({
       query: ({ id, limit }) => ({ url: `/api/growth/campaigns/${id}/run`, method: "POST", body: limit ? { limit } : {} }),
       invalidatesTags: (_r, _e, { id }) => [
@@ -2541,6 +2553,8 @@ export const {
   useApproveGrowthCampaignMutation,
   useScheduleGrowthCampaignMutation,
   usePauseGrowthCampaignMutation,
+  useCompleteGrowthCampaignMutation,
+  useCancelGrowthCampaignMutation,
   useRunGrowthCampaignMutation,
   useGrowthOutboundLogQuery,
   useCreateGrowthSuppressionMutation,

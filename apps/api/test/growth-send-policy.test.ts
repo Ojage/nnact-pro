@@ -163,7 +163,19 @@ test("follow-ups stop after a reply, meeting, opt-out, bounce or manual stop", (
   assert.equal(followUpStopReason({ ...base, hasHardBounced: true }), "HARD_BOUNCED");
   assert.equal(followUpStopReason({ ...base, manuallyStopped: true }), "MANUALLY_STOPPED");
   assert.equal(followUpStopReason({ ...base, converted: true }), "CONVERTED");
-  assert.equal(followUpStopReason({ ...base, followUpsSent: 3 }), "CONVERTED");
+  // Reaching the cap is not a conversion. This previously asserted
+  // "CONVERTED", which meant a normal end to a campaign sequence logged as
+  // though the recipient had won.
+  assert.equal(followUpStopReason({ ...base, followUpsSent: 3 }), "FOLLOW_UP_LIMIT");
+  // A genuine conversion still outranks the cap, so the two stay distinguishable.
+  assert.equal(followUpStopReason({ ...base, converted: true, followUpsSent: 3 }), "CONVERTED");
+  assert.throws(
+    () => assertFollowUpEligible({ ...base, followUpsSent: 3 }),
+    (error: unknown) =>
+      error instanceof SendPolicyError &&
+      error.code === "follow_up_not_eligible" &&
+      /follow-up limit was reached/.test(error.message),
+  );
   assert.throws(
     () => assertFollowUpEligible({ ...base, hasReplied: true }),
     (error: unknown) => error instanceof SendPolicyError && error.code === "follow_up_not_eligible",

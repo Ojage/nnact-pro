@@ -70,11 +70,22 @@ export const PUBLISHING_ERROR_CODES = [
 ] as const;
 export type PublishingErrorCode = (typeof PUBLISHING_ERROR_CODES)[number];
 
-/** RBAC helpers — owner/dispatcher act as marketing roles until granular permissions exist. */
+/**
+ * RBAC helpers for the client. These must mirror the role checks enforced in
+ * `apps/api/src/routes/content.ts`, which is the actual security boundary —
+ * a client gate is only there to avoid offering a button that will 403.
+ *
+ * Verified against the routes: submit-review accepts any staff; approve,
+ * reject, publish and unpublish are owner-only; schedule is owner or
+ * dispatcher. `CONTENT_PUBLISH_ROLES` previously listed `dispatcher` while
+ * the publish route rejects them, which would have rendered a Publish button
+ * that always failed.
+ */
 export const CONTENT_CREATE_ROLES = ["owner", "dispatcher"] as const;
 export const CONTENT_REVIEW_ROLES = ["owner", "dispatcher"] as const;
 export const CONTENT_APPROVE_ROLES = ["owner"] as const;
-export const CONTENT_PUBLISH_ROLES = ["owner", "dispatcher"] as const;
+export const CONTENT_PUBLISH_ROLES = ["owner"] as const;
+export const CONTENT_SCHEDULE_ROLES = ["owner", "dispatcher"] as const;
 export const CONTENT_INTEGRATION_ROLES = ["owner"] as const;
 
 export interface ContentSeoMetadata {

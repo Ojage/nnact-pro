@@ -34,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BlockNoteEditorComponent } from "@/components/content-editor/block-note-editor";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Plus, Check } from "lucide-react";
+import { useSessionUser } from "@/lib/use-session-user";
 
 const CHANNELS: PublishingChannel[] = ["WEBSITE", "LINKEDIN", "FACEBOOK", "INSTAGRAM"];
 const CHANNEL_LABELS: Record<string, string> = {
@@ -53,6 +54,13 @@ export default function ContentEditorPage() {
   const { data: item, isLoading, isError, refetch } = useContentItemQuery(id, { skip: !id });
   const { data: media } = useContentMediaQuery();
 
+  // The API is the security boundary; these flags only stop the UI offering
+  // buttons the routes would 403. Mirrors routes/content.ts: approve, reject,
+  // publish and unpublish are owner-only; schedule is owner or dispatcher.
+  const { user } = useSessionUser();
+  const isOwner = user?.role === "owner";
+  const isDispatcher = user?.role === "owner" || user?.role === "dispatcher";
+
   // While the publishing worker is running, poll so the button re-enables
   // (and the status badge updates) as soon as the item leaves PUBLISHING.
   useEffect(() => {
@@ -62,7 +70,7 @@ export default function ContentEditorPage() {
   }, [item?.status, refetch]);
 
   const [patchContent, { isLoading: saving }] = usePatchContentItemMutation();
-  const [submitReview] = useSubmitContentReviewMutation();
+  const [submitReview, { isLoading: submitting }] = useSubmitContentReviewMutation();
   const [approve] = useApproveContentMutation();
   const [reject] = useRejectContentMutation();
   const [publish, { isLoading: publishing }] = usePublishContentMutation();
@@ -203,6 +211,17 @@ export default function ContentEditorPage() {
     await unpublish(id).unwrap();
   };
 
+  // The route exists and accepts any staff, but the page never rendered it, so
+  // DRAFT was a dead end: nothing in the UI could move content to IN_REVIEW
+  // and an owner had no way to approve what they could not submit.
+  const handleSubmitReview = async () => {
+    try {
+      await submitReview(id).unwrap();
+    } catch (err) {
+      setSaveError(explainRtkError(err, "Failed to submit for review"));
+    }
+  };
+
   const handleCreateCategory = async () => {
     const name = categoryDraft.trim();
     if (!name) return;
@@ -275,10 +294,13 @@ export default function ContentEditorPage() {
           <div className="flex flex-wrap items-center gap-2">
             <span className={`text-xs ${saveState === "error" ? "text-red" : "text-fg-muted"}`}>{saveError ?? saveLabel[saveState]}</span>
             <Button variant="outline" onClick={() => setPreviewOpen(true)}>Preview</Button>
-            {item.status === "PUBLISHED" && (
+            {item.status === "DRAFT" && (
+              <Button loading={submitting} onClick={handleSubmitReview}>Submit for review</Button>
+            )}
+            {item.status === "PUBLISHED" && isOwner && (
               <Button variant="danger" loading={unpublishing} onClick={handleUnpublish}>Unpublish + Archive</Button>
             )}
-            {item.status === "IN_REVIEW" && (
+            {item.status === "IN_REVIEW" && isOwner && (
               <>
                 <Button variant="secondary" onClick={async () => reject(id).unwrap()}>Reject</Button>
                 <Button onClick={async () => approve(id).unwrap()}>Approve</Button>
@@ -386,7 +408,7 @@ export default function ContentEditorPage() {
                 </div>
               </div>
 
-              {(item.status === "APPROVED" || item.status === "DRAFT" || item.status === "SCHEDULED" || item.status === "PUBLISHING" || item.status === "PUBLISHED") && (
+              {(item.status === "APPROVED" || item.status === "DRAFT" || item.status === "SCHEDULED" || item.status === "PUBLISHING" || item.status === "PUBLISHED") && (isOwner || isDispatcher) && (
                 <>
                   <div className="grid gap-2">
                     <Label>Schedule (optional)</Label>
@@ -394,14 +416,16 @@ export default function ContentEditorPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <Button loading={scheduling} onClick={handleSchedule} disabled={!scheduleAt || item.status === "PUBLISHING"}>Schedule</Button>
-                    <Button
-                      variant="success"
-                      loading={publishing || item.status === "PUBLISHING"}
-                      disabled={item.status === "PUBLISHING"}
-                      onClick={handlePublish}
-                    >
-                      {item.status === "PUBLISHING" ? "Publishing…" : item.status === "PUBLISHED" ? "Update" : "Publish Now"}
-                    </Button>
+                    {isOwner && (
+                      <Button
+                        variant="success"
+                        loading={publishing || item.status === "PUBLISHING"}
+                        disabled={item.status === "PUBLISHING"}
+                        onClick={handlePublish}
+                      >
+                        {item.status === "PUBLISHING" ? "Publishing…" : item.status === "PUBLISHED" ? "Update" : "Publish Now"}
+                      </Button>
+                    )}
                   </div>
                 </>
               )}

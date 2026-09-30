@@ -24,6 +24,8 @@ import {
   useGrowthCampaignRecipientsQuery,
   useGrowthOutboundLogQuery,
   usePauseGrowthCampaignMutation,
+  useCompleteGrowthCampaignMutation,
+  useCancelGrowthCampaignMutation,
   useRunGrowthCampaignMutation,
   useSaveGrowthCampaignStepMutation,
   useScheduleGrowthCampaignMutation,
@@ -54,6 +56,8 @@ export default function GrowthCampaignDetailPage() {
   const [approve] = useApproveGrowthCampaignMutation();
   const [schedule] = useScheduleGrowthCampaignMutation();
   const [pause] = usePauseGrowthCampaignMutation();
+  const [complete] = useCompleteGrowthCampaignMutation();
+  const [cancel] = useCancelGrowthCampaignMutation();
   const [run] = useRunGrowthCampaignMutation();
   const [saveStep] = useSaveGrowthCampaignStepMutation();
   const [stopRecipient] = useStopGrowthRecipientMutation();
@@ -362,6 +366,43 @@ export default function GrowthCampaignDetailPage() {
                   }
                 >
                   Run now
+                </Button>
+              ) : null}
+
+              {/* COMPLETED and CANCELLED were unreachable before these
+                  actions existed: a campaign that exhausted its recipients
+                  stayed RUNNING and the scheduler re-selected it every tick.
+                  Cancel additionally stops each remaining recipient, which is
+                  what separates it from Pause. */}
+              {campaign.status !== "COMPLETED" && campaign.status !== "CANCELLED" ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    act("complete it", () => complete(campaign.id).unwrap(), () =>
+                      toast.success("Campaign marked complete"),
+                    )
+                  }
+                >
+                  Mark complete
+                </Button>
+              ) : null}
+
+              {campaign.status !== "COMPLETED" && campaign.status !== "CANCELLED" ? (
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={busy}
+                  onClick={() =>
+                    act(
+                      "cancel it",
+                      () => cancel(campaign.id).unwrap(),
+                      () => toast.success("Campaign cancelled and remaining recipients stopped"),
+                    )
+                  }
+                >
+                  Cancel campaign
                 </Button>
               ) : null}
             </div>
