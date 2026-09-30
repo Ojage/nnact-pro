@@ -5,9 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import type { ConnectionDTO } from "@/lib/redux/api";
+import { ChannelLogo } from "@/components/channel-logo";
+import { cn } from "@/lib/utils";
 
 const CHANNEL_INFO: Record<string, { label: string; blurb: string }> = {
   WEBSITE: { label: "Website", blurb: "Your NNACT Webapp blog — always available, no auth required." },
@@ -16,12 +17,59 @@ const CHANNEL_INFO: Record<string, { label: string; blurb: string }> = {
   INSTAGRAM: { label: "Instagram", blurb: "Publish to Instagram via the Meta Graph API." },
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  CONNECTED: "bg-green/10 text-green",
-  DISCONNECTED: "bg-fg-dim/10 text-fg-dim",
-  EXPIRED: "bg-red/10 text-red",
-  ERROR: "bg-red/10 text-red",
+/**
+ * Status is a lifecycle state, not a queue name: the raw enum read "CONNECTED"
+ * / "DISCONNECTED" in caps, which is both ugly and ambiguous next to a channel
+ * that is authenticated but not yet pointed at a Page.
+ */
+type StatusView = { label: string; dot: string; text: string; chip: string };
+
+const STATUS: Record<string, StatusView> = {
+  CONNECTED: {
+    label: "Connected",
+    dot: "bg-emerald-500",
+    text: "text-emerald-700 dark:text-emerald-400",
+    chip: "border-emerald-500/25 bg-emerald-500/10",
+  },
+  DISCONNECTED: {
+    label: "Not connected",
+    dot: "bg-slate-400 dark:bg-slate-500",
+    text: "text-fg-muted",
+    chip: "border-border bg-surface-300/50",
+  },
+  EXPIRED: {
+    label: "Token expired",
+    dot: "bg-amber-500",
+    text: "text-amber-700 dark:text-amber-400",
+    chip: "border-amber-500/25 bg-amber-500/10",
+  },
+  ERROR: {
+    label: "Needs attention",
+    dot: "bg-red-500",
+    text: "text-red-700 dark:text-red-400",
+    chip: "border-red-500/25 bg-red-500/10",
+  },
 };
+
+const SELECT_PAGE_STATUS: StatusView = {
+  label: "Select a Page",
+  dot: "bg-blue-500",
+  text: "text-blue-700 dark:text-blue-400",
+  chip: "border-blue-500/25 bg-blue-500/10",
+};
+
+/** What this channel can actually publish, derived from the registry. */
+function capabilityLine(conn?: ConnectionDTO): string | null {
+  const caps = conn?.capabilities;
+  if (!caps) return null;
+  const kinds = [
+    caps.supportsText && "Text",
+    caps.supportsImages && caps.supportsVideo ? "Media" : caps.supportsImages ? "Images" : caps.supportsVideo ? "Video" : null,
+  ].filter(Boolean);
+  if (kinds.length === 0) return null;
+  return `${kinds.join(" · ")}${caps.supportsScheduling ? " · Scheduled" : ""}`;
+}
+
 
 interface PageOption {
   id: string;
@@ -143,36 +191,71 @@ export default function ConnectionsPage() {
           const noPages = awaitingPage && options.length === 0;
           const expiry = expiryWarning(conn);
           const selected = pendingPage?.channel === channel ? pendingPage.pageId : null;
+          const status = awaitingPage ? SELECT_PAGE_STATUS : (STATUS[conn?.status ?? ""] ?? STATUS.DISCONNECTED!);
+          const caps = capabilityLine(conn);
+          const connected = status.label === "Connected";
           return (
-            <Card key={channel}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-fg">{info.label}</h3>
-                    <p className="mt-1 text-xs text-fg-muted">{info.blurb}</p>
+            <Card
+              key={channel}
+              className={cn(
+                "gap-0 overflow-hidden transition-shadow duration-200 hover:shadow-md",
+                connected && "border-emerald-500/30",
+                !connected && isSocial && "border-dashed",
+              )}
+            >
+              <CardContent className="flex flex-col gap-4 p-5">
+                <div className="flex items-start gap-3.5">
+                  <ChannelLogo channel={channel} />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-sm font-semibold tracking-tight text-fg">{info.label}</h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-fg-muted">{info.blurb}</p>
                   </div>
-                  <Badge className={`${STATUS_COLOR[conn?.status ?? "DISCONNECTED"] ?? ""} border-transparent`}>
-                    {awaitingPage ? "SELECT PAGE" : (conn?.status ?? "DISCONNECTED")}
-                  </Badge>
+                  <span
+                    className={cn(
+                      "mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                      status.chip,
+                      status.text,
+                    )}
+                  >
+                    <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
+                    {status.label}
+                  </span>
                 </div>
 
-                {conn && conn.accountName && !awaitingPage && (
-                  <p className="mt-3 text-xs text-fg-muted">Connected as: <span className="text-fg">{conn.accountName}</span></p>
+                {conn?.accountName && !awaitingPage && (
+                  <div className="flex items-center gap-2.5 rounded-lg border border-border bg-surface-100/60 px-3 py-2">
+                    <span className="text-xs text-fg-muted">Connected as</span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg">{conn.accountName}</span>
+                    {conn.tokenExpiresAt && <span className="shrink-0 text-[11px] text-fg-dim">via Page token</span>}
+                  </div>
                 )}
-                {conn?.lastError && <p className="mt-1 text-xs text-red">{conn.lastError}</p>}
-                {expiry && <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{expiry}</p>}
+
+                {conn?.lastError && (
+                  <p className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-400">
+                    {conn.lastError}
+                  </p>
+                )}
+                {expiry && (
+                  <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                    {expiry}
+                  </p>
+                )}
 
                 {awaitingPage && !noPages && (
-                  <fieldset className="mt-4 space-y-2">
-                    <legend className="text-xs font-medium text-fg">Which Page should NNACT publish to?</legend>
+                  <fieldset className="space-y-1.5">
+                    <legend className="mb-1.5 text-xs font-medium text-fg">Which Page should NNACT publish to?</legend>
                     {options.map((p) => {
                       const disabled = !p.canPublish;
                       return (
                         <label
                           key={p.id}
-                          className={`flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm ${
-                            disabled ? "opacity-50" : "cursor-pointer hover:bg-surface-300/60"
-                          }`}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors",
+                            disabled
+                              ? "border-border opacity-55"
+                              : "cursor-pointer border-border hover:border-accent/40 hover:bg-surface-100",
+                            selected === p.id && !disabled && "border-accent bg-accent-muted",
+                          )}
                         >
                           <input
                             type="radio"
@@ -187,8 +270,8 @@ export default function ConnectionsPage() {
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={p.picture} alt="" className="h-7 w-7 rounded-full" />
                           ) : null}
-                          <span className="text-fg">{p.name}</span>
-                          {disabled && <span className="ml-auto text-xs text-fg-muted">read-only</span>}
+                          <span className="min-w-0 flex-1 truncate text-fg">{p.name}</span>
+                          {disabled && <span className="shrink-0 text-xs text-fg-muted">read-only</span>}
                         </label>
                       );
                     })}
@@ -196,13 +279,13 @@ export default function ConnectionsPage() {
                 )}
 
                 {noPages && (
-                  <p className="mt-3 text-xs text-fg-muted">
+                  <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
                     No Pages were shared with this app. Reconnect and choose &ldquo;Pages&rdquo; when Facebook asks for
                     access, using an account that administers the Page.
                   </p>
                 )}
 
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                   {awaitingPage ? (
                     <>
                       {options.length > 0 && (
@@ -224,6 +307,7 @@ export default function ConnectionsPage() {
                   ) : (
                     <Button variant="secondary" loading={validating} onClick={() => handleValidate(channel)}>Validate</Button>
                   )}
+                  {caps && <span className="ml-auto text-[11px] text-fg-dim">{caps}</span>}
                 </div>
               </CardContent>
             </Card>
