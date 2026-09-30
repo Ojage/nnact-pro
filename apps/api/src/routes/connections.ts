@@ -9,9 +9,10 @@ import type { PublishingChannel } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { verifiedClaims } from "../operational-authorization.js";
 import { defaultRegistry } from "../publishing/registry.js";
-import { encryptSecret } from "../publishing/infra/connection-store.js";
+import { encryptSecret, decryptSecret } from "../publishing/infra/connection-store.js";
 import { providerFetch } from "../publishing/infra/http.js";
 import { contentAudit } from "../publishing/infra/audit.js";
+import { graphVersionFor } from "../publishing/adapters/facebook.js";
 
 const CHANNELS = ["WEBSITE", "LINKEDIN", "FACEBOOK", "INSTAGRAM"] as const;
 function isChannel(v: string): v is PublishingChannel {
@@ -39,13 +40,24 @@ function oauthConfigFor(channel: PublishingChannel): OAuthConfig | null {
       "w_organization_social r_organization_social openid",
       );
     case "FACEBOOK":
+      return envOAuth(
+        process.env.META_APP_ID,
+        process.env.META_APP_SECRET,
+        `https://www.facebook.com/${graphVersionFor()}/dialog/oauth`,
+        `https://graph.facebook.com/${graphVersionFor()}/oauth/access_token`,
+        // Minimum permissions for Page publishing only.
+        // pages_manage_engagement is what authorises DELETE on a post, so
+        // without it unpublish/retry would fail with error 200.
+        // Requesting only what we use keeps the App Review surface minimal.
+        "pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement",
+      );
     case "INSTAGRAM":
       return envOAuth(
         process.env.META_APP_ID,
         process.env.META_APP_SECRET,
-        "https://www.facebook.com/v21.0/dialog/oauth",
-        "https://graph.facebook.com/v21.0/oauth/access_token",
-        "pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish",
+        `https://www.facebook.com/${graphVersionFor()}/dialog/oauth`,
+        `https://graph.facebook.com/${graphVersionFor()}/oauth/access_token`,
+        "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
       );
     default:
       return null;
@@ -70,6 +82,7 @@ export async function connectionRoutes(app: FastifyInstance) {
       accountName: r.accountName,
       accountId: r.accountId,
       lastValidatedAt: r.lastValidatedAt,
+      tokenExpiresAt: r.tokenExpiresAt,
       lastError: r.lastError,
       metadata: r.metadata,
       capabilities: registry.get(r.channel).capabilities,
@@ -82,6 +95,7 @@ export async function connectionRoutes(app: FastifyInstance) {
         accountName: process.env.PUBLIC_WEB_URL ?? "NNACT Website",
         accountId: null,
         lastValidatedAt: null,
+        tokenExpiresAt: null,
         lastError: null,
         metadata: {},
         capabilities: registry.get("WEBSITE").capabilities,
@@ -158,47 +172,148 @@ export async function connectionRoutes(app: FastifyInstance) {
 
     // Resolve account identity per channel (best-effort).
     const identity = await resolveIdentity(channel, accessToken, oauth.clientId);
-    const expiresAt = tok.expires_in ? new Date(Date.now() + tok.expires_in * 1000) : null;
+
+    // Page tokens are secrets: they belong in the encrypted blob only. The
+    // plaintext jsonb metadata column gets the public summary, nothing more.
+    const rawMeta = (identity?.meta ?? {}) as Record<string, unknown>;
+    const { __pages: storedPages, ...publicMeta } = rawMeta;
+    const pages = Array.isArray(storedPages) ? (storedPages as StoredMetaPage[]) : [];
+    const pageSelectionRequired = publicMeta.pageSelectionRequired === true;
+
+    // Prefer the selected Page token's lifetime (~60 days) over the user
+    // token's (~1 hour): that is the credential publishing actually depends on.
+    const pageExpiry =
+      typeof publicMeta.pageTokenExpiresAt === "string" ? new Date(publicMeta.pageTokenExpiresAt) : null;
+    const expiresAt =
+      pageExpiry && !Number.isNaN(pageExpiry.getTime())
+        ? pageExpiry
+        : tok.expires_in
+          ? new Date(Date.now() + tok.expires_in * 1000)
+          : null;
+
+    // A connection with no Page chosen is not yet usable for publishing, so it
+    // is recorded as DISCONNECTED and surfaced as "select a Page" in the UI.
+    // The status enum has no PENDING value and the migration path is currently
+    // unusable, so pageSelectionRequired in metadata carries the distinction.
+    const status = pageSelectionRequired ? ("DISCONNECTED" as const) : ("CONNECTED" as const);
 
     const cipher = encryptSecret(
       JSON.stringify({
         accessToken,
         accountId: identity?.accountId ?? null,
-        pageId: identity?.pageId,
-        meta: identity?.meta,
+        pageId: identity?.pageId ?? null,
+        meta: { ...publicMeta, pages },
       }),
     );
 
+    const values = {
+      status,
+      accountName: identity?.accountName ?? null,
+      accountId: identity?.accountId ?? null,
+      credentialsCipher: cipher,
+      tokenExpiresAt: expiresAt,
+      lastValidatedAt: new Date(),
+      metadata: publicMeta,
+    };
+
     await db
       .insert(publishingConnections)
-      .values({
-        orgId,
-        channel,
-        status: "CONNECTED",
-        accountName: identity?.accountName ?? null,
-        accountId: identity?.accountId ?? null,
-        credentialsCipher: cipher,
-        tokenExpiresAt: expiresAt,
-        lastValidatedAt: new Date(),
-        metadata: identity?.meta ?? {},
-      })
+      .values({ orgId, channel, ...values })
       .onConflictDoUpdate({
         target: [publishingConnections.orgId, publishingConnections.channel],
-        set: {
-          status: "CONNECTED",
-          accountName: identity?.accountName ?? null,
-          accountId: identity?.accountId ?? null,
-          credentialsCipher: cipher,
-          tokenExpiresAt: expiresAt,
-          lastValidatedAt: new Date(),
-          lastError: null,
-          metadata: identity?.meta ?? {},
-          updatedAt: new Date(),
-        },
+        set: { ...values, lastError: null, updatedAt: new Date() },
       });
 
+    if (pageSelectionRequired) {
+      await contentAudit(orgId, {
+        actorId: claimsId(req),
+        action: "connection.page_selection_required",
+        details: { channel, availablePages: publicMeta.availablePages },
+      });
+      return {
+        channel,
+        status,
+        pageSelectionRequired: true,
+        availablePages: publicMeta.availablePages ?? [],
+        message:
+          pages.length === 0
+            ? "No Facebook Pages were shared with this app. Grant Page access and try again."
+            : "Select which Page to publish to.",
+      };
+    }
+
     await contentAudit(orgId, { actorId: claimsId(req), action: `connection.connected`, details: { channel } });
-    return { channel, status: "CONNECTED", accountName: identity?.accountName ?? null };
+    return { channel, status: "CONNECTED" as const, accountName: identity?.accountName ?? null, pageSelectionRequired: false };
+  });
+
+  // Choose which Page a Meta connection publishes to. The Page tokens were all
+  // captured during the OAuth callback and live in the encrypted blob, so this
+  // never re-hits Facebook and never re-prompts the user.
+  app.post<{ Params: { channel: string }; Body: { pageId?: string } }>("/:channel/select-page", async (req, reply) => {
+    const orgId = await resolveOrgId(req);
+    const claims = await verifiedClaims(req, reply);
+    if (!claims || reply.sent) return;
+    if (claims.role !== "owner") return reply.code(403).send({ error: "only owners can select a page" });
+    const channel = req.params.channel as PublishingChannel;
+    if (!isChannel(channel)) return reply.code(400).send({ error: "unsupported channel" });
+
+    const pageId = req.body?.pageId?.trim();
+    if (!pageId) return reply.code(400).send({ error: "pageId is required" });
+
+    const [row] = await db
+      .select()
+      .from(publishingConnections)
+      .where(and(eq(publishingConnections.orgId, orgId), eq(publishingConnections.channel, channel)))
+      .limit(1);
+    const cipher = row?.credentialsCipher;
+    if (typeof cipher !== "string" || cipher.length === 0) {
+      return reply.code(409).send({ error: "no stored Meta connection; reconnect first" });
+    }
+
+    let blob: { accessToken?: string; accountId?: string | null; pageId?: string | null; meta?: { pages?: StoredMetaPage[]; [k: string]: unknown } };
+    let plaintext: string | null = null;
+    try {
+      plaintext = decryptSecret(cipher);
+    } catch {
+      plaintext = null;
+    }
+    if (plaintext === null) {
+      return reply.code(500).send({ error: "stored credentials could not be decrypted; reconnect the channel" });
+    }
+    try {
+      blob = JSON.parse(plaintext);
+    } catch {
+      return reply.code(500).send({ error: "stored credentials are malformed; reconnect the channel" });
+    }
+
+    const page = blob.meta?.pages?.find((p) => p.id === pageId);
+    if (!page) return reply.code(400).send({ error: "that page is not available on this connection" });
+    if (!page.canPublish) return reply.code(400).send({ error: `no CREATE_CONTENT task on "${page.name}"` });
+
+    const publicMeta = { ...(blob.meta ?? {}) } as Record<string, unknown>;
+    delete publicMeta.pages;
+    publicMeta.selectedPageId = page.id;
+    publicMeta.pageName = page.name;
+    publicMeta.pageAccessToken = page.accessToken;
+    publicMeta.pageTokenExpiresAt = page.expiresAt;
+    publicMeta.pageSelectionRequired = false;
+
+    await db
+      .update(publishingConnections)
+      .set({
+        status: "CONNECTED",
+        accountName: page.name,
+        accountId: page.id,
+        credentialsCipher: encryptSecret(JSON.stringify({ ...blob, accountId: page.id, pageId: page.id, meta: publicMeta })),
+        tokenExpiresAt: page.expiresAt ? new Date(page.expiresAt) : null,
+        lastError: null,
+        metadata: publicMeta,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(publishingConnections.orgId, orgId), eq(publishingConnections.channel, channel)));
+
+    await contentAudit(orgId, { actorId: claims.userId, action: "connection.page_selected", details: { channel, pageId: page.id } });
+    return { channel, status: "CONNECTED" as const, accountName: page.name, accountId: page.id };
   });
 
   app.post<{ Params: { channel: string } }>("/:channel/disconnect", async (req, reply) => {
@@ -272,41 +387,204 @@ async function resolveIdentity(channel: PublishingChannel, accessToken: string, 
       };
     }
 
-    // Meta: resolve pages for the user token.
-    const me = await providerFetch(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${accessToken}`);
-    if (me.status >= 400) return null;
-    const meBody = me.body as { id?: string; name?: string };
-
-    const pages = await providerFetch(
-      `https://graph.facebook.com/v21.0/${meBody.id ?? "me"}/accounts?fields=id,name,access_token&access_token=${accessToken}`,
-    );
-    const page = (pages.body as { data?: { id: string; name: string; access_token: string }[] })?.data?.[0];
-    if (!page) return { accountId: meBody.id, accountName: meBody.name ?? null, pageId: null, meta: { page: null } };
-
-    if (channel === "INSTAGRAM") {
-      const ig = await providerFetch(
-        `https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account{id,username}&access_token=${page.access_token}`,
-      );
-      const igAccount = (ig.body as { instagram_business_account?: { id: string; username?: string } })?.instagram_business_account;
-      if (igAccount) {
-        return {
-          accountId: igAccount.id,
-          accountName: igAccount.username ?? null,
-          pageId: page.id,
-          meta: { page, igProfileId: igAccount.id, appId: clientId, pageAccessToken: page.access_token },
-        };
-      }
-    }
-
-    return {
-      accountId: page.id,
-      accountName: page.name,
-      pageId: page.id,
-      meta: { appId: clientId, page, pageAccessToken: page.access_token },
-    };
+    // Meta: enumerate every Page this user can publish to.
+    const meta = await resolveMetaIdentity(channel, accessToken, clientId);
+    if (!meta) return null;
+    return meta.identity;
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Meta / Facebook Page connection
+// ---------------------------------------------------------------------------
+
+const META_GRAPH_BASE = "https://graph.facebook.com";
+/** Page tasks that permit creating content on the Page. */
+const META_PUBLISH_TASKS = new Set(["CREATE_CONTENT", "MANAGE"]);
+
+export interface MetaPageSummary {
+  id: string;
+  name: string;
+  picture?: string | null;
+  tasks: string[];
+  canPublish: boolean;
+}
+
+interface StoredMetaPage extends MetaPageSummary {
+  /** Long-lived Page access token. Encrypted at rest; never in plaintext. */
+  accessToken: string;
+  expiresAt: string | null;
+}
+
+/** Strip every secret from a page record before it reaches the jsonb column. */
+function publicPageSummary(page: MetaPageSummary): MetaPageSummary {
+  return { id: page.id, name: page.name, picture: page.picture ?? null, tasks: page.tasks, canPublish: page.canPublish };
+}
+
+/**
+ * Upgrade a short-lived Page token to a long-lived one (~60 days). Without
+ * this the automation connection silently rots roughly every two months and
+ * publishing starts failing with error 463 at an unpredictable moment.
+ */
+async function exchangeLongLivedPageToken(
+  shortLivedToken: string,
+  appId: string,
+  appSecret: string | null,
+  version: string,
+): Promise<{ accessToken: string; expiresAt: string | null }> {
+  if (!appSecret) return { accessToken: shortLivedToken, expiresAt: null };
+  const params = new URLSearchParams({
+    grant_type: "fb_exchange_token",
+    client_id: appId,
+    client_secret: appSecret,
+    fb_exchange_token: shortLivedToken,
+  });
+  const res = await providerFetch(`${META_GRAPH_BASE}/${version}/oauth/access_token?${params.toString()}`);
+  if (res.status >= 400) return { accessToken: shortLivedToken, expiresAt: null };
+  const body = res.body as { access_token?: string; expires_in?: number };
+  if (!body?.access_token) return { accessToken: shortLivedToken, expiresAt: null };
+  return {
+    accessToken: body.access_token,
+    expiresAt: body.expires_in ? new Date(Date.now() + body.expires_in * 1000).toISOString() : null,
+  };
+}
+
+/**
+ * List the Pages the user administers, each with a long-lived Page token.
+ * `tasks` is requested so we can tell a Page we can actually post to from one
+ * we can merely read — surfacing that up front beats a 200 error later.
+ */
+export async function fetchManagedPages(
+  userToken: string,
+  appId: string,
+  appSecret: string | null,
+  version: string,
+): Promise<StoredMetaPage[]> {
+  // `me/accounts` is a relative edge on /me — the leading slash is required.
+  const res = await providerFetch(
+    `${META_GRAPH_BASE}/${version}/me/accounts?fields=id,name,picture,tasks,access_token&access_token=${encodeURIComponent(userToken)}`,
+  );
+  if (res.status >= 400) return [];
+  const data = (res.body as { data?: Array<{ id: string; name: string; picture?: { data?: { url?: string } }; tasks?: string[]; access_token?: string }> })?.data;
+  if (!Array.isArray(data)) return [];
+
+  const pages: StoredMetaPage[] = [];
+  for (const raw of data) {
+    if (!raw?.access_token) continue;
+    const tasks = Array.isArray(raw.tasks) ? raw.tasks : [];
+    const longLived = await exchangeLongLivedPageToken(raw.access_token, appId, appSecret, version);
+    pages.push({
+      id: raw.id,
+      name: raw.name,
+      picture: raw.picture?.data?.url ?? null,
+      tasks,
+      canPublish: tasks.some((t) => META_PUBLISH_TASKS.has(t)),
+      accessToken: longLived.accessToken,
+      expiresAt: longLived.expiresAt,
+    });
+  }
+  return pages;
+}
+
+/**
+ * Decide which Page a Facebook connection will publish to, and build the
+ * plaintext-safe metadata. Pure so the decision is testable without a database.
+ *
+ * Auto-selection only happens when exactly one Page is publishable. Taking
+ * `pages[0]` otherwise would risk posting customer content to the wrong Page —
+ * a mistake Facebook will happily accept, so we never get a second chance.
+ */
+export function planMetaConnection(
+  pages: StoredMetaPage[],
+  opts: { appId: string; userName: string | null; version: string },
+) {
+  const selectable = pages.filter((p) => p.canPublish);
+  const chosen = selectable.length === 1 ? selectable[0]! : null;
+  return {
+    chosen,
+    pageSelectionRequired: chosen === null,
+    publicMeta: {
+      appId: opts.appId,
+      graphVersion: opts.version,
+      userName: opts.userName,
+      selectedPageId: chosen?.id ?? null,
+      pageName: chosen?.name ?? null,
+      pageAccessToken: chosen?.accessToken ?? null,
+      pageTokenExpiresAt: chosen?.expiresAt ?? null,
+      pageSelectionRequired: chosen === null,
+      availablePages: pages.map(publicPageSummary),
+    },
+  };
+}
+
+async function resolveMetaIdentity(channel: PublishingChannel, userToken: string, clientId: string) {
+  const version = graphVersionFor();
+  const appSecret = process.env.META_APP_SECRET ?? null;
+
+  const me = await providerFetch(`${META_GRAPH_BASE}/${version}/me?fields=id,name&access_token=${encodeURIComponent(userToken)}`);
+  if (me.status >= 400) return null;
+  const meBody = me.body as { id?: string; name?: string };
+
+  const pages = await fetchManagedPages(userToken, clientId, appSecret, version);
+  if (pages.length === 0) {
+    return {
+      identity: {
+        accountId: meBody?.id ?? null,
+        accountName: meBody?.name ?? null,
+        pageId: null,
+        meta: { appId: clientId, graphVersion: version, userName: meBody?.name ?? null, availablePages: [] as MetaPageSummary[], pageSelectionRequired: true, noPagesGranted: true },
+      },
+    };
+  }
+
+  if (channel === "INSTAGRAM") {
+    // Instagram publishing runs on the Page's linked business account, so the
+    // Page is an intermediate rather than the publishing target.
+    const first = pages[0]!;
+    const ig = await providerFetch(
+      `${META_GRAPH_BASE}/${version}/${first.id}?fields=instagram_business_account{id,username}&access_token=${encodeURIComponent(first.accessToken)}`,
+    );
+    const igAccount = (ig.body as { instagram_business_account?: { id: string; username?: string } })?.instagram_business_account;
+    if (igAccount) {
+      return {
+        identity: {
+          accountId: igAccount.id,
+          accountName: igAccount.username ?? null,
+          pageId: first.id,
+          meta: {
+            appId: clientId,
+            graphVersion: version,
+            igProfileId: igAccount.id,
+            // NOTE: the Instagram adapter still publishes with the *user* token
+            // and must be moved onto `pageAccessToken` like Facebook.
+            pageAccessToken: first.accessToken,
+            pageId: first.id,
+            availablePages: pages.map(publicPageSummary),
+            pageSelectionRequired: false,
+          },
+        },
+      };
+    }
+  }
+
+  // Facebook: auto-select when there is exactly one candidate, otherwise leave
+  // the choice to the operator.
+  const plan = planMetaConnection(pages, { appId: clientId, userName: meBody?.name ?? null, version });
+
+  return {
+    identity: {
+      accountId: plan.chosen?.id ?? null,
+      accountName: plan.chosen?.name ?? null,
+      pageId: plan.chosen?.id ?? null,
+      meta: {
+        ...plan.publicMeta,
+        // Encrypted blob material — stripped before the plaintext column write.
+        __pages: pages,
+      },
+    },
+  };
 }
 
 function claimsId(req: { user?: unknown }) {

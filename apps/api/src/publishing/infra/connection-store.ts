@@ -93,4 +93,4 @@ export function connectionStoreFor(env: NodeJS.ProcessEnv = process.env): Creden
   return new DbConnectionStore();
 }
 
-export { encryptSecret };
+export { encryptSecret, decryptSecret };

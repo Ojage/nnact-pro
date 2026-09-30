@@ -258,6 +258,7 @@ export interface ConnectionDTO {
   accountName?: string | null;
   accountId?: string | null;
   lastValidatedAt?: string | null;
+  tokenExpiresAt?: string | null;
   lastError?: string | null;
   metadata?: Record<string, unknown>;
   capabilities: {
@@ -1257,6 +1258,13 @@ export const apiSlice = createApi({
     }),
     validateConnection: builder.mutation<{ valid: boolean; accountName?: string | null; accountId?: string | null; errorCode?: string | null; errorMessage?: string | null }, PublishingChannel>({
       query: (channel) => ({ url: `/api/connections/${channel}/validate`, method: "POST", body: {} }),
+      invalidatesTags: ["Connection"],
+    }),
+    selectChannelPage: builder.mutation<
+      { channel: string; status: string; accountName?: string | null; accountId?: string | null },
+      { channel: PublishingChannel; pageId: string }
+    >({
+      query: ({ channel, pageId }) => ({ url: `/api/connections/${channel}/select-page`, method: "POST", body: { pageId } }),
       invalidatesTags: ["Connection"],
     }),
 
@@ -2349,6 +2357,7 @@ export const {
   useOauthConnectionCallbackMutation,
   useDisconnectConnectionMutation,
   useValidateConnectionMutation,
+  useSelectChannelPageMutation,
   useAiSettingsQuery,
   useUpdateAiSettingsMutation,
   useAiProvidersQuery,
