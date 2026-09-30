@@ -164,6 +164,7 @@ export const AI_RUN_STATES = [
   "CREATING_CONTENT",
   "PUBLISHING_WEBSITE",
   "PUBLISHING_LINKEDIN",
+  "PUBLISHING_FACEBOOK",
   "PUBLISHED",
   "PARTIALLY_PUBLISHED",
   "NEEDS_ATTENTION",
@@ -255,6 +256,15 @@ export interface AiRunDTO {
   canonicalUrl: string | null;
   websitePublished: boolean;
   linkedinPublished: boolean;
+  /**
+   * Facebook cross-publish result.
+   *
+   * Unlike `linkedinPublished` this has no dedicated column: `ai_generation_runs`
+   * would need a migration, and the migration toolchain is currently unable to
+   * generate one. It is recorded in `aiMetadata.social` instead.
+   * `channel_publications` remains the authoritative per-channel record.
+   */
+  facebookPublished: boolean;
   writerProvider: string | null;
   reviewProvider: string | null;
   imageProvider: string | null;

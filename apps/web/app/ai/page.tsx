@@ -11,6 +11,7 @@ import {
   useAiRunsQuery,
   useTriggerAiRunMutation,
   useAiUsageQuery,
+  usePublishingConnectionsQuery,
 } from "@/lib/redux/api";
 import { explainRtkError } from "@/lib/redux/api";
 import type { AiAutomationSettingsDTO, AiProviderConfigDTO, AiProviderId } from "@nnact/shared";
@@ -32,6 +33,12 @@ import Link from "next/link";
 const PROVIDERS: AiProviderId[] = ["OPENAI", "CLAUDE", "GROK"];
 const PROVIDER_NAMES: Record<AiProviderId, string> = { OPENAI: "OpenAI", CLAUDE: "Anthropic Claude", GROK: "xAI Grok" };
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
+const AUTOMATION_CHANNELS = ["WEBSITE", "LINKEDIN", "FACEBOOK"] as const;
+const CHANNEL_LABELS: Record<(typeof AUTOMATION_CHANNELS)[number], string> = {
+  WEBSITE: "Website",
+  LINKEDIN: "LinkedIn",
+  FACEBOOK: "Facebook",
+};
 const STATUS_COLOR: Record<string, string> = {
   CONNECTED: "bg-green/10 text-green",
   DISCONNECTED: "bg-fg-dim/10 text-fg-dim",
@@ -49,6 +56,9 @@ export default function AiPage() {
   const healthQ = useAiHealthQuery();
   const runsQ = useAiRunsQuery({ take: 12 });
   const usageQ = useAiUsageQuery();
+  const connectionsQ = usePublishingConnectionsQuery();
+  const facebookConnected =
+    connectionsQ.data?.connections.some((c) => c.channel === "FACEBOOK" && c.status === "CONNECTED") ?? false;
 
   const [saveSettings, saveStatus] = useUpdateAiSettingsMutation();
   const [saveProvider] = useSaveAiProviderMutation();
@@ -218,12 +228,17 @@ export default function AiPage() {
               <div className="space-y-2">
                 <Label className="text-xs text-fg-muted">Channels</Label>
                 <div className="flex flex-wrap gap-2">
-                  {["WEBSITE", "LINKEDIN"].map((channel) => (
+                  {AUTOMATION_CHANNELS.map((channel) => (
                     <Button key={channel} size="sm" variant={settings.channels.includes(channel) ? "default" : "secondary"} onClick={() => patch({ channels: settings.channels.includes(channel) ? settings.channels.filter((c) => c !== channel) : [...settings.channels, channel] })}>
-                      {channel}
+                      {CHANNEL_LABELS[channel]}
                     </Button>
                   ))}
                 </div>
+                {settings.channels.includes("FACEBOOK") && !facebookConnected && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Facebook is not connected yet. Posts to it will fail until you connect and choose a Page under Channels.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs text-fg-muted">Text provider order</Label>

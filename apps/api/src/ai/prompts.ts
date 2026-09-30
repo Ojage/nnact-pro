@@ -23,7 +23,8 @@ export const ARTICLE_JSON_SCHEMA_DOC = `Return ONE JSON object only, no markdown
   ],
   "hashtags": ["#nnact", "#maintenance", "..."],
   "tags": ["4-8 lowercase SEO keywords that describe the article's real subject (services, equipment, locations, symptoms, benefits), each without '#'", "..."],
-  "linkedinCaption": "<= 1400 chars, plain text, no markdown, ends inviting a visit"
+  "linkedinCaption": "<= 1400 chars, plain text, no markdown, ends inviting a visit",
+  "facebookPost": "<= 2000 chars, conversational and self-contained (Facebook readers do not follow a link), no markdown, ends with a question or invitation"
 }
 Block types allowed: heading, paragraph, maintenanceTip, safetyNotice, serviceCta. Every "text" field must be plain text — no markdown, no emoji overload (max 1-2 emojis), no links.`;
 

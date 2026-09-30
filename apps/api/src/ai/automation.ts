@@ -28,6 +28,47 @@ import { windowStarts, costCentsForTextResult } from "./usage.js";
 /** System actor for AI-generated content; not a real user, never exposed. */
 const AI_ACTOR = "00000000-0000-4000-8000-0000000000a1";
 
+/** Social channels the automation cross-publishes to, in publish order. */
+const AUTOMATION_SOCIAL_CHANNELS = ["LINKEDIN", "FACEBOOK"] as const;
+type AutomationSocialChannel = (typeof AUTOMATION_SOCIAL_CHANNELS)[number];
+
+const SOCIAL_RUN_STATE: Record<AutomationSocialChannel, AiRunState> = {
+  LINKEDIN: "PUBLISHING_LINKEDIN",
+  FACEBOOK: "PUBLISHING_FACEBOOK",
+};
+
+/**
+ * Did this social channel actually publish?
+ *
+ * `PublicationWorker.sweep()` records provider failures on the publication row
+ * and never throws, so a sweep that "ran fine" does not mean the post went out.
+ * Treating a completed sweep as success reported PUBLISHED for posts that were
+ * never delivered — the failure only surfaced later on the publications page.
+ * Exported for direct test coverage of that regression.
+ */
+export function socialPublishSucceeded(summary: { succeeded: number; failed: number }): boolean {
+  return summary.failed === 0 && summary.succeeded > 0;
+}
+
+/**
+ * Per-channel post copy. Facebook copy is self-contained because a Facebook
+ * reader will not follow a link out of the post; LinkedIn copy is short and
+ * leans on the canonical link. Both degrade to the summary, then the headline,
+ * so a writer that ignores the new field still produces a usable post.
+ */
+export function socialCopyFor(
+  channel: AutomationSocialChannel,
+  article: { title: string; summary?: string; linkedinCaption?: string; facebookPost?: string },
+  canonicalUrl: string,
+): string {
+  if (channel === "FACEBOOK") {
+    const body = article.facebookPost?.trim() || article.summary?.trim() || article.title;
+    return body;
+  }
+  const caption = article.linkedinCaption?.trim() || article.summary?.trim() || article.title;
+  return `${caption}\n\n${canonicalUrl}`;
+}
+
 /**
  * Cap on the rejected draft persisted for diagnosis. Enough to contain the
  * sentence that tripped the gate without storing a whole article per failure.
@@ -293,7 +334,7 @@ export class AutomationEngine {
     }
   }
 
-  private async executeSlot(ctx: SlotRun): Promise<{ finalState: AiRunState; websitePublished: boolean; linkedinPublished: boolean; writerProvider: AiProviderId | null }> {
+  private async executeSlot(ctx: SlotRun): Promise<{ finalState: AiRunState; websitePublished: boolean; linkedinPublished: boolean; facebookPublished: boolean; writerProvider: AiProviderId | null }> {
     const { orgId, settings } = ctx;
     const runId = ctx.run.id;
     const now = this.deps.now();
@@ -341,7 +382,7 @@ export class AutomationEngine {
       recentTitles: recentTitles.slice(0, 8),
     });
 
-    let article: { title: string; seoTitle: string; seoDescription?: string; summary?: string; blocks: ArticleBlock[]; hashtags: string[]; tags: string[]; linkedinCaption?: string } | null = null;
+    let article: { title: string; seoTitle: string; seoDescription?: string; summary?: string; blocks: ArticleBlock[]; hashtags: string[]; tags: string[]; linkedinCaption?: string; facebookPost?: string } | null = null;
     let writerProvider: AiProviderId | null = null;
     for (let attempt = 0; attempt <= 1 && !article; attempt++) {
       const prompt = attempt === 1 ? rewriteDirective(articlePrompt) : articlePrompt;
@@ -409,6 +450,7 @@ export class AutomationEngine {
         hashtags: Array.isArray(data.hashtags) ? data.hashtags.map(String).filter((h) => /^#[\w-]{2,}$/.test(h)).slice(0, 6) : ["#nnact"],
         tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
         linkedinCaption: typeof data.linkedinCaption === "string" ? data.linkedinCaption : undefined,
+        facebookPost: typeof data.facebookPost === "string" ? data.facebookPost : undefined,
       };
     }
     if (!article) throw new Error("unable to produce an acceptable article draft");
@@ -468,27 +510,60 @@ export class AutomationEngine {
     const canonicalUrl = `${publicSiteUrl(process.env).replace(/\/$/, "")}/en/blog/${created.slug}`;
     await this.deps.runs.updateRun(orgId, runId, { canonicalUrl });
 
-    // 7 · LinkedIn (best-effort, after website success)
-    let linkedinPublished = false;
-    if (settings.channels.includes("LINKEDIN")) {
-      const caption = article.linkedinCaption?.trim() || article.summary?.trim() || article.title;
+    // 7 · Social channels (after website success).
+    //
+    // Each channel is genuinely best-effort: a social failure must not lose the
+    // website post that already went out. Success is read back from the worker
+    // summary rather than assumed, because sweep() records provider failures on
+    // the publication row instead of throwing — assuming success here would
+    // report PUBLISHED for a post that never reached the network.
+    const socialPublished: Record<string, boolean> = {};
+    for (const channel of AUTOMATION_SOCIAL_CHANNELS) {
+      if (!settings.channels.includes(channel)) {
+        socialPublished[channel] = false;
+        continue;
+      }
+      const copy = socialCopyFor(channel, article, canonicalUrl);
       await upsertVariant(orgId, {
         contentId: created.id,
-        channel: "LINKEDIN",
+        channel,
         enabled: true,
         titleOverride: article.title,
-        bodyOverride: `${caption}\n\n${canonicalUrl}`,
+        bodyOverride: copy,
         caption: null,
         hashtags: article.hashtags,
       });
-      await this.deps.runs.updateRun(orgId, runId, { state: "PUBLISHING_LINKEDIN" });
-      await services.publishUseCase.publish({ orgId, contentId: created.id, actorId: AI_ACTOR, channels: ["LINKEDIN"] });
-      await services.worker.sweep(this.deps.now());
-      linkedinPublished = true;
+      try {
+        await this.deps.runs.updateRun(orgId, runId, { state: SOCIAL_RUN_STATE[channel] });
+        await services.publishUseCase.publish({ orgId, contentId: created.id, actorId: AI_ACTOR, channels: [channel] });
+        const summary = await services.worker.sweep(this.deps.now());
+        socialPublished[channel] = socialPublishSucceeded(summary);
+        if (channel === "FACEBOOK") {
+          await this.deps.runs.updateRun(orgId, runId, { facebookPublished: socialPublished.FACEBOOK });
+        }
+        if (!socialPublished[channel]) {
+          await this.deps.runs.updateRun(orgId, runId, {
+            state: "PARTIALLY_PUBLISHED",
+            error: `${channel} publish failed (worker: ${summary.succeeded} ok, ${summary.failed} failed)`,
+          });
+        }
+      } catch (err) {
+        // Enqueue/sweep blew up entirely. Keep the website post, record why.
+        socialPublished[channel] = false;
+        const detail = err instanceof Error ? err.message : String(err);
+        await this.deps.runs.updateRun(orgId, runId, {
+          state: "PARTIALLY_PUBLISHED",
+          error: `${channel} publish error: ${detail}`.slice(0, 500),
+        });
+      }
     }
 
-    const finalState: AiRunState = linkedinPublished || !settings.channels.includes("LINKEDIN") ? "PUBLISHED" : "PARTIALLY_PUBLISHED";
-    return { finalState, websitePublished: true, linkedinPublished, writerProvider };
+    const requestedSocial = AUTOMATION_SOCIAL_CHANNELS.filter((c) => settings.channels.includes(c));
+    const anySocialFailed = requestedSocial.some((c) => !socialPublished[c]);
+    const linkedinPublished = socialPublished.LINKEDIN === true;
+    const facebookPublished = socialPublished.FACEBOOK === true;
+    const finalState: AiRunState = anySocialFailed ? "PARTIALLY_PUBLISHED" : "PUBLISHED";
+    return { finalState, websitePublished: true, linkedinPublished, facebookPublished, writerProvider };
   }
 
   /** Health/monitoring snapshot for the admin UI. */

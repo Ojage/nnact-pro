@@ -27,7 +27,7 @@ const settingsBody = z.object({
   morningTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   eveningTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   enabledDays: z.array(z.enum(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"])).optional(),
-  channels: z.array(z.enum(["WEBSITE", "LINKEDIN"])).optional(),
+  channels: z.array(z.enum(["WEBSITE", "LINKEDIN", "FACEBOOK"])).optional(),
   textProviderOrder: z.array(z.enum(AI_PROVIDERS)).optional(),
   imageProvider: z.enum(AI_PROVIDERS).nullable().optional(),
   reviewProvider: z.enum(AI_PROVIDERS).nullable().optional(),

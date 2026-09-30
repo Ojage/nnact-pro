@@ -243,6 +243,9 @@ function toRunDTO(row: typeof aiGenerationRuns.$inferSelect): AiRunDTO {
     canonicalUrl: row.canonicalUrl,
     websitePublished: Boolean(row.websitePublishedAt),
     linkedinPublished: Boolean(row.linkedinPublishedAt),
+    facebookPublished: Boolean(
+      ((row.aiMetadata as Record<string, unknown> | null)?.social as { FACEBOOK?: { published?: boolean } } | null)?.FACEBOOK?.published,
+    ),
     writerProvider: row.writerProvider,
     reviewProvider: row.reviewProvider,
     imageProvider: row.imageProvider,
@@ -287,8 +290,7 @@ export class DbRunStore implements AiRunStorePort {
   }
 
   async updateRun(orgId: string, runId: string, patch: Partial<AiRunDTO>): Promise<AiRunDTO> {
-    const changes: Record<string, unknown> = { updatedAt: new Date() };
-    if (patch.state !== undefined) changes.state = patch.state;
+    const changes: Record<string, unknown> = { updatedAt: new Date() };    if (patch.state !== undefined) changes.state = patch.state;
     if (patch.topic !== undefined) changes.topic = patch.topic;
     if (patch.angle !== undefined) changes.angle = patch.angle;
     if (patch.categoryName !== undefined) changes.categoryName = patch.categoryName;
@@ -297,6 +299,24 @@ export class DbRunStore implements AiRunStorePort {
     if (patch.canonicalUrl !== undefined) changes.canonicalUrl = patch.canonicalUrl;
     if (patch.websitePublished !== undefined && patch.contentId) changes.websitePublishedAt = patch.websitePublished ? new Date() : null;
     if (patch.linkedinPublished !== undefined && patch.contentId) changes.linkedinPublishedAt = patch.linkedinPublished ? new Date() : null;
+    // Facebook has no column (see AiRunDTO.facebookPublished); fold the flag
+    // into the jsonb metadata rather than silently dropping it.
+    if (patch.facebookPublished !== undefined) {
+      const [current] = await db
+        .select({ aiMetadata: aiGenerationRuns.aiMetadata })
+        .from(aiGenerationRuns)
+        .where(and(eq(aiGenerationRuns.orgId, orgId), eq(aiGenerationRuns.id, runId)))
+        .limit(1);
+      const existing = (current?.aiMetadata as Record<string, unknown> | null) ?? {};
+      const social = (existing.social as Record<string, unknown> | null) ?? {};
+      changes.aiMetadata = {
+        ...existing,
+        social: {
+          ...social,
+          FACEBOOK: { ...((social.FACEBOOK as Record<string, unknown>) ?? {}), published: patch.facebookPublished },
+        },
+      };
+    }
     if (patch.writerProvider !== undefined) changes.writerProvider = patch.writerProvider;
     if (patch.reviewProvider !== undefined) changes.reviewProvider = patch.reviewProvider;
     if (patch.imageProvider !== undefined) changes.imageProvider = patch.imageProvider;
