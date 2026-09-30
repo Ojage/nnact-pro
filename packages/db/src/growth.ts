@@ -274,6 +274,13 @@ export const growthCampaignPurpose = pgEnum("growth_campaign_purpose", [
   "COLD_OUTREACH",
   "PERMISSION_MARKETING",
   "EXISTING_CUSTOMER",
+  /**
+   * A staff reply to an inbound conversation. Distinct from the other three so
+   * the send log can prove what was sent: a reply is a response to someone who
+   * wrote to us, which is not the same act as a campaign step, and must never
+   * be inferred from a campaign's purpose after the fact.
+   */
+  "REPLY",
 ]);
 
 export const growthCampaignStatus = pgEnum("growth_campaign_status", [
@@ -445,15 +452,26 @@ export const growthOutboundMessages = pgTable(
   {
     id: id(),
     orgId: orgId(),
-    campaignId: uuid("campaign_id")
-      .notNull()
-      .references(() => growthCampaigns.id, { onDelete: "cascade" }),
-    stepId: uuid("step_id")
-      .notNull()
-      .references(() => growthCampaignSteps.id, { onDelete: "cascade" }),
-    recipientId: uuid("recipient_id")
-      .notNull()
-      .references(() => growthCampaignRecipients.id, { onDelete: "cascade" }),
+    /**
+     * Nullable because a staff reply to an inbound conversation is not a
+     * campaign step: it belongs to a thread, and the thread may predate any
+     * campaign. Campaign sends always set this.
+     */
+    campaignId: uuid("campaign_id").references(() => growthCampaigns.id, { onDelete: "cascade" }),
+    /** Null for replies; set for every campaign send. See `campaignId`. */
+    stepId: uuid("step_id").references(() => growthCampaignSteps.id, { onDelete: "cascade" }),
+    /**
+     * The staff member who triggered the send, for replies sent by hand.
+     * Null for automated campaign sends, which are attributed to the campaign
+     * instead — so the log always says whether a message was automated or a
+     * person wrote it.
+     */
+    sentByUserId: uuid("sent_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * Null for a reply on a thread that predates any campaign. Campaign sends
+     * always set it.
+     */
+    recipientId: uuid("recipient_id").references(() => growthCampaignRecipients.id, { onDelete: "cascade" }),
     prospectId: uuid("prospect_id")
       .notNull()
       .references(() => growthProspects.id, { onDelete: "cascade" }),
@@ -473,7 +491,12 @@ export const growthOutboundMessages = pgTable(
     fromDisplayName: text("from_display_name"),
     status: growthOutboundStatus("status").default("QUEUED").notNull(),
     providerMessageId: text("provider_message_id"),
-    /** Unified inbox thread when this send was mirrored into conversations. */
+    /**
+     * Unified inbox thread this send belongs to. Set for a staff reply (the
+     * send *is* the thread's next message) and for campaign sends that were
+     * mirrored into the conversation. Read back by the conversation route to
+     * reconstruct a thread from the send log.
+     */
     inboxThreadId: uuid("inbox_thread_id"),
     /** Machine-readable refusal code, e.g. "suppressed" or "cold_transport_not_configured". */
     blockedReason: text("blocked_reason"),

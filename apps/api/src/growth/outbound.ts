@@ -86,7 +86,7 @@ export function isStepDue(delayDays: number, lastSentAt: Date | null, now: Date)
   return now.getTime() >= lastSentAt.getTime() + delayDays * 24 * HOUR_MS;
 }
 
-function toSenderIdentity(row: typeof growthSenderIdentities.$inferSelect): SenderIdentity {
+export function toSenderIdentity(row: typeof growthSenderIdentities.$inferSelect): SenderIdentity {
   return {
     id: row.id,
     displayName: row.displayName,

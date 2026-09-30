@@ -13,7 +13,8 @@ import {
 } from "@nnact/db";
 import { GROWTH_REPLY_INTENTS } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
-import { requireGrowthRead } from "../growth/access.js";
+import { requireGrowthRead, requireGrowthWrite } from "../growth/access.js";
+import { sendThreadReply } from "../growth/reply-send.js";
 
 const uuid = z.string().uuid();
 
@@ -211,5 +212,44 @@ export async function growthConversationsRoutes(app: FastifyInstance) {
         createdAt: o.createdAt.toISOString(),
       })),
     };
+  });
+
+  // Staff reply to a thread. Write-gated (not owner-only): replying to inbound
+  // mail is ordinary staff work, unlike changing sender identities or campaign
+  // strategy. The suppression re-check and the org pause live in the service.
+  app.post("/conversations/:threadId/reply", async (req, reply) => {
+    const claims = await requireGrowthWrite(req, reply);
+    if (!claims) return;
+    const orgId = await resolveOrgId(req);
+    const threadId = uuid.parse((req.params as { threadId: string }).threadId);
+
+    const body = z
+      .object({
+        bodyText: z.string().min(1).max(20_000),
+        subject: z.string().min(1).max(300).optional(),
+      })
+      .safeParse(req.body);
+    if (!body.success) {
+      return reply.code(400).send({ error: "invalid_body", details: body.error.flatten() });
+    }
+
+    const result = await sendThreadReply({
+      orgId,
+      threadId,
+      bodyText: body.data.bodyText,
+      subject: body.data.subject ?? null,
+      sentByUserId: claims.userId,
+    });
+
+    if (result.status === "refused") {
+      // 409 for a policy refusal (suppressed, paused, thread not sendable) so a
+      // client can distinguish "you may not" from "the request was malformed".
+      const status = result.code === "not_found" ? 404 : 409;
+      return reply.code(status).send({ error: result.code, message: result.message });
+    }
+    if (result.status === "duplicate") {
+      return reply.code(200).send({ sent: false, duplicate: true, outboundMessageId: result.outboundMessageId });
+    }
+    return reply.code(201).send({ sent: true, outboundMessageId: result.outboundMessageId });
   });
 }

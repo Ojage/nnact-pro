@@ -22,7 +22,13 @@
 
 import { resolveSmtpConfig, type SmtpConfig } from "../mailer.js";
 
-export type MessagePurpose = "transactional" | "permission_marketing" | "cold_outreach";
+/**
+ * `reply` is a response to someone who wrote to us, so it is permitted on the
+ * same transport as opted-in marketing and is never subject to cold-approval
+ * rules. It is kept as its own value so the send log distinguishes a staff
+ * reply from a campaign step.
+ */
+export type MessagePurpose = "transactional" | "permission_marketing" | "cold_outreach" | "reply";
 
 export type TransportId = "resend" | "cold_transport";
 
@@ -31,7 +37,7 @@ export const TRANSPORT_PERMITTED_PURPOSES: Readonly<Record<TransportId, readonly
   Object.freeze({
     // Resend: transactional + opted-in marketing only. Cold prospecting is
     // excluded by provider AUP.
-    resend: Object.freeze(["transactional", "permission_marketing"] as const),
+    resend: Object.freeze(["transactional", "permission_marketing", "reply"] as const),
     // The dedicated cold transport is provisioned for cold outreach only, so a
     // misconfigured campaign cannot leak transactional mail onto a bulk-sending
     // reputation.

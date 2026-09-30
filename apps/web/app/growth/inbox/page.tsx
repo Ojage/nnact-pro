@@ -14,8 +14,10 @@ import {
   useGrowthInboxMessagesQuery,
   useGrowthInboxThreadNotesQuery,
   usePatchGrowthInboxThreadMutation,
+  useSendGrowthThreadReplyMutation,
   explainRtkError,
 } from "@/lib/redux/api";
+import { useSessionUser } from "@/lib/use-session-user";
 
 const VIEW_LABELS: Record<GrowthInboxView, string> = {
   all: "All",
@@ -34,6 +36,7 @@ export default function UnifiedInboxPage() {
   const [view, setView] = useState<GrowthInboxView>("all");
   const [selected, setSelected] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [replyText, setReplyText] = useState("");
 
   const { data: threads = [], refetch } = useGrowthConversationsSearchQuery({
     q: q.trim() || undefined,
@@ -43,6 +46,11 @@ export default function UnifiedInboxPage() {
   const { data: notes = [] } = useGrowthInboxThreadNotesQuery(selected ?? "", { skip: !selected });
   const [addNote] = useAddGrowthInboxThreadNoteMutation();
   const [patchThread] = usePatchGrowthInboxThreadMutation();
+  const [sendReply, { isLoading: sending }] = useSendGrowthThreadReplyMutation();
+  const { user } = useSessionUser();
+  // Replying is write-level staff work, matching the route gate. Read-only
+  // Growth roles can triage and take notes but cannot send mail.
+  const canReply = user?.role === "owner" || user?.role === "dispatcher" || user?.role === "secretary";
 
   const selectedThread = threads.find((t) => t.id === selected);
 
@@ -65,6 +73,21 @@ export default function UnifiedInboxPage() {
       toast.success("Note saved");
     } catch (error) {
       toast.error(explainRtkError(error, "Could not save note"));
+    }
+  }
+
+  async function submitReply() {
+    if (!selected || !replyText.trim()) return;
+    try {
+      const result = await sendReply({ threadId: selected, bodyText: replyText.trim() }).unwrap();
+      setReplyText("");
+      if (result.duplicate) {
+        toast.info("That reply was already sent");
+      } else {
+        toast.success("Reply sent");
+      }
+    } catch (error) {
+      toast.error(explainRtkError(error, "Could not send reply"));
     }
   }
 
@@ -132,6 +155,31 @@ export default function UnifiedInboxPage() {
                     <p className="whitespace-pre-wrap">{m.bodyText}</p>
                   </div>
                 ))}
+                <div className="border-t border-border pt-3">
+                  <p className="mb-2 text-xs font-semibold text-fg-muted">Reply</p>
+                  {canReply ? (
+                    <>
+                      <Textarea
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        rows={4}
+                        placeholder={`Reply to ${selectedThread?.senderEmail ?? "this prospect"}…`}
+                      />
+                      <div className="mt-2 flex items-center gap-2">
+                        <Button size="sm" onClick={submitReply} disabled={sending || !replyText.trim()}>
+                          {sending ? "Sending…" : "Send reply"}
+                        </Button>
+                        <p className="text-xs text-fg-muted">
+                          Sends as the thread&apos;s NNACT sender and is recorded in the outbound log.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-fg-muted">
+                      Your role can read this inbox but cannot send replies.
+                    </p>
+                  )}
+                </div>
                 <div className="border-t border-border pt-3">
                   <p className="mb-2 text-xs font-semibold text-fg-muted">Internal notes</p>
                   {notes.map((n) => (

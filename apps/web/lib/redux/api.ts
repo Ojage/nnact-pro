@@ -1907,6 +1907,17 @@ aiReserve: builder.query<Record<string, unknown>, void>({
       }),
       invalidatesTags: ["GrowthIntelligence"],
     }),
+    sendGrowthThreadReply: builder.mutation<
+      { sent: boolean; duplicate: boolean; outboundMessageId: string },
+      { threadId: string; bodyText: string; subject?: string }
+    >({
+      query: ({ threadId, ...body }) => ({
+        url: `/api/growth/conversations/${threadId}/reply`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["GrowthIntelligence"],
+    }),
     growthOpportunities: builder.query<GrowthOpportunityDTO[], { stage?: string } | void>({
       query: (params) => ({ url: "/api/growth/opportunities", params: (params ?? {}) as Record<string, unknown> }),
       providesTags: ["GrowthPipeline"],
@@ -2585,6 +2596,7 @@ export const {
   useGrowthInboxThreadNotesQuery,
   useAddGrowthInboxThreadNoteMutation,
   usePatchGrowthInboxThreadMutation,
+  useSendGrowthThreadReplyMutation,
   useStartGrowthCampaignResearchMutation,
   useEnrollGrowthCampaignFromRulesMutation,
   useGrowthOpportunitiesQuery,

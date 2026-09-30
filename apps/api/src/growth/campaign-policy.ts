@@ -33,7 +33,12 @@ import {
   type SuppressionTarget,
 } from "./send-policy.js";
 
-export type CampaignPurpose = "COLD_OUTREACH" | "PERMISSION_MARKETING" | "EXISTING_CUSTOMER";
+/**
+ * Includes REPLY for a staff reply to an inbound conversation. A reply is not a
+ * campaign step, so it never reaches `assertCampaignSendable`; the value exists
+ * on the outbound send log so a reply is never mistaken for a campaign send.
+ */
+export type CampaignPurpose = "COLD_OUTREACH" | "PERMISSION_MARKETING" | "EXISTING_CUSTOMER" | "REPLY";
 export type CampaignStatus =
   | "DRAFT"
   | "RESEARCHING"
@@ -52,6 +57,10 @@ const PURPOSE_ALLOWED_TRANSPORTS: Record<CampaignPurpose, readonly MessagePurpos
   COLD_OUTREACH: ["cold_outreach"],
   PERMISSION_MARKETING: ["permission_marketing", "transactional"],
   EXISTING_CUSTOMER: ["permission_marketing", "transactional"],
+  // A reply goes out because the recipient wrote first, so it rides the shared
+  // transport like opted-in mail. Listed here for completeness: a REPLY purpose
+  // is only ever written by the reply path, which sets the transport directly.
+  REPLY: ["permission_marketing", "reply"],
 };
 
 /** Statuses in which the scheduler may pick a campaign up and send. */
@@ -75,6 +84,9 @@ export function purposeToMessagePurpose(purpose: CampaignPurpose): MessagePurpos
     case "EXISTING_CUSTOMER":
       // Existing customers are a relationship, so their mail is transactional.
       return "transactional";
+    case "REPLY":
+      // A response to inbound mail, not an unsolicited send.
+      return "reply";
     default: {
       const exhaustive: never = purpose;
       throw new TransportPolicyError("unknown_campaign_purpose", `unknown purpose: ${String(exhaustive)}`);

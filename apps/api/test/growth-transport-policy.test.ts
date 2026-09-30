@@ -35,10 +35,14 @@ test("Resend may not carry cold outreach", () => {
   assert.equal(transportPermitsPurpose("resend", "cold_outreach"), false);
 });
 
-test("Resend carries transactional and permission marketing mail", () => {
-  assert.deepEqual(TRANSPORT_PERMITTED_PURPOSES.resend, ["transactional", "permission_marketing"]);
+test("Resend carries transactional, permission marketing and reply mail", () => {
+  // "reply" was added for staff replies to inbound conversations. A reply goes
+  // out because the recipient wrote first, so it is permitted here and nowhere
+  // else — in particular not on the cold transport.
+  assert.deepEqual(TRANSPORT_PERMITTED_PURPOSES.resend, ["transactional", "permission_marketing", "reply"]);
   assert.doesNotThrow(() => assertTransportPermitsPurpose("resend", "transactional"));
   assert.doesNotThrow(() => assertTransportPermitsPurpose("resend", "permission_marketing"));
+  assert.doesNotThrow(() => assertTransportPermitsPurpose("resend", "reply"));
 });
 
 test("cold outreach resolves to a dedicated transport, never to Resend", () => {
