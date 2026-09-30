@@ -7,7 +7,7 @@
 //     never the plaintext `metadata` jsonb column that the client can read.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchManagedPages, planMetaConnection } from "../src/routes/connections.js";
+import { fetchManagedPages, planMetaConnection, splitChannelMeta } from "../src/routes/connections.js";
 
 const APP_ID = "999888777";
 const APP_SECRET = "app-secret";
@@ -139,8 +139,8 @@ test("exactly one publishable Page is auto-selected", () => {
   const plan = planMetaConnection(pages as never, { appId: APP_ID, userName: "Owner", version: VERSION });
   assert.equal(plan.chosen?.id, "2");
   assert.equal(plan.pageSelectionRequired, false);
-  assert.equal(plan.publicMeta.pageAccessToken, LONG_LIVED);
-  assert.equal(plan.publicMeta.selectedPageId, "2");
+  assert.equal(plan.meta.pageAccessToken, LONG_LIVED);
+  assert.equal(plan.meta.selectedPageId, "2");
 });
 
 test("several publishable Pages require an explicit choice instead of taking the first", () => {
@@ -151,9 +151,9 @@ test("several publishable Pages require an explicit choice instead of taking the
   const plan = planMetaConnection(pages as never, { appId: APP_ID, userName: "Owner", version: VERSION });
   assert.equal(plan.chosen, null, "must not guess which Page to post to");
   assert.equal(plan.pageSelectionRequired, true);
-  assert.equal(plan.publicMeta.pageAccessToken, null);
-  assert.equal(plan.publicMeta.selectedPageId, null);
-  assert.equal(plan.publicMeta.availablePages.length, 2);
+  assert.equal(plan.meta.pageAccessToken, null);
+  assert.equal(plan.meta.selectedPageId, null);
+  assert.equal(plan.meta.availablePages.length, 2);
 });
 
 test("zero publishable Pages requires selection and offers nothing publishable", () => {
@@ -161,19 +161,38 @@ test("zero publishable Pages requires selection and offers nothing publishable",
   const plan = planMetaConnection(pages as never, { appId: APP_ID, userName: "Owner", version: VERSION });
   assert.equal(plan.chosen, null);
   assert.equal(plan.pageSelectionRequired, true);
-  assert.equal(plan.publicMeta.availablePages[0]!.canPublish, false);
+  assert.equal(plan.meta.availablePages[0]!.canPublish, false);
 });
 
 test("page tokens never reach the plaintext metadata column", () => {
   const pages = [{ id: "1", name: "NNACT", tasks: ["CREATE_CONTENT"], canPublish: true, accessToken: "SUPER_SECRET_TOKEN", expiresAt: null }];
   const plan = planMetaConnection(pages as never, { appId: APP_ID, userName: "Owner", version: VERSION });
-  // The selected page token IS intentionally denormalised into the encrypted
-  // blob for the adapter; what must never happen is a token riding along inside
-  // the per-page summaries that are mirrored into the readable jsonb column.
-  const summaries = plan.publicMeta.availablePages as unknown as Record<string, unknown>[];
+
+  // This is the actual persistence boundary: what `splitChannelMeta` hands to
+  // the `metadata` jsonb column. The previous version of this test only checked
+  // `availablePages`, which is why a top-level pageAccessToken leak passed CI.
+  const { __pages, ...rest } = { ...plan.meta, __pages: pages };
+  assert.ok(__pages);
+  const { publicMeta, secretMeta } = splitChannelMeta(rest);
+
+  // Top level: no token anywhere in the plaintext shape.
+  assert.equal(publicMeta.pageAccessToken, undefined, "plaintext metadata must not carry a top-level page token");
+  assert.equal(secretMeta.pageAccessToken, "SUPER_SECRET_TOKEN", "the token must still reach the encrypted blob");
+  for (const [key, value] of Object.entries(publicMeta)) {
+    assert.notEqual(value, "SUPER_SECRET_TOKEN", `plaintext metadata key ${key} leaked the token`);
+  }
+
+  // Nested per-page summaries are mirrored into the readable column too.
+  const summaries = publicMeta.availablePages as unknown as Record<string, unknown>[];
   for (const summary of summaries) {
     assert.equal(summary.accessToken, undefined, "availablePages must not carry tokens");
     assert.equal(summary.expiresAt, undefined, "availablePages must not carry token metadata");
   }
-  assert.deepEqual(Object.keys(plan.publicMeta.availablePages[0]!).sort(), ["canPublish", "id", "name", "picture", "tasks"]);
+  assert.deepEqual(Object.keys(summaries[0]!).sort(), ["canPublish", "id", "name", "picture", "tasks"]);
+});
+
+test("the Instagram plan's page token is also routed to the encrypted blob only", () => {
+  const { publicMeta, secretMeta } = splitChannelMeta({ igProfileId: "1784", pageId: "1", pageAccessToken: "IG_PAGE_TOKEN" });
+  assert.deepEqual(publicMeta, { igProfileId: "1784", pageId: "1" });
+  assert.deepEqual(secretMeta, { pageAccessToken: "IG_PAGE_TOKEN" });
 });

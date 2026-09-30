@@ -21,6 +21,22 @@ function isChannel(v: string): v is PublishingChannel {
 
 const redirectBase = () => (process.env.PUBLIC_WEB_URL ?? "http://localhost:3003").replace(/\/$/, "");
 
+// A Page access token is a *write* credential for that Page. Every persistence
+// site splits channel metadata through `splitChannelMeta` so the token reaches
+// `credentialsCipher` and nothing else: the plaintext `metadata` jsonb column is
+// returned verbatim by GET / and is readable by anyone with DB access.
+const SECRET_META_KEYS = new Set(["pageAccessToken"]);
+
+export function splitChannelMeta(meta: Record<string, unknown>) {
+  const publicMeta: Record<string, unknown> = {};
+  const secretMeta: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(meta)) {
+    if (SECRET_META_KEYS.has(key)) secretMeta[key] = value;
+    else publicMeta[key] = value;
+  }
+  return { publicMeta, secretMeta };
+}
+
 interface OAuthConfig {
   clientId: string;
   clientSecret: string | null;
@@ -46,10 +62,12 @@ function oauthConfigFor(channel: PublishingChannel): OAuthConfig | null {
         `https://www.facebook.com/${graphVersionFor()}/dialog/oauth`,
         `https://graph.facebook.com/${graphVersionFor()}/oauth/access_token`,
         // Minimum permissions for Page publishing only.
-        // pages_manage_engagement is what authorises DELETE on a post, so
-        // without it unpublish/retry would fail with error 200.
-        // Requesting only what we use keeps the App Review surface minimal.
-        "pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement",
+        // pages_manage_engagement is deliberately NOT requested: Meta rejects
+        // the whole consent screen with "Invalid Scopes" unless the app is
+        // approved for it, and it is not on the standard App Review list.
+        // Consequence: DELETE /unpublish may be refused, so edit is a
+        // delete-then-repost that can fail on pages the app cannot delete from.
+        "pages_show_list,pages_read_engagement,pages_manage_posts",
       );
     case "INSTAGRAM":
       return envOAuth(
@@ -175,9 +193,9 @@ export async function connectionRoutes(app: FastifyInstance) {
 
     // Page tokens are secrets: they belong in the encrypted blob only. The
     // plaintext jsonb metadata column gets the public summary, nothing more.
-    const rawMeta = (identity?.meta ?? {}) as Record<string, unknown>;
-    const { __pages: storedPages, ...publicMeta } = rawMeta;
+    const { __pages: storedPages, ...restMeta } = (identity?.meta ?? {}) as Record<string, unknown>;
     const pages = Array.isArray(storedPages) ? (storedPages as StoredMetaPage[]) : [];
+    const { publicMeta, secretMeta } = splitChannelMeta(restMeta);
     const pageSelectionRequired = publicMeta.pageSelectionRequired === true;
 
     // Prefer the selected Page token's lifetime (~60 days) over the user
@@ -202,7 +220,7 @@ export async function connectionRoutes(app: FastifyInstance) {
         accessToken,
         accountId: identity?.accountId ?? null,
         pageId: identity?.pageId ?? null,
-        meta: { ...publicMeta, pages },
+        meta: { ...publicMeta, ...secretMeta, pages },
       }),
     );
 
@@ -290,13 +308,21 @@ export async function connectionRoutes(app: FastifyInstance) {
     if (!page) return reply.code(400).send({ error: "that page is not available on this connection" });
     if (!page.canPublish) return reply.code(400).send({ error: `no CREATE_CONTENT task on "${page.name}"` });
 
-    const publicMeta = { ...(blob.meta ?? {}) } as Record<string, unknown>;
-    delete publicMeta.pages;
+    // `pages` is kept in the encrypted blob (it holds every Page token) so a
+    // later switch to a different Page still has the list to choose from.
+    const { pages: blobPages, ...restBlobMeta } = (blob.meta ?? {}) as Record<string, unknown>;
+    const { publicMeta, secretMeta } = splitChannelMeta(restBlobMeta);
     publicMeta.selectedPageId = page.id;
     publicMeta.pageName = page.name;
-    publicMeta.pageAccessToken = page.accessToken;
     publicMeta.pageTokenExpiresAt = page.expiresAt;
     publicMeta.pageSelectionRequired = false;
+    secretMeta.pageAccessToken = page.accessToken;
+
+    const encryptedMeta = {
+      ...publicMeta,
+      ...secretMeta,
+      ...(Array.isArray(blobPages) ? { pages: blobPages } : {}),
+    };
 
     await db
       .update(publishingConnections)
@@ -304,7 +330,7 @@ export async function connectionRoutes(app: FastifyInstance) {
         status: "CONNECTED",
         accountName: page.name,
         accountId: page.id,
-        credentialsCipher: encryptSecret(JSON.stringify({ ...blob, accountId: page.id, pageId: page.id, meta: publicMeta })),
+        credentialsCipher: encryptSecret(JSON.stringify({ ...blob, accountId: page.id, pageId: page.id, meta: encryptedMeta })),
         tokenExpiresAt: page.expiresAt ? new Date(page.expiresAt) : null,
         lastError: null,
         metadata: publicMeta,
@@ -505,7 +531,9 @@ export function planMetaConnection(
   return {
     chosen,
     pageSelectionRequired: chosen === null,
-    publicMeta: {
+    // Pre-partition metadata. `splitChannelMeta` strips pageAccessToken at each
+    // persistence site, so this must not be treated as client-safe on its own.
+    meta: {
       appId: opts.appId,
       graphVersion: opts.version,
       userName: opts.userName,
@@ -541,7 +569,11 @@ async function resolveMetaIdentity(channel: PublishingChannel, userToken: string
 
   if (channel === "INSTAGRAM") {
     // Instagram publishing runs on the Page's linked business account, so the
-    // Page is an intermediate rather than the publishing target.
+    // Page is an intermediate rather than the publishing target. The adapter
+    // authenticates with `pageAccessToken`, so the Page token is what is stored.
+    // NOTE: this still picks `pages[0]` rather than prompting, so with several
+    // Pages it silently binds to whichever one happens to come first. Only one
+    // publishable Page is safe until Instagram gets the explicit picker.
     const first = pages[0]!;
     const ig = await providerFetch(
       `${META_GRAPH_BASE}/${version}/${first.id}?fields=instagram_business_account{id,username}&access_token=${encodeURIComponent(first.accessToken)}`,
@@ -557,8 +589,8 @@ async function resolveMetaIdentity(channel: PublishingChannel, userToken: string
             appId: clientId,
             graphVersion: version,
             igProfileId: igAccount.id,
-            // NOTE: the Instagram adapter still publishes with the *user* token
-            // and must be moved onto `pageAccessToken` like Facebook.
+            // Read by the Instagram adapter (see adapters/instagram.ts). Routed
+            // to the encrypted blob by splitChannelMeta, never to plaintext.
             pageAccessToken: first.accessToken,
             pageId: first.id,
             availablePages: pages.map(publicPageSummary),
@@ -579,7 +611,7 @@ async function resolveMetaIdentity(channel: PublishingChannel, userToken: string
       accountName: plan.chosen?.name ?? null,
       pageId: plan.chosen?.id ?? null,
       meta: {
-        ...plan.publicMeta,
+        ...plan.meta,
         // Encrypted blob material — stripped before the plaintext column write.
         __pages: pages,
       },
