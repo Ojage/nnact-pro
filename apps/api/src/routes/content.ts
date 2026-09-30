@@ -80,6 +80,19 @@ const listQuery = z.object({
   search: z.string().optional(),
 });
 
+// SEO metadata is authored by a human (or by the AI automation layer) and is
+// consumed by the public API and the publisher, so the columns already exist.
+// These fields were previously only settable by internal automation code
+// because no route forwarded them.
+const seoSchema = z.object({
+  seoTitle: z.string().max(255).optional().nullable(),
+  seoDescription: z.string().max(500).optional().nullable(),
+  canonicalUrl: z.string().url().max(2000).optional().nullable(),
+  openGraphTitle: z.string().max(255).optional().nullable(),
+  openGraphDescription: z.string().max(500).optional().nullable(),
+  openGraphMediaId: z.string().optional().nullable(),
+});
+
 const createSchema = z.object({
   type: z.enum(CONTENT_TYPES),
   title: z.string().min(1).max(255),
@@ -91,6 +104,7 @@ const createSchema = z.object({
   visibility: z.enum(CONTENT_VISIBILITY).optional(),
   language: z.string().max(10).optional(),
   featuredMediaId: z.string().optional().nullable(),
+  seo: seoSchema.optional(),
 });
 
 const variantSchema = z.object({
@@ -153,6 +167,7 @@ export async function contentRoutes(app: FastifyInstance) {
       featuredMediaId: body.featuredMediaId ?? null,
       visibility: body.visibility ?? "PUBLIC",
       language: body.language ?? "en",
+      seo: body.seo,
     });
     await contentAudit(orgId, { contentId: item.id, actorId, action: "content.created", details: { type: body.type } });
     return reply.code(201).send(item);
@@ -193,6 +208,7 @@ export async function contentRoutes(app: FastifyInstance) {
       featuredMediaId: body.featuredMediaId,
       categoryId: body.categoryId,
       tagIds,
+      seo: body.seo,
     });
     await contentAudit(orgId, { contentId: updated.id, actorId, action: "content.updated" });
     return updated;

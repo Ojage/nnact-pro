@@ -129,6 +129,14 @@ export interface CreateContentInput {
   featuredMediaId?: string | null;
   visibility?: string;
   language?: string;
+  seo?: {
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    canonicalUrl?: string | null;
+    openGraphTitle?: string | null;
+    openGraphDescription?: string | null;
+    openGraphMediaId?: string | null;
+  };
 }
 
 export async function createContent(input: CreateContentInput) {
@@ -152,6 +160,12 @@ export async function createContent(input: CreateContentInput) {
         language: input.language ?? "en",
         status: "DRAFT",
         revision: 1,
+        seoTitle: input.seo?.seoTitle,
+        seoDescription: input.seo?.seoDescription,
+        canonicalUrl: input.seo?.canonicalUrl,
+        openGraphTitle: input.seo?.openGraphTitle,
+        openGraphDescription: input.seo?.openGraphDescription,
+        openGraphMediaId: input.seo?.openGraphMediaId,
       })
       .returning();
     if (input.tagIds?.length) {
