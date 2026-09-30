@@ -26,6 +26,10 @@ const ALL_ROLES: readonly NavRole[] = ["owner", "dispatcher", "secretary", "tech
  * future routes are never blocked silently.
  */
 const ROUTE_ROLES: ReadonlyArray<readonly [string, readonly NavRole[]]> = [
+  // The FAQ documents the product to the people using it, so every staff role
+  // can read it — including roles that cannot open most of the screens it
+  // describes.
+  ["/help", ALL_ROLES],
   ["/repair-brain/workspace", ["owner", "dispatcher"]],
   ["/repair-brain", ALL_ROLES],
   ["/ai/usage", ["owner"]],
@@ -170,6 +174,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "System",
     links: [
+      { href: "/help/faq", label: "FAQ", icon: "?" },
       { href: "/integrations", label: "Integrations", icon: "⧉" },
       { href: "/settings", label: "Settings", icon: "⚙" },
     ],
