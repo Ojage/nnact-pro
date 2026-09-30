@@ -262,6 +262,13 @@ export interface AiRunDTO {
   quality: number | null;
   reserveUsed: boolean;
   error: string | null;
+  /**
+   * Free-form run metadata. Carries the rejected draft when the quality gate
+   * blocks an article, so a blocked run can be diagnosed without having to
+   * reproduce generation. Never rendered to end users — it can contain
+   * unreviewed copy.
+   */
+  aiMetadata: Record<string, unknown> | null;
   attempts: number;
   startedAt: string | null;
   completedAt: string | null;

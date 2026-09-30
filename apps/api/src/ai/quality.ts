@@ -8,15 +8,74 @@ import type { AiProviderRegistry } from "./registry.js";
 import type { QualityAssessorPort } from "./ports.js";
 import { buildQualityPrompt } from "./prompts.js";
 
+// A blocker fires only when the unsafe phrasing is NOT negated. The writer is
+// explicitly instructed to warn people away from unsafe work and to refer them
+// to a certified technician (see buildMarketingKnowledge guarantees), so
+// "Never bypass the safety interlock" is the content we WANT — blocking it
+// punished the writer for following the brand-safety brief, which is how
+// production runs started failing with "article blocked: RULE: safety bypass".
+//
+// This is a lexical heuristic, not comprehension. It deliberately matches only
+// explicit prohibitions rather than bare "not", so an encouraging sentence
+// ("you can bypass the guard") is still caught. The residual risk is a writer
+// that negates and then advises in the same clause; the review provider
+// (when configured) is the second layer for that.
+const PROHIBITION_CUES =
+  /\b(?:never|do not|don'?t|does not|doesn'?t|must not|mustn'?t|should not|shouldn'?t|shall not|cannot|can'?t|will not|won'?t|avoid|avoids|avoiding|refrain from|refuses to|prohibited|forbidden|not recommended|is not safe|isn'?t safe|are not safe|aren'?t safe|at no point|under no circumstances)\b/i;
+
+// Returns the sentence containing a match, so a cue in one sentence can never
+// excuse or condemn phrasing in another.
+function sentenceAround(text: string, matchIndex: number, matchLength: number): string {
+  const upToMatch = text.slice(0, matchIndex);
+  const start = Math.max(
+    upToMatch.lastIndexOf("."),
+    upToMatch.lastIndexOf("!"),
+    upToMatch.lastIndexOf("?"),
+    upToMatch.lastIndexOf("\n"),
+  );
+  const rest = text.slice(matchIndex + matchLength);
+  const endOffset = rest.search(/[.!?\n]/);
+  const end = endOffset === -1 ? text.length : matchIndex + matchLength + endOffset;
+  return text.slice(start + 1, end);
+}
+
+// A prohibition anywhere in that sentence disarms the blocker. Lookahead as
+// well as lookbehind, because prohibition is frequently postposed in English:
+// "bypassing the interlock is prohibited" states the rule after the phrase, and
+// a backward-only scan read that as unsafe content.
+function isNegated(text: string, matchIndex: number, matchLength: number): boolean {
+  return PROHIBITION_CUES.test(sentenceAround(text, matchIndex, matchLength));
+}
+
+// True when the sentence reports the work as someone else's professional job.
+function isAttributedToPro(text: string, matchIndex: number, matchLength: number): boolean {
+  return LICENSED_THIRD_PARTY.test(sentenceAround(text, matchIndex, matchLength));
+}
+
+// Determiners and short filler between a verb and its object. Without this,
+// "recharge the refrigerant" evaded the rule while the bare "recharge
+// refrigerant" was caught — the pattern was matching on adjacency, not meaning.
+const FILLER = String.raw`(?:\s+(?:the|a|an|your|their|its|this|that|these|those|some|any|all|own|unit's|system's|condensing|evaporating)){0,3}`;
+
+// Work attributed to a qualified third party is a report, not instructions.
+// "The refrigerant was recharged by a certified technician" must not read as
+// advice to recharge it.
+const LICENSED_THIRD_PARTY =
+  /\b(?:certified|licensed|qualified|trained|professional|accredited|registered|competent|authori[sz]ed|approved|factory|nnact|technician|engineer|installer|specialist)\b/i;
+
 const HARD_BLOCKER_PATTERNS: { pattern: RegExp; label: string }[] = [
-  { pattern: /\b(diy|d\.i\.y\.?|do[- ]it[- ]yourself)\b/i, label: "DIY guidance" },
-  { pattern: /\b(recharge|reconnect|rewire|resolder|refill)\s+(refrigerant|compressor|condensor|condenser)\b/i, label: "unsafe refrigerant work" },
-  { pattern: /\b(replace|install|remove|change|swap)\b.{0,40}\b(relay|breaker|fuse|contactor|transformer|capacitor)\b/i, label: "layperson electrical component work" },
-  { pattern: /\b(bypass(ing)?|jump(ing)? out|short[- ]?circuit)\b/i, label: "safety bypass" },
-  { pattern: /\b(disconnect|remove|disable)\b.{0,30}\b(guard|interlock|safety|shutoff|lockout)\b/i, label: "safety device removal" },
-  { pattern: /\b(tamper|take apart|disassemble)\b.{0,30}\b(relief valve|regulator|gas|LPG|propane|ammoni[ae])\b/i, label: "attempting gas/pressure relief work" },
-  { pattern: /100%\s*(guarant|success|effective)/i, label: "unverifiable absolute claim" },
-  { pattern: /learn more (by )?contacting|schedule (a )?free (visit|inspection)/i, label: "overly promotional soft CTA" },
+  // Active voice: recharge (the) refrigerant. Verb first, object within reach.
+  { pattern: new RegExp(String.raw`\b(?:recharge|refill|top\s*up|reconnect|rewire|resolder|swap\s+out)\b${FILLER}\s+\b(?:refrigerant|compressor|condensor|condenser|evaporator|expansion\s+valve)\b`, "i"), label: "unsafe refrigerant work" },
+  // Passive voice: the refrigerant was recharged by the owner.
+  { pattern: /\b(?:refrigerant|compressor|condensor|condenser|evaporator)\b(?:\s+\w+){0,3}?\s+\b(?:was|were|is|are|has\s+been|have\s+been|gets?|got)\s+\b(?:recharged|refilled|rewired|resoldered|reconnected|topped\s+up|serviced\s+by\s+you)\b/i, label: "unsafe refrigerant work" },
+  // Layperson component work. Scoped to one sentence so it cannot pair a verb
+  // in one sentence with a component word in an unrelated one.
+  { pattern: /\b(?:replace|install|remove|change|swap|tap|bridge|jump)\b[^.!?\n]{0,40}?\b(?:relay|breaker|fuse|contactor|transformer|capacitor|ignitor|igniter|thermal\s+cut-?out|limit\s+switch)\b/i, label: "layperson electrical component work" },
+  { pattern: /\b(?:bypass(?:ing)?|bridging|defeating|jump(?:ing)?\s+(?:out|the)|short(?:ing)?\s+out)\b[^.!?\n]{0,30}?\b(?:guard|interlock|safety|shut-?off|lock-?out|limit\s+switch|pressure\s+switch)\b/i, label: "safety bypass" },
+  { pattern: /\b(?:disconnect|remove|disable|defeat|block)\b[^.!?\n]{0,30}?\b(?:guard|interlock|safety\s+switch|shut-?off|lock-?out|emergency\s+stop)\b/i, label: "safety device removal" },
+  { pattern: /\b(?:tamper\s+with|take\s+apart|disassemble|open\s+the|strip)\b[^.!?\n]{0,30}?\b(?:relief\s+valve|regulator|gas\s+valve|LPG|propane|ammoni[ae]|pressure\s+vessel|expansion\s+valve)\b/i, label: "attempting gas/pressure relief work" },
+  { pattern: /100%\s*(?:guarantee[ds]?|guarant|success|effective|problem[- ]free)/i, label: "unverifiable absolute claim" },
+  { pattern: /learn more (?:by )?contacting|schedule (?:a )?free (?:visit|inspection)/i, label: "overly promotional soft CTA" },
 ];
 
 function ruleAssessment(input: { title: string; body: string; briefTopic: string }): Partial<QualityAssessmentDTO> & { set: QualityAssessmentDTO["publishDecision"] } {
@@ -28,7 +87,12 @@ function ruleAssessment(input: { title: string; body: string; briefTopic: string
   let technicalSafety = 95;
 
   for (const { pattern, label } of HARD_BLOCKER_PATTERNS) {
-    if (pattern.test(`${input.title}\n${input.body}`)) {
+    // A negated mention ("never bypass the interlock") is the safety advice we
+    // asked the writer to produce, so it must not count against it. Nor does
+    // work attributed to a licensed third party.
+    const text = `${input.title}\n${input.body}`;
+    const match = new RegExp(pattern.source, pattern.flags.replace("g", "")).exec(text);
+    if (match && !isNegated(text, match.index, match[0].length) && !isAttributedToPro(text, match.index, match[0].length)) {
       technicalSafety = Math.min(technicalSafety, 15);
       issues.push(label);
     }

@@ -28,6 +28,12 @@ import { windowStarts, costCentsForTextResult } from "./usage.js";
 /** System actor for AI-generated content; not a real user, never exposed. */
 const AI_ACTOR = "00000000-0000-4000-8000-0000000000a1";
 
+/**
+ * Cap on the rejected draft persisted for diagnosis. Enough to contain the
+ * sentence that tripped the gate without storing a whole article per failure.
+ */
+const BLOCKED_DRAFT_MAX_CHARS = 4000;
+
 export interface AutomationEngineDeps extends AiAutomationRuntimePorts {
   registry: AiProviderRegistry;
   publicApiBaseUrl: string;
@@ -363,7 +369,32 @@ export class AutomationEngine {
       });
 
       if (assessment.publishDecision === "BLOCK") {
-        await this.deps.runs.updateRun(orgId, runId, { state: "FAILED", quality: assessment.overall, error: assessment.blockingIssues.join("; ") });
+        // Persist the rejected draft. Without it a blocked run is
+        // undiagnosable: the run row records only the rule label, so there is
+        // no way to tell which sentence tripped the gate or whether the gate
+        // was right. Truncated because a full article would bloat the row, and
+        // the offending phrasing appears early.
+        await this.deps.runs.updateRun(orgId, runId, {
+          state: "FAILED",
+          quality: assessment.overall,
+          error: assessment.blockingIssues.join("; "),
+          aiMetadata: {
+            ...(await this.deps.runs.getRun(orgId, runId))?.aiMetadata,
+            blockedDraft: {
+              attempt,
+              title,
+              seoTitle: typeof data.seoTitle === "string" ? data.seoTitle : null,
+              summary: typeof data.summary === "string" ? data.summary : null,
+              body: blocks.map((b) => b.text).join("\n").slice(0, BLOCKED_DRAFT_MAX_CHARS),
+              bodyTruncated: blocks.map((b) => b.text).join("\n").length > BLOCKED_DRAFT_MAX_CHARS,
+              blockingIssues: assessment.blockingIssues,
+              overall: assessment.overall,
+              writerProvider: result.provider,
+              model: result.model,
+              blockedAt: new Date().toISOString(),
+            },
+          },
+        });
         throw new Error(`article blocked: ${assessment.blockingIssues.join("; ")}`);
       }
       if (assessment.publishDecision === "REGENERATE" && attempt === 0) continue;

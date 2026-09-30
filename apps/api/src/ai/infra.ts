@@ -250,6 +250,7 @@ function toRunDTO(row: typeof aiGenerationRuns.$inferSelect): AiRunDTO {
     quality: ((row.quality as unknown as Record<string, unknown>)?.overall as number) ?? null,
     reserveUsed: row.reserveUsed ?? false,
     error: row.error,
+    aiMetadata: (row.aiMetadata as Record<string, unknown> | null) ?? null,
     attempts: row.attempts ?? 0,
     startedAt: iso(row.startedAt) ?? null,
     completedAt: iso(row.completedAt) ?? null,
@@ -303,6 +304,7 @@ export class DbRunStore implements AiRunStorePort {
     if (patch.quality !== undefined) changes.quality = { overall: patch.quality };
     if (patch.reserveUsed !== undefined) changes.reserveUsed = patch.reserveUsed;
     if (patch.error !== undefined) changes.error = patch.error;
+    if (patch.aiMetadata !== undefined) changes.aiMetadata = patch.aiMetadata;
     if (patch.startedAt !== undefined) changes.startedAt = patch.startedAt ? new Date(patch.startedAt) : null;
     if (patch.completedAt !== undefined) changes.completedAt = patch.completedAt ? new Date(patch.completedAt) : null;
     await db.update(aiGenerationRuns).set(changes).where(and(eq(aiGenerationRuns.orgId, orgId), eq(aiGenerationRuns.id, runId)));
