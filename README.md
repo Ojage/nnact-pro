@@ -92,16 +92,31 @@ restarting the dev servers.
 
 ### Mobile (Expo / React Native)
 
+The app ships native modules (`expo-sqlite`, `expo-notifications`,
+`expo-secure-store`) and a `google-services.json`, so it needs a development
+build. Expo Go cannot load it.
+
 ```bash
-# LAN IP of the machine running the API, or your phone's tunnel to it:
-EXPO_PUBLIC_API_URL=http://localhost:3003 pnpm --filter @nnact/mobile dev
+# Build and install the Android development build (first run and after native changes)
+pnpm --filter @nnact/mobile android
+
+# Then start the dev server; press `a` to open on the connected device
+EXPO_PUBLIC_API_URL=http://192.168.1.191:3003 pnpm --filter @nnact/mobile dev
 ```
 
-- With Expo Go installed, scan the QR code from `localhost:8081`.
+If `expo start` reports `No development build (com.nnact.nnact_technician) for
+this project is installed`, the dev build has not been installed yet — run
+`pnpm --filter @nnact/mobile android` once.
+
+- Requires the Android SDK, a JDK, and either an emulator or a USB/ADB-connected
+  device. `expo run:android` generates `apps/mobile/android` (gitignored) if it
+  is missing.
+- iOS equivalent: `pnpm --filter @nnact/mobile ios` (macOS with Xcode).
 - The app defaults to `http://localhost:3003` when `EXPO_PUBLIC_API_URL` is
   unset (`apps/mobile/App.tsx`). For a physical device point it at the API host's
   LAN IP, e.g. `EXPO_PUBLIC_API_URL=http://192.168.1.191:3003`.
-- No emulator is required; the app runs through Expo Go on the phone.
+- Store/PRE builds go through EAS: `pnpm --filter @nnact/mobile build:android:apk`
+  (preview) or `build:android:store` (production).
 
 ### One-time prerequisites and teardown
 
