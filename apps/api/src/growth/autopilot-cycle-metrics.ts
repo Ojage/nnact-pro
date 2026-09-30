@@ -19,8 +19,12 @@ export async function loadSectorMetricsFromDb(orgId: string, sectorId: string) {
       count(distinct r.id) filter (where r.status = 'CONVERTED')::int as assessments,
       count(distinct r.id) filter (where p.lifecycle = 'QUOTED')::int as estimates,
       count(distinct r.id) filter (where r.replied_at is not null)::int as positive_replies,
-      count(distinct r.id) filter (where r.opted_out_at is not null)::int as unsubscribes,
+      -- Complaints are counted apart from unsubscribes: allocation scores a
+      -- complaint at 25 and an unsubscribe at 10, so folding them together
+      -- under-reported complaint pressure (it was hardcoded 0 before).
+      count(distinct r.id) filter (where r.opted_out_at is not null and r.complained_at is null)::int as unsubscribes,
       count(distinct r.id) filter (where r.bounced_at is not null)::int as bounces,
+      count(distinct r.id) filter (where r.complained_at is not null)::int as complaints,
       greatest(1, extract(day from now() - min(c.created_at)))::int as days_observed
     from growth_campaigns c
     left join growth_campaign_recipients r on r.campaign_id = c.id
@@ -38,7 +42,7 @@ export async function loadSectorMetricsFromDb(orgId: string, sectorId: string) {
     objections: 0,
     unsubscribes: Number(m.unsubscribes ?? 0),
     bounces: Number(m.bounces ?? 0),
-    complaints: 0,
+    complaints: Number(m.complaints ?? 0),
     daysObserved: Number(m.days_observed ?? 1),
   };
 }

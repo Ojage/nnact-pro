@@ -413,6 +413,13 @@ export const growthCampaignRecipients = pgTable(
     repliedAt: timestamp("replied_at", { withTimezone: true }),
     optedOutAt: timestamp("opted_out_at", { withTimezone: true }),
     bouncedAt: timestamp("bounced_at", { withTimezone: true }),
+    /**
+     * Spam/abuse complaint from the ESP. Tracked separately from `optedOutAt`
+     * because the two carry very different weight: a complaint is scored as a
+     * much more serious signal than a polite unsubscribe, and folding them
+     * together hid complaint pressure from Autopilot allocation entirely.
+     */
+    complainedAt: timestamp("complained_at", { withTimezone: true }),
     meetingBookedAt: timestamp("meeting_booked_at", { withTimezone: true }),
     manuallyStoppedAt: timestamp("manually_stopped_at", { withTimezone: true }),
     convertedAt: timestamp("converted_at", { withTimezone: true }),

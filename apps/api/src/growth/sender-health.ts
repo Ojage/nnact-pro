@@ -1,5 +1,5 @@
-import { and, count, eq, gte } from "drizzle-orm";
-import { db, growthOutboundMessages, growthSenderIdentities } from "@nnact/db";
+import { and, count, countDistinct, eq, gte, isNotNull, or } from "drizzle-orm";
+import { db, growthCampaignRecipients, growthOutboundMessages, growthSenderIdentities } from "@nnact/db";
 
 export interface SenderHealthRow {
   senderId: string;
@@ -70,6 +70,32 @@ export async function computeSenderHealth(orgId: string): Promise<SenderHealthRo
       alerts.push("Elevated send failures in the last 30 days — check provider configuration.");
     }
 
+    // Real bounce and complaint signals attributed to this identity's own sends.
+    // This was hardcoded to 0, so sender health could never surface a degrading
+    // domain — the exact condition an owner needs to catch before the provider
+    // throttles or blocklists the identity.
+    const [bounceRow] = await db
+      .select({ n: countDistinct(growthCampaignRecipients.id) })
+      .from(growthOutboundMessages)
+      .innerJoin(growthCampaignRecipients, eq(growthOutboundMessages.recipientId, growthCampaignRecipients.id))
+      .where(
+        and(
+          eq(growthOutboundMessages.orgId, sender.orgId),
+          eq(growthOutboundMessages.senderIdentityId, sender.id),
+          gte(growthOutboundMessages.createdAt, since),
+          or(
+            isNotNull(growthCampaignRecipients.bouncedAt),
+            isNotNull(growthCampaignRecipients.complainedAt),
+          ),
+        ),
+      );
+    const bounceSignals = Number(bounceRow?.n ?? 0);
+    if (sentN > 10 && bounceSignals / sentN > 0.05) {
+      alerts.push(
+        `${bounceSignals} hard bounce or complaint signal(s) in the last 30 days — pause and review this sender before it is throttled.`,
+      );
+    }
+
     rows.push({
       senderId: sender.id,
       displayName: sender.displayName,
@@ -79,7 +105,7 @@ export async function computeSenderHealth(orgId: string): Promise<SenderHealthRo
       sent30d: sentN,
       failed30d: failedN,
       blocked30d: Number(blocked?.n ?? 0),
-      bounceSignals: 0,
+      bounceSignals,
       alerts,
     });
   }
