@@ -10,6 +10,7 @@ import type { DecryptedProviderConfig } from "./domain.js";
 import type { AiAdapterFactory, AiProviderConfigStorePort, AiProviderProbeResult } from "./ports.js";
 import { fakeAiFactory, factoryFor } from "./adapters.js";
 import type { AiUsageStorePort } from "./ports.js";
+import { costCentsForImage, costCentsForTextResult, costCentsForVision } from "./usage.js";
 
 export interface AiRegistryDeps {
   configStore: AiProviderConfigStorePort;
@@ -55,7 +56,7 @@ export class AiProviderRegistry {
     try {
       const result = await this.factory(provider).text().generateText(request, config);
       const ok = classifyTextSuccess(result);
-      await this.deps.usage?.record(orgId, { runId: (request as { runId?: string }).runId ?? null, task: request.task ?? "text", provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, latencyMs: result.latencyMs, costCents: 0 });
+      await this.deps.usage?.record(orgId, { runId: (request as { runId?: string }).runId ?? null, task: request.task ?? "text", provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, latencyMs: result.latencyMs, costCents: costCentsForTextResult(result.model, result.inputTokens, result.outputTokens) });
       if (!ok) throw new Error("empty text result");
       return { result, attempt: { provider, ok: true }, config };
     } catch (error) {
@@ -139,7 +140,7 @@ export class AiProviderRegistry {
     if (!config) return null;
     try {
       const result = await this.factory(provider).text().generateText(request, config);
-      await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "text", provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, latencyMs: result.latencyMs, costCents: 0 });
+      await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "text", provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, latencyMs: result.latencyMs, costCents: costCentsForTextResult(result.model, result.inputTokens, result.outputTokens) });
       return { result };
     } catch (error) {
       await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", `imageBrief: ${(error as Error).message}`);
@@ -154,7 +155,7 @@ export class AiProviderRegistry {
     if (!adapter) return null;
     try {
       const result = await adapter.generateImage(request, config);
-      await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "image", provider, model: result.model, inputTokens: 0, outputTokens: 0, imageCount: 1, latencyMs: result.latencyMs, costCents: 0 });
+      await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "image", provider, model: result.model, inputTokens: 0, outputTokens: 0, imageCount: 1, latencyMs: result.latencyMs, costCents: costCentsForImage(1) });
       return result;
     } catch (error) {
       await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", `image: ${(error as Error).message}`);
@@ -167,7 +168,7 @@ export class AiProviderRegistry {
     if (!resolved) return null;
     try {
       const result = await this.factory(resolved.provider).vision().analyzeImage(request, resolved.config);
-      await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "vision", provider: resolved.provider, model: result.model, inputTokens: 0, outputTokens: 0, latencyMs: result.latencyMs, costCents: 0 });
+      await this.deps.usage?.record(orgId, { runId: null, task: request.task ?? "vision", provider: resolved.provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, latencyMs: result.latencyMs, costCents: costCentsForVision(result.model, result.inputTokens, result.outputTokens) });
       return result;
     } catch (error) {
       await this.deps.configStore.setStatus(orgId, resolved.provider, "DEGRADED", `vision: ${(error as Error).message}`);

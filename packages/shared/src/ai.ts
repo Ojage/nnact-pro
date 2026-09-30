@@ -151,6 +151,9 @@ export interface VisionAnalysisResult {
   summary: string;
   latencyMs: number;
   providerRequestId: string | null;
+  /** Token counts from the provider `usage` block, for cost metering. */
+  inputTokens: number;
+  outputTokens: number;
 }
 
 // ── Automation domain ──────────────────────────────────────────────────────

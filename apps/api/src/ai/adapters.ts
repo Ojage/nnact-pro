@@ -148,6 +148,8 @@ class OpenAiVisionAdapter implements VisionProviderPort {
       summary: typeof verdict.summary === "string" ? verdict.summary : "",
       latencyMs: Date.now() - started,
       providerRequestId: data.id ?? null,
+      inputTokens: data.usage?.prompt_tokens ?? 0,
+      outputTokens: data.usage?.completion_tokens ?? 0,
     };
   }
 }
@@ -216,7 +218,7 @@ class AnthropicVisionAdapter implements VisionProviderPort {
     if (response.status < 200 || response.status >= 300) {
       throw new TransportError(extractErrorDetail(response.json, `Anthropic vision returned ${response.status}`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
     }
-    const data = response.json as { content?: { type?: string; text?: string }[]; id?: string };
+    const data = response.json as { content?: { type?: string; text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number }; id?: string };
     const verdict = parseStructured((data.content ?? []).map((b) => b.text ?? "").join("")) ?? {};
     const score = Number(verdict.score ?? 50);
     const issues = Array.isArray(verdict.issues) ? verdict.issues.map(String) : verdict.issues ? [String(verdict.issues)] : [];
@@ -230,6 +232,8 @@ class AnthropicVisionAdapter implements VisionProviderPort {
       summary: typeof verdict.summary === "string" ? verdict.summary : "",
       latencyMs: Date.now() - started,
       providerRequestId: data.id ?? null,
+      inputTokens: data.usage?.input_tokens ?? 0,
+      outputTokens: data.usage?.output_tokens ?? 0,
     };
   }
 }
@@ -294,7 +298,7 @@ class GrokVisionAdapter implements VisionProviderPort {
     if (response.status < 200 || response.status >= 300) {
       throw new TransportError(extractErrorDetail(response.json, `Grok vision returned ${response.status}`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
     }
-    const data = response.json as { choices?: { message?: { content?: string } }[]; id?: string };
+    const data = response.json as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number }; id?: string };
     const verdict = parseStructured(data.choices?.[0]?.message?.content ?? "") ?? {};
     const score = Number(verdict.score ?? 50);
     const issues = Array.isArray(verdict.issues) ? verdict.issues.map(String) : verdict.issues ? [String(verdict.issues)] : [];
@@ -307,6 +311,8 @@ class GrokVisionAdapter implements VisionProviderPort {
       summary: typeof verdict.summary === "string" ? verdict.summary : "",
       latencyMs: Date.now() - started,
       providerRequestId: data.id ?? null,
+      inputTokens: data.usage?.prompt_tokens ?? 0,
+      outputTokens: data.usage?.completion_tokens ?? 0,
     };
   }
 }
@@ -372,7 +378,7 @@ class FakeVisionAdapter implements VisionProviderPort {
   readonly provider = "OPENAI" as const;
 
   async analyzeImage(): Promise<VisionAnalysisResult> {
-    return { provider: this.provider, model: "fake-openai-gpt-4o", verdict: "PASS", score: 95, issues: [], summary: "fake review", latencyMs: 1, providerRequestId: "fake-vision" };
+    return { provider: this.provider, model: "fake-openai-gpt-4o", verdict: "PASS", score: 95, issues: [], summary: "fake review", latencyMs: 1, providerRequestId: "fake-vision", inputTokens: 1_200, outputTokens: 180 };
   }
 }
 
