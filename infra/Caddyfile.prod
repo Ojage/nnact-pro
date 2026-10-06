@@ -67,6 +67,34 @@
 	}
 }
 
+# Campaign Assistant — a separate project sharing this host. Optional like the
+# portfolio: leave either address unset and that surface simply stays offline,
+# so bringing Caddy up never depends on this stack already being deployed.
+# Service names are prefixed with campaign- because Docker DNS aliases live on
+# the shared proxy network, where an unprefixed "api"/"web" would collide with
+# this stack's own services.
+{$DMECAMPAIGN_SITE_ADDRESS} {
+	import security_headers
+	reverse_proxy campaign-web:80
+	log {
+		output stdout
+		format json
+	}
+}
+
+{$DMECAMPAIGN_API_ADDRESS} {
+	import security_headers
+	# Generations can take close to a minute and the chat endpoint streams,
+	# so never buffer the response to fill the proxy's buffer size.
+	reverse_proxy campaign-api:4000 {
+		flush_interval -1
+	}
+	log {
+		output stdout
+		format json
+	}
+}
+
 # Ojage portfolio. Static single-page app: every path resolves to index.html so
 # react-router client routes (/project/:slug) deep-link correctly on refresh.
 # Content-hashed assets are immutable; index.html must never be cached, or a

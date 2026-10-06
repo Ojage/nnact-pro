@@ -229,6 +229,11 @@ services:
       # not yet provisioned the portfolio root still brings Caddy up, rather
       # than failing the whole stack on a missing mount.
       OJAGE_PORTFOLIO_ADDRESS: ${OJAGE_PORTFOLIO_ADDRESS:-salathiel.ojage.org}
+      # Campaign Assistant, same optional treatment: default to its real
+      # hostnames so an out-of-the-box deploy publishes them, but tolerate
+      # them being unset or overridden.
+      DMECAMPAIGN_SITE_ADDRESS: ${DMECAMPAIGN_SITE_ADDRESS:-campaign.ojage.org}
+      DMECAMPAIGN_API_ADDRESS: ${DMECAMPAIGN_API_ADDRESS:-api.campaign.ojage.org}
     dns:
       - 1.1.1.1
       - 8.8.8.8
