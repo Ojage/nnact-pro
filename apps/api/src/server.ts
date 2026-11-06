@@ -8,6 +8,7 @@ import swaggerUi from "@fastify/swagger-ui";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { customerAuthRoutes } from "./routes/customer-auth.js";
+import { customerPortalRoutes } from "./routes/customer-portal.js";
 import { customerRoutes } from "./routes/customers.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { appointmentRoutes } from "./routes/appointments.js";
@@ -272,6 +273,7 @@ export function buildServer(
   app.get(withVersion("/internal/drain"), async () => apiDrain.status());
   app.register(authRoutes, { prefix: withVersion("/auth") });
   app.register(customerAuthRoutes, { prefix: withVersion("/customer-auth") });
+  app.register(customerPortalRoutes, { prefix: withVersion("/customer-auth") });
   app.register(customerRoutes, { prefix: withVersion("/customers") });
   app.register(jobRoutes, { prefix: withVersion("/jobs") });
   app.register(appointmentRoutes, { prefix: withVersion("/appointments") });
@@ -355,6 +357,7 @@ export function buildServer(
   app.get(withLegacy("/internal/drain"), async () => apiDrain.status());
   app.register(authRoutes, { prefix: withLegacy("/auth") });
   app.register(customerAuthRoutes, { prefix: withLegacy("/customer-auth") });
+  app.register(customerPortalRoutes, { prefix: withLegacy("/customer-auth") });
   app.register(customerRoutes, { prefix: withLegacy("/customers") });
   app.register(jobRoutes, { prefix: withLegacy("/jobs") });
   app.register(appointmentRoutes, { prefix: withLegacy("/appointments") });

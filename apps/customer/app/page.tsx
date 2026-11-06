@@ -24,6 +24,9 @@ export default function HomePage() {
                 <Link href="/book" className="rounded-full bg-accent px-5 py-3 text-sm font-black text-white no-underline hover:bg-accent-hover">
                   Request service
                 </Link>
+                <Link href="/account" className="rounded-full border border-border bg-surface-50 px-5 py-3 text-sm font-bold text-fg no-underline hover:bg-surface-200">
+                  My account
+                </Link>
                 <a
                   href={`tel:${NNACT_COMPANY.contact.phones[0].replace(/\s/g, "")}`}
                   className="rounded-full border border-border bg-surface-50 px-5 py-3 text-sm font-bold text-fg no-underline hover:bg-surface-200"

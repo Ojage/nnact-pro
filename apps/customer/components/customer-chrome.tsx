@@ -19,17 +19,23 @@ export function CustomerHeader({ compact = false }: { compact?: boolean }) {
         {!compact ? (
           <nav className="hidden items-center gap-5 text-sm font-semibold text-fg-muted md:flex">
             <Link href="/book" className="no-underline hover:text-fg">Request service</Link>
+            <Link href="/account" className="no-underline hover:text-fg">My account</Link>
             <a href={`tel:${NNACT_COMPANY.contact.phones[0].replace(/\s/g, "")}`} className="no-underline hover:text-fg">
               Call us
             </a>
           </nav>
         ) : null}
-        <Link
-          href="/book"
-          className="shrink-0 rounded-full bg-accent px-4 py-2 text-sm font-black text-white no-underline hover:bg-accent-hover"
-        >
-          Book service
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link href="/account" className="hidden rounded-full border border-border px-4 py-2 text-sm font-bold text-fg no-underline hover:bg-surface-200 sm:inline-flex">
+            My account
+          </Link>
+          <Link
+            href="/book"
+            className="rounded-full bg-accent px-4 py-2 text-sm font-black text-white no-underline hover:bg-accent-hover"
+          >
+            Book service
+          </Link>
+        </div>
       </div>
     </header>
   );

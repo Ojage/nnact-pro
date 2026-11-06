@@ -1,6 +1,7 @@
 export * from "./auth.js";
 export * from "./team-credentials.js";
 export * from "./portal.js";
+export * from "./customer-portal.js";
 export * from "./brand.js";
 export * from "./sponsors.js";
 export * from "./documents.js";
