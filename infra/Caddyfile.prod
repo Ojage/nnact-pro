@@ -95,6 +95,48 @@
 	}
 }
 
+# Vojage — a separate project sharing this host, reached through the nnact Caddy
+# bridge gateway rather than through nnact's Docker network. Caddy publishes to
+# the host's bridge gateway address, where Vojage web/API have loopback-bound
+# high ports; reverse_proxy to the host, not to a nnact service.
+{$VOJAGE_WEB_ADDRESS} {
+	import security_headers
+	reverse_proxy 172.18.0.1:3100
+	log {
+		output stdout
+		format json
+	}
+}
+
+{$VOJAGE_API_ADDRESS} {
+	import security_headers
+	# Generations can take close to a minute and the chat endpoint streams, so
+	# never buffer the proxy response.
+	reverse_proxy 172.18.0.1:8100 {
+		flush_interval -1
+	}
+	log {
+		output stdout
+		format json
+	}
+}
+
+# Vojage admin panel — same Next.js app/container as VOJAGE_WEB_ADDRESS, no
+# new port: only the bare root gets rewritten to the app's /admin route
+# group. Everything else (the shared /sign-in page, /auth/callback, and
+# critically /_next/* static assets) must reach the upstream unprefixed, or
+# the app's own JS/CSS 404s and the page never actually renders.
+{$VOJAGE_ADMIN_ADDRESS} {
+	import security_headers
+	@admin_root path /
+	rewrite @admin_root /admin
+	reverse_proxy 172.18.0.1:3100
+	log {
+		output stdout
+		format json
+	}
+}
+
 # Ojage portfolio. Static single-page app: every path resolves to index.html so
 # react-router client routes (/project/:slug) deep-link correctly on refresh.
 # Content-hashed assets are immutable; index.html must never be cached, or a
