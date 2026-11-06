@@ -133,8 +133,22 @@ export default function AiPage() {
     setMessage(null);
     try {
       const res = await triggerRun({ isoDate: todayDouala(), slot: "MORNING" }).unwrap();
+      if (res.queued === false) {
+        // The API now distinguishes "started" from "did nothing". Say which,
+        // rather than pointing at a tray that will never appear.
+        setMessage({ kind: "err", text: `Run ${res.runId.slice(0, 8)} was not started (${res.state}).` });
+        return;
+      }
       setMessage({ kind: "ok", text: `Run ${res.runId.slice(0, 8)} queued — watch it live in the tray (bottom right).` });
     } catch (err) {
+      const detail = err as { status?: number; data?: { message?: string; error?: string } };
+      const data = detail?.data;
+      if (detail?.status === 409 && data?.message) {
+        // Already published, already running, or terminal — Retry is the way out
+        // of the last two.
+        setMessage({ kind: "err", text: data.message });
+        return;
+      }
       setMessage({ kind: "err", text: explainRtkError(err, "Failed to trigger run") });
     }
   };

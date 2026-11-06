@@ -151,8 +151,26 @@ export async function aiRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const body = triggerBody.parse(req.body);
     try {
-      // Fire-and-forget: reply 202 immediately; the run row + tray poll track it.
+      // Fire-and-forget when work actually starts: reply 202 immediately and let
+      // the run row + tray poll track it.
       const outcome = await engine.runNowQueued(orgId, body.isoDate, body.slot);
+      if (!outcome.queued) {
+        // 409, not 202: nothing was started, so the caller must not be told to
+        // watch a live run. `reason` says which case it was, so the client can
+        // offer Retry rather than a button that does nothing.
+        return reply.code(409).send({
+          error: outcome.reason,
+          runId: outcome.runId,
+          state: outcome.state,
+          queued: false,
+          message:
+            outcome.reason === "already_published"
+              ? "This slot has already published. Nothing to re-run."
+              : outcome.reason === "already_running"
+                ? "This slot is already running."
+                : "This run is in a terminal state. Use Retry to run it again.",
+        });
+      }
       return reply.code(202).send({ ...outcome, async: true });
     } catch (error) {
       const err = error as Error & { statusCode?: number };

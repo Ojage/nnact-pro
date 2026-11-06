@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { AI_MODES, AI_SLOTS, type AiAutomationMode, type AiRunDTO, type AiSlot, type ChannelPublicationDTO } from "@nnact/shared";
+import {
+  AI_MODES,
+  AI_RUN_STATES,
+  AI_SLOTS,
+  type AiAutomationMode,
+  type AiRunDTO,
+  type AiRunState,
+  type AiSlot,
+  type ChannelPublicationDTO,
+} from "@nnact/shared";
 import type { StoredStaffSession } from "../../auth-storage";
 import {
   getAiSettings,
@@ -29,6 +38,54 @@ function fmtDate(iso?: string | null): string | null {
 
 function errorText(caught: unknown): string {
   return caught instanceof Error ? caught.message : String(caught);
+}
+
+/**
+ * A run counts as running while its state is non-terminal. Anything that has
+ * reached a final verdict — published, blocked, failed, cancelled — is history,
+ * not work in flight. Derived from AI_RUN_STATES so a newly added state is
+ * treated as active (safer than silently under-reporting the count).
+ */
+const TERMINAL_RUN_STATES = new Set<AiRunState>([
+  "PUBLISHED",
+  "PARTIALLY_PUBLISHED",
+  "NEEDS_ATTENTION",
+  "FAILED",
+  "CANCELLED",
+]);
+
+function isActiveRunState(state: AiRunState): boolean {
+  return !TERMINAL_RUN_STATES.has(state);
+}
+
+/** Verifies an arbitrary string really is a state before narrowing it. */
+function isRunState(value: string): value is AiRunState {
+  return (AI_RUN_STATES as readonly string[]).includes(value);
+}
+
+/** "4m 20s" / "38s" — the live counter in the running sheet. */
+function elapsed(from: string | null | undefined, now: number = Date.now()): string | null {
+  if (!from) return null;
+  const started = new Date(from).getTime();
+  if (Number.isNaN(started)) return null;
+  const seconds = Math.max(0, Math.floor((now - started) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  if (minutes < 60) return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+/** One-line summary under the running bar; elapsed time is driven by `tick`. */
+function summariseActiveRuns(runs: AiRunDTO[], now: number): string {
+  const first = runs[0];
+  if (!first) return "";
+  const parts = [humanize(first.slot), humanize(first.state)];
+  const running = elapsed(first.startedAt, now);
+  if (running) parts.push(`for ${running}`);
+  if (runs.length > 1) parts.push(`+${runs.length - 1} more`);
+  return parts.join(" · ");
 }
 
 export function ContentPublicationsScreen({
@@ -334,10 +391,15 @@ export function ContentAutomationScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [runsSheet, setRunsSheet] = useState(false);
+  const [tick, setTick] = useState(0);
 
   const load = useCallback(async () => {
     try {
-      const [s, r] = await Promise.all([getAiSettings(session), listAiRuns(session, { take: 15 })]);
+      // 50 rather than 15: active runs have to be present in the page for the
+      // running count to be right, and the API returns newest-first, so a
+      // recent page always contains anything still in flight.
+      const [s, r] = await Promise.all([getAiSettings(session), listAiRuns(session, { take: 50 })]);
       setSettings(s);
       setRuns(r.items);
       setError(null);
@@ -353,6 +415,27 @@ export function ContentAutomationScreen({
     void load();
   }, [load]);
 
+  const activeRuns = useMemo(() => runs.filter((r) => isActiveRunState(r.state)), [runs]);
+  const now = useMemo(() => Date.now(), [tick, runs]);
+
+  // Poll only while something is actually in flight, so an idle automation
+  // screen does not keep hitting the API. Matches the useFieldData pattern of
+  // reading through a ref to avoid a stale closure.
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    if (activeRuns.length === 0 && !runsSheet) return;
+    const interval = setInterval(() => void loadRef.current(), 10_000);
+    return () => clearInterval(interval);
+  }, [activeRuns.length, runsSheet]);
+
+  // Drives the "running for 4m 20s" labels without re-fetching.
+  useEffect(() => {
+    if (activeRuns.length === 0) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 1_000);
+    return () => clearInterval(interval);
+  }, [activeRuns.length]);
+
   const setMode = useCallback(
     async (mode: AiAutomationMode) => {
       if (busy || !settings) return;
@@ -367,18 +450,6 @@ export function ContentAutomationScreen({
     },
     [session, busy, settings],
   );
-
-  const toggleKillSwitch = useCallback(async () => {
-    if (busy || !settings) return;
-    setBusy("kill");
-    try {
-      setSettings(await updateAiSettings(session, { killSwitch: !settings.killSwitch }));
-    } catch (caught) {
-      setError(errorText(caught));
-    } finally {
-      setBusy(null);
-    }
-  }, [session, busy, settings]);
 
   const trigger = useCallback(
     async (slot: AiSlot) => {
@@ -422,6 +493,23 @@ export function ContentAutomationScreen({
       />
 
       <InlineError colors={colors} message={error} />
+
+      {activeRuns.length > 0 ? (
+        <TouchableOpacity activeOpacity={0.85} onPress={() => setRunsSheet(true)} style={styles.runningBar}>
+          <View style={styles.runningBarLeft}>
+            <View style={styles.pulseDot} />
+            <View style={styles.runningBarText}>
+              <Text style={styles.runningBarTitle}>
+                {activeRuns.length} run{activeRuns.length === 1 ? "" : "s"} in progress
+              </Text>
+              <Text style={styles.runningBarSubtitle} numberOfLines={1}>
+                {summariseActiveRuns(activeRuns, now)}
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-up" size={18} color={colors.primary} />
+        </TouchableOpacity>
+      ) : null}
 
       {settings ? (
         <>
@@ -470,15 +558,18 @@ export function ContentAutomationScreen({
             ))}
           </View>
 
-          <SectionLabel colors={colors}>Safety</SectionLabel>
+          <SectionLabel colors={colors}>Kill switch</SectionLabel>
           <Row
             colors={colors}
             icon={settings.killSwitch ? "lock-closed-outline" : "shield-checkmark-outline"}
-            title={settings.killSwitch ? "Resume automation" : "Stop all automation"}
-            subtitle="The kill switch halts every scheduled slot immediately."
-            danger={!settings.killSwitch}
-            onPress={() => void toggleKillSwitch()}
+            title={settings.killSwitch ? "Automation halted" : "Automation running"}
+            subtitle="Controlled by the AI_AUTOPUBLISH_DISABLED environment variable, not by the app."
           />
+          {settings.killSwitch ? (
+            <Text style={styles.hintNote}>
+              Every slot is refusing to run. Unset AI_AUTOPUBLISH_DISABLED on the API host and restart it.
+            </Text>
+          ) : null}
 
           <SectionLabel colors={colors}>Budget</SectionLabel>
           <View style={styles.card}>
@@ -549,4 +640,22 @@ const createStyles = (colors: Palette) =>
     line: { flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.sm },
     lineLabel: { color: colors.dimForeground, fontSize: 13, fontFamily: fonts.regular },
     lineValue: { color: colors.foreground, fontSize: 13, fontFamily: fonts.semibold },
+    runningBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.primaryAlpha,
+      borderRadius: 14,
+    },
+    runningBarLeft: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 },
+    pulseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
+    runningBarText: { flex: 1 },
+    runningBarTitle: { color: colors.foreground, fontSize: 14, fontFamily: fonts.semibold },
+    runningBarSubtitle: { color: colors.dimForeground, fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
   });

@@ -32,7 +32,6 @@ import type {
   AiRunDTO,
   AiSlot,
   ChannelPublicationDTO,
-  ChannelPublicationStatus,
   ChannelVariantDTO,
   ContentItemDTO,
   ContentSeoMetadata,
@@ -669,7 +668,11 @@ export interface ContentWriteInput {
   visibility?: ContentVisibility;
   language?: string;
   categoryId?: string | null;
-  tagIds?: string[];
+  /**
+   * Names, not ids: the route resolves them via ensureTags and the API does
+   * not accept tag ids. Sending `tagIds` is silently dropped by the schema.
+   */
+  tagNames?: string[];
   seo?: Partial<ContentSeoMetadata>;
 }
 
@@ -761,14 +764,19 @@ export function saveChannelVariant(
   });
 }
 
+/**
+ * No `status` filter is offered: GET /content/publications reuses the content
+ * list query, whose enum is content statuses (DRAFT, IN_REVIEW, ...) rather
+ * than publication statuses, so filtering by publication status fails
+ * validation. Filtered client-side instead.
+ */
 export function listPublications(
   session: StoredStaffSession,
-  filters: { skip?: number; take?: number; status?: ChannelPublicationStatus | "" } = {},
+  filters: { skip?: number; take?: number } = {},
 ): Promise<{ items: ChannelPublicationDTO[]; total: number }> {
   const params = new URLSearchParams();
   if (filters.skip !== undefined) params.set("skip", String(filters.skip));
   if (filters.take !== undefined) params.set("take", String(filters.take));
-  if (filters.status) params.set("status", filters.status);
   const qs = params.toString();
   return staffFetch<{ items: ChannelPublicationDTO[]; total: number }>(session, `/api/content/publications${qs ? `?${qs}` : ""}`);
 }
@@ -841,11 +849,27 @@ export function listAiRuns(
   return staffFetch<{ items: AiRunDTO[]; total: number }>(session, `/api/ai/runs${qs ? `?${qs}` : ""}`);
 }
 
-/** Owner-only: run a slot now. */
-export function triggerAiRun(session: StoredStaffSession, slot: AiSlot): Promise<{ accepted: boolean; runId?: string }> {
-  return staffFetch<{ accepted: boolean; runId?: string }>(session, "/api/ai/trigger", {
+/** Today as YYYY-MM-DD in the device's local time, which is what the API wants. */
+function todayIsoDate(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Owner-only: queue a slot to run now.
+ *
+ * Both `isoDate` and `slot` are required by the API's triggerBody. Sending only
+ * `slot` fails validation with invalid_type (expected "string", received
+ * undefined), so the date is defaulted to today in local time rather than left
+ * to the caller.
+ */
+export function triggerAiRun(
+  session: StoredStaffSession,
+  slot: AiSlot,
+  isoDate: string = todayIsoDate(),
+): Promise<{ runId: string; state: string; async?: boolean }> {
+  return staffFetch<{ runId: string; state: string; async?: boolean }>(session, "/api/ai/trigger", {
     method: "POST",
-    body: JSON.stringify({ slot }),
+    body: JSON.stringify({ isoDate, slot }),
   });
 }
 

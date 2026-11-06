@@ -10,7 +10,7 @@ import type { AiAutomationSettingsDTO, AiSlot, AiProviderId, AiRunDTO, AiRunStat
 import { AI_PROVIDERS } from "@nnact/shared";
 import { AiProviderRegistry, settingsOrder } from "./registry.js";
 import type { AiAutomationRuntimePorts, AiRunStorePort, LogoCompositorPort } from "./ports.js";
-import { TERMINAL_RUN_STATES, WIP_RUN_STATES } from "./ports.js";
+import { CLAIMABLE_RUN_STATES, TERMINAL_RUN_STATES, WIP_RUN_STATES } from "./ports.js";
 import { dueSlots, nextSlot, hashValue, type SlotSchedule } from "./domain.js";
 import { buildArticlePrompt } from "./prompts.js";
 import { planSlot } from "./planner.js";
@@ -298,12 +298,32 @@ export class AutomationEngine {
    * use claimRun() as the single executor gate, so a duplicate request (or a
    * concurrent worker sweep) can never execute the same slot twice.
    */
-  async runNowQueued(orgId: string, isoDate: string, slot: AiSlot): Promise<{ runId: string; state: string }> {
+  async runNowQueued(
+    orgId: string,
+    isoDate: string,
+    slot: AiSlot,
+  ): Promise<{ runId: string; state: string; queued: boolean; reason?: string }> {
     if (this.deps.settings.killSwitchActive()) throw paramError("global kill switch is active (AI_AUTOPUBLISH_DISABLED)");
     const schedule: SlotSchedule = { isoDate, slot, dueAt: this.deps.now() };
     const run = await this.deps.runs.ensureRun(orgId, schedule);
+
+    // `ensureRun` returns the existing run for this (date, slot) rather than
+    // creating a second one, so "Generate now" on a slot that already has a run
+    // resolves to that run. If it is in a state the executor cannot claim, the
+    // click is a no-op — and returning the runId as though work had started made
+    // the UI promise a live run that would never appear. The tray showed nothing
+    // because there was genuinely nothing to show.
+    //
+    // Report the difference instead of hiding it. Retry is the correct remedy for
+    // a cancelled run, and there is nothing to do for a published one.
     if (run.state === "PUBLISHED" || run.state === "PARTIALLY_PUBLISHED") {
-      return { runId: run.id, state: run.state };
+      return { runId: run.id, state: run.state, queued: false, reason: "already_published" };
+    }
+    if (WIP_RUN_STATES.includes(run.state as never)) {
+      return { runId: run.id, state: run.state, queued: false, reason: "already_running" };
+    }
+    if (!CLAIMABLE_RUN_STATES.includes(run.state as never)) {
+      return { runId: run.id, state: run.state, queued: false, reason: "not_claimable" };
     }
     setImmediate(() => {
       this.runNow(orgId, isoDate, slot)
@@ -317,7 +337,7 @@ export class AutomationEngine {
           });
         });
     });
-    return { runId: run.id, state: run.state };
+    return { runId: run.id, state: run.state, queued: true };
   }
 
   /**

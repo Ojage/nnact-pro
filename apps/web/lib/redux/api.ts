@@ -1357,7 +1357,10 @@ aiHealth: builder.query<Record<string, unknown>, void>({
       query: (id) => `/api/ai/runs/${id}`,
       providesTags: ["Ai"],
     }),
-    triggerAiRun: builder.mutation<{ runId: string; state: string }, { isoDate: string; slot: AiSlot }>({
+    triggerAiRun: builder.mutation<
+      { runId: string; state: string; queued: boolean; reason?: string },
+      { isoDate: string; slot: AiSlot }
+    >({
       query: (body) => ({ url: "/api/ai/trigger", method: "POST", body }),
       invalidatesTags: ["Ai"],
     }),
