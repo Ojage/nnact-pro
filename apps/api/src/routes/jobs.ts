@@ -1,17 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { and, desc, eq, max, or, sql } from "drizzle-orm";
-import { db, jobs, users, orgs, jobStatusHistory, customers } from "@nnact/db";
-import { JOB_STATUS, mergeBusinessSettings } from "@nnact/shared";
+import { and, desc, eq, or } from "drizzle-orm";
+import { db, jobs, users, jobStatusHistory, customers } from "@nnact/db";
+import { JOB_STATUS } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";
 import { safeNotifyUser } from "../notify-user.js";
 import { technicianJobPatchAllowed, verifiedClaims } from "../operational-authorization.js";
-import { jobNumber, jobStatusLabel, nextJobStatus, type JobRole } from "../job-lifecycle.js";
+import { jobStatusLabel, nextJobStatus, type JobRole } from "../job-lifecycle.js";
+import { createJobInOrg } from "../job-creation.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Tx = any;
 
 const createBody = z.object({
   customerId: z.string().uuid(),
@@ -76,33 +75,6 @@ function officeRole(role: string): role is "owner" | "dispatcher" {
   return role === "owner" || role === "dispatcher";
 }
 
-/**
- * Allocate the next per-org work-order number under an advisory lock so two
- * concurrent creates cannot collide. Walks the highest existing numeric suffix
- * (collision-proof across deletions) and never goes below the configured start.
- */
-async function allocateNumberInOrg(tx: Tx, orgId: string): Promise<string> {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'job-number:' + orgId}))`);
-  const [{ maxNum }] = await tx
-    .select({ maxNum: max(jobs.number) })
-    .from(jobs)
-    .where(eq(jobs.orgId, orgId));
-  const [org] = await tx
-    .select({ businessSettings: orgs.businessSettings })
-    .from(orgs)
-    .where(eq(orgs.id, orgId))
-    .limit(1);
-  const settings = mergeBusinessSettings(org?.businessSettings);
-  const parsed = typeof maxNum === "string" ? Number(maxNum.match(/(\d+)\s*$/)?.[1]) : NaN;
-  const highest = Number.isFinite(parsed) ? parsed : settings.numbering.jobNextNumber - 1;
-  const next = Math.max(highest + 1, settings.numbering.jobNextNumber);
-  return jobNumber(
-    next - settings.numbering.jobNextNumber,
-    settings.numbering.jobPrefix,
-    settings.numbering.jobNextNumber,
-  );
-}
-
 export async function jobRoutes(app: FastifyInstance) {
   app.get("/", async (req, reply) => {
     const orgId = await resolveOrgId(req);
@@ -155,27 +127,16 @@ export async function jobRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const { scheduledAt, ...rest } = parsed.data;
 
-    const row = await db.transaction(async (tx) => {
-      const number = await allocateNumberInOrg(tx, orgId);
-      const [created] = await tx
-        .insert(jobs)
-        .values({
-          orgId,
-          ...rest,
-          number,
-          scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
-        })
-        .returning();
-      await tx.insert(jobStatusHistory).values({
+    const row = await db.transaction(async (tx) =>
+      createJobInOrg(tx, {
         orgId,
-        jobId: created.id,
-        fromStatus: null,
-        toStatus: created.status,
-        changedBy: claims.userId,
-        reason: "job created",
-      });
-      return created;
-    });
+        actorUserId: claims.userId,
+        values: {
+          ...rest,
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+        },
+      }),
+    );
 
     if (!row) return reply.code(500).send({ error: "failed to create job" });
 
@@ -408,31 +369,22 @@ export async function jobRoutes(app: FastifyInstance) {
           continue;
         }
 
-        const number = await allocateNumberInOrg(tx, orgId);
-        const [job] = await tx
-          .insert(jobs)
-          .values({
-            orgId,
+        const job = await createJobInOrg(tx, {
+          orgId,
+          actorUserId: claims.userId,
+          reason: "imported historical job",
+          createdAt: jobDate,
+          updatedAt: jobDate,
+          values: {
             customerId,
-            number,
             title: row.title,
             description: row.description?.trim() || null,
             status: row.status,
             source: "staff",
             preferredDate: jobDate ? jobDate.toISOString().slice(0, 10) : null,
             scheduledAt: jobDate,
-            createdAt: jobDate,
-            updatedAt: jobDate,
             total: row.total,
-          })
-          .returning();
-        await tx.insert(jobStatusHistory).values({
-          orgId,
-          jobId: job.id,
-          fromStatus: null,
-          toStatus: job.status,
-          changedBy: claims.userId,
-          reason: "imported historical job",
+          },
         });
         created.push(job);
       }
