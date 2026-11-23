@@ -2,7 +2,7 @@
 // The automation never names providers directly; it requests whichever enabled
 // provider tops the settings order and the registry handles failover, usage
 // recording, and status writes. Adding a provider = extend factoryFor().
-import type { AiAutomationSettingsDTO, AiProviderConfigDTO, AiProviderId, AiProviderStatus, TextGenerationRequest, TextGenerationResult } from "@nnact/shared";
+import type { AiAutomationSettingsDTO, AiProviderConfigDTO, AiProviderId, AiProviderStatus, AudioTranscriptionRequest, AudioTranscriptionResult, TextGenerationRequest, TextGenerationResult } from "@nnact/shared";
 import type { VisionAnalysisRequest, VisionAnalysisResult, ImageGenerationRequest, ImageGenerationResult } from "@nnact/shared";
 import { AI_PROVIDERS } from "@nnact/shared";
 import { classifyTextSuccess } from "./domain.js";
@@ -10,7 +10,7 @@ import type { DecryptedProviderConfig } from "./domain.js";
 import type { AiAdapterFactory, AiProviderConfigStorePort, AiProviderProbeResult } from "./ports.js";
 import { fakeAiFactory, factoryFor } from "./adapters.js";
 import type { AiUsageStorePort } from "./ports.js";
-import { costCentsForImage, costCentsForTextResult, costCentsForVision } from "./usage.js";
+import { costCentsForAudio, costCentsForImage, costCentsForTextResult, costCentsForVision } from "./usage.js";
 
 export interface AiRegistryDeps {
   configStore: AiProviderConfigStorePort;
@@ -89,6 +89,28 @@ export class AiProviderRegistry {
       attempts: failures,
       statusCode: 502,
     });
+  }
+
+  /** Speech-to-text through the same provider registry and usage ledger. */
+  async transcribeAudio(orgId: string, request: AudioTranscriptionRequest, provider: AiProviderId = "OPENAI"): Promise<AudioTranscriptionResult | null> {
+    const config = await this.resolveConfig(orgId, provider);
+    const adapter = this.factory(provider).audio();
+    if (!config || !adapter) return null;
+    try {
+      const result = await adapter.transcribe(request, config);
+      await this.deps.usage?.record(orgId, {
+        runId: request.runId ?? null,
+        task: request.task ?? "agent.stt",
+        provider,
+        model: result.model,
+        latencyMs: result.latencyMs,
+        costCents: costCentsForAudio(request.audio.byteLength),
+      });
+      return result;
+    } catch (error) {
+      await this.deps.configStore.setStatus(orgId, provider, "DEGRADED", `stt: ${(error as Error).message}`);
+      return null;
+    }
   }
 
   async probe(orgId: string, provider: AiProviderId): Promise<AiProviderProbeResult> {

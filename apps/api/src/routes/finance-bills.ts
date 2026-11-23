@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sql, eq, and, lt, asc, desc, inArray } from "drizzle-orm";
@@ -115,7 +116,7 @@ export async function hydrate(orgId: string, rows: BillRow[]): Promise<SupplierB
     db
       .select({ id: jobs.id, number: jobs.number })
       .from(jobs)
-      .where(eq(jobs.orgId, orgId)),
+      .where(visibleJobsWhere(eq(jobs.orgId, orgId))),
     db
       .select({ id: supplierBills.id, supplierName: supplierBills.supplierName, supplierReference: supplierBills.supplierReference })
       .from(supplierBills)

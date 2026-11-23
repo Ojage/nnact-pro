@@ -53,6 +53,8 @@ import { growthRoutes } from "./routes/growth.js";
 import { growthCampaignRoutes } from "./routes/growth-campaigns.js";
 import { growthIntelligenceRoutes } from "./routes/growth-intelligence.js";
 import { growthInboundWebhookRoutes } from "./routes/growth-inbound-webhook.js";
+import { whatsappWebhookRoutes } from "./routes/agent-webhook.js";
+import { agentRoutes, agentDraftRoutes } from "./routes/agent.js";
 import { growthDeliverabilityWebhookRoutes } from "./routes/growth-deliverability-webhook.js";
 import { growthConversationsRoutes } from "./routes/growth-conversations.js";
 import { growthPipelineRoutes } from "./routes/growth-pipeline.js";
@@ -281,6 +283,9 @@ export function buildServer(
   app.register(invoiceRoutes, { prefix: withVersion("/invoices") });
   app.register(stripeWebhookRoute, { prefix: withVersion("") });
   app.register(growthInboundWebhookRoutes, { prefix: withVersion("") });
+  app.register(whatsappWebhookRoutes, { prefix: withVersion("") });
+  app.register(agentRoutes, { prefix: withVersion("") });
+  app.register(agentDraftRoutes, { prefix: withVersion("") });
   app.register(growthDeliverabilityWebhookRoutes, { prefix: withVersion("") });
   app.register(estimateRoutes, { prefix: withVersion("/estimates") });
   app.register(reviewRoutes, { prefix: withVersion("/reviews") });
@@ -365,6 +370,9 @@ export function buildServer(
   app.register(invoiceRoutes, { prefix: withLegacy("/invoices") });
   app.register(stripeWebhookRoute, { prefix: withLegacy("") });
   app.register(growthInboundWebhookRoutes, { prefix: withLegacy("") });
+  app.register(whatsappWebhookRoutes, { prefix: withLegacy("") });
+  app.register(agentRoutes, { prefix: withLegacy("") });
+  app.register(agentDraftRoutes, { prefix: withLegacy("") });
   app.register(growthDeliverabilityWebhookRoutes, { prefix: withLegacy("") });
   app.register(estimateRoutes, { prefix: withLegacy("/estimates") });
   app.register(reviewRoutes, { prefix: withLegacy("/reviews") });

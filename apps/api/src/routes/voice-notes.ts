@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import multipart from "@fastify/multipart";
 import { resolveOrgId } from "./org.js";
@@ -87,7 +88,7 @@ export async function voiceNoteRoutes(app: FastifyInstance) {
       const [jobRow] = await db
         .select({ title: jobs.title, customerId: jobs.customerId })
         .from(jobs)
-        .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)))
+        .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))))
         .limit(1);
 
       const [author] = await db

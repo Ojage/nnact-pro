@@ -15,6 +15,8 @@ import type {
   AiSlot,
   AiUsageSummaryDTO,
   AiUsageAnalyticsDTO,
+  AudioTranscriptionRequest,
+  AudioTranscriptionResult,
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageQualityAssessmentDTO,
@@ -32,6 +34,12 @@ import type { DecryptedProviderConfig, SlotSchedule } from "./domain.js";
 export interface TextProviderPort {
   readonly provider: AiProviderId;
   generateText(request: TextGenerationRequest, config: DecryptedProviderConfig): Promise<TextGenerationResult>;
+}
+
+/** Speech-to-text. OpenAI Whisper is the default; the port is swappable. */
+export interface AudioProviderPort {
+  readonly provider: AiProviderId;
+  transcribe(request: AudioTranscriptionRequest, config: DecryptedProviderConfig): Promise<AudioTranscriptionResult>;
 }
 
 /** Image generation provider (OpenAI is the only one today). */
@@ -57,6 +65,7 @@ export interface AiProviderProbeResult {
 export interface AiAdapterFactory {
   probe(config: DecryptedProviderConfig): Promise<AiProviderProbeResult>;
   text(): TextProviderPort;
+  audio(): AudioProviderPort | null;
   image(): ImageProviderPort | null;
   vision(): VisionProviderPort;
 }

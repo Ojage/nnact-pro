@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -660,7 +661,7 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     const [job] = await db
       .select({ id: jobs.id })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
     const [appliance] = await db
       .select({ id: equipment.id })
       .from(equipment)
@@ -719,7 +720,7 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     const [job] = await db
       .select({ id: jobs.id })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
     const [appliance] = await db
       .select({ id: equipment.id })
       .from(equipment)

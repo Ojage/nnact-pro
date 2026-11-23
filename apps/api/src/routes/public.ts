@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -569,7 +570,7 @@ export async function publicRoutes(app: FastifyInstance) {
       const [job] = await db
         .select()
         .from(jobs)
-        .where(eq(jobs.trackingTokenHash, hashPortalToken(raw)))
+        .where(visibleJobsWhere(eq(jobs.trackingTokenHash, hashPortalToken(raw))))
         .limit(1);
       if (!job) return reply.code(404).send({ error: "request not found" });
 

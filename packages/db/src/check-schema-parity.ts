@@ -8,6 +8,7 @@ import * as financeSchema from "./finance.js";
 import { expectedUdtName } from "./udt-name.js";
 import * as growthSchema from "./growth.js";
 import * as customerPortalSchema from "./customer-portal.js";
+import * as agentSchema from "./agent.js";
 
 const url = process.env.DATABASE_URL?.trim();
 if (!url) throw new Error("DATABASE_URL is required for schema parity checks");
@@ -19,7 +20,7 @@ try {
     where table_schema = 'public'
   `;
   const actualColumns = new Map(actual.map((row) => [`${row.table_name}.${row.column_name}`, row.udt_name]));
-  const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...financeSchema, ...growthSchema, ...customerPortalSchema };
+  const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...financeSchema, ...growthSchema, ...customerPortalSchema, ...agentSchema };
   const tables = Object.values(schema).filter((value): value is PgTable => is(value, PgTable));
   const problems: string[] = [];
 

@@ -10,20 +10,26 @@ import { safeNotifyUser } from "../notify-user.js";
 import { technicianJobPatchAllowed, verifiedClaims } from "../operational-authorization.js";
 import { jobStatusLabel, nextJobStatus, type JobRole } from "../job-lifecycle.js";
 import { createJobInOrg } from "../job-creation.js";
+import { visibleJobsWhere } from "../job-visibility.js";
 
+
+/** Staff-created jobs cannot start life as an unreviewed AI draft. */
+const staffJobStatus = z.enum(JOB_STATUS).refine((status) => status !== "draft", {
+  message: "draft status is reserved for the intake agent",
+});
 
 const createBody = z.object({
   customerId: z.string().uuid(),
   title: z.string().min(1),
   description: z.string().optional(),
-  status: z.enum(JOB_STATUS).optional(),
+  status: staffJobStatus.optional(),
   scheduledAt: z.string().datetime().optional(),
   total: z.number().int().nonnegative().optional(),
   laborCostCents: z.number().int().nonnegative().optional().default(0),
 });
 
 export const jobPatchBody = z.object({
-  status: z.enum(JOB_STATUS).optional(),
+  status: staffJobStatus.optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   total: z.number().int().nonnegative().optional(),
@@ -52,7 +58,7 @@ const importJobRow = z.object({
   description: z.string().trim().optional(),
   /** YYYY-MM-DD date the historical job was (originally) done on. */
   date: z.string().trim().optional(),
-  status: z.enum(JOB_STATUS).optional().default("completed"),
+  status: staffJobStatus.optional().default("completed"),
   total: z.number().int().nonnegative().optional().default(0),
 });
 
@@ -87,7 +93,7 @@ export async function jobRoutes(app: FastifyInstance) {
     const scope = claims.role === "technician"
       ? and(eq(jobs.orgId, orgId), eq(jobs.assignedTo, claims.userId))
       : eq(jobs.orgId, orgId);
-    return db.select().from(jobs).where(scope).orderBy(desc(jobs.createdAt)).limit(t).offset(s);
+    return db.select().from(jobs).where(visibleJobsWhere(scope)).orderBy(desc(jobs.createdAt)).limit(t).offset(s);
   });
 
   app.get("/:id/history", async (req, reply) => {
@@ -110,7 +116,7 @@ export async function jobRoutes(app: FastifyInstance) {
     const scope = claims.role === "technician"
       ? and(eq(jobs.orgId, orgId), eq(jobs.id, id), eq(jobs.assignedTo, claims.userId))
       : and(eq(jobs.orgId, orgId), eq(jobs.id, id));
-    const [row] = await db.select().from(jobs).where(scope).limit(1);
+    const [row] = await db.select().from(jobs).where(visibleJobsWhere(scope)).limit(1);
     if (!row) return reply.code(404).send({ error: "not found" });
     return row;
   });
@@ -164,7 +170,7 @@ export async function jobRoutes(app: FastifyInstance) {
     const [before] = await db
       .select({ id: jobs.id, status: jobs.status, assignedTo: jobs.assignedTo, title: jobs.title })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, id)))
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, id))))
       .limit(1);
     if (!before) return reply.code(404).send({ error: "not found" });
 
@@ -218,7 +224,7 @@ export async function jobRoutes(app: FastifyInstance) {
           ? { scheduledAt: scheduledAt ? new Date(scheduledAt) : null }
           : {}),
       })
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, id)))
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, id))))
       .returning();
     if (!row) return reply.code(404).send({ error: "not found" });
 

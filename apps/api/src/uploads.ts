@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "./job-visibility.js";
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, readFile, rename, rm } from "node:fs/promises";
@@ -248,7 +249,7 @@ export async function savePhoto(
   const [job] = await db
     .select({ id: jobs.id })
     .from(jobs)
-    .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+    .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))));
   if (!job) throw httpError(404, "job not found");
 
   const photoId = randomUUID();

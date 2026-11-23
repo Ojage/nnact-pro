@@ -75,7 +75,7 @@ async function mockCloseoutApi(
       const job = data.jobs.find((row) => row.id === body.jobId);
       const invoice = {
         id: "invoice-created",
-        jobId: body.jobId,
+        jobId: String(body.jobId),
         number: "INV-1002",
         status: "draft",
         total: job?.total ?? 0,

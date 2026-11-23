@@ -9,6 +9,7 @@ import type {
   ComebackTechnicianMetricDTO,
   CustomerDTO,
   JobDTO,
+  JobDraft,
   JobStatus,
   JobVoiceNoteDTO,
   UserDTO,
@@ -320,6 +321,15 @@ export interface AiUsageAnalyticsPayload {
   };
 }
 
+export interface DraftJobDTO extends JobDTO {
+  draft: JobDraft | null;
+  confidence: JobDraft["confidence"] | null;
+  agentDraft?: boolean;
+  agentConversationId?: string | null;
+  agentRejectedAt?: string | null;
+  agentRejectionReason?: string | null;
+}
+
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({
@@ -363,6 +373,7 @@ export const apiSlice = createApi({
     "Invoice",
     "Estimate",
     "ServiceAgreement",
+    "AgentDraft",
   ],
   endpoints: (builder) => ({
     // ── Jobs ──
@@ -381,6 +392,22 @@ export const apiSlice = createApi({
     createJob: builder.mutation<JobDTO, { customerId: string; title: string; description?: string }>({
       query: (body) => ({ url: "/api/jobs", method: "POST", body: { ...body, status: "lead" } }),
       invalidatesTags: ["Job"],
+    }),
+    draftJobs: builder.query<DraftJobDTO[], void>({
+      query: () => "/api/agent/draft-jobs",
+      providesTags: (result) => ["AgentDraft", ...(result ?? []).map(({ id }) => ({ type: "AgentDraft" as const, id }))],
+    }),
+    draftJob: builder.query<DraftJobDTO & { messages: Record<string, unknown>[] }, string>({
+      query: (id) => `/api/agent/draft-jobs/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "AgentDraft", id }],
+    }),
+    approveDraftJob: builder.mutation<JobDTO, { id: string; data?: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/api/agent/draft-jobs/${id}/approve`, method: "POST", body: data ?? {} }),
+      invalidatesTags: (_result, _error, arg) => ["Job", "AgentDraft", { type: "AgentDraft", id: arg.id }],
+    }),
+    rejectDraftJob: builder.mutation<JobDTO, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/api/agent/draft-jobs/${id}/reject`, method: "POST", body: { reason } }),
+      invalidatesTags: (_result, _error, arg) => ["Job", "AgentDraft", { type: "AgentDraft", id: arg.id }],
     }),
     importJobs: builder.mutation<
       { created: JobDTO[]; skipped: Array<{ index: number; reason: string }> },
@@ -2288,6 +2315,10 @@ export interface GrowthCampaignRunDTO {
 }
 
 export const {
+  useDraftJobsQuery,
+  useDraftJobQuery,
+  useApproveDraftJobMutation,
+  useRejectDraftJobMutation,
   useJobsQuery,
   useJobQuery,
   usePatchJobMutation,

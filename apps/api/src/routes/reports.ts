@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { eq, and, ne, gte, inArray, sql } from "drizzle-orm";
 import { db, jobs, invoices, reviews, lineItems, payments, estimates, appointments, users } from "@nnact/db";
@@ -36,7 +37,7 @@ export async function reportRoutes(app: FastifyInstance) {
     const byStatus = await db
       .select({ status: jobs.status, count: sql<number>`count(*)::int` })
       .from(jobs)
-      .where(eq(jobs.orgId, orgId))
+      .where(visibleJobsWhere(eq(jobs.orgId, orgId)))
       .groupBy(jobs.status);
 
     const [revenue] = await db
@@ -57,7 +58,7 @@ export async function reportRoutes(app: FastifyInstance) {
     // Margin rollup: fetch the whole org's jobs + line items once, group in JS,
     // then reuse the pure totals helpers so the math stays identical to the
     // per-job POST/DELETE path. O(N+M) DB + O(N+M) in-JS; fine at <1000 jobs/org.
-    const orgJobs = await db.select().from(jobs).where(eq(jobs.orgId, orgId));
+    const orgJobs = await db.select().from(jobs).where(visibleJobsWhere(eq(jobs.orgId, orgId)));
     const orgLines = await db.select().from(lineItems).where(eq(lineItems.orgId, orgId));
     const linesByJob = new Map<string, typeof orgLines>();
     for (const line of orgLines) {
@@ -149,7 +150,7 @@ export async function reportRoutes(app: FastifyInstance) {
     const completedJobs = await db
       .select({ id: jobs.id, assignedTo: jobs.assignedTo, scheduledAt: jobs.scheduledAt })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.status, "completed"), gte(jobs.updatedAt, cutoff)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.status, "completed"), gte(jobs.updatedAt, cutoff))));
     if (completedJobs.length === 0) return { scorecards: [], windowDays: window };
 
     const jobIds = completedJobs.map((job) => job.id);
@@ -305,7 +306,7 @@ export async function reportRoutes(app: FastifyInstance) {
         const completedJobs = await db
           .select({ id: jobs.id, assignedTo: jobs.assignedTo, scheduledAt: jobs.scheduledAt, title: jobs.title })
           .from(jobs)
-          .where(and(eq(jobs.orgId, orgId), eq(jobs.status, "completed"), gte(jobs.updatedAt, cutoff)));
+          .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.status, "completed"), gte(jobs.updatedAt, cutoff))));
         if (completedJobs.length === 0) return csvResponse(reply, toCsv([]), "technician-scorecards.csv");
         const jobIds = completedJobs.map((job) => job.id);
         const [apptRows, userRows] = await Promise.all([

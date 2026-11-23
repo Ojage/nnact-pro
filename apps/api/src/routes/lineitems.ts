@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
@@ -26,7 +27,7 @@ async function recomputeJobTotals(orgId: string, jobId: string) {
   const [job] = await db
     .select({ laborCostCents: jobs.laborCostCents })
     .from(jobs)
-    .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+    .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))));
   const laborCents = job?.laborCostCents ?? 0;
 
   const items = await db

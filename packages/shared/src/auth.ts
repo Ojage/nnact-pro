@@ -1,6 +1,7 @@
 export const AUTH_AUDIENCES = {
   staff: "staff",
   customer: "customer",
+  agent: "agent",
 } as const;
 
 export type AuthAudience = (typeof AUTH_AUDIENCES)[keyof typeof AUTH_AUDIENCES];
@@ -12,6 +13,29 @@ export interface StaffSessionUser {
   role: string;
   orgId: string;
   mustChangePassword?: boolean;
+}
+
+/**
+ * Narrow service identity. Agent tokens are accepted only on agent endpoints;
+ * `isStaffClaims` deliberately rejects them, so adding this audience does not
+ * grant access to any existing staff route.
+ */
+export interface AgentJwtClaims {
+  aud: typeof AUTH_AUDIENCES.agent;
+  agentId: string;
+  orgId: string;
+  scope: "draft-jobs:create";
+}
+
+export function isAgentClaims(claims: unknown): claims is AgentJwtClaims {
+  return Boolean(
+    claims &&
+      typeof claims === "object" &&
+      (claims as { aud?: unknown }).aud === AUTH_AUDIENCES.agent &&
+      typeof (claims as { agentId?: unknown }).agentId === "string" &&
+      typeof (claims as { orgId?: unknown }).orgId === "string" &&
+      (claims as { scope?: unknown }).scope === "draft-jobs:create",
+  );
 }
 
 export interface CustomerSessionUser {

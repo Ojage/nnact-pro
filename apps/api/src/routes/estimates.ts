@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, asc, desc, inArray, sql } from "drizzle-orm";
@@ -107,7 +108,7 @@ async function detail(orgId: string, id: string) {
 
   // Merchant guard-rails surfaced to editors: identical option sets and scope
   // narrative that names components without a priced line item.
-  const [job] = await db.select({ description: jobs.description }).from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, estimate.jobId)));
+  const [job] = await db.select({ description: jobs.description }).from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, estimate.jobId))));
   const checks = estimateChecks({
     options: withLines.map((option) => ({
       id: option.id,
@@ -222,7 +223,7 @@ export async function estimateRoutes(app: FastifyInstance) {
     const parsed = createBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const result = await db.transaction(async (tx) => {
-      const [job] = await tx.select().from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
+      const [job] = await tx.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
       if (!job) return null;
       const sourceLines = await tx.select().from(lineItems).where(and(eq(lineItems.orgId, orgId), eq(lineItems.jobId, job.id)));
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`estimate-number:${orgId}`}))`);

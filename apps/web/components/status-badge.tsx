@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import type { JobStatus, InvoiceStatus } from "@nnact/shared";
 
-const jobStatusMap: Record<JobStatus, "lead" | "scheduled" | "in_progress" | "completed" | "canceled"> = {
+const jobStatusMap: Record<JobStatus, "draft" | "lead" | "scheduled" | "in_progress" | "completed" | "canceled"> = {
+  draft: "draft",
   lead: "lead",
   scheduled: "scheduled",
   in_progress: "in_progress",

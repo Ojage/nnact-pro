@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "./job-visibility.js";
 // Comeback module shared helpers: org policy access, concurrency-safe case
 // numbering, comeback-job number allocation, and small DTO assembly. Money is
 // integer cents; all role logic goes through `isOfficeRole`/`verifiedClaims`.
@@ -71,7 +72,7 @@ export async function allocateComebackJobNumberTx(tx: CbTx, orgId: string): Prom
   const [{ maxNum }] = await tx
     .select({ maxNum: max(jobs.number) })
     .from(jobs)
-    .where(eq(jobs.orgId, orgId));
+    .where(visibleJobsWhere(eq(jobs.orgId, orgId)));
   const parsed = typeof maxNum === "string" ? Number(maxNum.match(/(\d+)\s*$/)?.[1]) : NaN;
   const highest = Number.isFinite(parsed) ? parsed : settings.numbering.jobNextNumber - 1;
   const next = Math.max(highest + 1, settings.numbering.jobNextNumber);

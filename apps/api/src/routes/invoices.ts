@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq, and, asc, desc, ne, sql } from "drizzle-orm";
@@ -111,7 +112,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`invoice-job:${parsed.data.jobId}`}))`);
-      const [job] = await tx.select().from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
+      const [job] = await tx.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
       if (!job) return { kind: "not-found" as const };
 
       const [existing] = await tx

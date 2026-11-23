@@ -101,6 +101,26 @@ export interface TextGenerationRequest {
   temperature?: number;
   /** Short task label for usage metering. */
   task?: string;
+  /** Link provider usage to a domain run (agent_runs.id, ai_generation_runs.id). */
+  runId?: string;
+}
+
+export interface AudioTranscriptionRequest {
+  /** Raw audio bytes; kept as Buffer at the API boundary. */
+  audio: Uint8Array;
+  fileName: string;
+  contentType: string;
+  language?: string | null;
+  task?: string;
+  runId?: string;
+}
+
+export interface AudioTranscriptionResult {
+  provider: AiProviderId;
+  model: string;
+  text: string;
+  durationMs: number;
+  latencyMs: number;
 }
 
 export interface TextGenerationResult {

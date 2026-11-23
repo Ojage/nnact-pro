@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import {
@@ -47,12 +48,12 @@ export async function searchRoutes(app: FastifyInstance) {
         db
           .select({ id: jobs.id, title: jobs.title, number: jobs.number, status: jobs.status })
           .from(jobs)
-          .where(
+          .where(visibleJobsWhere(
             and(
               eq(jobs.orgId, orgId),
               or(ilike(jobs.title, term), ilike(jobs.number, term)),
             ),
-          )
+          ))
           .limit(6),
         db
           .select({
@@ -106,7 +107,7 @@ export async function searchRoutes(app: FastifyInstance) {
           })
           .from(appointments)
           .innerJoin(jobs, eq(appointments.jobId, jobs.id))
-          .where(and(eq(appointments.orgId, orgId), ilike(jobs.title, term)))
+          .where(visibleJobsWhere(and(eq(appointments.orgId, orgId), ilike(jobs.title, term))))
           .limit(6),
         db
           .select({

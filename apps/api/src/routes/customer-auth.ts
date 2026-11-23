@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
@@ -531,27 +532,27 @@ export async function customerAuthRoutes(app: FastifyInstance) {
       db
         .select({ id: jobs.id, title: jobs.title, status: jobs.status })
         .from(jobs)
-        .where(and(eq(jobs.orgId, orgId), eq(jobs.customerId, customerId), ilike(jobs.title, term)))
+        .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.customerId, customerId), ilike(jobs.title, term))))
         .limit(6),
       db
         .select({ id: estimates.id, number: estimates.number, status: estimates.status })
         .from(estimates)
         .innerJoin(jobs, eq(estimates.jobId, jobs.id))
-        .where(
+        .where(visibleJobsWhere(
           and(
             eq(estimates.orgId, orgId),
             eq(jobs.customerId, customerId),
             or(ilike(estimates.number, term), ilike(jobs.title, term)),
           ),
-        )
+        ))
         .limit(6),
       db
         .select({ id: invoices.id, number: invoices.number, status: invoices.status })
         .from(invoices)
         .innerJoin(jobs, eq(invoices.jobId, jobs.id))
-        .where(
+        .where(visibleJobsWhere(
           and(eq(invoices.orgId, orgId), eq(jobs.customerId, customerId), ilike(invoices.number, term)),
-        )
+        ))
         .limit(6),
     ]);
 

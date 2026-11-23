@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "./job-visibility.js";
 // Unified activity-log emitter. Callers go through this so the schema is
 // written consistently. Never throws — the originating action (billing,
 // scheduling) must not fail just because logging missed a beat.
@@ -29,7 +30,7 @@ export async function safeEmitActivity(
       const [job] = await db
         .select({ customerId: jobs.customerId })
         .from(jobs)
-        .where(eq(jobs.id, jobId));
+        .where(visibleJobsWhere(eq(jobs.id, jobId)));
       if (job) customerId = job.customerId;
     }
     await db.insert(activities).values({

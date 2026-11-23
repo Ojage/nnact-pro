@@ -78,3 +78,8 @@ export function costCentsForImage(imageCount = 1): number {
 export function costCentsForVision(model: string, inputTokens: number, outputTokens: number): number {
   return costCentsForTextResult(model, inputTokens, outputTokens);
 }
+
+/** Rough Whisper pricing proxy: billed per audio minute, not per token. */
+export function costCentsForAudio(byteLength: number): number {
+  return Math.max(1, Math.ceil(byteLength / 1_000_000));
+}

@@ -107,6 +107,7 @@ const TECH_COLORS = [
 ];
 
 const STATUS_CYCLE: Record<JobStatus, JobStatus> = {
+  draft: "lead",
   scheduled: "in_progress",
   in_progress: "completed",
   completed: "scheduled",

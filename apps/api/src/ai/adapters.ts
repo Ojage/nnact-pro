@@ -3,6 +3,8 @@
 // paid API. Each adapter implements the port interfaces from ports.ts and is
 // selected by the registry using stored, decrypted configs.
 import type {
+  AudioTranscriptionRequest,
+  AudioTranscriptionResult,
   ImageGenerationRequest,
   ImageGenerationResult,
   TextGenerationRequest,
@@ -12,8 +14,8 @@ import type {
 } from "@nnact/shared";
 import type { AiProviderId } from "@nnact/shared";
 import type { DecryptedProviderConfig } from "./domain.js";
-import type { AiAdapterFactory, AiProviderProbeResult, ImageProviderPort, TextProviderPort, VisionProviderPort } from "./ports.js";
-import { TransportError, extractErrorDetail, getJson, postJson } from "./transport.js";
+import type { AiAdapterFactory, AiProviderProbeResult, AudioProviderPort, ImageProviderPort, TextProviderPort, VisionProviderPort } from "./ports.js";
+import { TransportError, extractErrorDetail, getJson, postJson, postMultipart } from "./transport.js";
 
 const ONE_PX_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -78,6 +80,38 @@ class OpenAiTextAdapter implements TextProviderPort {
       outputTokens,
       latencyMs: Date.now() - started,
       providerRequestId: data.id ?? null,
+    };
+  }
+}
+
+class OpenAiAudioAdapter implements AudioProviderPort {
+  readonly provider = "OPENAI" as const;
+
+  async transcribe(request: AudioTranscriptionRequest, config: DecryptedProviderConfig): Promise<AudioTranscriptionResult> {
+    const base = (config.baseUrl ?? "https://api.openai.com").replace(/\/$/, "");
+    const model = process.env.AGENT_STT_MODEL?.trim() || "whisper-1";
+    const started = Date.now();
+    const response = await postMultipart(`${base}/v1/audio/transcriptions`, {
+      headers: { authorization: `Bearer ${config.apiKey}` },
+      timeoutMs: Math.max(config.timeoutMs, 120_000),
+      fields: {
+        model,
+        ...(request.language ? { language: request.language } : {}),
+        ...(request.task ? { prompt: request.task } : {}),
+      },
+      file: { name: "file", fileName: request.fileName, contentType: request.contentType, data: request.audio },
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new TransportError(extractErrorDetail(response.json, `OpenAI transcription returned ${response.status}`), "HTTP", response.status, response.json, response.status === 429 || response.status >= 500);
+    }
+    const data = response.json as { text?: string };
+    if (typeof data.text !== "string" || !data.text.trim()) throw new TransportError("empty transcription from OpenAI", "HTTP", response.status, response.json);
+    return {
+      provider: this.provider,
+      model,
+      text: data.text,
+      durationMs: 0,
+      latencyMs: Date.now() - started,
     };
   }
 }
@@ -355,6 +389,20 @@ class FakeTextAdapter implements TextProviderPort {
   }
 }
 
+class FakeAudioAdapter implements AudioProviderPort {
+  readonly provider = "OPENAI" as const;
+
+  async transcribe(request: AudioTranscriptionRequest): Promise<AudioTranscriptionResult> {
+    return {
+      provider: this.provider,
+      model: "fake-whisper-1",
+      text: request.task ? `Fake transcript for ${request.task}` : "Fake transcript of a voice note.",
+      durationMs: 0,
+      latencyMs: 1,
+    };
+  }
+}
+
 class FakeImageAdapter implements ImageProviderPort {
   readonly provider = "OPENAI" as const;
 
@@ -410,6 +458,7 @@ export function factoryFor(provider: "OPENAI" | "CLAUDE" | "GROK"): AiAdapterFac
       return {
         probe: (config) => probeViaModels(config, "OPENAI", "https://api.openai.com"),
         text: () => new OpenAiTextAdapter(),
+        audio: () => new OpenAiAudioAdapter(),
         image: () => new OpenAiImageAdapter(),
         vision: () => new OpenAiVisionAdapter(),
       };
@@ -417,6 +466,7 @@ export function factoryFor(provider: "OPENAI" | "CLAUDE" | "GROK"): AiAdapterFac
       return {
         probe: (config) => probeViaModels(config, "CLAUDE", "https://api.anthropic.com"),
         text: () => new AnthropicTextAdapter(),
+        audio: () => null,
         image: () => null,
         vision: () => new AnthropicVisionAdapter(),
       };
@@ -424,6 +474,7 @@ export function factoryFor(provider: "OPENAI" | "CLAUDE" | "GROK"): AiAdapterFac
       return {
         probe: (config) => probeViaModels(config, "GROK", "https://api.x.ai"),
         text: () => new GrokTextAdapter(),
+        audio: () => null,
         image: () => null,
         vision: () => new GrokVisionAdapter(),
       };
@@ -434,6 +485,7 @@ export function fakeAiFactory(): AiAdapterFactory {
   return {
     probe: () => Promise.resolve({ provider: "OPENAI", status: "CONNECTED", lastError: null, latencyMs: 0 }),
     text: () => new FakeTextAdapter(),
+    audio: () => new FakeAudioAdapter(),
     image: () => new FakeImageAdapter(),
     vision: () => new FakeVisionAdapter(),
   };

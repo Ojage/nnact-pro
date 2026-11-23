@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
@@ -159,7 +160,7 @@ async function loadPackage(orgId: string, jobId: string) {
   const [job] = await db
     .select()
     .from(jobs)
-    .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+    .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))));
   if (!job) return null;
 
   const [customerRow] = await db
@@ -411,7 +412,7 @@ async function applyOfflineOp(
       db
         .select({ id: jobs.id })
         .from(jobs)
-        .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))),
+        .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)))),
       db
         .select({ id: equipment.id })
         .from(equipment)
@@ -492,7 +493,7 @@ async function applyOfflineOp(
     const [before] = await db
       .select()
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))));
     if (!before) return { opId: op.opId, ok: false, error: "job not found" };
 
     if (baseStatus && before.status !== baseStatus) {

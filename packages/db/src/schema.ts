@@ -34,6 +34,7 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 import type { PortalLinkScope, PricingSnapshot, WalkthroughProgressMap } from "@nnact/shared";
 
 export const jobStatus = pgEnum("job_status", [
+  "draft",
   "lead",
   "scheduled",
   "in_progress",
@@ -53,7 +54,7 @@ export const estimateStatus = pgEnum("estimate_status", [
   "declined",
   "expired",
 ]);
-export const userRole = pgEnum("user_role", ["owner", "dispatcher", "secretary", "technician"]);
+export const userRole = pgEnum("user_role", ["owner", "dispatcher", "secretary", "technician", "agent"]);
 
 const id = () => uuid("id").primaryKey().defaultRandom();
 const orgId = () =>
@@ -150,6 +151,8 @@ export const customers = pgTable(
     name: text("name").notNull(),
     email: text("email"),
     phone: text("phone"),
+    /** Normalized digits for WhatsApp/customer matching. Not unique: two customers may share a phone. */
+    phoneE164: text("phone_e164"),
     company: text("company"),
     address: text("address"),
     notes: text("notes"),
@@ -157,7 +160,10 @@ export const customers = pgTable(
     updatedAt: updatedAt(),
     createdAt: ts(),
   },
-  (t) => ({ orgIdx: index("customers_org_idx").on(t.orgId) }),
+  (t) => ({
+    orgIdx: index("customers_org_idx").on(t.orgId),
+    orgPhone: index("customers_org_phone_e164_idx").on(t.orgId, t.phoneE164),
+  }),
 );
 
 export const properties = pgTable("properties", {
@@ -209,6 +215,11 @@ export const jobs = pgTable(
     preferredTime: text("preferred_time"),
     /** SHA-256 of the customer-facing tracking token. Never stored in plain text. */
     trackingTokenHash: text("tracking_token_hash"),
+    /** True while a job is an unreviewed AI intake draft. Drafts have no job number. */
+    agentDraft: boolean("agent_draft").default(false).notNull(),
+    agentRejectedAt: timestamp("agent_rejected_at", { withTimezone: true }),
+    agentRejectionReason: text("agent_rejection_reason"),
+    agentConversationId: uuid("agent_conversation_id"),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     total: integer("total").default(0).notNull(),
     laborCostCents: integer("labor_cost_cents").default(0).notNull(),
