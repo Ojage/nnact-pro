@@ -35,6 +35,25 @@ function defaultTextModel(provider: string, configured: string | null): string {
   return configured?.trim() || (provider === "CLAUDE" ? "claude-sonnet-4-5" : provider === "GROK" ? "grok-3" : "gpt-4o");
 }
 
+function openAiUserContent(request: TextGenerationRequest): string | Record<string, unknown>[] {
+  if (!request.images?.length) return request.prompt;
+  return [
+    { type: "text", text: request.prompt },
+    ...request.images.map((image) => ({ type: "image_url", image_url: { url: `data:${image.mediaType};base64,${image.dataBase64}` } })),
+  ];
+}
+
+function anthropicUserContent(request: TextGenerationRequest): string | Record<string, unknown>[] {
+  if (!request.images?.length) return request.prompt;
+  return [
+    ...request.images.map((image) => ({
+      type: "image",
+      source: { type: "base64", media_type: image.mediaType, data: image.dataBase64 },
+    })),
+    { type: "text", text: request.prompt },
+  ];
+}
+
 function costMeta(model: string, kind: string, inputTokens: number, outputTokens: number): { inputTokens: number; outputTokens: number } {
   void model;
   void kind;
@@ -56,7 +75,7 @@ class OpenAiTextAdapter implements TextProviderPort {
         model,
         messages: [
           ...(request.system ? [{ role: "system", content: request.system }] : []),
-          { role: "user", content: request.prompt },
+          { role: "user", content: openAiUserContent(request) },
         ],
         temperature: request.temperature ?? 0.4,
         max_tokens: request.maxTokens ?? 2048,
@@ -203,7 +222,7 @@ class AnthropicTextAdapter implements TextProviderPort {
         model,
         max_tokens: request.maxTokens ?? 2048,
         ...(request.system ? { system: request.system } : {}),
-        messages: [{ role: "user", content: request.prompt }],
+        messages: [{ role: "user", content: anthropicUserContent(request) }],
       },
     });
     if (response.status < 200 || response.status >= 300) {
@@ -287,7 +306,7 @@ class GrokTextAdapter implements TextProviderPort {
         model,
         messages: [
           ...(request.system ? [{ role: "system", content: request.system }] : []),
-          { role: "user", content: request.prompt },
+          { role: "user", content: openAiUserContent(request) },
         ],
         temperature: request.temperature ?? 0.4,
         max_tokens: request.maxTokens ?? 2048,

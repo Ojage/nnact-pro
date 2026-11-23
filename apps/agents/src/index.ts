@@ -10,20 +10,28 @@ import {
   aiUsageRecords,
   conversations,
   customers,
+  jobs,
   messages,
+  quoteProposals,
   whatsappConfigs,
 } from "@nnact/db";
 import {
-  AGENT_RUN_TASKS,
+  AGENT_SCOPES,
   AUTH_AUDIENCES,
   FOLLOW_UP_QUESTIONS,
+  INTAKE_RUN_TASKS,
   JOB_DRAFT_KEY_FIELDS,
+  QUOTING_RUN_TASKS,
   SAFETY_ACKNOWLEDGEMENTS,
   SAFETY_TERMS,
   jobDraftSchema,
   normalizePhone,
+  quoteProposalDraftSchema,
   type AgentLanguage,
+  type AgentScope,
   type JobDraft,
+  type PricedCandidateDTO,
+  type QuoteProposalDraft,
 } from "@nnact/shared";
 import { DbAutomationSettingsStore, DbProviderConfigStore, DbUsageStore } from "../../api/src/ai/infra.ts";
 import { AiProviderRegistry } from "../../api/src/ai/registry.ts";
@@ -32,6 +40,7 @@ import { getWhatsappConfig, sendWhatsappText } from "../../api/src/agent/whatsap
 
 const POLL_MS = Number(process.env.AGENT_POLL_MS ?? 15_000);
 const DAILY_COST_CAP_CENTS = Number(process.env.AGENT_DAILY_COST_CAP_CENTS ?? 200);
+const QUOTE_DAILY_COST_CAP_CENTS = Number(process.env.QUOTE_AGENT_DAILY_COST_CAP_CENTS ?? 200);
 const MAX_ATTEMPTS = 3;
 const API_URL = (process.env.AGENT_API_URL ?? "http://api:3001").replace(/\/$/, "");
 const AGENT_ID = process.env.AGENT_ID?.trim() || "nnact-intake-agent";
@@ -46,8 +55,8 @@ function base64url(value: string | Buffer): string {
   return Buffer.from(value).toString("base64url");
 }
 
-/** HS256 service token; audience is `agent`, scope is a single draft-jobs write. */
-function agentToken(orgId: string): string {
+/** HS256 service token. Intake gets one scope; quoting gets three narrow reads/write scopes. */
+function agentToken(orgId: string, scopes: AgentScope[] = [AGENT_SCOPES.draftJobsCreate]): string {
   const secret = process.env.JWT_SECRET?.trim() || "nnactpro-development-only-secret";
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
@@ -56,7 +65,8 @@ function agentToken(orgId: string): string {
       aud: AUTH_AUDIENCES.agent,
       agentId: AGENT_ID,
       orgId,
-      scope: "draft-jobs:create",
+      scope: scopes[0],
+      scopes,
       iat: now,
       exp: now + 300,
     }),
@@ -76,7 +86,7 @@ function todayStart(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-async function dailySpendCents(orgId: string): Promise<number> {
+async function dailySpendCents(orgId: string, tasks: readonly string[]): Promise<number> {
   const [{ value }] = await db
     .select({ value: sum(aiUsageRecords.costCents) })
     .from(aiUsageRecords)
@@ -84,7 +94,7 @@ async function dailySpendCents(orgId: string): Promise<number> {
       and(
         eq(aiUsageRecords.orgId, orgId),
         gte(aiUsageRecords.createdAt, todayStart()),
-        inArray(aiUsageRecords.task, [...AGENT_RUN_TASKS]),
+        inArray(aiUsageRecords.task, [...tasks]),
       ),
     );
   return Number(value ?? 0);
@@ -94,6 +104,7 @@ async function startRun(input: {
   orgId: string;
   conversationId?: string | null;
   messageId?: string | null;
+  jobId?: string | null;
   task: string;
   payload: Record<string, unknown>;
 }): Promise<string> {
@@ -103,6 +114,7 @@ async function startRun(input: {
       orgId: input.orgId,
       conversationId: input.conversationId ?? null,
       messageId: input.messageId ?? null,
+      jobId: input.jobId ?? null,
       state: "running",
       task: input.task,
       input: input.payload,
@@ -367,6 +379,199 @@ async function processMessage(messageId: string): Promise<void> {
   }
 }
 
+const QUOTE_API_SCOPES: AgentScope[] = [
+  AGENT_SCOPES.jobsRead,
+  AGENT_SCOPES.priceBookRead,
+  AGENT_SCOPES.quoteProposalsCreate,
+];
+
+const QUOTE_SYSTEM = [
+  "You prepare an internal repair quote draft from the offered price-book candidates.",
+  "Choose only candidateId, kind and quantity from the supplied snapshot. Never write a price, total or amount.",
+  "A candidate with no range means the price is unknown: select it with needsManualPrice true if it is genuinely needed.",
+  "Keep the line list short. Include assumptions and missing information as short factual notes; never claim a diagnosis.",
+  "Return only JSON matching the requested quote draft schema.",
+].join(" ");
+
+const FORBIDDEN_PRICE_KEYS = new Set([
+  "price", "unitPrice", "unitPriceCents", "amount", "amountCents",
+  "total", "totalCents", "costCents", "lowCents", "highCents", "weightedCents",
+]);
+
+function rejectModelPrices(value: unknown, path = "output"): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => rejectModelPrices(item, `${path}[${index}]`));
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const [key, nested] of Object.entries(value)) {
+    if (FORBIDDEN_PRICE_KEYS.has(key)) {
+      throw new Error(`model output contained forbidden price field ${path}.${key}`);
+    }
+    rejectModelPrices(nested, `${path}.${key}`);
+  }
+}
+
+function quotePrompt(input: {
+  job: { title: string; description: string | null; serviceArea: string | null };
+  candidates: PricedCandidateDTO[];
+}): string {
+  return JSON.stringify(
+    {
+      job: input.job,
+      instruction: "Select candidate ids and quantities only. Prices come from the server, never from you.",
+      candidates: input.candidates.map((candidate) => ({
+        candidateId: candidate.itemId ?? candidate.rateId,
+        kind: candidate.kind,
+        name: candidate.name,
+        aliases: candidate.aliases,
+        unit: candidate.unit,
+        range: candidate.range,
+      })),
+    },
+    null,
+    2,
+  );
+}
+
+async function agentFetch<T>(path: string, orgId: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: {
+      authorization: `Bearer ${agentToken(orgId, QUOTE_API_SCOPES)}`,
+      "content-type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const json = (await response.json().catch(() => ({}))) as T & { error?: unknown };
+  if (!response.ok) throw new Error(`quote API ${path} returned ${response.status}: ${JSON.stringify(json.error ?? json)}`);
+  return json;
+}
+
+function serviceAreaFromAddress(address: string | null): string | null {
+  const parts = (address ?? "").split(",").map((part) => part.trim()).filter(Boolean);
+  return parts.slice(-2).join(", ") || null;
+}
+
+async function processQuoteJob(job: {
+  id: string;
+  orgId: string;
+  title: string;
+  description: string | null;
+  serviceAddress: string | null;
+}): Promise<void> {
+  const runId = await startRun({
+    orgId: job.orgId,
+    jobId: job.id,
+    task: "agent.quote",
+    payload: { jobId: job.id, serviceArea: serviceAreaFromAddress(job.serviceAddress) },
+  });
+  try {
+    const candidates = await agentFetch<PricedCandidateDTO[]>("/api/v1/agent/quotes/candidates", job.orgId);
+    if (!candidates.length) {
+      await finishRun(runId, { state: "skipped", error: "no priced candidates available" });
+      return;
+    }
+    const settings = await settingsStore.get(job.orgId);
+    const order = settings.textProviderOrder.length ? settings.textProviderOrder : (["OPENAI"] as const);
+    const generated = await registry.generateTextWithFallback(
+      job.orgId,
+      {
+        system: QUOTE_SYSTEM,
+        prompt: quotePrompt({
+          job: {
+            title: job.title,
+            description: job.description,
+            serviceArea: serviceAreaFromAddress(job.serviceAddress),
+          },
+          candidates,
+        }),
+        structured: true,
+        temperature: 0,
+        maxTokens: 1600,
+        task: "agent.quote",
+        runId,
+      },
+      [...order],
+    );
+    rejectModelPrices(generated.result.structuredData);
+    const parsed = quoteProposalDraftSchema.safeParse(generated.result.structuredData);
+    if (!parsed.success) throw new Error(`invalid quote draft: ${parsed.error.message.slice(0, 300)}`);
+    const draft: QuoteProposalDraft = { ...parsed.data };
+    if (draft.diagnosticVisitRecommended && !draft.lines.some((line) => line.kind === "diagnostic")) {
+      const diagnostic = candidates.find((candidate) => candidate.kind === "diagnostic");
+      if (diagnostic) {
+        const candidateId = diagnostic.itemId ?? diagnostic.rateId ?? "";
+        draft.lines.push({
+          candidateId,
+          kind: "diagnostic",
+          quantity: 1,
+          reason: "Diagnostic visit recommended by the agent.",
+          needsManualPrice: diagnostic.range.lowCents === null,
+        });
+      }
+    }
+    const proposal = await agentFetch<{ id: string }>("/api/v1/agent/quotes/proposals", job.orgId, {
+      orgId: job.orgId,
+      jobId: job.id,
+      runId,
+      model: generated.result.model,
+      draft,
+    });
+    await finishRun(runId, {
+      state: "completed",
+      output: { proposalId: proposal.id, draft },
+      provider: generated.result.provider,
+      model: generated.result.model,
+      jobId: job.id,
+    });
+  } catch (error) {
+    await finishRun(runId, { state: "failed", error: (error as Error).message.slice(0, 1000), jobId: job.id });
+  }
+}
+
+async function quotingTick(): Promise<void> {
+  const eligible = await db
+    .select({
+      id: jobs.id,
+      orgId: jobs.orgId,
+      title: jobs.title,
+      description: jobs.description,
+      serviceAddress: jobs.serviceAddress,
+    })
+    .from(jobs)
+    .where(inArray(jobs.status, ["lead", "scheduled", "in_progress"]))
+    .orderBy(asc(jobs.createdAt))
+    .limit(50);
+  if (!eligible.length) return;
+  const quoted = await db.select({ jobId: quoteProposals.jobId }).from(quoteProposals);
+  const quotedSet = new Set(quoted.map((row) => row.jobId));
+  const quoteRuns = await db
+    .select({ jobId: agentRuns.jobId, state: agentRuns.state, attempts: agentRuns.attempts })
+    .from(agentRuns)
+    .where(eq(agentRuns.task, "agent.quote"));
+  const handled = new Map<string, { done: boolean; attempts: number }>();
+  for (const run of quoteRuns) {
+    if (!run.jobId) continue;
+    const prior = handled.get(run.jobId);
+    handled.set(run.jobId, {
+      done: (prior?.done ?? false) || run.state === "completed" || run.state === "skipped",
+      attempts: Math.max(prior?.attempts ?? 0, run.attempts ?? 0),
+    });
+  }
+
+  for (const job of eligible) {
+    if (quotedSet.has(job.id) || handled.get(job.id)?.done) continue;
+    if ((handled.get(job.id)?.attempts ?? 0) >= MAX_ATTEMPTS) continue;
+    if ((await dailySpendCents(job.orgId, QUOTING_RUN_TASKS)) >= QUOTE_DAILY_COST_CAP_CENTS) {
+      console.warn(`[agent] quoting daily AI cost cap reached for org ${job.orgId}`);
+      return;
+    }
+    await processQuoteJob(job);
+  }
+}
+
 async function sweepExpiredMedia(): Promise<void> {
   const expired = await db
     .select()
@@ -423,7 +628,7 @@ async function tick(): Promise<void> {
         });
       continue;
     }
-    if ((await dailySpendCents(message.orgId)) >= DAILY_COST_CAP_CENTS) {
+    if ((await dailySpendCents(message.orgId, INTAKE_RUN_TASKS)) >= DAILY_COST_CAP_CENTS) {
       console.warn(`[agent] daily AI cost cap reached for org ${message.orgId}`);
       return;
     }
@@ -440,8 +645,12 @@ async function tick(): Promise<void> {
 }
 
 setInterval(() => {
-  void tick().catch((error) => console.error("[agent] tick failed:", error));
+  void tick().catch((error) => console.error("[agent] intake tick failed:", error));
+  void quotingTick().catch((error) => console.error("[agent] quoting tick failed:", error));
 }, POLL_MS).unref();
 
-void tick().catch((error) => console.error("[agent] initial tick failed:", error));
-console.log(`[agent] intake worker started (poll ${POLL_MS}ms, daily cap ${DAILY_COST_CAP_CENTS}c)`);
+void tick().catch((error) => console.error("[agent] initial intake tick failed:", error));
+void quotingTick().catch((error) => console.error("[agent] initial quoting tick failed:", error));
+console.log(
+  `[agent] intake + quoting workers started (poll ${POLL_MS}ms, intake cap ${DAILY_COST_CAP_CENTS}c, quoting cap ${QUOTE_DAILY_COST_CAP_CENTS}c)`,
+);

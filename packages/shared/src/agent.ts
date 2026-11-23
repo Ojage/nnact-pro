@@ -98,5 +98,7 @@ export type JobDraftQuestion = z.infer<typeof jobDraftQuestionSchema>;
 /** Fields the dispatcher must see before a draft can be turned into a job. */
 export const JOB_DRAFT_KEY_FIELDS = ["customerName", "phone", "town", "applianceType", "symptom"] as const;
 
-export const AGENT_RUN_TASKS = ["agent.extract", "agent.stt", "agent.followup"] as const;
+export const INTAKE_RUN_TASKS = ["agent.extract", "agent.stt", "agent.followup"] as const;
+export const QUOTING_RUN_TASKS = ["agent.quote", "agent.receipt_vision"] as const;
+export const AGENT_RUN_TASKS = [...INTAKE_RUN_TASKS, ...QUOTING_RUN_TASKS] as const;
 export type AgentRunTask = (typeof AGENT_RUN_TASKS)[number];

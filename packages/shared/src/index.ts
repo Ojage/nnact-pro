@@ -25,6 +25,7 @@ export * from "./ai.js";
 export * from "./phone.js";
 export * from "./api-error.js";
 export * from "./agent.js";
+export * from "./price-book.js";
 
 // Shared domain enums + DTO types used by api, web, and mobile.
 

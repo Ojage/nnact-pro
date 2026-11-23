@@ -20,22 +20,44 @@ export interface StaffSessionUser {
  * `isStaffClaims` deliberately rejects them, so adding this audience does not
  * grant access to any existing staff route.
  */
+export const AGENT_SCOPES = {
+  draftJobsCreate: "draft-jobs:create",
+  jobsRead: "jobs:read",
+  priceBookRead: "price-book:read",
+  quoteProposalsCreate: "quote-proposals:create",
+} as const;
+
+export type AgentScope = (typeof AGENT_SCOPES)[keyof typeof AGENT_SCOPES];
+
 export interface AgentJwtClaims {
   aud: typeof AUTH_AUDIENCES.agent;
   agentId: string;
   orgId: string;
-  scope: "draft-jobs:create";
+  /** Primary scope; kept for the original single-scope Intake token. */
+  scope: AgentScope;
+  /** All scopes granted to this token; quoting needs three at once. */
+  scopes?: AgentScope[];
 }
 
+const AGENT_SCOPE_VALUES = Object.values(AGENT_SCOPES) as string[];
+
 export function isAgentClaims(claims: unknown): claims is AgentJwtClaims {
-  return Boolean(
-    claims &&
-      typeof claims === "object" &&
-      (claims as { aud?: unknown }).aud === AUTH_AUDIENCES.agent &&
-      typeof (claims as { agentId?: unknown }).agentId === "string" &&
-      typeof (claims as { orgId?: unknown }).orgId === "string" &&
-      (claims as { scope?: unknown }).scope === "draft-jobs:create",
-  );
+  if (
+    !claims ||
+    typeof claims !== "object" ||
+    (claims as { aud?: unknown }).aud !== AUTH_AUDIENCES.agent ||
+    typeof (claims as { agentId?: unknown }).agentId !== "string" ||
+    typeof (claims as { orgId?: unknown }).orgId !== "string" ||
+    !AGENT_SCOPE_VALUES.includes((claims as { scope?: unknown }).scope as string)
+  ) {
+    return false;
+  }
+  const scopes = (claims as { scopes?: unknown }).scopes;
+  return scopes === undefined || (Array.isArray(scopes) && scopes.every((scope) => AGENT_SCOPE_VALUES.includes(scope as string)));
+}
+
+export function hasAgentScope(claims: AgentJwtClaims, scope: AgentScope): boolean {
+  return (claims.scopes ?? [claims.scope]).includes(scope);
 }
 
 export interface CustomerSessionUser {

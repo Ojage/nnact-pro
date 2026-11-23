@@ -365,6 +365,13 @@
       "when": 1790000200000,
       "tag": "0053_agent_intake",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1790000300000,
+      "tag": "0054_price_book_quoting",
+      "breakpoints": true
     }
   ]
 }

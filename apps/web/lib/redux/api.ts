@@ -1,5 +1,14 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type {
+  HistoricalImportReport,
+  PriceBookCategoryDTO,
+  PriceBookItemDTO,
+  PriceBookRateDTO,
+  PriceObservationDTO,
+  PriceRangeDTO,
+  QuoteProposalDTO,
+} from "@nnact/shared";
+import type {
   ActivityDTO,
   ComebackAnalyticsDTO,
   ComebackCaseDetailDTO,
@@ -374,8 +383,70 @@ export const apiSlice = createApi({
     "Estimate",
     "ServiceAgreement",
     "AgentDraft",
+    "PriceBook",
+    "QuoteProposal",
   ],
   endpoints: (builder) => ({
+    priceBookCategories: builder.query<PriceBookCategoryDTO[], void>({
+      query: () => "/api/price-book/categories",
+      providesTags: ["PriceBook"],
+    }),
+    addPriceBookCategory: builder.mutation<PriceBookCategoryDTO, { name: string; freshnessDays: number }>({
+      query: (body) => ({ url: "/api/price-book/categories", method: "POST", body }),
+      invalidatesTags: ["PriceBook"],
+    }),
+    priceBookItems: builder.query<Array<PriceBookItemDTO & { range: PriceRangeDTO | null }>, void>({
+      query: () => "/api/price-book/items",
+      providesTags: ["PriceBook"],
+    }),
+    addPriceBookItem: builder.mutation<PriceBookItemDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/price-book/items", method: "POST", body }),
+      invalidatesTags: ["PriceBook"],
+    }),
+    priceBookObservations: builder.query<PriceObservationDTO[], { itemId?: string; status?: "pending" | "confirmed" } | void>({
+      query: (params) => ({ url: "/api/price-book/observations", params: params ?? undefined }),
+      providesTags: ["PriceBook"],
+    }),
+    addPriceBookObservation: builder.mutation<PriceObservationDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/price-book/observations", method: "POST", body }),
+      invalidatesTags: ["PriceBook"],
+    }),
+    confirmPriceObservation: builder.mutation<PriceObservationDTO, string>({
+      query: (id) => ({ url: `/api/price-book/observations/${id}/confirm`, method: "POST" }),
+      invalidatesTags: ["PriceBook", "QuoteProposal"],
+    }),
+    priceBookRates: builder.query<PriceBookRateDTO[], void>({
+      query: () => "/api/price-book/rates",
+      providesTags: ["PriceBook"],
+    }),
+    addPriceBookRate: builder.mutation<PriceBookRateDTO, Record<string, unknown>>({
+      query: (body) => ({ url: "/api/price-book/rates", method: "POST", body }),
+      invalidatesTags: ["PriceBook", "QuoteProposal"],
+    }),
+    logJobPurchase: builder.mutation<{ observationIds: string[]; extracted: { lines: number; suggestions: string[] } | null }, FormData>({
+      query: (body) => ({ url: `/api/price-book/jobs/${body.get("jobId") as string}/purchases`, method: "POST", body }),
+      invalidatesTags: ["PriceBook", "QuoteProposal"],
+    }),
+    importHistoricalPrices: builder.mutation<HistoricalImportReport, { dryRun: boolean }>({
+      query: (body) => ({ url: "/api/price-book/historical/import", method: "POST", body }),
+      invalidatesTags: ["PriceBook"],
+    }),
+    quoteProposals: builder.query<QuoteProposalDTO[], void>({
+      query: () => "/api/quotes/proposals",
+      providesTags: ["QuoteProposal"],
+    }),
+    quoteProposal: builder.query<QuoteProposalDTO, string>({
+      query: (id) => `/api/quotes/proposals/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "QuoteProposal", id }],
+    }),
+    approveQuoteProposal: builder.mutation<{ proposal: QuoteProposalDTO; estimate: unknown }, { id: string; lines: Array<{ lineId: string; quantity: number; unitPriceCents: number }> }>({
+      query: ({ id, lines }) => ({ url: `/api/quotes/proposals/${id}/approve`, method: "POST", body: { lines } }),
+      invalidatesTags: ["QuoteProposal", "Estimate", "Job"],
+    }),
+    rejectQuoteProposal: builder.mutation<QuoteProposalDTO, string>({
+      query: (id) => ({ url: `/api/quotes/proposals/${id}/reject`, method: "POST" }),
+      invalidatesTags: ["QuoteProposal"],
+    }),
     // ── Jobs ──
     jobs: builder.query<JobDTO[], void>({
       query: () => "/api/jobs",
@@ -2315,6 +2386,21 @@ export interface GrowthCampaignRunDTO {
 }
 
 export const {
+  usePriceBookCategoriesQuery,
+  useAddPriceBookCategoryMutation,
+  usePriceBookItemsQuery,
+  useAddPriceBookItemMutation,
+  usePriceBookObservationsQuery,
+  useAddPriceBookObservationMutation,
+  useConfirmPriceObservationMutation,
+  usePriceBookRatesQuery,
+  useAddPriceBookRateMutation,
+  useLogJobPurchaseMutation,
+  useImportHistoricalPricesMutation,
+  useQuoteProposalsQuery,
+  useQuoteProposalQuery,
+  useApproveQuoteProposalMutation,
+  useRejectQuoteProposalMutation,
   useDraftJobsQuery,
   useDraftJobQuery,
   useApproveDraftJobMutation,

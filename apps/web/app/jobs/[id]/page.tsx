@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { JobVoiceNotesPanel } from "@/components/job-voice-notes";
 import { JobPricingPanel } from "@/components/job-pricing-panel";
+import { JobPurchaseLog } from "@/components/job-purchase-log";
 import { JobQuickMoney } from "@/components/job-quick-money";
 import { UserAvatar } from "@/components/user-avatar";
 
@@ -289,6 +290,8 @@ export default function JobDetailPage() {
             <JobQuickMoney job={job} />
 
             <JobPricingPanel job={job} />
+
+            <JobPurchaseLog jobId={job.id} />
 
             <Card>
               <CardHeader>

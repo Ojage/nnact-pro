@@ -94,6 +94,8 @@ export interface AiProviderConfigWrite {
 
 export interface TextGenerationRequest {
   prompt: string;
+  /** Optional images for structured vision through the existing text ports. */
+  images?: { mediaType: string; dataBase64: string }[];
   system?: string | null;
   /** Force valid JSON on the model output when the provider supports it. */
   structured?: boolean;

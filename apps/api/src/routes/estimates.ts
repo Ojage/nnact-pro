@@ -15,7 +15,8 @@ import {
   orgs,
 } from "@nnact/db";
 import { estimateChecks, mergeBusinessSettings, type PricingSnapshot } from "@nnact/shared";
-import { defaultEstimateExpiresAt, depositAmountFor, depositSummary, estimateNumber } from "../estimates.js";
+import { depositAmountFor, depositSummary, estimateNumber } from "../estimates.js";
+import { createEstimateInOrg } from "../estimate-creation.js";
 import { defaultInvoiceDueAt, invoiceNumber } from "../invoicing.js";
 import { buildPricingSnapshot } from "../pricing.js";
 import { resolveOrgId } from "./org.js";
@@ -226,41 +227,12 @@ export async function estimateRoutes(app: FastifyInstance) {
       const [job] = await tx.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
       if (!job) return null;
       const sourceLines = await tx.select().from(lineItems).where(and(eq(lineItems.orgId, orgId), eq(lineItems.jobId, job.id)));
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`estimate-number:${orgId}`}))`);
-      const [org] = await tx.select({ businessSettings: orgs.businessSettings }).from(orgs).where(eq(orgs.id, orgId)).limit(1);
-      const settings = mergeBusinessSettings(org?.businessSettings);
-      const [{ count }] = await tx.select({ count: sql<number>`count(*)::int` }).from(estimates).where(eq(estimates.orgId, orgId));
-      const subtotal = estimateOptionTotal(sourceLines.length ? sourceLines : [{ quantity: 1, unitPrice: job.total }]);
-      const pricing = buildPricingSnapshot(settings, subtotal);
-      const [estimate] = await tx.insert(estimates).values({
+      return createEstimateInOrg(tx, {
         orgId,
         jobId: job.id,
-        number: estimateNumber(count, settings.numbering.estimatePrefix, settings.numbering.estimateNextNumber),
-        total: pricing.total,
-        pricing,
-        expiresAt: defaultEstimateExpiresAt(settings.estimate.expirationDays),
-        status: "draft",
-      }).returning();
-      // approvalMode guards against a quote that offers three identical
-      // options by default: single-option mode creates exactly one quote.
-      const optionLabels = settings.estimate.approvalMode === "single_option"
-        ? [settings.estimate.singleOptionLabel || "Recommended solution"]
-        : settings.estimate.optionLabels;
-      const options = await tx.insert(estimateOptions).values(optionLabels.map((label, position) => ({
-        orgId, estimateId: estimate.id, label, position, total: pricing.total, pricing,
-      }))).returning();
-      if (sourceLines.length) {
-        await tx.insert(estimateOptionLineItems).values(options.flatMap((option) => sourceLines.map((line) => ({
-          orgId,
-          optionId: option.id,
-          description: line.description,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-          unitCost: line.unitCost,
-          unit: line.unit ?? null,
-        }))));
-      }
-      return estimate;
+        lines: sourceLines,
+        subtotalCents: sourceLines.length ? undefined : job.total,
+      });
     });
     if (!result) return reply.code(404).send({ error: "job not found" });
     return reply.code(201).send(await detail(orgId, result.id));
