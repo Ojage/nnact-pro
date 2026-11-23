@@ -211,6 +211,11 @@ export const jobs = pgTable(
     originalJobId: uuid("original_job_id"),
     serviceCategory: text("service_category"),
     serviceAddress: text("service_address"),
+    /** Structured location extracted from landmark-based intake; nullable and expand-only. */
+    town: text("town"),
+    neighborhood: text("neighborhood"),
+    landmark: text("landmark"),
+    zone: text("zone"),
     preferredDate: text("preferred_date"),
     preferredTime: text("preferred_time"),
     /** SHA-256 of the customer-facing tracking token. Never stored in plain text. */
@@ -235,6 +240,7 @@ export const jobs = pgTable(
   },
   (t) => ({
     orgStatus: index("jobs_org_status_idx").on(t.orgId, t.status),
+    orgAssigned: index("jobs_org_assigned_idx").on(t.orgId, t.assignedTo, t.scheduledAt),
     sched: index("jobs_scheduled_idx").on(t.scheduledAt),
     tracking: uniqueIndex("jobs_tracking_hash_idx").on(t.trackingTokenHash),
     orgNumber: uniqueIndex("jobs_org_number_idx").on(t.orgId, t.number),
@@ -434,6 +440,7 @@ export const appointments = pgTable(
   },
   (t) => ({
     orgStart: index("appointments_org_starts_idx").on(t.orgId, t.startsAt),
+    orgTechnicianStart: index("appointments_org_technician_starts_idx").on(t.orgId, t.technicianId, t.startsAt),
     job: index("appointments_job_idx").on(t.jobId),
   }),
 );

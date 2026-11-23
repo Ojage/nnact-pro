@@ -19,6 +19,7 @@
 const SCALAR_TYPE_TO_UDT: Record<string, string> = {
   boolean: "bool",
   integer: "int4",
+  "double precision": "float8",
   "timestamp with time zone": "timestamptz",
 };
 
