@@ -195,6 +195,10 @@ export const agentLeases = pgTable(
     leaseKey: text("lease_key").notNull(),
     state: text("state").default("leased").notNull(),
     attempts: integer("attempts").default(0).notNull(),
+    task: text("task").default("").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().default(sql`'{}'::jsonb`).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
+    maxAttempts: integer("max_attempts").default(3).notNull(),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
@@ -206,6 +210,21 @@ export const agentLeases = pgTable(
     agentKey: uniqueIndex("agent_leases_agent_key_idx").on(t.agentId, t.leaseKey),
     expiry: index("agent_leases_expiry_idx").on(t.expiresAt),
     agentState: index("agent_leases_agent_state_idx").on(t.agentId, t.state),
+  }),
+);
+
+export const agentControls = pgTable(
+  "agent_controls",
+  {
+    agentId: text("agent_id").primaryKey(),
+    enabled: boolean("enabled").default(true).notNull(),
+    costCapCents: integer("cost_cap_cents"),
+    maxAttempts: integer("max_attempts").default(3).notNull(),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    updated: index("agent_controls_updated_at_idx").on(t.updatedAt),
   }),
 );
 
@@ -234,6 +253,7 @@ export type AgentMessage = typeof messages.$inferSelect;
 export type AgentMedia = typeof agentMedia.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type AgentLease = typeof agentLeases.$inferSelect;
+export type AgentControl = typeof agentControls.$inferSelect;
 export type AgentDeadLetter = typeof agentDeadLetters.$inferSelect;
 export type AgentLanguageCode = AgentLanguage;
 export type AgentUrgencyCode = AgentUrgency;

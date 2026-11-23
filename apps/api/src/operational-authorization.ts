@@ -14,6 +14,7 @@ const OWNER_ONLY_WRITE_PREFIXES = [
   "/api/org",
   "/api/plugins",
   "/api/connections",
+  "/api/agents",
 ];
 
 const OFFICE_WRITE_PREFIXES = [
