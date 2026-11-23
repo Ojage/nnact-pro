@@ -1,4 +1,5 @@
 // Shared navigation and auth helpers used by Sidebar, MobileNav, and CommandPalette.
+import { AGENT_OFFICE_ENABLED } from "@/lib/agent-office/format";
 // NNACT Pro is an open-source field-service operations platform with appliance-service workflows.
 
 export interface NavLink {
@@ -40,6 +41,7 @@ const ROUTE_ROLES: ReadonlyArray<readonly [string, readonly NavRole[]]> = [
   ["/newsletter", ["owner"]],
   ["/integrations", ["owner"]],
   ["/settings", ["owner"]],
+  ["/agents", ["owner"]],
   ["/agent/drafts", ["owner", "dispatcher"]],
   ["/agent/quotes", ["owner", "dispatcher"]],
   ["/agent/price-book", ["owner", "dispatcher"]],
@@ -105,6 +107,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/agent/drafts", label: "Draft jobs", icon: "◎" },
       { href: "/agent/quotes", label: "Quote proposals", icon: "◇" },
       { href: "/agent/price-book", label: "Quoting prices", icon: "⊞" },
+      ...(AGENT_OFFICE_ENABLED ? [{ href: "/agents", label: "Agent Office", icon: "⌂" }] : []),
       { href: "/diagnostics", label: "Diagnostics", icon: "⌁" },
     ],
   },

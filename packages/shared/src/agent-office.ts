@@ -113,6 +113,8 @@ export const agentLogLineSchema = z.object({
 });
 export type AgentLogLineDTO = z.infer<typeof agentLogLineSchema>;
 
+export const agentLogsResponseSchema = z.object({ lines: z.array(agentLogLineSchema) });
+
 export const agentRunSummarySchema = z.object({
   id: z.string(),
   agentId: agentIdSchema,
