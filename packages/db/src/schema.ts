@@ -211,7 +211,6 @@ export const jobs = pgTable(
     originalJobId: uuid("original_job_id"),
     serviceCategory: text("service_category"),
     serviceAddress: text("service_address"),
-    /** Structured location extracted from landmark-based intake; nullable and expand-only. */
     town: text("town"),
     neighborhood: text("neighborhood"),
     landmark: text("landmark"),

@@ -11,6 +11,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { DispatchCandidate, DispatchRankedCandidate, DispatchScoreFactor } from "@nnact/shared";
 import { jobs, users } from "./schema.js";
 
 const id = () => uuid("id").primaryKey().defaultRandom();
@@ -29,28 +30,6 @@ export const dispatchSuggestionState = pgEnum("dispatch_suggestion_state", [
 
 export type DispatchTechnicianSkillKind = "skill" | "certification" | "specialty";
 
-export interface DispatchScoreFactor {
-  key: string;
-  label: string;
-  points: number;
-  detail: string;
-}
-
-export interface DispatchCandidate {
-  technicianId: string;
-  name: string;
-  rank: number;
-  score: number;
-  confidence: number;
-  factors: DispatchScoreFactor[];
-  reasons: string[];
-}
-
-export interface DispatchSuggestionCandidate extends DispatchCandidate {
-  reasonSource: "model" | "fallback";
-}
-
-/** Owner-managed coverage and capacity for a technician. Expand-only: null means unknown. */
 export const technicianProfiles = pgTable(
   "technician_profiles",
   {
@@ -70,7 +49,6 @@ export const technicianProfiles = pgTable(
   }),
 );
 
-/** Owner-managed technician capabilities. Text kind keeps this additive and easy to extend. */
 export const technicianSkills = pgTable(
   "technician_skills",
   {
@@ -92,7 +70,6 @@ export const technicianSkills = pgTable(
   }),
 );
 
-/** One current suggestion per job; terminal rows keep the audit trail. */
 export const dispatchSuggestions = pgTable(
   "dispatch_suggestions",
   {
@@ -106,7 +83,7 @@ export const dispatchSuggestions = pgTable(
     current: integer("current").default(1).notNull(),
     shadow: integer("shadow").default(1).notNull(),
     fingerprint: text("fingerprint").notNull(),
-    candidates: jsonb("candidates").$type<DispatchSuggestionCandidate[]>().default(sql`'[]'::jsonb`).notNull(),
+    candidates: jsonb("candidates").$type<DispatchRankedCandidate[]>().default(sql`'[]'::jsonb`).notNull(),
     causes: jsonb("causes").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
     confidence: doublePrecision("confidence").default(0).notNull(),
     actualTechnicianId: uuid("actual_technician_id").references(() => users.id, { onDelete: "set null" }),

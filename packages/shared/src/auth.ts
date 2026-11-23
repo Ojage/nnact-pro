@@ -23,6 +23,8 @@ export interface StaffSessionUser {
 export const AGENT_SCOPES = {
   draftJobsCreate: "draft-jobs:create",
   jobsRead: "jobs:read",
+  techniciansRead: "technicians:read",
+  dispatchSuggestionsCreate: "dispatch-suggestions:create",
   priceBookRead: "price-book:read",
   quoteProposalsCreate: "quote-proposals:create",
 } as const;
