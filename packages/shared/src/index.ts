@@ -11,7 +11,10 @@ export {
   type AgentId,
   type AgentAutonomyTier,
   type AgentDefinition,
+  AGENT_STAGES,
+  type AgentStage,
 } from "./agent-registry.js";
+export * from "./agent-office.js";
 export * from "./team-credentials.js";
 export * from "./portal.js";
 export * from "./customer-portal.js";

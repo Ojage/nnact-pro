@@ -25,6 +25,7 @@ export const AGENT_ID = {
   quoting: "quoting-agent",
   dispatch: "dispatch-agent",
   pricebook: "pricebook-agent",
+  triage: "triage-agent",
   sourcing: "sourcing-agent",
   copilot: "copilot-agent",
   payments: "payments-agent",
@@ -43,6 +44,11 @@ export const AGENT_AUTONOMY_TIERS = {
 
 export type AgentAutonomyTier = (typeof AGENT_AUTONOMY_TIERS)[keyof typeof AGENT_AUTONOMY_TIERS];
 
+/** Delivery stage. Only `live` agents run; the others are shown as vacant offices. */
+export const AGENT_STAGES = ["live", "building", "planned"] as const;
+
+export type AgentStage = (typeof AGENT_STAGES)[number];
+
 interface AgentDefinitionInput {
   id: AgentId;
   displayName: string;
@@ -52,6 +58,7 @@ interface AgentDefinitionInput {
   costCapEnv: string;
   featureFlagKey: string;
   never: readonly string[];
+  stage: AgentStage;
 }
 
 export interface AgentDefinition extends AgentDefinitionInput {
@@ -81,6 +88,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentDefinition> = {
     taskLabels: ["agent.extract", "agent.stt", "agent.followup"],
     costCapEnv: "AGENT_DAILY_COST_CAP_CENTS",
     featureFlagKey: "agents.intake.enabled",
+    stage: "live",
     never: ["confirm-price", "send-estimate", "assign-job", "accept-payment", "free-form-customer-replies"],
   }),
   [AGENT_ID.quoting]: defineAgent({
@@ -96,6 +104,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentDefinition> = {
     taskLabels: ["agent.quote", "agent.receipt_vision"],
     costCapEnv: "QUOTE_AGENT_DAILY_COST_CAP_CENTS",
     featureFlagKey: "agents.quoting.enabled",
+    stage: "live",
     never: ["confirm-price", "send-estimate", "collect-payment"],
   }),
   [AGENT_ID.dispatch]: defineAgent({
@@ -111,6 +120,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentDefinition> = {
     taskLabels: ["agent.dispatch"],
     costCapEnv: "DISPATCH_AGENT_DAILY_COST_CAP_CENTS",
     featureFlagKey: "agents.dispatch.enabled",
+    stage: "building",
     never: ["assign-job", "send-estimate", "message-customer"],
   }),
   [AGENT_ID.pricebook]: defineAgent({
@@ -121,7 +131,19 @@ export const AGENT_REGISTRY: Record<AgentId, AgentDefinition> = {
     taskLabels: ["agent.price_observation"],
     costCapEnv: "PRICEBOOK_AGENT_DAILY_COST_CAP_CENTS",
     featureFlagKey: "agents.pricebook.enabled",
+    stage: "building",
     never: ["confirm-price", "send-estimate", "edit-price-book"],
+  }),
+  [AGENT_ID.triage]: defineAgent({
+    id: AGENT_ID.triage,
+    displayName: "Triage agent",
+    scopes: [AGENT_SCOPES.jobsRead, AGENT_SCOPES.agentRunsWrite],
+    tier: AGENT_AUTONOMY_TIERS.T1,
+    taskLabels: ["agent.triage"],
+    costCapEnv: "TRIAGE_AGENT_DAILY_COST_CAP_CENTS",
+    featureFlagKey: "agents.triage.enabled",
+    stage: "planned",
+    never: ["confirm-price", "message-customer", "change-record"],
   }),
   [AGENT_ID.sourcing]: defineAgent({
     id: AGENT_ID.sourcing,
@@ -136,6 +158,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentDefinition> = {
     taskLabels: ["agent.sourcing", "agent.supplier_message"],
     costCapEnv: "SOURCING_AGENT_DAILY_COST_CAP_CENTS",
     featureFlagKey: "agents.sourcing.enabled",
+    stage: "planned",
     never: ["place-order", "confirm-price", "message-customer"],
   }),
   [AGENT_ID.copilot]: defineAgent({
@@ -151,6 +174,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentDefinition> = {
     taskLabels: ["agent.copilot_suggestion"],
     costCapEnv: "COPILOT_AGENT_DAILY_COST_CAP_CENTS",
     featureFlagKey: "agents.copilot.enabled",
+    stage: "planned",
     never: ["send-message", "assign-job", "change-record"],
   }),
   [AGENT_ID.payments]: defineAgent({
@@ -166,6 +190,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentDefinition> = {
     taskLabels: ["agent.payment_reminder"],
     costCapEnv: "PAYMENTS_AGENT_DAILY_COST_CAP_CENTS",
     featureFlagKey: "agents.payments.enabled",
+    stage: "planned",
     never: ["record-payment", "issue-refund", "change-invoice"],
   }),
 };
