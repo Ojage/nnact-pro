@@ -139,6 +139,21 @@ pnpm --filter @nnact/web test:e2e
 pnpm --filter @nnact/mobile typecheck
 ```
 
+#### Isolated test database
+
+API tests need a migrated Postgres. Use a throwaway container on its own port —
+never the shared development database already listening on 5432/5433:
+
+```bash
+docker run -d --name nnact-quoting-test-pg \
+  -e POSTGRES_USER=quoting_test -e POSTGRES_PASSWORD=quoting-test-only-4d7b \
+  -e POSTGRES_DB=nnact_test -p 55432:5432 postgres:16-alpine
+export DATABASE_URL=postgres://quoting_test:quoting-test-only-4d7b@127.0.0.1:55432/nnact_test
+export PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome  # any installed Chrome/Chromium
+pnpm db:check && ALLOW_SCHEMA_PUSH=true pnpm db:migrate && pnpm db:parity
+pnpm test
+```
+
 ## What works today
 
 ### Operations

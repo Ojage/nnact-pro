@@ -20,98 +20,98 @@ DO $$ BEGIN
   CREATE TYPE "agent_run_state" AS ENUM ('pending', 'running', 'completed', 'failed', 'skipped');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "whatsapp_configs" (
-\t"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-\t"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
-\t"phone_number_id" text NOT NULL,
-\t"business_account_id" text,
-\t"access_token_cipher" text NOT NULL,
-\t"app_secret_cipher" text NOT NULL,
-\t"verify_token_cipher" text NOT NULL,
-\t"enabled" boolean DEFAULT true NOT NULL,
-\t"media_retention_days" integer DEFAULT 30 NOT NULL,
-\t"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-\t"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
+	"phone_number_id" text NOT NULL,
+	"business_account_id" text,
+	"access_token_cipher" text NOT NULL,
+	"app_secret_cipher" text NOT NULL,
+	"verify_token_cipher" text NOT NULL,
+	"enabled" boolean DEFAULT true NOT NULL,
+	"media_retention_days" integer DEFAULT 30 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "whatsapp_configs_org_idx" ON "whatsapp_configs" ("org_id");--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "conversations" (
-\t"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-\t"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
-\t"channel" "conversation_channel" DEFAULT 'whatsapp' NOT NULL,
-\t"external_id" text NOT NULL,
-\t"participant_phone" text NOT NULL,
-\t"display_name" text,
-\t"language" text DEFAULT 'en' NOT NULL,
-\t"state" "conversation_state" DEFAULT 'open' NOT NULL,
-\t"customer_id" uuid REFERENCES "customers"("id") ON DELETE SET NULL,
-\t"last_message_at" timestamp with time zone,
-\t"last_customer_message_at" timestamp with time zone,
-\t"follow_up_count" integer DEFAULT 0 NOT NULL,
-\t"needs_template" boolean DEFAULT false NOT NULL,
-\t"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
-\t"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-\t"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
+	"channel" "conversation_channel" DEFAULT 'whatsapp' NOT NULL,
+	"external_id" text NOT NULL,
+	"participant_phone" text NOT NULL,
+	"display_name" text,
+	"language" text DEFAULT 'en' NOT NULL,
+	"state" "conversation_state" DEFAULT 'open' NOT NULL,
+	"customer_id" uuid REFERENCES "customers"("id") ON DELETE SET NULL,
+	"last_message_at" timestamp with time zone,
+	"last_customer_message_at" timestamp with time zone,
+	"follow_up_count" integer DEFAULT 0 NOT NULL,
+	"needs_template" boolean DEFAULT false NOT NULL,
+	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "conversations_org_external_idx" ON "conversations" ("org_id", "channel", "external_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "conversations_org_phone_idx" ON "conversations" ("org_id", "participant_phone");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "conversations_org_last_message_idx" ON "conversations" ("org_id", "last_message_at");--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "messages" (
-\t"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-\t"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
-\t"conversation_id" uuid NOT NULL REFERENCES "conversations"("id") ON DELETE CASCADE,
-\t"external_id" text,
-\t"direction" "message_direction" NOT NULL,
-\t"from_address" text,
-\t"to_address" text,
-\t"text" text,
-\t"transcript" text,
-\t"language" text,
-\t"safety_flags" jsonb DEFAULT '[]'::jsonb NOT NULL,
-\t"media" jsonb DEFAULT '[]'::jsonb NOT NULL,
-\t"follow_up_index" integer,
-\t"raw_payload" jsonb,
-\t"sent_at" timestamp with time zone,
-\t"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
+	"conversation_id" uuid NOT NULL REFERENCES "conversations"("id") ON DELETE CASCADE,
+	"external_id" text,
+	"direction" "message_direction" NOT NULL,
+	"from_address" text,
+	"to_address" text,
+	"text" text,
+	"transcript" text,
+	"language" text,
+	"safety_flags" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"media" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"follow_up_index" integer,
+	"raw_payload" jsonb,
+	"sent_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "messages_org_external_idx" ON "messages" ("org_id", "external_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "messages_conversation_created_idx" ON "messages" ("conversation_id", "created_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "messages_org_sender_created_idx" ON "messages" ("org_id", "from_address", "created_at");--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "agent_media" (
-\t"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-\t"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
-\t"message_id" uuid NOT NULL REFERENCES "messages"("id") ON DELETE CASCADE,
-\t"job_id" uuid REFERENCES "jobs"("id") ON DELETE SET NULL,
-\t"kind" text NOT NULL,
-\t"object_key" text NOT NULL,
-\t"content_type" text NOT NULL,
-\t"file_name" text,
-\t"byte_size" integer NOT NULL,
-\t"wa_media_id" text,
-\t"sha256" text,
-\t"expires_at" timestamp with time zone NOT NULL,
-\t"attached_at" timestamp with time zone,
-\t"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
+	"message_id" uuid NOT NULL REFERENCES "messages"("id") ON DELETE CASCADE,
+	"job_id" uuid REFERENCES "jobs"("id") ON DELETE SET NULL,
+	"kind" text NOT NULL,
+	"object_key" text NOT NULL,
+	"content_type" text NOT NULL,
+	"file_name" text,
+	"byte_size" integer NOT NULL,
+	"wa_media_id" text,
+	"sha256" text,
+	"expires_at" timestamp with time zone NOT NULL,
+	"attached_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "agent_media_job_idx" ON "agent_media" ("job_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "agent_media_expiry_idx" ON "agent_media" ("expires_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "agent_media_message_idx" ON "agent_media" ("message_id");--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "agent_runs" (
-\t"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-\t"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
-\t"conversation_id" uuid REFERENCES "conversations"("id") ON DELETE SET NULL,
-\t"message_id" uuid REFERENCES "messages"("id") ON DELETE SET NULL,
-\t"job_id" uuid REFERENCES "jobs"("id") ON DELETE SET NULL,
-\t"state" "agent_run_state" DEFAULT 'pending' NOT NULL,
-\t"task" text NOT NULL,
-\t"input" jsonb NOT NULL,
-\t"output" jsonb,
-\t"provider" text,
-\t"model" text,
-\t"latency_ms" integer,
-\t"cost_cents" integer DEFAULT 0 NOT NULL,
-\t"error" text,
-\t"attempts" integer DEFAULT 0 NOT NULL,
-\t"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-\t"completed_at" timestamp with time zone
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL REFERENCES "orgs"("id") ON DELETE CASCADE,
+	"conversation_id" uuid REFERENCES "conversations"("id") ON DELETE SET NULL,
+	"message_id" uuid REFERENCES "messages"("id") ON DELETE SET NULL,
+	"job_id" uuid REFERENCES "jobs"("id") ON DELETE SET NULL,
+	"state" "agent_run_state" DEFAULT 'pending' NOT NULL,
+	"task" text NOT NULL,
+	"input" jsonb NOT NULL,
+	"output" jsonb,
+	"provider" text,
+	"model" text,
+	"latency_ms" integer,
+	"cost_cents" integer DEFAULT 0 NOT NULL,
+	"error" text,
+	"attempts" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"completed_at" timestamp with time zone
 );--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "agent_runs_org_task_created_idx" ON "agent_runs" ("org_id", "task", "created_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "agent_runs_conversation_idx" ON "agent_runs" ("conversation_id", "created_at");--> statement-breakpoint
