@@ -14,9 +14,12 @@ import {
   users,
 } from "@nnact/db";
 import {
+  AGENT_ID,
+  AGENT_SCOPES,
   isAgentClaims,
   jobDraftSchema,
   normalizePhone,
+  requireAgentScope,
   type AgentLanguage,
 } from "@nnact/shared";
 import { allocateJobNumberInOrg, createJobInOrg } from "../job-creation.js";
@@ -116,6 +119,9 @@ export async function agentRoutes(app: FastifyInstance) {
   app.post("/agent/intake/draft-jobs", async (req, reply) => {
     const claims = await agentSession(req, reply);
     if (!claims || reply.sent) return;
+    if (!requireAgentScope(claims, AGENT_ID.intake, AGENT_SCOPES.draftJobsCreate)) {
+      return reply.code(403).send({ error: "intake agent needs draft-jobs:create" });
+    }
     const parsed = intakeBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const body = parsed.data;
@@ -162,7 +168,7 @@ export async function agentRoutes(app: FastifyInstance) {
       const symptom = body.draft.symptom?.trim() || "Customer reported a fault";
       const job = await createJobInOrg(tx, {
         orgId: body.orgId,
-        actorUserId: claims.agentId,
+        actorUserId: claims.agentId ?? claims.agent_id ?? AGENT_ID.intake,
         reason: "created from WhatsApp intake agent",
         number: null,
         values: {

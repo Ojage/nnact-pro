@@ -1,4 +1,17 @@
 export * from "./auth.js";
+export {
+  AGENT_ID,
+  AGENT_IDS,
+  AGENT_AUTONOMY_TIERS,
+  AGENT_REGISTRY,
+  getAgentDefinition,
+  resolveAgentId,
+  isAgentId,
+  scopeBelongsToAgent,
+  type AgentId,
+  type AgentAutonomyTier,
+  type AgentDefinition,
+} from "./agent-registry.js";
 export * from "./team-credentials.js";
 export * from "./portal.js";
 export * from "./customer-portal.js";

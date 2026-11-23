@@ -1,3 +1,5 @@
+import type { AgentId as CanonicalAgentId } from "./agent-registry.js";
+
 export const AUTH_AUDIENCES = {
   staff: "staff",
   customer: "customer",
@@ -27,13 +29,25 @@ export const AGENT_SCOPES = {
   dispatchSuggestionsCreate: "dispatch-suggestions:create",
   priceBookRead: "price-book:read",
   quoteProposalsCreate: "quote-proposals:create",
+  messagesRead: "messages:read",
+  messagesWrite: "messages:write",
+  conversationsRead: "conversations:read",
+  conversationsWrite: "conversations:write",
+  whatsappTemplatedSend: "whatsapp:templated-send",
+  priceObservationsCreate: "price-observations:create",
+  sourcingSuggestionsCreate: "sourcing-suggestions:create",
+  supplierMessagesTemplatedSend: "supplier-messages:templated-send",
+  invoicesRead: "invoices:read",
+  paymentRemindersSend: "payment-reminders:send",
+  agentRunsWrite: "agent-runs:write",
 } as const;
 
 export type AgentScope = (typeof AGENT_SCOPES)[keyof typeof AGENT_SCOPES];
 
 export interface AgentJwtClaims {
   aud: typeof AUTH_AUDIENCES.agent;
-  agentId: string;
+  agent_id?: CanonicalAgentId;
+  agentId?: string;
   orgId: string;
   /** Primary scope; kept for the original single-scope Intake token. */
   scope: AgentScope;
@@ -43,23 +57,99 @@ export interface AgentJwtClaims {
 
 const AGENT_SCOPE_VALUES = Object.values(AGENT_SCOPES) as string[];
 
+const AGENT_CLAIM_SCOPE_GRANTS: Record<string, readonly AgentScope[]> = {
+  "intake-agent": [
+    AGENT_SCOPES.draftJobsCreate,
+    AGENT_SCOPES.messagesRead,
+    AGENT_SCOPES.messagesWrite,
+    AGENT_SCOPES.conversationsRead,
+    AGENT_SCOPES.conversationsWrite,
+    AGENT_SCOPES.whatsappTemplatedSend,
+    AGENT_SCOPES.agentRunsWrite,
+  ],
+  "quoting-agent": [
+    AGENT_SCOPES.jobsRead,
+    AGENT_SCOPES.priceBookRead,
+    AGENT_SCOPES.quoteProposalsCreate,
+    AGENT_SCOPES.agentRunsWrite,
+  ],
+  "dispatch-agent": [
+    AGENT_SCOPES.jobsRead,
+    AGENT_SCOPES.techniciansRead,
+    AGENT_SCOPES.dispatchSuggestionsCreate,
+    AGENT_SCOPES.agentRunsWrite,
+  ],
+  "pricebook-agent": [AGENT_SCOPES.priceBookRead, AGENT_SCOPES.priceObservationsCreate, AGENT_SCOPES.agentRunsWrite],
+  "sourcing-agent": [
+    AGENT_SCOPES.priceBookRead,
+    AGENT_SCOPES.sourcingSuggestionsCreate,
+    AGENT_SCOPES.supplierMessagesTemplatedSend,
+    AGENT_SCOPES.agentRunsWrite,
+  ],
+  "copilot-agent": [AGENT_SCOPES.jobsRead, AGENT_SCOPES.messagesRead, AGENT_SCOPES.conversationsRead, AGENT_SCOPES.agentRunsWrite],
+  "payments-agent": [AGENT_SCOPES.jobsRead, AGENT_SCOPES.invoicesRead, AGENT_SCOPES.paymentRemindersSend, AGENT_SCOPES.agentRunsWrite],
+};
+
+function isAgentScope(value: unknown): value is AgentScope {
+  return typeof value === "string" && AGENT_SCOPE_VALUES.includes(value);
+}
+
+function resolveClaimAgentId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (Object.hasOwn(AGENT_CLAIM_SCOPE_GRANTS, trimmed)) return trimmed;
+  const canonical = trimmed.startsWith("nnact-") ? trimmed.slice("nnact-".length) : trimmed;
+  return Object.hasOwn(AGENT_CLAIM_SCOPE_GRANTS, canonical) ? canonical : null;
+}
+
+function claimAgentScopeAllowed(agentId: string, scope: AgentScope): boolean {
+  return AGENT_CLAIM_SCOPE_GRANTS[agentId]?.includes(scope) ?? false;
+}
+
+function resolveClaimIds(candidate: { agent_id?: unknown; agentId?: unknown }): string | null {
+  if (candidate.agent_id === undefined && candidate.agentId === undefined) return null;
+  const canonical = resolveClaimAgentId(candidate.agent_id);
+  const alias = resolveClaimAgentId(candidate.agentId);
+  if (candidate.agent_id !== undefined && !canonical) return null;
+  if (candidate.agentId !== undefined && !alias) return null;
+  if (canonical && alias && canonical !== alias) return null;
+  return canonical ?? alias;
+}
+
 export function isAgentClaims(claims: unknown): claims is AgentJwtClaims {
-  if (
-    !claims ||
-    typeof claims !== "object" ||
-    (claims as { aud?: unknown }).aud !== AUTH_AUDIENCES.agent ||
-    typeof (claims as { agentId?: unknown }).agentId !== "string" ||
-    typeof (claims as { orgId?: unknown }).orgId !== "string" ||
-    !AGENT_SCOPE_VALUES.includes((claims as { scope?: unknown }).scope as string)
-  ) {
-    return false;
-  }
-  const scopes = (claims as { scopes?: unknown }).scopes;
-  return scopes === undefined || (Array.isArray(scopes) && scopes.every((scope) => AGENT_SCOPE_VALUES.includes(scope as string)));
+  if (!claims || typeof claims !== "object") return false;
+  const candidate = claims as {
+    aud?: unknown;
+    agent_id?: unknown;
+    agentId?: unknown;
+    orgId?: unknown;
+    scope?: unknown;
+    scopes?: unknown;
+  };
+  if (candidate.aud !== AUTH_AUDIENCES.agent || typeof candidate.orgId !== "string") return false;
+  const agentId = resolveClaimIds(candidate);
+  if (!agentId || !isAgentScope(candidate.scope) || !claimAgentScopeAllowed(agentId, candidate.scope)) return false;
+  if (candidate.scopes === undefined) return true;
+  return (
+    Array.isArray(candidate.scopes) &&
+    candidate.scopes.every((scope) => isAgentScope(scope) && claimAgentScopeAllowed(agentId, scope))
+  );
 }
 
 export function hasAgentScope(claims: AgentJwtClaims, scope: AgentScope): boolean {
   return (claims.scopes ?? [claims.scope]).includes(scope);
+}
+
+export function requireAgentScope(
+  claims: unknown,
+  expectedAgentId: CanonicalAgentId | string,
+  scope: AgentScope | string,
+): claims is AgentJwtClaims {
+  if (!isAgentClaims(claims)) return false;
+  const expected = resolveClaimAgentId(expectedAgentId);
+  if (!expected || !isAgentScope(scope) || !claimAgentScopeAllowed(expected, scope)) return false;
+  const candidate = claims as { agent_id?: unknown; agentId?: unknown };
+  return resolveClaimIds(candidate) === expected && hasAgentScope(claims, scope);
 }
 
 export interface CustomerSessionUser {

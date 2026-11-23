@@ -171,6 +171,12 @@ export const agentRuns = pgTable(
     costCents: integer("cost_cents").default(0).notNull(),
     error: text("error"),
     attempts: integer("attempts").default(0).notNull(),
+    agentId: text("agent_id"),
+    promptVersion: text("prompt_version"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    outcome: text("outcome"),
+    leaseId: uuid("lease_id"),
     createdAt: ts(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
@@ -180,10 +186,54 @@ export const agentRuns = pgTable(
   }),
 );
 
+export const agentLeases = pgTable(
+  "agent_leases",
+  {
+    id: id(),
+    agentId: text("agent_id").notNull(),
+    orgId: uuid("org_id"),
+    leaseKey: text("lease_key").notNull(),
+    state: text("state").default("leased").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: ts(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    agentKey: uniqueIndex("agent_leases_agent_key_idx").on(t.agentId, t.leaseKey),
+    expiry: index("agent_leases_expiry_idx").on(t.expiresAt),
+    agentState: index("agent_leases_agent_state_idx").on(t.agentId, t.state),
+  }),
+);
+
+export const agentDeadLetters = pgTable(
+  "agent_dead_letters",
+  {
+    id: id(),
+    agentId: text("agent_id").notNull(),
+    orgId: uuid("org_id"),
+    leaseKey: text("lease_key"),
+    runId: uuid("run_id"),
+    task: text("task").notNull(),
+    error: text("error").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().default(sql`'{}'::jsonb`).notNull(),
+    createdAt: ts(),
+  },
+  (t) => ({
+    agentCreated: index("agent_dead_letters_agent_created_idx").on(t.agentId, t.createdAt),
+    taskCreated: index("agent_dead_letters_task_created_idx").on(t.task, t.createdAt),
+  }),
+);
+
 export type WhatsAppConfig = typeof whatsappConfigs.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type AgentMessage = typeof messages.$inferSelect;
 export type AgentMedia = typeof agentMedia.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
+export type AgentLease = typeof agentLeases.$inferSelect;
+export type AgentDeadLetter = typeof agentDeadLetters.$inferSelect;
 export type AgentLanguageCode = AgentLanguage;
 export type AgentUrgencyCode = AgentUrgency;

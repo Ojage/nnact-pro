@@ -4,11 +4,13 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@nnact/db";
 import { agentRuns, jobs, quoteProposalLines, quoteProposals } from "@nnact/db";
 import {
+  AGENT_ID,
   AGENT_SCOPES,
-  hasAgentScope,
   isAgentClaims,
   quoteProposalDraftSchema,
+  requireAgentScope,
   type AgentJwtClaims,
+  type AgentScope,
 } from "@nnact/shared";
 import { verifiedClaims } from "../operational-authorization.js";
 import { createEstimateInOrg } from "../estimate-creation.js";
@@ -27,8 +29,8 @@ async function agentSession(req: FastifyRequest, reply: FastifyReply): Promise<A
   return null;
 }
 
-function requireScopes(claims: AgentJwtClaims, scopes: string[]): boolean {
-  return scopes.every((scope) => hasAgentScope(claims, scope as (typeof AGENT_SCOPES)[keyof typeof AGENT_SCOPES]));
+function requireQuoteScopes(claims: AgentJwtClaims, scopes: readonly AgentScope[]): boolean {
+  return scopes.every((scope) => requireAgentScope(claims, AGENT_ID.quoting, scope));
 }
 
 async function officeSession(req: FastifyRequest, reply: FastifyReply) {
@@ -62,7 +64,7 @@ export async function agentQuoteRoutes(app: FastifyInstance) {
   app.get("/agent/quotes/jobs", async (req, reply) => {
     const claims = await agentSession(req, reply);
     if (!claims) return;
-    if (!requireScopes(claims, [AGENT_SCOPES.jobsRead, AGENT_SCOPES.priceBookRead])) {
+    if (!requireQuoteScopes(claims, [AGENT_SCOPES.jobsRead, AGENT_SCOPES.priceBookRead])) {
       return reply.code(403).send({ error: "quote worker needs jobs:read and price-book:read" });
     }
     const rows = await db
@@ -94,7 +96,7 @@ export async function agentQuoteRoutes(app: FastifyInstance) {
   app.get("/agent/quotes/candidates", async (req, reply) => {
     const claims = await agentSession(req, reply);
     if (!claims) return;
-    if (!requireScopes(claims, [AGENT_SCOPES.priceBookRead, AGENT_SCOPES.jobsRead])) {
+    if (!requireQuoteScopes(claims, [AGENT_SCOPES.priceBookRead, AGENT_SCOPES.jobsRead])) {
       return reply.code(403).send({ error: "quote worker needs price-book:read" });
     }
     return pricedCandidates(claims.orgId);
@@ -103,7 +105,7 @@ export async function agentQuoteRoutes(app: FastifyInstance) {
   app.post("/agent/quotes/proposals", async (req, reply) => {
     const claims = await agentSession(req, reply);
     if (!claims) return;
-    if (!requireScopes(claims, [AGENT_SCOPES.quoteProposalsCreate, AGENT_SCOPES.priceBookRead, AGENT_SCOPES.jobsRead])) {
+    if (!requireQuoteScopes(claims, [AGENT_SCOPES.quoteProposalsCreate, AGENT_SCOPES.priceBookRead, AGENT_SCOPES.jobsRead])) {
       return reply.code(403).send({ error: "quote worker is missing a required scope" });
     }
     const parsed = proposalBody.safeParse(req.body);
