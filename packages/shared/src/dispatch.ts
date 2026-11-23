@@ -73,6 +73,7 @@ export const dispatchReasonsRequestSchema = z.object({
 });
 
 export const dispatchReasonsOutputSchema = z.object({
+  area: z.string().trim().max(160).nullable(),
   reasons: z.array(
     z.object({
       technicianId: z.string().uuid(),
