@@ -56,6 +56,16 @@ const approveBody = z.object({
   preferredTime: z.string().trim().max(40).nullable().optional(),
 });
 
+const EDITABLE_DRAFT_FIELDS = ["title", "description", "serviceAddress", "preferredDate", "preferredTime"] as const;
+
+/** Whether the dispatcher changed any of the agent's drafted fields when approving. */
+export function draftWasEdited(
+  before: Partial<Record<(typeof EDITABLE_DRAFT_FIELDS)[number], string | null>>,
+  body: Partial<Record<(typeof EDITABLE_DRAFT_FIELDS)[number], string | null | undefined>>,
+): boolean {
+  return EDITABLE_DRAFT_FIELDS.some((field) => body[field] !== undefined && (body[field] ?? null) !== (before[field] ?? null));
+}
+
 const rejectBody = z.object({
   reason: z.string().trim().min(1).max(500),
 });
@@ -296,6 +306,7 @@ export async function agentDraftRoutes(app: FastifyInstance) {
           agentDraft: false,
           agentRejectedAt: null,
           agentRejectionReason: null,
+          agentDraftEdited: draftWasEdited(before, body),
           updatedAt: new Date(),
         })
         .where(eq(jobs.id, id))

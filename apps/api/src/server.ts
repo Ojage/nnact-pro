@@ -56,6 +56,7 @@ import { growthInboundWebhookRoutes } from "./routes/growth-inbound-webhook.js";
 import { whatsappWebhookRoutes } from "./routes/agent-webhook.js";
 import { agentRoutes, agentDraftRoutes } from "./routes/agent.js";
 import { agentPlatformRoutes } from "./routes/agent-platform.js";
+import { agentOfficeRoutes } from "./routes/agent-office.js";
 import { agentAdminRoutes } from "./routes/agents-admin.js";
 import { priceBookRoutes, quoteReviewRoutes } from "./routes/price-book.js";
 import { agentQuoteRoutes, quoteApprovalRoutes } from "./routes/agent-quotes.js";
@@ -290,6 +291,7 @@ export function buildServer(
   app.register(whatsappWebhookRoutes, { prefix: withVersion("") });
   app.register(agentRoutes, { prefix: withVersion("") });
   app.register(agentPlatformRoutes, { prefix: withVersion("/agent/platform") });
+  app.register(agentOfficeRoutes, { prefix: withVersion("/agent-office") });
   app.register(agentAdminRoutes, { prefix: withVersion("/agents") });
   app.register(agentDraftRoutes, { prefix: withVersion("") });
   app.register(agentQuoteRoutes, { prefix: withVersion("") });
@@ -383,6 +385,7 @@ export function buildServer(
   app.register(whatsappWebhookRoutes, { prefix: withLegacy("") });
   app.register(agentRoutes, { prefix: withLegacy("") });
   app.register(agentPlatformRoutes, { prefix: withLegacy("/agent/platform") });
+  app.register(agentOfficeRoutes, { prefix: withLegacy("/agent-office") });
   app.register(agentAdminRoutes, { prefix: withLegacy("/agents") });
   app.register(agentDraftRoutes, { prefix: withLegacy("") });
   app.register(agentQuoteRoutes, { prefix: withLegacy("") });

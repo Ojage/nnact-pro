@@ -2,9 +2,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, agentRuns, conversations, messages } from "@nnact/db";
+import { heartbeatBody, logsBody, recordHeartbeat, recordLogs, recordStep, stepBody } from "../agent-office/ingest.js";
 import {
   AGENT_SCOPES,
   isAgentClaims,
+  resolveAgentId,
   requireAgentScope,
   type AgentJwtClaims,
   type AgentScope,
@@ -98,7 +100,57 @@ async function ensureOrg(claims: AgentJwtClaims, orgId: string, reply: FastifyRe
   return false;
 }
 
+function claimAgent(claims: AgentJwtClaims) {
+  return resolveAgentId(claims.agent_id ?? claims.agentId ?? "");
+}
+
 export async function agentPlatformRoutes(app: FastifyInstance) {
+  // Agent Office telemetry. Each agent writes only as itself, and only for
+  // runs of its own organization; text is redacted before it is stored.
+  app.post("/heartbeat", async (req, reply) => {
+    const claims = await authorizeAgent(req, reply, AGENT_SCOPES.agentRunsWrite);
+    if (!claims || reply.sent) return;
+    const agentId = claimAgent(claims);
+    if (!agentId) return reply.code(403).send({ error: "unknown agent" });
+    const parsed = heartbeatBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (parsed.data.current) {
+      const [run] = await db
+        .select({ id: agentRuns.id })
+        .from(agentRuns)
+        .where(and(eq(agentRuns.id, parsed.data.current.runId), eq(agentRuns.orgId, claims.orgId), eq(agentRuns.agentId, agentId)))
+        .limit(1);
+      if (!run) return reply.code(404).send({ error: "run not found" });
+    }
+    await recordHeartbeat(agentId, parsed.data);
+    return reply.code(204).send();
+  });
+
+  app.put("/runs/:runId/steps/:seq", async (req, reply) => {
+    const claims = await authorizeAgent(req, reply, AGENT_SCOPES.agentRunsWrite);
+    if (!claims || reply.sent) return;
+    const agentId = claimAgent(claims);
+    if (!agentId) return reply.code(403).send({ error: "unknown agent" });
+    const params = z.object({ runId: uuid, seq: z.coerce.number().int().min(1).max(100) }).safeParse(req.params);
+    if (!params.success) return reply.code(400).send({ error: params.error.flatten() });
+    const parsed = stepBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const result = await recordStep(agentId, claims.orgId, params.data.runId, params.data.seq, parsed.data);
+    if (result === "not-found") return reply.code(404).send({ error: "run not found" });
+    return reply.code(204).send();
+  });
+
+  app.post("/logs", async (req, reply) => {
+    const claims = await authorizeAgent(req, reply, AGENT_SCOPES.agentRunsWrite);
+    if (!claims || reply.sent) return;
+    const agentId = claimAgent(claims);
+    if (!agentId) return reply.code(403).send({ error: "unknown agent" });
+    const parsed = logsBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const stored = await recordLogs(agentId, claims.orgId, parsed.data);
+    return reply.code(202).send({ stored });
+  });
+
   app.post("/runs", async (req, reply) => {
     const claims = await authorizeAgent(req, reply, AGENT_SCOPES.agentRunsWrite);
     if (!claims || reply.sent) return;
