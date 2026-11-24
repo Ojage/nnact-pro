@@ -2,9 +2,6 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-// The page is behind a build-time flag; build with NEXT_PUBLIC_AGENT_OFFICE_ENABLED=true to run this.
-test.skip(process.env.NEXT_PUBLIC_AGENT_OFFICE_ENABLED !== "true", "Agent Office flag is off in this build");
-
 const artifactDir = path.resolve("artifacts");
 const API = "http://127.0.0.1:3001";
 
@@ -57,8 +54,8 @@ function overview() {
     agents: [
       intakeWorking,
       room({ id: "quoting-agent", displayName: "Quoting agent", costTodayCents: 45 }),
-      room({ id: "dispatch-agent", displayName: "Dispatch agent", stage: "building", status: "offline", lastSeenAt: null }),
-      room({ id: "payments-agent", displayName: "Payments agent", tier: "T3", stage: "planned", status: "offline", lastSeenAt: null }),
+      room({ id: "dispatch-agent", displayName: "Dispatch agent", stage: "live", status: "offline", lastSeenAt: null }),
+      room({ id: "payments-agent", displayName: "Payments agent", tier: "T3", stage: "live", status: "offline", lastSeenAt: null }),
     ],
   };
 }

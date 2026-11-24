@@ -477,7 +477,7 @@ function CompanySection({ form, updateOrg, updateSettings, logoBusy, signatureBu
           <p className="text-sm font-semibold text-fg">Company logo</p>
           <p className="mt-1 text-xs text-fg-muted">PNG, JPEG, or WebP up to 2 MB. It appears on invoices and estimates automatically.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:opacity-90">
+            <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-[#141414] hover:opacity-90">
               {logoBusy ? "Uploading…" : form.logoUrl ? "Replace logo" : "Upload logo"}
               <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Upload company logo" onChange={chooseLogo} disabled={logoBusy} />
             </label>
@@ -558,7 +558,7 @@ function CompanySection({ form, updateOrg, updateSettings, logoBusy, signatureBu
           <p className="text-sm font-semibold text-fg">Signature image</p>
           <p className="mt-1 text-xs text-fg-muted">Upload a PNG of the authorized signatory&apos;s signature. It appears on the Signature line in PDFs.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:opacity-90">
+            <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-[#141414] hover:opacity-90">
               {signatureBusy ? "Uploading…" : form.signatureUrl ? "Replace signature" : "Upload signature"}
               <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseSignature} disabled={signatureBusy} />
             </label>
@@ -578,7 +578,7 @@ function CompanySection({ form, updateOrg, updateSettings, logoBusy, signatureBu
           <p className="text-sm font-semibold text-fg">Official stamp</p>
           <p className="mt-1 text-xs text-fg-muted">Upload a PNG of your company stamp. It overlays the signatory block on PDFs, matching your printed estimates.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:opacity-90">
+            <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg bg-accent px-3 text-sm font-semibold text-[#141414] hover:opacity-90">
               {stampBusy ? "Uploading…" : form.stampUrl ? "Replace stamp" : "Upload stamp"}
               <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseStamp} disabled={stampBusy} />
             </label>

@@ -202,14 +202,14 @@ export default function NewAgreementPage() {
                     <button
                       type="button"
                       onClick={() => setMode("template")}
-                      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${mode === "template" ? "bg-accent text-white" : "text-fg-muted hover:text-fg"}`}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${mode === "template" ? "bg-accent text-[#141414]" : "text-fg-muted hover:text-fg"}`}
                     >
                       Use a template
                     </button>
                     <button
                       type="button"
                       onClick={() => setMode("custom")}
-                      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${mode === "custom" ? "bg-accent text-white" : "text-fg-muted hover:text-fg"}`}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${mode === "custom" ? "bg-accent text-[#141414]" : "text-fg-muted hover:text-fg"}`}
                     >
                       Custom agreement
                     </button>

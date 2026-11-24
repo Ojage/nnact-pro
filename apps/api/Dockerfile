@@ -41,6 +41,7 @@ RUN node scripts/verify-lockfile.mjs \
 # Source after deps: edits to app/package code reuse the store layer above.
 COPY packages ./packages
 COPY apps/api ./apps/api
+COPY apps/agents ./apps/agents
 RUN pnpm install --frozen-lockfile --offline --reporter=silent \
   && pnpm --filter @nnact/api build \
   && mkdir -p /uploads \

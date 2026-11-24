@@ -1,6 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import type { JobStatus, InvoiceStatus } from "@nnact/shared";
 
+const statusDot = "before:mr-0.5 before:inline-block before:size-1.5 before:rounded-full before:bg-current before:opacity-70";
+
 const jobStatusMap: Record<JobStatus, "draft" | "lead" | "scheduled" | "in_progress" | "completed" | "canceled"> = {
   draft: "draft",
   lead: "lead",
@@ -18,11 +20,11 @@ const invoiceStatusMap: Record<InvoiceStatus, "draft" | "sent" | "paid" | "void"
 };
 
 export function JobStatusBadge({ status }: { status: JobStatus }) {
-  return <Badge variant={jobStatusMap[status]}>{status.replace("_", " ")}</Badge>;
+  return <Badge variant={jobStatusMap[status]} className={statusDot}>{status.replace("_", " ")}</Badge>;
 }
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
-  return <Badge variant={invoiceStatusMap[status]}>{status}</Badge>;
+  return <Badge variant={invoiceStatusMap[status]} className={statusDot}>{status}</Badge>;
 }
 
 type EstimateStatus = "draft" | "sent" | "approved" | "declined" | "expired";
@@ -36,5 +38,5 @@ const estimateStatusMap: Record<EstimateStatus, "draft" | "sent" | "paid" | "voi
 };
 
 export function EstimateStatusBadge({ status }: { status: EstimateStatus }) {
-  return <Badge variant={estimateStatusMap[status]}>{status.replaceAll("_", " ")}</Badge>;
+  return <Badge variant={estimateStatusMap[status]} className={statusDot}>{status.replaceAll("_", " ")}</Badge>;
 }

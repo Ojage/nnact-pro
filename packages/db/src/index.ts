@@ -18,6 +18,7 @@ import * as agentSchema from "./agent.js";
 import * as priceBookSchema from "./price-book.js";
 import * as dispatchSchema from "./dispatch.js";
 import * as agentOfficeSchema from "./agent-office.js";
+import * as agentWorkflowsSchema from "./agent-workflows.js";
 
 const url = process.env.DATABASE_URL ?? "postgres://ofp:ofp@localhost:5432/ofp";
 
@@ -25,7 +26,7 @@ const url = process.env.DATABASE_URL ?? "postgres://ofp:ofp@localhost:5432/ofp";
 // product foundation; raise it only after measuring real concurrency.
 const client = postgres(url, { max: 10 });
 
-export const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...repairBrainSchema, ...financeSchema, ...comebackSchema, ...growthSchema, ...authAccountsSchema, ...contentSchema, ...aiSchema, ...etechKeysSchema, ...customerPortalSchema, ...agentSchema, ...priceBookSchema, ...dispatchSchema, ...agentOfficeSchema };
+export const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...repairBrainSchema, ...financeSchema, ...comebackSchema, ...growthSchema, ...authAccountsSchema, ...contentSchema, ...aiSchema, ...etechKeysSchema, ...customerPortalSchema, ...agentSchema, ...priceBookSchema, ...dispatchSchema, ...agentOfficeSchema, ...agentWorkflowsSchema };
 export const db = drizzle(client, { schema });
 
 /** Close the pool, so a script or test process can exit. */
@@ -48,3 +49,4 @@ export * from "./agent.js";
 export * from "./price-book.js";
 export * from "./dispatch.js";
 export * from "./agent-office.js";
+export * from "./agent-workflows.js";

@@ -199,15 +199,15 @@ export default function RepairBrainPage() {
     results.repairHistory.length;
 
   return (
-    <div>
+    <div className="space-y-5">
       <PageHeader
         title="Repair Brain"
         description="Search NNACT's institutional repair knowledge — models, faults, parts, procedures, and field history."
       />
 
       {/* ── Search ── */}
-      <Card className="mb-6" data-tour="rb-search">
-        <CardContent className="pt-6">
+      <Card className="apple-surface" data-tour="rb-search">
+        <CardContent className="p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search
@@ -267,18 +267,18 @@ export default function RepairBrainPage() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center rounded-lg border border-border bg-surface-200 p-0.5 text-xs" role="group" aria-label="Search mode">
+            <div className="inline-flex items-center rounded-xl border border-border bg-surface-100 p-1 text-xs" role="group" aria-label="Search mode">
               <button
                 type="button"
                 onClick={() => setMode("keyword")}
-                className={`rounded-md px-2.5 py-1 transition-colors ${mode === "keyword" ? "bg-surface-300 font-semibold text-fg" : "text-fg-muted"}`}
+                className={`rounded-lg px-3 py-1.5 transition-colors ${mode === "keyword" ? "bg-accent font-semibold text-[#1d1d1f]" : "text-fg-muted"}`}
               >
                 Keyword
               </button>
               <button
                 type="button"
                 onClick={() => setMode("semantic")}
-                className={`rounded-md px-2.5 py-1 transition-colors ${mode === "semantic" ? "bg-surface-300 font-semibold text-fg" : "text-fg-muted"}`}
+                className={`rounded-lg px-3 py-1.5 transition-colors ${mode === "semantic" ? "bg-accent font-semibold text-[#1d1d1f]" : "text-fg-muted"}`}
               >
                 Semantic
               </button>
@@ -293,7 +293,7 @@ export default function RepairBrainPage() {
                 key={q}
                 type="button"
                 onClick={() => runQuery(q)}
-                className="rounded-full border border-border bg-surface-200 px-3 py-1 text-xs text-fg-muted transition-colors hover:border-fg-dim hover:text-fg"
+                className="apple-chip transition-colors hover:border-accent hover:text-fg"
               >
                 {q}
               </button>
@@ -352,8 +352,8 @@ export default function RepairBrainPage() {
       )}
 
       {searched && !searching && mode === "semantic" && semanticQuery.data && semanticQuery.data.hits.length === 0 && (
-        <Card className="mb-4">
-          <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+        <Card className="apple-empty mb-4">
+          <CardContent className="flex flex-col items-center gap-2 text-center">
             <Search className="size-6 text-fg-dim" aria-hidden />
             <p className="font-medium">No semantic matches for “{query.trim()}”</p>
             <p className="max-w-sm text-sm text-fg-muted">
@@ -372,8 +372,8 @@ export default function RepairBrainPage() {
       )}
 
       {searched && mode !== "semantic" && !searchQuery.isError && !searching && total === 0 && (
-        <Card className="mb-4">
-          <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+        <Card className="apple-empty mb-4">
+          <CardContent className="flex flex-col items-center gap-2 text-center">
             <Search className="size-6 text-fg-dim" aria-hidden />
             <p className="font-medium">No results for “{query.trim()}”</p>
             <p className="max-w-sm text-sm text-fg-muted">
@@ -405,7 +405,7 @@ export default function RepairBrainPage() {
               <Link
                 key={`${h.kind}-${h.id}`}
                 href={h.equipmentModelId ? `/repair-brain/models/${h.equipmentModelId}` : "/repair-brain/models"}
-                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]"
               >
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-center gap-1.5">
@@ -433,7 +433,7 @@ export default function RepairBrainPage() {
               <Link
                 key={m.id}
                 href={`/repair-brain/models/${m.id}`}
-                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]"
               >
                 <span className="min-w-0">
                   <span className="block truncate font-medium">
@@ -455,7 +455,7 @@ export default function RepairBrainPage() {
               <Link
                 key={f.id}
                 href={`/repair-brain/models/${f.equipmentModelId}`}
-                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]"
               >
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-center gap-1.5">
@@ -482,7 +482,7 @@ export default function RepairBrainPage() {
               <Link
                 key={p.id}
                 href={`/repair-brain/models/${p.equipmentModelId}`}
-                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]"
               >
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{p.partName}</span>
@@ -503,7 +503,7 @@ export default function RepairBrainPage() {
               <Link
                 key={p.id}
                 href={p.equipmentModelId ? `/repair-brain/models/${p.equipmentModelId}` : "/diagnostic-library"}
-                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]"
               >
                 <span className="min-w-0">
                   <span className="truncate font-medium">{p.title}</span>
@@ -521,7 +521,7 @@ export default function RepairBrainPage() {
               <Link
                 key={d.id}
                 href={d.equipmentModelId ? `/repair-brain/models/${d.equipmentModelId}` : "/repair-brain"}
-                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]"
               >
                 <span className="min-w-0">
                   <span className="truncate font-medium">{d.title}</span>
@@ -539,7 +539,7 @@ export default function RepairBrainPage() {
               <Link
                 key={r.id}
                 href={r.equipmentModelId ? `/repair-brain/models/${r.equipmentModelId}` : "/repair-brain"}
-                className="group flex items-start justify-between gap-3 rounded-md border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-300"
+                className="group flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]"
               >
                 <div className="min-w-0 flex-1">
                   <Badge variant="secondary" className="shrink-0 capitalize">
@@ -792,7 +792,7 @@ function ResultSection({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle className="apple-section-title flex items-center gap-2">
           <Icon className="size-4 text-primary" aria-hidden />
           {title} <span className="font-normal text-fg-muted">({count})</span>
         </CardTitle>
@@ -820,7 +820,7 @@ function QuickLink({
     <Link
       href={href}
       data-tour={dataTour}
-      className="group flex items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:border-fg-dim hover:bg-surface-200"
+      className="group flex items-start gap-3 rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:shadow-[0_10px_28px_rgba(0,0,0,0.06)]"
     >
       <Icon className="mt-0.5 size-4 shrink-0 text-fg-muted" aria-hidden />
       <span className="min-w-0 flex-1">

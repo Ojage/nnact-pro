@@ -25,6 +25,7 @@ export const SMS_TEMPLATE_SLUGS = [
   "invoice_issued",
   "invoice_reminder",
   "payment_received",
+  "supplier_stock_check",
   // Estimates
   "estimate_ready",
   "estimate_approved",
@@ -48,7 +49,7 @@ export type SmsTemplateSlug = (typeof SMS_TEMPLATE_SLUGS)[number];
 export interface SmsTemplateDef {
   slug: SmsTemplateSlug;
   label: string;
-  audience: "customer" | "staff";
+  audience: "customer" | "staff" | "supplier";
   /** The real-world moment this message is sent. */
   trigger: string;
   /** Variables the template may reference (superset; unused entries are fine). */
@@ -188,6 +189,16 @@ export const SMS_TEMPLATE_CATALOG: SmsTemplateDef[] = [
     requiredVariables: ["amount"],
     template:
       "Payment received, {{customerName}}! Thank you for your payment of {{amount}} to {{companyName}}. Your receipt is in the portal: {{portalLink}}",
+  },
+  {
+    slug: "supplier_stock_check",
+    label: "Supplier stock and price check",
+    audience: "supplier",
+    trigger: "The sourcing agent asks a known supplier to confirm stock and pricing for specific parts.",
+    variables: ["companyName", "supplierName", "items", "contactPhone"],
+    requiredVariables: ["supplierName", "items"],
+    template:
+      "Hi {{supplierName}}, {{companyName}} is checking availability and current prices for: {{items}}. Please reply with stock and pricing{{#contactPhone}} via {{contactPhone}}{{/contactPhone}}.",
   },
   {
     slug: "estimate_ready",

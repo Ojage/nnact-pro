@@ -28,8 +28,8 @@ export function NavLinkItem({ href, label, icon, tour, active, onNavigate, class
       aria-current={active ? "page" : undefined}
       aria-busy={loading || undefined}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm no-underline transition-all duration-150",
-        active ? "bg-accent font-medium text-white" : "text-fg-muted hover:bg-surface-300 hover:text-fg",
+        "flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold no-underline transition-all duration-200",
+        active ? "bg-accent text-[#1d1d1f] shadow-[0_4px_16px_rgba(255,212,0,0.25)]" : "text-fg-muted hover:bg-surface-200 hover:text-fg",
         className,
       )}
     >
@@ -40,7 +40,7 @@ export function NavLinkItem({ href, label, icon, tour, active, onNavigate, class
       <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden={!loading}>
         {loading ? (
           <Loader2
-            className={cn("h-3.5 w-3.5 animate-spin", active ? "text-white/90" : "text-fg-muted")}
+            className={cn("h-3.5 w-3.5 animate-spin", active ? "text-[#1d1d1f]" : "text-fg-muted")}
           />
         ) : null}
       </span>

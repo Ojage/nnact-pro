@@ -26,7 +26,7 @@ const TabsList = React.forwardRef<
     ref={ref}
     data-slot="tabs-list"
     className={cn(
-      "bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-xl p-[3px] flex",
+      "bg-surface-100 text-fg-muted inline-flex h-12 w-fit items-center justify-center rounded-xl p-1 flex",
       className,
     )}
     {...props}
@@ -42,7 +42,7 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     data-slot="tabs-trigger"
     className={cn(
-      "data-[state=active]:bg-card data-[state=active]:!text-blue-600 dark:data-[state=active]:!text-blue-400 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 text-foreground dark:text-muted-foreground inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "text-fg-muted inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-transparent px-4 py-1 text-sm font-semibold whitespace-nowrap transition-[color,background-color,box-shadow] hover:text-fg data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-sm focus-visible:border-accent focus-visible:ring-4 focus-visible:ring-accent/15 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
     {...props}

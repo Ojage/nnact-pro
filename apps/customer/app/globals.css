@@ -1,44 +1,81 @@
 @import "tailwindcss";
+
+@font-face {
+  font-family: "Poppins Local";
+  src: url("/fonts/poppins-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins Local";
+  src: url("/fonts/poppins-latin-500-normal.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins Local";
+  src: url("/fonts/poppins-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins Local";
+  src: url("/fonts/poppins-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins Local";
+  src: url("/fonts/poppins-latin-800-normal.woff2") format("woff2");
+  font-weight: 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins Local";
+  src: url("/fonts/poppins-latin-900-normal.woff2") format("woff2");
+  font-weight: 900;
+  font-display: swap;
+}
 @custom-variant dark (&:is(.dark *));
 
 :root {
   --font-size: 16px;
 
   /* ── Banking Design System: Light ── */
-  --background: #f8fafc;
-  --foreground: #1e293b;
+  --background: #fbfaf8;
+  --foreground: #141414;
   --card: #ffffff;
-  --card-foreground: #1e293b;
-  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --card-foreground: #141414;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   --popover: #ffffff;
-  --popover-foreground: #1e293b;
-  --primary: #1d4ed8;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #1e293b;
-  --muted: #f8fafc;
-  --muted-foreground: #64748b;
-  --accent: #e2e8f0;
-  --accent-foreground: #1e293b;
+  --popover-foreground: #141414;
+  --primary: #ffd400;
+  --primary-foreground: #141414;
+  --secondary: #fff7cc;
+  --secondary-foreground: #141414;
+  --muted: #f3f1ec;
+  --muted-foreground: #5f5f5f;
+  --accent: #ffd400;
+  --accent-foreground: #141414;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
+  --border: #e6e3da;
+  --input: #e6e3da;
   --input-background: #ffffff;
-  --switch-background: #d1d5db;
+  --switch-background: #d6d2c6;
   --font-weight-medium: 600;
   --font-weight-normal: 400;
-  --ring: #2563eb;
+  --ring: #ffd400;
   --radius: 0.75rem;
   --sidebar: #f8fafc;
   --sidebar-foreground: #1e293b;
-  --sidebar-primary: #1d4ed8;
+  --sidebar-primary: #ffd400;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #e2e8f0;
   --sidebar-accent-foreground: #1e293b;
   --sidebar-border: #e5e7eb;
-  --sidebar-ring: #2563eb;
-  --chart-1: #1d4ed8;
+  --sidebar-ring: #f0c500;
+  --chart-1: #ffd400;
   --chart-2: #16a34a;
   --chart-3: #7c3aed;
   --chart-4: #f59e0b;
@@ -55,9 +92,9 @@
   --color-neutral-emphasis: rgba(107, 114, 128, 0.3);
   --color-nav-hover: #f1f5f9;
   --color-nav-active: #e2e8f0;
-  --color-accent-fg: #1d4ed8;
-  --color-accent-subtle: #eff6ff;
-  --color-accent-emphasis: #1d4ed8;
+  --color-accent-fg: #ffd400;
+  --color-accent-subtle: #fff7cc;
+  --color-accent-emphasis: #ffd400;
   --color-success-fg: #16a34a;
   --color-success-subtle: #f0fdf4;
   --color-success-emphasis: #16a34a;
@@ -70,47 +107,47 @@
 
   /* ── NNACT app aliases: light (resolved from the Banking palette above) ── */
   --surface-50: #ffffff;
-  --surface-100: #f8fafc;
-  --surface-200: #f1f5f9;
-  --surface-300: #e2e8f0;
-  --surface-400: #cbd5e1;
-  --surface-500: #94a3b8;
-  --surface-600: #64748b;
-  --fg: #1e293b;
-  --fg-muted: #64748b;
-  --fg-dim: #94a3b8;
-  --fg-link: #1d4ed8;
-  --accent-app: #1d4ed8;
-  --accent-app-hover: #1e40af;
-  --accent-muted: #eff6ff;
-  --blue-app: #2563eb;
-  --border-light: #cbd5e1;
+  --surface-100: #fbfaf8;
+  --surface-200: #f3f1ec;
+  --surface-300: #e6e3da;
+  --surface-400: #d6d2c6;
+  --surface-500: #a3a3a3;
+  --surface-600: #5f5f5f;
+  --fg: #141414;
+  --fg-muted: #5f5f5f;
+  --fg-dim: #8a8a8a;
+  --fg-link: #8a6a00;
+  --accent-app: #ffd400;
+  --accent-app-hover: #f0c500;
+  --accent-muted: #fff7cc;
+  --blue-app: #8a6a00;
+  --border-light: #d6d2c6;
 }
 
 .dark {
   /* ── Banking Design System: Dark ── */
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --card: #1e293b;
-  --card-foreground: #e2e8f0;
-  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --popover: #0f172a;
-  --popover-foreground: #e2e8f0;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --accent: #334155;
-  --accent-foreground: #e2e8f0;
+  --background: #0d0d0d;
+  --foreground: #f5f5f5;
+  --card: #171717;
+  --card-foreground: #f5f5f5;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --popover: #171717;
+  --popover-foreground: #f5f5f5;
+  --primary: #ffd400;
+  --primary-foreground: #141414;
+  --secondary: #242115;
+  --secondary-foreground: #f5f5f5;
+  --muted: #1a1a1a;
+  --muted-foreground: #a3a3a3;
+  --accent: #ffd400;
+  --accent-foreground: #141414;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #334155;
-  --input: #334155;
-  --input-background: #0f172a;
-  --switch-background: #475569;
-  --ring: #60a5fa;
+  --border: #2e2e2e;
+  --input: #2e2e2e;
+  --input-background: #141414;
+  --switch-background: #404040;
+  --ring: #ffd400;
   --sidebar: #0f172a;
   --sidebar-foreground: #e2e8f0;
   --sidebar-primary: #3b82f6;
@@ -137,7 +174,7 @@
   --color-nav-hover: #1e293b;
   --color-nav-active: #334155;
   --color-accent-fg: #60a5fa;
-  --color-accent-subtle: #1e3a5f;
+  --color-accent-subtle: #2a2400;
   --color-accent-emphasis: #3b82f6;
   --color-success-fg: #22c55e;
   --color-success-subtle: #052e16;
@@ -150,22 +187,22 @@
   --color-danger-emphasis: #dc2626;
 
   /* ── NNACT app aliases: dark ── */
-  --surface-50: #0f172a;
-  --surface-100: #0f172a;
-  --surface-200: #1e293b;
-  --surface-300: #334155;
-  --surface-400: #475569;
-  --surface-500: #64748b;
-  --surface-600: #94a3b8;
-  --fg: #e2e8f0;
-  --fg-muted: #94a3b8;
-  --fg-dim: #64748b;
-  --fg-link: #60a5fa;
-  --accent-app: #3b82f6;
-  --accent-app-hover: #2563eb;
-  --accent-muted: #1e3a5f;
-  --blue-app: #60a5fa;
-  --border-light: #475569;
+  --surface-50: #171717;
+  --surface-100: #0d0d0d;
+  --surface-200: #1a1a1a;
+  --surface-300: #2e2e2e;
+  --surface-400: #404040;
+  --surface-500: #737373;
+  --surface-600: #a3a3a3;
+  --fg: #f5f5f5;
+  --fg-muted: #a3a3a3;
+  --fg-dim: #737373;
+  --fg-link: #ffd400;
+  --accent-app: #ffd400;
+  --accent-app-hover: #ffe266;
+  --accent-muted: #2a2400;
+  --blue-app: #ffd400;
+  --border-light: #3f3f3f;
 }
 
 @theme inline {
@@ -217,8 +254,8 @@
 /* ── App-facing aliases → Tailwind utilities (surface-, fg-, status colors) ── */
 @theme {
   --font-sans:
-    "Source Sans 3 Variable", "Source Sans Pro", "Source Sans 3", ui-sans-serif, system-ui,
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    "Poppins Local", "Poppins", "Source Sans 3 Variable", "Source Sans Pro", "Source Sans 3", ui-sans-serif,
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   --color-surface-50: var(--surface-50);
   --color-surface-100: var(--surface-100);
@@ -245,6 +282,9 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
   }
 
   ::selection { @apply bg-primary/20; }
@@ -271,57 +311,61 @@
   :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
     h1 {
       font-size: var(--text-2xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.08;
       font-family: var(--font-sans);
     }
 
     h2 {
       font-size: var(--text-xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
       font-family: var(--font-sans);
     }
 
     h3 {
       font-size: var(--text-lg);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      line-height: 1.25;
       font-family: var(--font-sans);
     }
 
     h4 {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.3;
       font-family: var(--font-sans);
     }
 
     p {
       font-size: var(--text-base);
       font-weight: var(--font-weight-normal);
-      line-height: 1.5;
+      line-height: 1.7;
       font-family: var(--font-sans);
     }
 
     label {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 700;
+      line-height: 1.4;
       font-family: var(--font-sans);
     }
 
     button {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 700;
+      line-height: 1.2;
       font-family: var(--font-sans);
     }
 
     input {
       font-size: var(--text-base);
       font-weight: var(--font-weight-normal);
-      line-height: 1.5;
+      line-height: 1.4;
       font-family: var(--font-sans);
     }
   }
@@ -404,5 +448,46 @@ html {
     white-space: normal !important;
     text-overflow: clip !important;
     line-height: 1.35;
+  }
+}
+
+html:has(.landing-page) {
+  scroll-behavior: smooth;
+}
+
+.landing-page section[id] {
+  scroll-margin-top: 5rem;
+}
+
+.landing-page a,
+.landing-page button,
+.landing-page summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.landing-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(8px);
+}
+
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+.landing-reveal[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-page *,
+  .landing-page *::before,
+  .landing-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

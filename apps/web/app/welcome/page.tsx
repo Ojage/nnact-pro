@@ -1,7 +1,33 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { NNACT_COMPANY, NNACT_PRODUCT } from "@nnact/shared";
-import { BrandMark } from "@/components/brand-mark";
+import {
+  AirVent,
+  ArrowDown,
+  ArrowUpRight,
+  CalendarCheck,
+  Car,
+  ClipboardCheck,
+  Factory,
+  Home,
+  Mail,
+  MapPin,
+  Phone,
+  Power,
+  Refrigerator,
+  ShieldCheck,
+  Sun,
+  Wrench,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+import { buildWhatsAppUrl, NNACT_COMPANY, NNACT_PRODUCT } from "@nnact/shared";
+import { BookVisitButton } from "./booking-dialog";
+import { welcomeFaq, welcomeServices, welcomeSteps } from "./content";
+import { OpenStatus } from "./open-status";
+import { Reveal } from "./reveal";
+import { WelcomeHeader } from "./welcome-header";
+import { WelcomeMobileBar } from "./mobile-bar";
 import { pageMetadata } from "@/lib/site-metadata";
 
 export const metadata: Metadata = pageMetadata({
@@ -10,230 +36,309 @@ export const metadata: Metadata = pageMetadata({
   path: "/welcome",
 });
 
-const divisions = NNACT_COMPANY.divisions.map((division) => ({
-  title: division.name,
-  services: division.services,
-}));
+const serviceIcons: Record<string, LucideIcon> = {
+  AirVent,
+  Refrigerator,
+  Car,
+  Zap,
+  Power,
+  Sun,
+  Home,
+  CalendarCheck,
+  Factory,
+};
 
-const operations = [
-  ["Dispatch and field command", "Schedule technicians, assign jobs, track status, and coordinate return visits across HVAC, refrigeration, electrical, and maintenance work."],
-  ["CRM and asset history", "Customers, properties, equipment, cold rooms, generators, solar systems, photos, and complete service history in one record."],
-  ["Estimate to payment", "Itemized BOQs, estimates, approvals, invoices, offline payments, and transparent pricing for residential and commercial clients."],
-  ["Preventive maintenance", "Service plans, reminders, and contract workflows — because equipment should be maintained before it fails."],
-  ["Repair Brain", "Institutional knowledge from every visit: symptoms, faults, measurements, procedures, and verified repair outcomes your team can reuse."],
-  ["Business control", "Reporting, margins, organization branding, integrations, backups, and self-hosted deployment you own."],
-];
-
-const fieldFlow = [
-  "Open the work order and confirm the equipment or system",
-  "Link the asset to model knowledge — AC, fridge, inverter, cold room, or motor",
-  "Start from the complaint, error code, or measured symptom",
-  "Run exact checks with meter points and operating conditions",
-  "Record readings before the workflow branches",
-  "Apply verified repair procedures and capture parts used",
-  "Close with outcome, evidence, and a knowledge proposal for the next technician",
+const workCards: Array<{ icon: LucideIcon; title: string; copy: string }> = [
+  {
+    icon: Wrench,
+    title: "Diagnose the real fault",
+    copy: "Technicians work from symptoms, measurements, and equipment history — not guesswork.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Repair with evidence",
+    copy: "Parts, checks, and outcomes are captured so the next visit starts with verified context.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Prevent the next failure",
+    copy: "Maintenance plans keep HVAC, refrigeration, electrical, and power systems running longer.",
+  },
 ];
 
 export default function WelcomePage() {
   return (
-    <main className="min-h-screen bg-surface-100 text-fg">
-      <header className="sticky top-0 z-50 border-b border-border bg-surface-100/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-[min(1180px,calc(100%-32px))] items-center gap-5">
-          <BrandMark href="/welcome" size="lg" />
-          <nav className="ml-auto hidden items-center gap-6 text-sm font-semibold text-fg-muted md:flex">
-            <a href="#divisions">Services</a>
-            <a href="#operations">Platform</a>
-            <a href="#repair-brain">Repair Brain</a>
-            <a href="#deploy">Deploy</a>
-          </nav>
-          <Link href="/login" className="rounded-full bg-accent px-4 py-2 text-sm font-black text-white no-underline hover:bg-accent-hover">
-            Open workspace
-          </Link>
-        </div>
-      </header>
+    <main
+      id="top"
+      className="welcome-page min-h-screen overflow-x-hidden bg-[#fbfaf8] text-[#141414] dark:bg-[#0a0a0a] dark:text-white"
+    >
+      <WelcomeHeader />
 
-      <section className="overflow-hidden border-b border-border bg-gradient-to-br from-surface-100 via-surface-50 to-surface-100">
-        <div className="mx-auto grid w-[min(1180px,calc(100%-32px))] gap-12 py-20 lg:grid-cols-[.95fr_1.05fr] lg:items-center lg:py-28">
-          <div>
-            <p className="mb-5 inline-flex rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-accent">
-              {NNACT_COMPANY.tagline}
+      <section className="relative flex min-h-[720px] items-center justify-center overflow-hidden bg-[#0d0d0d]">
+        <Image
+          src="/welcome-hero.png"
+          alt="NNACT technician at work"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/70 to-black/90" />
+        <div className="relative z-10 mx-auto flex w-[min(1180px,calc(100%-32px))] flex-col items-center px-0 pb-28 pt-28 text-center sm:px-6">
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#ffd400]">
+            NNACT · Buea, Southwest Cameroon
+          </p>
+          <h1 className="mt-6 max-w-5xl text-5xl font-black leading-[1.02] tracking-[-0.055em] text-white sm:text-6xl lg:text-[5.5rem]">
+            Technical help that gets to the root of it.
+          </h1>
+          <p className="mt-7 max-w-2xl text-lg leading-8 text-white/80 sm:text-xl">
+            HVAC, refrigeration, electrical, solar, appliances, and preventive maintenance — delivered by NNACT field teams
+            and supported by {NNACT_PRODUCT.name}.
+          </p>
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+            <BookVisitButton />
+            <a
+              href="#services"
+              className="rounded-full border border-white/30 bg-white/10 px-6 py-3 text-sm font-bold text-white no-underline backdrop-blur-md transition hover:bg-white/20 active:scale-[0.98]"
+            >
+              See services ›
+            </a>
+          </div>
+          <div className="mt-8">
+            <OpenStatus />
+          </div>
+        </div>
+        <a
+          href="#divisions"
+          aria-label="Scroll to services"
+          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded-full border border-white/20 p-2 text-white/70 transition hover:text-white"
+        >
+          <ArrowDown className="size-5" aria-hidden="true" />
+        </a>
+      </section>
+
+      <section
+        id="divisions"
+        className="border-b border-black/5 bg-white py-14 dark:border-white/10 dark:bg-[#111111]"
+      >
+        <div className="mx-auto w-[min(1180px,calc(100%-32px))]">
+          <p className="text-center text-[11px] font-black uppercase tracking-[0.22em] text-[#6b6b6b] dark:text-white/50">
+            One company · three engineering divisions
+          </p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {NNACT_COMPANY.divisions.map((division) => (
+              <div
+                key={division.name}
+                className="rounded-2xl border border-black/5 bg-[#fbfaf8] px-5 py-6 text-center dark:border-white/10 dark:bg-white/5"
+              >
+                <p className="text-sm font-black uppercase tracking-[0.12em] text-[#141414] dark:text-white">
+                  {division.name}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-[#6b6b6b] dark:text-white/50">{division.services.join(" · ")}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="services" className="bg-[#fbfaf8] py-24 dark:bg-[#0a0a0a]">
+        <div className="mx-auto w-[min(1180px,calc(100%-32px))]">
+          <Reveal className="max-w-3xl">
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#8a6a00] dark:text-[#ffd400]">
+              What we service
             </p>
-            <h1 className="max-w-4xl text-5xl font-black leading-[.92] tracking-[-0.075em] text-fg md:text-7xl">
-              Technical operations for HVAC, energy, and maintenance teams.
-            </h1>
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-fg-muted md:text-xl">
-              {NNACT_PRODUCT.name} is {NNACT_COMPANY.shortName}&apos;s operations platform — dispatch, CRM, estimates, preventive maintenance, and{" "}
-              <strong className="font-bold text-fg">Repair Brain</strong> institutional knowledge for field work across Buea and Southwest Cameroon.
+            <h2 className="mt-4 text-4xl font-black leading-[1.05] tracking-[-0.045em] sm:text-5xl">
+              Skilled help for the systems your day depends on.
+            </h2>
+            <p className="mt-5 text-lg leading-8 text-[#5f5f5f] dark:text-white/60">
+              Every visit is handled by a NNACT technician and recorded in {NNACT_PRODUCT.name}, so your equipment history
+              travels with the job.
+            </p>
+          </Reveal>
+
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {welcomeServices.map((service, index) => {
+              const Icon = serviceIcons[service.icon] ?? Wrench;
+              return (
+                <Reveal key={service.title} delay={Math.min(index * 0.04, 0.24)}>
+                  <article className="flex h-full flex-col rounded-[24px] border border-black/5 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-[#ffd400] hover:shadow-lg dark:border-white/10 dark:bg-white/5">
+                    <span className="flex size-11 items-center justify-center rounded-2xl bg-[#ffd400]/20 text-[#141414] dark:text-[#ffd400]">
+                      <Icon className="size-5" aria-hidden="true" />
+                    </span>
+                    <h3 className="mt-5 text-lg font-black tracking-tight">{service.title}</h3>
+                    <p className="mt-2 flex-1 text-sm leading-6 text-[#5f5f5f] dark:text-white/55">{service.description}</p>
+                    <div className="mt-5">
+                      <BookVisitButton service={service.title} variant="quiet" />
+                    </div>
+                  </article>
+                </Reveal>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" className="bg-[#111111] py-24 text-white">
+        <div className="mx-auto w-[min(1180px,calc(100%-32px))]">
+          <Reveal className="max-w-3xl">
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#ffd400]">How it works</p>
+            <h2 className="mt-4 text-4xl font-black leading-[1.05] tracking-[-0.045em] sm:text-5xl">
+              From first message to verified outcome.
+            </h2>
+          </Reveal>
+
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {welcomeSteps.map((step, index) => (
+              <Reveal key={step.title} delay={index * 0.06}>
+                <article className="h-full rounded-[24px] border border-white/10 bg-white/5 p-6 transition-colors duration-300 hover:border-[#ffd400]/60 hover:bg-[#ffd400]/5">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-[#ffd400] text-sm font-black text-[#141414]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="mt-5 text-lg font-black">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/60">{step.description}</p>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="our-work" className="bg-white py-24 dark:bg-[#111111]">
+        <div className="mx-auto grid w-[min(1180px,calc(100%-32px))] gap-12 lg:grid-cols-[.85fr_1.15fr] lg:items-center">
+          <Reveal>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#8a6a00] dark:text-[#ffd400]">
+              Our work
+            </p>
+            <h2 className="mt-4 text-4xl font-black leading-[1.05] tracking-[-0.045em] sm:text-5xl">
+              Field knowledge, not guesswork.
+            </h2>
+            <p className="mt-5 text-lg leading-8 text-[#5f5f5f] dark:text-white/60">
+              {NNACT_PRODUCT.name} turns every NNACT visit into reusable Repair Brain knowledge — symptoms, faults,
+              measurements, procedures, and verified outcomes.
+            </p>
+            <Link
+              href="/login"
+              className="mt-7 inline-flex items-center gap-2 text-sm font-black text-[#141414] no-underline dark:text-white"
+            >
+              Open workspace <ArrowUpRight className="size-4" aria-hidden="true" />
+            </Link>
+          </Reveal>
+
+          <div className="grid gap-3">
+            {workCards.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <Reveal key={item.title} delay={index * 0.06}>
+                  <article className="flex gap-4 rounded-[24px] border border-black/5 bg-[#fbfaf8] p-6 dark:border-white/10 dark:bg-white/5">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#141414] text-[#ffd400] dark:bg-[#ffd400] dark:text-[#141414]">
+                      <Icon className="size-5" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <h3 className="text-lg font-black">{item.title}</h3>
+                      <p className="mt-1 text-sm leading-6 text-[#5f5f5f] dark:text-white/55">{item.copy}</p>
+                    </div>
+                  </article>
+                </Reveal>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" className="bg-[#fbfaf8] py-24 dark:bg-[#0a0a0a]">
+        <div className="mx-auto grid w-[min(1180px,calc(100%-32px))] gap-12 lg:grid-cols-[.8fr_1.2fr]">
+          <Reveal>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#8a6a00] dark:text-[#ffd400]">FAQ</p>
+            <h2 className="mt-4 text-4xl font-black leading-[1.05] tracking-[-0.045em] sm:text-5xl">Good questions.</h2>
+          </Reveal>
+          <div className="grid gap-3">
+            {welcomeFaq.map((item, index) => (
+              <Reveal key={item.question} delay={index * 0.04}>
+                <details className="group rounded-[20px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-white/5">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-black [&::-webkit-details-marker]:hidden">
+                    {item.question}
+                    <span aria-hidden="true" className="text-xl leading-none transition-transform group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <p className="mt-3 text-sm leading-6 text-[#5f5f5f] dark:text-white/55">{item.answer}</p>
+                </details>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="contact" className="bg-[#ffd400] py-20 text-[#141414]">
+        <div className="mx-auto grid w-[min(1180px,calc(100%-32px))] gap-10 lg:grid-cols-[1.2fr_.8fr] lg:items-center">
+          <Reveal>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em]">Contact NNACT</p>
+            <h2 className="mt-4 max-w-2xl text-4xl font-black leading-[1.05] tracking-[-0.045em] sm:text-5xl">
+              Ready when equipment isn&apos;t.
+            </h2>
+            <p className="mt-5 max-w-xl text-lg leading-8 text-[#141414]/70">
+              Book a visit for AC, refrigeration, electrical, solar, appliance, or maintenance work in Buea and Southwest
+              Cameroon.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/login" className="rounded-full bg-accent px-5 py-3 text-sm font-black text-white no-underline hover:bg-accent-hover">
-                Open the workspace
-              </Link>
-              <a
-                href={NNACT_COMPANY.contact.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full border border-border bg-surface-50 px-5 py-3 text-sm font-bold text-fg no-underline hover:bg-surface-200"
+              <BookVisitButton className="bg-[#141414] text-white outline-[#141414] hover:bg-black" />
+              <Link
+                href="/login"
+                className="rounded-full border border-[#141414]/30 px-6 py-3 text-sm font-bold no-underline transition hover:bg-[#141414]/10"
               >
-                Visit NNACT services
-              </a>
+                Open workspace
+              </Link>
             </div>
-            <div className="mt-10 grid max-w-2xl grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-              {["HVAC & refrigeration", "Electrical & solar", "Preventive maintenance", "Repair Brain"].map((item) => (
-                <div key={item} className="rounded-2xl border border-border bg-surface-50 p-3 text-center font-semibold text-fg-muted">
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
+          </Reveal>
 
-          <div className="rounded-[2rem] border border-border bg-surface-50 p-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[.18em] text-accent">Today&apos;s field command</p>
-                <p className="mt-1 text-xl font-black text-fg">Next visit and repair state</p>
-              </div>
-              <span className="rounded-full bg-green/10 px-3 py-1 text-xs font-bold text-green">Synced</span>
-            </div>
-            <div className="mt-5 grid gap-4">
-              <div className="rounded-2xl border border-border bg-surface-200 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-fg-dim">9:30 AM · Split AC · 2.5 HP</p>
-                    <p className="mt-2 text-lg font-black text-fg">Not cooling — suspected refrigerant leak</p>
-                    <p className="mt-1 text-sm text-fg-muted">Model linked · Repair Brain fault suggestions loaded</p>
-                  </div>
-                  <span className="rounded-full bg-blue/10 px-3 py-1 text-xs font-bold text-blue">Diagnosing</span>
+          <Reveal delay={0.08}>
+            <div className="rounded-[28px] bg-[#141414] p-7 text-white">
+              <div className="grid gap-5">
+                <div className="flex gap-3">
+                  <MapPin className="mt-0.5 size-5 shrink-0 text-[#ffd400]" aria-hidden="true" />
+                  <p className="text-sm leading-6 text-white/75">
+                    {NNACT_COMPANY.location.streetAddress}, {NNACT_COMPANY.location.addressLocality}
+                  </p>
                 </div>
-                <div className="mt-5 rounded-xl border border-accent/30 bg-accent/5 p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-accent">Active check</p>
-                  <p className="mt-2 font-bold text-fg">Verify suction and discharge pressures under cooling load</p>
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div className="rounded-lg bg-surface-100 p-3"><span className="text-fg-dim">Expected</span><p className="mt-1 font-semibold text-fg">65–75 PSI suction</p></div>
-                    <div className="rounded-lg bg-surface-100 p-3"><span className="text-fg-dim">Recorded</span><p className="mt-1 font-semibold text-fg">42 PSI — low</p></div>
-                    <div className="rounded-lg bg-surface-100 p-3"><span className="text-fg-dim">Procedure</span><p className="mt-1 font-semibold text-fg">Leak detection → recharge</p></div>
-                    <div className="rounded-lg bg-surface-100 p-3"><span className="text-fg-dim">Knowledge</span><p className="mt-1 font-semibold text-fg">3 prior successes</p></div>
+                <div className="flex gap-3">
+                  <Phone className="mt-0.5 size-5 shrink-0 text-[#ffd400]" aria-hidden="true" />
+                  <div className="grid gap-1 text-sm">
+                    {NNACT_COMPANY.contact.phones.map((number) => (
+                      <a key={number} href={`tel:${number.replace(/\s/g, "")}`} className="text-white/75 no-underline hover:text-white">
+                        {number}
+                      </a>
+                    ))}
                   </div>
                 </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[["6", "visits today"], ["4", "active jobs"], ["2", "maintenance plans"]].map(([value, label]) => (
-                  <div key={label} className="rounded-2xl border border-border bg-surface-200 p-4 text-center">
-                    <p className="text-2xl font-black text-fg">{value}</p>
-                    <p className="mt-1 text-xs text-fg-muted">{label}</p>
-                  </div>
-                ))}
+                <div className="flex gap-3">
+                  <Mail className="mt-0.5 size-5 shrink-0 text-[#ffd400]" aria-hidden="true" />
+                  <a
+                    href={`mailto:${NNACT_COMPANY.contact.email}`}
+                    className="text-sm text-white/75 no-underline hover:text-white"
+                  >
+                    {NNACT_COMPANY.contact.email}
+                  </a>
+                </div>
+                <a
+                  href={buildWhatsAppUrl(NNACT_COMPANY.contact.phones[0])}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex justify-center rounded-full bg-[#ffd400] px-5 py-3 text-sm font-black text-[#141414] no-underline transition active:scale-[0.98]"
+                >
+                  Chat on WhatsApp
+                </a>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
-      </section>
 
-      <section id="divisions" className="border-b border-border py-20">
-        <div className="mx-auto w-[min(1180px,calc(100%-32px))]">
-          <div className="max-w-3xl">
-            <p className="text-xs font-black uppercase tracking-[.2em] text-blue">NNACT technical divisions</p>
-            <h2 className="mt-3 text-4xl font-black tracking-tight text-fg md:text-6xl">One company. Three engineering pillars.</h2>
-            <p className="mt-5 text-lg leading-8 text-fg-muted">
-              {NNACT_COMPANY.customerPromise} {NNACT_PRODUCT.name} supports every division with shared customer records, equipment history, and field intelligence.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-4 lg:grid-cols-3">
-            {divisions.map((division) => (
-              <article key={division.title} className="rounded-3xl border border-border bg-surface-50 p-6">
-                <p className="text-xl font-black text-fg">{division.title}</p>
-                <ul className="mt-4 space-y-2 text-sm leading-6 text-fg-muted">
-                  {division.services.map((service) => (
-                    <li key={service} className="flex gap-2">
-                      <span className="text-accent">·</span>
-                      <span>{service}</span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="operations" className="border-b border-border bg-surface-50 py-20">
-        <div className="mx-auto w-[min(1180px,calc(100%-32px))]">
-          <div className="max-w-3xl">
-            <p className="text-xs font-black uppercase tracking-[.2em] text-blue">Operations platform</p>
-            <h2 className="mt-3 text-4xl font-black tracking-tight text-fg md:text-6xl">Run the business. Execute in the field.</h2>
-            <p className="mt-5 text-lg leading-8 text-fg-muted">
-              From emergency AC repairs to cold-room installations and solar commissioning — {NNACT_PRODUCT.name} keeps dispatch, billing, and technical evidence in one system.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {operations.map(([title, description]) => (
-              <article key={title} className="rounded-3xl border border-border bg-surface-100 p-6">
-                <p className="text-lg font-black text-fg">{title}</p>
-                <p className="mt-3 text-sm leading-6 text-fg-muted">{description}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="repair-brain" className="border-b border-border py-20">
-        <div className="mx-auto grid w-[min(1180px,calc(100%-32px))] gap-12 lg:grid-cols-[.8fr_1.2fr]">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[.2em] text-accent">Repair Brain</p>
-            <h2 className="mt-3 text-4xl font-black tracking-tight text-fg md:text-6xl">Every repair makes the next one faster.</h2>
-            <p className="mt-5 text-lg leading-8 text-fg-muted">
-              Institutional knowledge accumulates from real field work — symptoms, faults, measurements, procedures, and outcomes — so technicians start from verified experience, not guesswork.
-            </p>
-          </div>
-          <div className="grid gap-3">
-            {fieldFlow.map((step, index) => (
-              <div key={step} className="flex items-center gap-4 rounded-2xl border border-border bg-surface-50 p-4">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 font-black text-accent">{index + 1}</span>
-                <p className="font-semibold text-fg">{step}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-border bg-surface-50 py-20">
-        <div className="mx-auto grid w-[min(1180px,calc(100%-32px))] gap-6 lg:grid-cols-3">
-          {[
-            ["Dreams, honesty, integrity", "The values that guide NNACT field work — transparent pricing, skilled professionals, and customer-centered service."],
-            ["Preventive-first mindset", "Maintenance contracts for banks, hotels, restaurants, cold-storage, and industrial clients reduce downtime and operating cost."],
-            ["Local expertise, professional standards", `Based in ${NNACT_COMPANY.location.addressLocality}, ${NNACT_COMPANY.location.addressRegion} — serving businesses and households across Southwest Cameroon.`],
-          ].map(([title, copy]) => (
-            <article key={title} className="rounded-3xl border border-border bg-surface-100 p-6">
-              <p className="text-xl font-black text-fg">{title}</p>
-              <p className="mt-3 text-sm leading-6 text-fg-muted">{copy}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="deploy" className="py-20">
-        <div className="mx-auto flex w-[min(1180px,calc(100%-32px))] flex-col items-start justify-between gap-8 rounded-[2rem] border border-accent/25 bg-accent/5 p-8 lg:flex-row lg:items-center lg:p-12">
-          <div className="max-w-3xl">
-            <p className="text-xs font-black uppercase tracking-[.2em] text-accent">Own your operations data</p>
-            <h2 className="mt-3 text-4xl font-black tracking-tight text-fg">Self-hosted. No telemetry required.</h2>
-            <p className="mt-4 text-lg leading-8 text-fg-muted">
-              PostgreSQL, Fastify, Next.js, Expo, Redis, and container deployment — {NNACT_PRODUCT.name} stays under your control while your team runs HVAC, refrigeration, electrical, and maintenance operations in the field.
-            </p>
-          </div>
-          <Link href="/login" className="shrink-0 rounded-full bg-accent px-6 py-3 text-sm font-black text-white no-underline hover:bg-accent-hover">
-            Open workspace
-          </Link>
-        </div>
-      </section>
-
-      <footer className="border-t border-border py-8">
-        <div className="mx-auto flex w-[min(1180px,calc(100%-32px))] flex-wrap items-center justify-between gap-3 text-sm text-fg-dim">
+        <footer className="mx-auto mt-16 flex w-[min(1180px,calc(100%-32px))] flex-wrap items-center justify-between gap-3 border-t border-[#141414]/20 pt-6 text-xs font-semibold text-[#141414]/65">
           <span>{NNACT_COMPANY.legalName}</span>
-          <span>
-            {NNACT_COMPANY.location.streetAddress}, {NNACT_COMPANY.location.addressLocality} · {NNACT_COMPANY.contact.email}
-          </span>
-        </div>
-      </footer>
+          <span>{NNACT_COMPANY.motto}</span>
+        </footer>
+      </section>
+
+      <WelcomeMobileBar />
     </main>
   );
 }

@@ -152,7 +152,7 @@ export default function NewJobPage() {
                     aria-pressed={customerMode === mode}
                     onClick={() => setCustomerMode(mode)}
                     className={`h-auto rounded-lg px-3 py-2 text-sm font-semibold capitalize ${
-                      customerMode === mode ? "bg-accent text-white" : "text-fg-muted hover:text-fg"
+                      customerMode === mode ? "bg-accent text-[#141414]" : "text-fg-muted hover:text-fg"
                     }`}
                   >
                     {mode} customer

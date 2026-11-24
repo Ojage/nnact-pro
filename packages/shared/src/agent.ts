@@ -101,5 +101,17 @@ export const JOB_DRAFT_KEY_FIELDS = ["customerName", "phone", "town", "appliance
 export const INTAKE_RUN_TASKS = ["agent.extract", "agent.stt", "agent.followup"] as const;
 export const QUOTING_RUN_TASKS = ["agent.quote", "agent.receipt_vision"] as const;
 export const DISPATCH_RUN_TASKS = ["agent.dispatch"] as const;
-export const AGENT_RUN_TASKS = [...INTAKE_RUN_TASKS, ...QUOTING_RUN_TASKS, ...DISPATCH_RUN_TASKS] as const;
+export const PRICEBOOK_RUN_TASKS = ["agent.price_observation"] as const;
+export const TRIAGE_RUN_TASKS = ["agent.triage"] as const;
+export const SOURCING_RUN_TASKS = ["agent.sourcing", "agent.supplier_message"] as const;
+export const PAYMENTS_RUN_TASKS = ["agent.payment_reminder"] as const;
+export const AGENT_RUN_TASKS = [
+  ...INTAKE_RUN_TASKS,
+  ...QUOTING_RUN_TASKS,
+  ...DISPATCH_RUN_TASKS,
+  ...PRICEBOOK_RUN_TASKS,
+  ...TRIAGE_RUN_TASKS,
+  ...SOURCING_RUN_TASKS,
+  ...PAYMENTS_RUN_TASKS,
+] as const;
 export type AgentRunTask = (typeof AGENT_RUN_TASKS)[number];

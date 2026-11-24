@@ -127,6 +127,7 @@ test("registry scopes are valid and never grant forbidden actions", () => {
     "conversations:write",
     "whatsapp:templated-send",
     "price-observations:create",
+    "triage-suggestions:create",
     "sourcing-suggestions:create",
     "supplier-messages:templated-send",
     "invoices:read",

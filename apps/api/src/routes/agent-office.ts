@@ -1,6 +1,6 @@
 // Agent Office: owner-only monitoring and controls for every NNACT agent.
-// Behind AGENT_OFFICE_ENABLED. Agent tokens, technicians, secretaries and
-// dispatchers are refused: only a staff session with the owner role passes.
+// Agent tokens, technicians, secretaries and dispatchers are refused:
+// only a staff session with the owner role passes.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { agentControlActionSchema, isAgentId, type AgentId, type AgentOfficeEvent } from "@nnact/shared";
@@ -8,16 +8,18 @@ import { retryRun, revealRun, setAgentEnabled, type Actor } from "../agent-offic
 import { MAX_STREAMS_PER_USER, MAX_STREAMS_TOTAL, latestEventId, officeBroadcaster, type Subscriber } from "../agent-office/events.js";
 import { startRetentionTimer } from "../agent-office/retention.js";
 import { buildDetail, buildOverview, getRunDetail, listRuns, recentLogs } from "../agent-office/service.js";
+import {
+  restartAgentProcess,
+  startAgentProcess,
+  startDefaultAgentProcesses,
+  stopAllAgentProcesses,
+} from "../agent-office/supervisor.js";
 import type { StaffJwtClaims } from "../auth.js";
 import { verifiedClaims } from "../operational-authorization.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KEEP_ALIVE_MS = 15_000;
 const runParams = z.object({ runId: z.string().regex(UUID) });
-
-export function agentOfficeEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.AGENT_OFFICE_ENABLED === "true";
-}
 
 async function requireOwner(req: FastifyRequest, reply: FastifyReply): Promise<Actor | null> {
   const claims = (await verifiedClaims(req, reply)) as StaffJwtClaims | null;
@@ -43,6 +45,31 @@ function agentParam(req: FastifyRequest, reply: FastifyReply): AgentId | null {
   return raw;
 }
 
+async function startManagedAgent(
+  app: FastifyInstance,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  mode: "start" | "restart",
+) {
+  const actor = await requireOwner(req, reply);
+  if (!actor) return;
+  const agentId = agentParam(req, reply);
+  if (!agentId) return;
+
+  const result =
+    mode === "restart"
+      ? await restartAgentProcess(agentId, app.log)
+      : await startAgentProcess(agentId, app.log);
+  if (!result.ok) {
+    await reply.code(400).send({ error: result.error ?? "could not start agent" });
+    return;
+  }
+
+  const reason = `${mode === "restart" ? "Restarted" : "Started"} from Agent Office by ${actor.name ?? actor.userId}`;
+  await setAgentEnabled(agentId, true, reason, actor);
+  return { ok: true as const, pid: result.pid, started: result.started };
+}
+
 function parseCursor(req: FastifyRequest): number | null {
   const header = req.headers["last-event-id"];
   const raw = (Array.isArray(header) ? header[0] : header) ?? (req.query as { lastEventId?: string }).lastEventId;
@@ -53,16 +80,16 @@ function parseCursor(req: FastifyRequest): number | null {
 let retentionStarted = false;
 
 export async function agentOfficeRoutes(app: FastifyInstance) {
-  app.addHook("onRequest", async (_req, reply) => {
-    if (!agentOfficeEnabled()) await reply.code(404).send({ error: "not found" });
-  });
-
-  if (agentOfficeEnabled() && !retentionStarted && process.env.NODE_ENV !== "test") {
+  if (!retentionStarted && process.env.NODE_ENV !== "test") {
     retentionStarted = true;
     const stop = startRetentionTimer((message) => app.log.info(message));
+    void startDefaultAgentProcesses(app.log).catch((error: unknown) => {
+      app.log.error(`[agents] could not start default workers: ${error instanceof Error ? error.message : String(error)}`);
+    });
     app.addHook("onClose", async () => {
       stop();
       officeBroadcaster.stop();
+      await stopAllAgentProcesses();
       retentionStarted = false;
     });
   }
@@ -121,6 +148,10 @@ export async function agentOfficeRoutes(app: FastifyInstance) {
       return { ok: true as const, changed: result.changed };
     });
   }
+
+  app.post("/agents/:agentId/start", async (req, reply) => startManagedAgent(app, req, reply, "start"));
+
+  app.post("/agents/:agentId/restart", async (req, reply) => startManagedAgent(app, req, reply, "restart"));
 
   app.post("/runs/:runId/retry", async (req, reply) => {
     const actor = await requireOwner(req, reply);

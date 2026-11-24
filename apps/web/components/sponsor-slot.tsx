@@ -7,7 +7,7 @@ export function SponsorSlot() {
   return (
     <aside
       aria-label={`Sponsor: ${sponsor.name}`}
-      className="mb-6 rounded-xl border border-border bg-surface-100 px-4 py-3"
+      className="apple-surface mb-6 px-5 py-4"
       data-testid="sponsor-slot"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -1,25 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PrefetchLink as Link } from "@/components/prefetch-link";
-import { NavLinkItem } from "@/components/nav-link-item";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { activeNavHref, navSectionsForRole } from "@/lib/nav";
 import type { NavRole } from "@/lib/nav";
-import { useTheme } from "@/components/theme-provider";
-import { useSessionUser } from "@/lib/use-session-user";
 import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
-import { UserAvatar } from "@/components/user-avatar";
+import { useSessionUser } from "@/lib/use-session-user";
+import { SidebarAccountFooter, SidebarNavSections } from "@/components/sidebar";
 
 export function MobileNav() {
   const pathname = usePathname();
   const currentNavHref = activeNavHref(pathname);
-  const { theme, toggle } = useTheme();
-  const { user, loading, signingOut, signOut } = useSessionUser();
   const [open, setOpen] = useState(false);
-  const sections = user?.role ? navSectionsForRole(user.role as NavRole) : [];
+  const { user } = useSessionUser();
+  const role = user?.role as NavRole | null | undefined;
+  const sections = role ? navSectionsForRole(role) : [];
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -46,7 +43,7 @@ export function MobileNav() {
         variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        className="fixed left-0 top-0 z-30 h-12 w-12 rounded-lg text-fg-muted hover:text-fg md:hidden"
+        className="fixed left-2 top-2 z-30 h-12 w-12 rounded-2xl border border-border bg-card/80 text-fg shadow-sm backdrop-blur-xl hover:text-fg md:hidden"
         aria-label="Open navigation menu"
       >
         <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
@@ -58,26 +55,26 @@ export function MobileNav() {
 
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-md md:hidden"
           onClick={() => setOpen(false)}
         />
       )}
 
       <aside
         className={cn(
-          "fixed bottom-0 left-0 top-0 z-50 flex w-72 flex-col border-r border-border bg-surface-50 shadow-2xl transition-transform duration-300 ease-out md:hidden",
+          "fixed bottom-0 left-0 top-0 z-50 flex w-[300px] flex-col border-r border-border bg-card/95 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-2xl transition-transform duration-300 ease-out md:hidden",
           open ? "translate-x-0" : "-translate-x-full",
         )}
         aria-hidden={!open}
       >
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-5">
           <BrandMark size="md" showSubtitle={false} />
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={() => setOpen(false)}
-            className="h-8 w-8 text-fg-muted hover:text-fg"
+            className="h-10 w-10 rounded-xl text-fg-muted hover:text-fg"
             aria-label="Close navigation menu"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -86,84 +83,19 @@ export function MobileNav() {
           </Button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3">
+        <nav className="flex-1 overflow-y-auto px-4 py-5" aria-label="Mobile navigation">
           {sections.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-xs text-fg-dim">Loading…</div>
           ) : (
-            sections.map((section) => (
-              <div key={section.label} className="mb-5 last:mb-0">
-                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">{section.label}</p>
-                <div className="flex flex-col gap-1">
-                  {section.links.map(({ href, label, icon, tour }) => {
-                    const active = currentNavHref === href;
-                    return (
-                      <NavLinkItem
-                        key={href}
-                        href={href}
-                        label={label}
-                        icon={icon}
-                        tour={tour}
-                        active={active}
-                        onNavigate={() => setOpen(false)}
-                        className="py-3"
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ))
+            <SidebarNavSections
+              sections={sections}
+              currentNavHref={currentNavHref}
+              onNavigate={() => setOpen(false)}
+            />
           )}
         </nav>
 
-        <div className="shrink-0 border-t border-border p-3">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              toggle();
-              setOpen(false);
-            }}
-            className="h-auto w-full justify-start gap-3 px-3 py-3 text-sm text-fg-muted hover:text-fg"
-          >
-            <span className="w-5 text-center text-base">{theme === "dark" ? "☀" : "☾"}</span>
-            {theme === "dark" ? "Light mode" : "Dark mode"}
-          </Button>
-        </div>
-
-        <div className="shrink-0 border-t border-border p-3">
-          {loading ? (
-            <div className="px-3 py-3 text-xs text-fg-dim">Loading session…</div>
-          ) : user ? (
-            <div className="space-y-2">
-              <Link
-                href="/profile"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 rounded-lg px-3 py-3 no-underline hover:bg-surface-300"
-              >
-                <UserAvatar name={user.name} src={user.profilePictureUrl} size="default" />
-                <div className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-fg-muted">{user.name}</span>
-                  <span className="block text-[10px] capitalize text-fg-dim">{user.title || user.role || "team member"}</span>
-                </div>
-              </Link>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => void signOut()}
-                disabled={signingOut}
-                className="h-auto w-full justify-start gap-3 px-3 py-3 text-sm text-fg-muted hover:text-fg"
-              >
-                <span className="w-5 text-center">↪</span>
-                {signingOut ? "Signing out…" : "Sign out"}
-              </Button>
-            </div>
-          ) : (
-            <Link href="/login" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm text-fg-muted no-underline hover:bg-surface-300 hover:text-fg">
-              <span className="w-5 text-center text-base">↪</span>
-              Sign in
-            </Link>
-          )}
-        </div>
+        <SidebarAccountFooter compact onNavigate={() => setOpen(false)} />
       </aside>
     </>
   );

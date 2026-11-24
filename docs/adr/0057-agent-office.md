@@ -28,7 +28,7 @@ The owner needs to watch every NNACT agent live: whether each one is running, wh
   - Limits: 3 streams per user and 200 per process. The server sends a keep-alive comment every 15 s, and the client falls back to polling after repeated errors.
 - **Access**
   - Owner only. Dispatchers, secretaries, technicians and agent tokens are refused.
-  - The whole page is behind `AGENT_OFFICE_ENABLED` (API) and `NEXT_PUBLIC_AGENT_OFFICE_ENABLED` (web).
+  - The page and nav item are available by default. The Agents page has an on/off switch for the local dashboard view; individual agent controls remain server-side and owner-only.
 - **Controls**
   - Pause and resume flip `agent_controls.enabled` and require a reason. The audit row is written in the same transaction.
   - Retry re-queues the lease behind a failed run, and only for tasks that only write drafts, proposals or suggestions (`RETRYABLE_TASKS`). Customer-facing sends are never retried.
@@ -38,6 +38,6 @@ The owner needs to watch every NNACT agent live: whether each one is running, wh
 
 ## Rollback
 
-Set `AGENT_OFFICE_ENABLED=false` and `NEXT_PUBLIC_AGENT_OFFICE_ENABLED=false`. Every staff route returns 404 and the nav link disappears. Telemetry writes keep working and are purged on schedule.
+Turn the Agents switch off on the Agents page to hide the office view locally. API routes remain owner-only; telemetry writes keep working and are purged on schedule.
 
 The tables in migration `0058_agent_office.sql` are additive. They can be dropped in a later migration without touching any existing flow.

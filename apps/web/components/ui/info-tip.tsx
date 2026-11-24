@@ -25,7 +25,7 @@ function InfoTip({
           type="button"
           aria-label={label}
           className={cn(
-            "inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground transition-colors align-middle hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 [&>svg]:size-3.5",
+            "inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full text-fg-muted transition-colors align-middle hover:bg-accent-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 [&>svg]:size-3.5 [&>svg]:stroke-[1.75]",
             className,
           )}
         >

@@ -37,8 +37,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Sidebar />
           <MobileNav />
           <TopBar />
-          <main className="ml-0 min-h-screen p-4 pb-8 pt-16 md:ml-64 md:px-8 md:pt-24">
-            <div className="mx-auto w-full max-w-[1600px]">
+          <main className="apple-page ml-0 min-h-screen p-4 pb-12 pt-20 md:ml-[var(--sidebar-width)] md:p-8 md:pt-24 lg:p-10 lg:pt-24">
+            <div className="mx-auto w-full max-w-[1440px]">
               <RoleGate>{children}</RoleGate>
             </div>
           </main>

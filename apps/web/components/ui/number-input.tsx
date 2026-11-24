@@ -83,9 +83,9 @@ export function NumberInput({
   return (
     <div
       className={cn(
-        "group flex items-stretch rounded-md border border-[--color-border-default] bg-[--color-canvas-default] transition-[box-shadow]",
-        "focus-within:border-[--color-accent-emphasis] focus-within:ring-2 focus-within:ring-[--color-accent-emphasis]/20",
-        disabled && "opacity-50 cursor-not-allowed",
+        "group flex min-h-11 items-stretch overflow-hidden rounded-xl border border-input bg-input-background transition-[border-color,box-shadow,background-color]",
+        "focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/15",
+        disabled && "cursor-not-allowed opacity-50",
         className
       )}
     >
@@ -94,14 +94,14 @@ export function NumberInput({
         aria-hidden
         tabIndex={-1}
         className={cn(
-          "flex items-center justify-center px-3 transition-colors",
-          "hover:bg-[--color-canvas-subtle]",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          "flex min-w-11 items-center justify-center px-3 text-muted-foreground transition-colors",
+          "hover:bg-muted/70 hover:text-foreground",
+          "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
         )}
         disabled={disabled || (min != null && value <= min)}
         onPointerDown={handlePointerDown(-1)}
       >
-        <Minus className="h-4 w-4 text-[--color-fg-muted]" strokeWidth={2} />
+        <Minus className="h-4 w-4" strokeWidth={2} />
       </button>
       <div className="relative grid flex-1 items-center justify-items-center text-center [grid-template-areas:'overlap'] *:[grid-area:overlap]">
         <input
@@ -111,11 +111,9 @@ export function NumberInput({
           required={required}
           aria-label={ariaLabel}
           className={clsx(
-            showCaret ? "caret-[--color-accent-emphasis]" : "caret-transparent",
-            "w-full bg-transparent py-2 px-1 text-center font-[inherit] text-transparent outline-none",
-            "text-sm"
+            showCaret ? "caret-accent" : "caret-transparent",
+            "w-full bg-transparent px-2 py-2 text-center font-[inherit] text-sm text-transparent outline-none"
           )}
-          // Make sure to disable kerning, to match NumberFlow:
           style={{ fontKerning: "none" }}
           type="number"
           min={min}
@@ -135,7 +133,7 @@ export function NumberInput({
           animated={animated}
           onAnimationsStart={() => setShowCaret(false)}
           onAnimationsFinish={() => setShowCaret(true)}
-          className="pointer-events-none text-sm text-[--color-fg-default]"
+          className="pointer-events-none text-sm font-medium text-foreground"
           willChange
         />
       </div>
@@ -144,14 +142,14 @@ export function NumberInput({
         aria-hidden
         tabIndex={-1}
         className={cn(
-          "flex items-center justify-center px-3 transition-colors",
-          "hover:bg-[--color-canvas-subtle]",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          "flex min-w-11 items-center justify-center px-3 text-muted-foreground transition-colors",
+          "hover:bg-muted/70 hover:text-foreground",
+          "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
         )}
         disabled={disabled || (max != null && value >= max)}
         onPointerDown={handlePointerDown(1)}
       >
-        <Plus className="h-4 w-4 text-[--color-fg-muted]" strokeWidth={2} />
+        <Plus className="h-4 w-4" strokeWidth={2} />
       </button>
     </div>
   );
@@ -213,9 +211,9 @@ export function CompactNumberInput({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 rounded-md border border-[--color-border-default] bg-[--color-canvas-default] p-1",
-        "focus-within:border-[--color-accent-emphasis] focus-within:ring-1 focus-within:ring-[--color-accent-emphasis]/20",
-        disabled && "opacity-50 cursor-not-allowed",
+        "inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-input bg-input-background p-1.5 transition-[border-color,box-shadow,background-color]",
+        "focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/15",
+        disabled && "cursor-not-allowed opacity-50",
         className
       )}
       onClick={() => inputRef.current?.focus()}
@@ -228,22 +226,21 @@ export function CompactNumberInput({
         }}
         disabled={disabled || value <= min}
         className={cn(
-          "flex h-6 w-6 items-center justify-center rounded hover:bg-[--color-canvas-subtle]",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent cursor-pointer",
+          "flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground",
+          "cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
           buttonClassName
         )}
         tabIndex={-1}
       >
-        <Minus className="h-3 w-3 text-[--color-fg-muted]" strokeWidth={2} />
+        <Minus className="h-3.5 w-3.5" strokeWidth={2} />
       </button>
 
       <div className="relative grid flex-1 items-center justify-items-center text-center [grid-template-areas:'overlap'] *:[grid-area:overlap]">
         <input
           ref={inputRef}
           className={clsx(
-            showCaret ? "caret-[--color-accent-emphasis]" : "caret-transparent",
-            "w-full min-w-[3rem] bg-transparent py-0 text-center font-[inherit] text-transparent outline-none",
-            "text-sm",
+            showCaret ? "caret-accent" : "caret-transparent",
+            "w-full min-w-[3rem] bg-transparent py-0 text-center font-[inherit] text-sm text-transparent outline-none",
             inputClassName
           )}
           style={{ fontKerning: "none" }}
@@ -261,7 +258,7 @@ export function CompactNumberInput({
           animated={animated}
           onAnimationsStart={() => setShowCaret(false)}
           onAnimationsFinish={() => setShowCaret(true)}
-          className={cn("pointer-events-none text-sm text-[--color-fg-default]", valueClassName)}
+          className={cn("pointer-events-none text-sm font-medium text-foreground", valueClassName)}
           willChange
         />
       </div>
@@ -274,13 +271,13 @@ export function CompactNumberInput({
         }}
         disabled={disabled || value >= max}
         className={cn(
-          "flex h-6 w-6 items-center justify-center rounded hover:bg-[--color-canvas-subtle]",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent cursor-pointer",
+          "flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground",
+          "cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
           buttonClassName
         )}
         tabIndex={-1}
       >
-        <Plus className="h-3 w-3 text-[--color-fg-muted]" strokeWidth={2} />
+        <Plus className="h-3.5 w-3.5" strokeWidth={2} />
       </button>
     </div>
   );

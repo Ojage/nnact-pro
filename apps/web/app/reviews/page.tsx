@@ -190,10 +190,10 @@ export default function ReviewsPage() {
                 onValueChange={(value) => value && handleSort(value as "date" | "rating")}
                 className="w-fit overflow-hidden rounded-lg border border-border bg-surface-300"
               >
-                <ToggleGroupItem value="date" className="rounded-none px-3 py-1.5 text-xs data-[state=on]:bg-accent data-[state=on]:text-white">
+                <ToggleGroupItem value="date" className="rounded-none px-3 py-1.5 text-xs data-[state=on]:bg-accent data-[state=on]:text-[#141414]">
                   Date {sort === "date" ? (dir === "asc" ? "↑" : "↓") : ""}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="rating" className="rounded-none px-3 py-1.5 text-xs data-[state=on]:bg-accent data-[state=on]:text-white">
+                <ToggleGroupItem value="rating" className="rounded-none px-3 py-1.5 text-xs data-[state=on]:bg-accent data-[state=on]:text-[#141414]">
                   Rating {sort === "rating" ? (dir === "asc" ? "↑" : "↓") : ""}
                 </ToggleGroupItem>
               </ToggleGroup>

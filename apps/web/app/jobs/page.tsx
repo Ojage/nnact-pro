@@ -190,7 +190,7 @@ export default function JobsPage() {
 
   // ── No results state ──
   return (
-    <div>
+    <div className="space-y-5">
       <PageHeader
         title="Jobs"
         description={
@@ -209,14 +209,14 @@ export default function JobsPage() {
 
       {/* ── Error ── */}
       {isError && (
-        <Card className="mb-6 border-red/30 bg-red/5">
+        <Card className="apple-surface border-red/30 bg-red/5 p-4">
           <p className="text-red text-sm">We couldn't load this page. Check your connection and try again.</p>
         </Card>
       )}
 
       {/* ── Search + filter ── */}
       {jobs.length > 0 && (
-        <div className="mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="apple-surface flex flex-col gap-3 p-4 sm:flex-row">
           <Input
             type="search"
             placeholder="Search by title, customer name, or status..."
@@ -250,7 +250,7 @@ export default function JobsPage() {
       ) : (
         <>
           {/* ═══ Desktop table ═══ */}
-          <Card className="p-0 overflow-hidden hidden md:block" data-tour="jobs-list">
+          <Card className="hidden overflow-hidden p-0 md:block" data-tour="jobs-list">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -371,7 +371,7 @@ export default function JobsPage() {
                     data-tour="jobs-link"
                     className="block no-underline hover:no-underline"
                   >
-<Card className="p-4 hover:bg-surface-400 transition-colors cursor-pointer">
+                  <Card className="apple-tile cursor-pointer p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1 min-w-0 mr-3">
                             <p className="text-sm font-semibold text-fg truncate">

@@ -1,8 +1,5 @@
 import type { AgentOfficeStatus, AgentRunState, AgentStage } from "@nnact/shared";
 
-/** The page is behind a build-time flag; off unless explicitly turned on. */
-export const AGENT_OFFICE_ENABLED = process.env.NEXT_PUBLIC_AGENT_OFFICE_ENABLED === "true";
-
 /** AI spend is tracked in US cents. */
 export function formatCents(cents: number | null | undefined): string {
   if (cents == null) return "—";

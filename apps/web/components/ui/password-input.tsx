@@ -18,14 +18,14 @@ const PasswordInput = React.forwardRef<
       <Input
         ref={ref}
         type={visible ? "text" : "password"}
-        className={cn("pr-10", className)}
+        className={cn("pr-12", className)}
         {...props}
       />
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="absolute top-0 right-0 h-full w-10 text-muted-foreground hover:text-foreground"
+        className="absolute top-1/2 right-1.5 h-9 w-9 -translate-y-1/2 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
         onClick={() => setVisible((value) => !value)}
         aria-label={visible ? "Hide password" : "Show password"}
         aria-pressed={visible}

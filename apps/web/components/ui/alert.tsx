@@ -4,13 +4,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "./utils";
 
 const alertVariants = cva(
-  "relative w-full rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
+  "relative grid w-full grid-cols-[0_1fr] items-start gap-y-1 rounded-2xl border px-4 py-3.5 text-sm has-[>svg]:grid-cols-[calc(var(--spacing)*5)_1fr] has-[>svg]:gap-x-3 [&>svg]:size-5 [&>svg]:translate-y-0.5 [&>svg]:text-current",
   {
     variants: {
       variant: {
-        default: "bg-card text-card-foreground",
+        default: "border-border bg-card text-fg [&>svg]:text-fg-muted",
+        info: "border-blue/20 bg-blue/10 text-blue [&>svg]:text-blue *:data-[slot=alert-description]:text-blue/90",
+        success:
+          "border-green/20 bg-green/10 text-green [&>svg]:text-green *:data-[slot=alert-description]:text-green/90",
+        warning:
+          "border-yellow/20 bg-yellow/10 text-yellow [&>svg]:text-yellow *:data-[slot=alert-description]:text-yellow/90",
         destructive:
-          "text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90",
+          "border-red/20 bg-red/10 text-red [&>svg]:text-red *:data-[slot=alert-description]:text-red/90",
       },
     },
     defaultVariants: {
@@ -39,7 +44,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="alert-title"
       className={cn(
-        "col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight",
+        "col-start-2 line-clamp-1 min-h-4 font-semibold tracking-[-0.01em] text-fg",
         className,
       )}
       {...props}
@@ -55,7 +60,7 @@ function AlertDescription({
     <div
       data-slot="alert-description"
       className={cn(
-        "text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed",
+        "col-start-2 grid justify-items-start gap-1 text-sm text-fg-muted [&_p]:leading-relaxed",
         className,
       )}
       {...props}

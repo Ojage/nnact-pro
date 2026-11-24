@@ -7,7 +7,6 @@ import { request as httpRequest, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
 
-process.env.AGENT_OFFICE_ENABLED = "true";
 process.env.NODE_ENV = "test";
 
 const { buildServer } = await import("../src/server.js");
@@ -87,21 +86,11 @@ describe("agent office", { skip: reachable ? false : "no migrated Postgres in DA
     assert.equal(pause.statusCode, 403);
   });
 
-  test("the flag hides every route", async () => {
-    process.env.AGENT_OFFICE_ENABLED = "false";
-    try {
-      const res = await app.inject({ method: "GET", url: "/api/agent-office/overview", headers: staff("owner") });
-      assert.equal(res.statusCode, 404);
-    } finally {
-      process.env.AGENT_OFFICE_ENABLED = "true";
-    }
-  });
-
   test("the overview lists every registry agent, vacant ones included", async () => {
     const res = await app.inject({ method: "GET", url: "/api/agent-office/overview", headers: staff("owner") });
     const body = res.json() as { agents: Array<{ id: string; stage: string; activity: number[] }> };
     assert.equal(body.agents.length, 8);
-    assert.equal(body.agents.find((room) => room.id === "payments-agent")?.stage, "planned");
+    assert.equal(body.agents.find((room) => room.id === "payments-agent")?.stage, "live");
     assert.equal(body.agents[0]!.activity.length, 24);
   });
 

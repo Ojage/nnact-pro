@@ -32,6 +32,12 @@ export interface AgentControlArgs {
   reason: string;
 }
 
+export interface AgentProcessResult {
+  ok: true;
+  pid?: number;
+  started?: boolean;
+}
+
 export interface RevealedRunContent {
   input: unknown;
   output: unknown;
@@ -160,6 +166,22 @@ const officeApi = apiSlice.enhanceEndpoints({ addTagTypes: ["AgentOffice", "Agen
       invalidatesTags: ["AgentOffice"],
     }),
 
+    startAgent: builder.mutation<AgentProcessResult, string>({
+      query: (agentId) => ({
+        url: `${BASE}/agents/${encodeURIComponent(agentId)}/start`,
+        method: "POST",
+      }),
+      invalidatesTags: ["AgentOffice"],
+    }),
+
+    restartAgent: builder.mutation<AgentProcessResult, string>({
+      query: (agentId) => ({
+        url: `${BASE}/agents/${encodeURIComponent(agentId)}/restart`,
+        method: "POST",
+      }),
+      invalidatesTags: ["AgentOffice"],
+    }),
+
     retryAgentRun: builder.mutation<{ ok: true; runId: string }, string>({
       query: (runId) => ({ url: `${BASE}/runs/${encodeURIComponent(runId)}/retry`, method: "POST" }),
       invalidatesTags: ["AgentOfficeRuns"],
@@ -180,6 +202,8 @@ export const {
   useAgentOfficeLogsQuery,
   usePauseAgentMutation,
   useResumeAgentMutation,
+  useStartAgentMutation,
+  useRestartAgentMutation,
   useRetryAgentRunMutation,
   useRevealAgentRunMutation,
 } = officeApi;

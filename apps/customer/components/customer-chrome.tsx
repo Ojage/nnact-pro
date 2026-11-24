@@ -31,7 +31,7 @@ export function CustomerHeader({ compact = false }: { compact?: boolean }) {
           </Link>
           <Link
             href="/book"
-            className="rounded-full bg-accent px-4 py-2 text-sm font-black text-white no-underline hover:bg-accent-hover"
+            className="rounded-full bg-accent px-4 py-2 text-sm font-black text-[#141414] no-underline hover:bg-accent-hover"
           >
             Book service
           </Link>

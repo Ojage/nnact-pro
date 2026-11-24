@@ -16,13 +16,16 @@ import {
   type AgentRunStepDTO,
 } from "@nnact/shared";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-select";
 import {
   useAgentOfficeAgentQuery,
   useAgentOfficeLogsQuery,
   useAgentOfficeRunQuery,
   useAgentOfficeRunsInfiniteQuery,
   usePauseAgentMutation,
+  useRestartAgentMutation,
   useResumeAgentMutation,
+  useStartAgentMutation,
   useRetryAgentRunMutation,
   useRevealAgentRunMutation,
 } from "@/lib/agent-office/api";
@@ -163,6 +166,7 @@ function DrawerContent({ room }: { room: AgentRoomDTO }) {
 
   return (
     <div className={styles.drawerBody}>
+      {live ? <AgentProcessCallout room={room} onOpenControls={() => setSelected("controls")} /> : null}
       {tabs.length > 1 ? (
         <DrawerTabs tabs={tabs} selected={selected} onSelect={setSelected} idPrefix={idPrefix} />
       ) : null}
@@ -506,6 +510,62 @@ function CopyButton({ getText, label }: { getText: () => string; label: string }
   );
 }
 
+function AgentProcessCallout({ room, onOpenControls }: { room: AgentRoomDTO; onOpenControls: () => void }) {
+  const [start, startState] = useStartAgentMutation();
+  const [restart, restartState] = useRestartAgentMutation();
+  const busy = startState.isLoading || restartState.isLoading;
+
+  const onProcessAction = async (mode: "start" | "restart") => {
+    try {
+      const mutation = mode === "start" ? start : restart;
+      const result = await mutation(room.id).unwrap();
+      toast.success(
+        result.started === false
+          ? `${room.displayName} is already running`
+          : `${room.displayName} ${mode === "start" ? "started" : "restarted"}`,
+      );
+    } catch (error) {
+      toast.error(explainRtkError(error, `Could not ${mode} ${room.displayName}`));
+    }
+  };
+
+  return (
+    <section className="mb-4 grid gap-3 rounded-2xl border border-accent/40 bg-surface-200/70 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-1">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-fg">
+            <Activity size={16} aria-hidden="true" />
+            Agent process
+          </h2>
+          <p className="max-w-prose text-xs text-fg-muted">
+            {room.status === "offline"
+              ? "No heartbeat has arrived yet. Start or restart the worker here; the status turns live when it connects."
+              : "This worker is connected. Restart it here if it needs a fresh process."}
+          </p>
+        </div>
+        <StatusLamp status={room.status} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => void onProcessAction("start")} disabled={busy}>
+          <Play size={14} aria-hidden="true" />
+          Start
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => void onProcessAction("restart")} disabled={busy}>
+          <RefreshCw size={14} aria-hidden="true" />
+          Restart
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onOpenControls}>
+          {room.enabled ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+          {room.enabled ? "Pause in Controls" : "Resume in Controls"}
+        </Button>
+      </div>
+      <p className="text-xs text-fg-muted">
+        Start and Restart run the worker directly. No terminal command or environment change is needed.
+      </p>
+    </section>
+  );
+}
+
 function LogsPanel({ agentId, polling }: { agentId: string; polling: boolean }) {
   const logs = useAgentOfficeLogsQuery(agentId, { pollingInterval: polling ? AGENT_OFFICE_POLL_MS : 0 });
   const [minLevel, setMinLevel] = useState<AgentLogLevel>("info");
@@ -558,18 +618,16 @@ function LogsPanel({ agentId, polling }: { agentId: string; polling: boolean }) 
           <label htmlFor={levelId} className="text-xs text-fg-muted">
             Level
           </label>
-          <select
+          <FormSelect
             id={levelId}
-            className="h-8 rounded-md border border-border bg-[var(--input-background)] px-2 text-sm"
             value={minLevel}
-            onChange={(event) => setMinLevel(event.target.value as AgentLogLevel)}
-          >
-            {AGENT_LOG_LEVELS.map((level) => (
-              <option key={level} value={level}>
-                {level === "debug" ? "Everything" : `${level[0].toUpperCase()}${level.slice(1)} and above`}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setMinLevel(value as AgentLogLevel)}
+            className="min-w-40"
+            options={AGENT_LOG_LEVELS.map((level) => ({
+              value: level,
+              label: level === "debug" ? "Everything" : `${level[0].toUpperCase()}${level.slice(1)} and above`,
+            }))}
+          />
         </span>
         <span className="grid flex-1 gap-1">
           <label htmlFor={searchId} className="text-xs text-fg-muted">
@@ -865,12 +923,14 @@ function ControlsPanel({ room, detail }: { room: AgentRoomDTO; detail: AgentDeta
     <>
       <section className="grid gap-3" aria-label="Kill switch">
         <h2 className="text-sm font-semibold text-fg">
-          {room.enabled ? `${room.displayName} is running` : `${room.displayName} is paused`}
+          {room.enabled ? `${room.displayName} is enabled` : `${room.displayName} is paused`}
         </h2>
         <p className="text-sm text-fg-muted">
           {room.enabled
-            ? "Pausing stops it taking new work. A run already in progress finishes its current step."
-            : "Resuming lets it take new work from its queue again."}
+            ? room.status === "offline"
+              ? "Enabled means it may take new work, but no worker is connected. Resume only changes this permission; use Start in the Agent process section to launch the worker."
+              : "Pausing stops it taking new work. A run already in progress finishes its current step."
+            : "Paused means it will not take new work. Resuming clears the pause once a worker is connected."}
         </p>
         <form className="grid gap-2" onSubmit={onSubmit} noValidate>
           <label htmlFor={reasonId} className="text-sm font-medium text-fg">

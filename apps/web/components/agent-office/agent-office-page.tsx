@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LayoutGrid, List, Radio, RefreshCw, TriangleAlert, Unplug } from "lucide-react";
 import { deriveAgentAlerts, type AgentOfficeAlert } from "@nnact/shared";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useAgentOfficeOverviewQuery } from "@/lib/agent-office/api";
-import { AGENT_OFFICE_ENABLED, formatCents } from "@/lib/agent-office/format";
+import { formatCents } from "@/lib/agent-office/format";
+import { useAgentsEnabled } from "@/lib/agent-office/preferences";
 import { AGENT_OFFICE_POLL_MS, useAgentOfficeConnection, type AgentOfficeConnection } from "@/lib/agent-office/stream";
 import { explainRtkError } from "@/lib/redux/api";
 import { AgentDrawer } from "./agent-drawer";
@@ -74,18 +76,39 @@ function AlertList({ alerts, onOpen }: { alerts: readonly AgentOfficeAlert[]; on
 }
 
 export function AgentOfficePage() {
-  if (!AGENT_OFFICE_ENABLED) {
+  const { enabled, setEnabled } = useAgentsEnabled();
+  const toggle = (
+    <label className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-fg-muted">
+      <Switch
+        checked={enabled}
+        onCheckedChange={setEnabled}
+        aria-label="Agents enabled"
+        className="data-[state=checked]:!bg-accent"
+      />
+      Agents {enabled ? "on" : "off"}
+    </label>
+  );
+
+  if (!enabled) {
     return (
-      <>
-        <PageHeader title="Agent Office" />
-        <p className="text-sm text-fg-muted">The Agent Office is turned off for this installation.</p>
-      </>
+      <div className="grid gap-4">
+        <PageHeader
+          title="Agents"
+          description="Turn agents on or off from this page. No setup flag required."
+          actions={toggle}
+        />
+        <section className="apple-card grid justify-items-start gap-2 p-6">
+          <h2 className="text-lg font-semibold text-fg">Agents are paused</h2>
+          <p className="text-sm text-fg-muted">Turn agents back on above to see every desk and control.</p>
+        </section>
+      </div>
     );
   }
-  return <AgentOffice />;
+
+  return <AgentOffice toggle={toggle} />;
 }
 
-function AgentOffice() {
+function AgentOffice({ toggle }: { toggle: ReactNode }) {
   const connection = useAgentOfficeConnection();
   const overview = useAgentOfficeOverviewQuery(undefined, {
     pollingInterval: connection === "polling" ? AGENT_OFFICE_POLL_MS : 0,
@@ -119,10 +142,11 @@ function AgentOffice() {
   return (
     <div className={`${styles.office} grid gap-4`}>
       <PageHeader
-        title="Agent Office"
+        title="Agents"
         description="Every NNACT agent at its desk: what it is doing now, what it costs, and what is waiting for a person."
         actions={
           <>
+            {toggle}
             <ConnectionPill state={connection} />
             <span className="text-sm text-fg">
               <span className="text-fg-muted">Cost today </span>
