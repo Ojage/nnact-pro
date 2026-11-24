@@ -20,6 +20,7 @@ declare module 'claude-code' {
       logs: Shaped<string[]>
       busy: Shaped<string[]>
       problem: Shaped<string | null>
+      logPaused: Shaped<boolean>
     }
   }
 }

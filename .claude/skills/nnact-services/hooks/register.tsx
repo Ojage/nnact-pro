@@ -6,6 +6,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { PaneView, ServiceRow, ServiceState } from '../types'
+import { LEVEL_COLOR, LEVEL_TAG, toRows } from './logline'
 
 const PANE = 'nnact-services'
 const CLI = 'tools/services/src/cli.ts'
@@ -19,6 +20,7 @@ const view = atom({ plugin: 'nnact-services', key: 'view' } as const, { mode: 'l
 const logs = atom({ plugin: 'nnact-services', key: 'logs' } as const, [] as string[], { shape: 'logs-1' })
 const busy = atom({ plugin: 'nnact-services', key: 'busy' } as const, [] as string[], { shape: 'busy-1' })
 const problem = atom({ plugin: 'nnact-services', key: 'problem' } as const, null as string | null, { shape: 'problem-1' })
+const logPaused = atom({ plugin: 'nnact-services', key: 'logPaused' } as const, false, { shape: 'paused-1' })
 
 const LAMP: Record<ServiceState, { mark: string; color: 'success' | 'warning' | 'error' | 'inactive' }> = {
   running: { mark: '●', color: 'success' },
@@ -105,7 +107,7 @@ async function refresh($: EngineInterface): Promise<void> {
 async function loadLogs($: EngineInterface, name: string): Promise<void> {
   if (!NAME.test(name)) return
   try {
-    const { stdout } = await cli($, ['logs', name, '-n', '400'], 10_000)
+    const { stdout } = await cli($, ['logs', name, '-n', '300'], 10_000)
     await update($, logs, () => stdout.split('\n'))
   } catch {
     // The next tick tries again.
@@ -134,9 +136,27 @@ async function act($: EngineInterface, action: 'start' | 'stop' | 'restart', nam
 
 async function showLogs($: EngineInterface, name: string): Promise<void> {
   await update($, view, () => ({ mode: 'logs', name }) as PaneView)
+  await update($, logPaused, () => false)
   await loadLogs($, name)
+  followLogs($, name)
+}
+
+function followLogs($: EngineInterface, name: string): void {
   logTimer?.cancel()
   logTimer = $.clock.every(LOG_REFRESH_MS, () => void loadLogs($, name))
+}
+
+/** Freeze the log view so lines can be read, or resume following. */
+async function togglePause($: EngineInterface, name: string): Promise<void> {
+  const paused = await read($, logPaused)
+  await update($, logPaused, () => !paused)
+  if (paused) {
+    await loadLogs($, name)
+    followLogs($, name)
+  } else {
+    logTimer?.cancel()
+    logTimer = null
+  }
 }
 
 async function showList($: EngineInterface): Promise<void> {
@@ -214,23 +234,43 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const current = await read($, view)
-    const height = Math.max(6, (e.viewport?.rows ?? 24) - 4)
+    const height = Math.max(6, (e.viewport?.rows ?? 24) - 3)
+
+    // An icon control: a one-glyph plain Button, focusable and pressable.
+    const Icon = (props: { id: string; glyph: string; color?: string; dim?: boolean; onPress: () => unknown }) => (
+      <Button key={props.id} label={props.glyph} plain dimColor={props.dim} onPress={() => void props.onPress()} />
+    )
 
     if (current.mode === 'logs') {
-      const lines = (await read($, logs)).slice(-(height - 2))
+      const paused = await read($, logPaused)
+      const lines = toRows(await read($, logs), height - 2)
+      const service = (await read($, rows)).find(row => row.name === current.name)
+      const lamp = service ? LAMP[service.state] : LAMP.stopped
       return (
         <Box flexDirection="column">
-          <Box flexDirection="row" gap={1}>
-            <Text bold>Log: {current.name}</Text>
-            <Button key="back" label="Back" hotkey="b" onPress={() => showList($)} />
-            <Button key="close-logs" label="Close" hotkey="q" onPress={() => closePane($)} />
+          <Box flexDirection="row" gap={2}>
+            <Icon id="back" glyph="←" onPress={() => showList($)} />
+            <Text color={lamp.color}>{lamp.mark}</Text>
+            <Text bold>{current.name}</Text>
+            <Text dimColor>{paused ? 'paused' : 'live'} · {lines.length} lines</Text>
+            <Box flexGrow={1} />
+            <Icon id="pause" glyph={paused ? '▶' : '⏸'} onPress={() => togglePause($, current.name)} />
+            <Icon id="close-logs" glyph="✕" onPress={() => closePane($)} />
           </Box>
-          {lines.length === 0 ? <Text dimColor>No log lines yet.</Text> : null}
-          {lines.map((line, index) => (
-            <Text key={`l${index}`} mono>
-              {line || ' '}
-            </Text>
-          ))}
+          <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
+            {lines.length === 0 ? <Text dimColor>No log lines yet.</Text> : null}
+            {lines.map((row, index) => (
+              <Box key={`l${index}`} flexDirection="row" gap={1}>
+                <Text dimColor mono>{(row.time || '        ').padEnd(8)}</Text>
+                <Text color={LEVEL_COLOR[row.level]} bold mono>
+                  {LEVEL_TAG[row.level]}
+                </Text>
+                <Text mono wrap="truncate-end">
+                  {row.text}
+                </Text>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )
     }
@@ -238,40 +278,64 @@ export const register: Register = on => {
     const list = await read($, rows)
     const working = await read($, busy)
     const trouble = await read($, problem)
+    const nameWidth = Math.max(8, ...list.map(row => row.name.length))
     return (
       <Box flexDirection="column">
+        <Box flexDirection="row" gap={2}>
+          <Text bold>Services</Text>
+          <Text dimColor>
+            {list.filter(row => row.state === 'running').length}/{list.length} running
+          </Text>
+          <Box flexGrow={1} />
+          <Icon id="refresh" glyph="⟳" onPress={() => refresh($)} />
+          <Icon id="close" glyph="✕" onPress={() => closePane($)} />
+        </Box>
         {trouble ? <Text color="error">{trouble}</Text> : null}
         {list.length === 0 && !trouble ? <Text dimColor>Asking the supervisor…</Text> : null}
-        {list.map((row, index) => {
+        {list.length > 0 ? (
+          <Box flexDirection="row" gap={1}>
+            <Text dimColor mono>
+              {'  '}
+              {'SERVICE'.padEnd(nameWidth)} {'STATE'.padEnd(10)} {'PORT'.padEnd(6)} {'UP'.padEnd(6)}
+            </Text>
+          </Box>
+        ) : null}
+        {list.map(row => {
           const lamp = LAMP[row.state]
           const isBusy = working.includes(row.name)
           const isUp = row.state !== 'stopped' && row.state !== 'crashed'
           return (
             <Box key={row.name} flexDirection="row" gap={1}>
               <Text color={lamp.color}>{lamp.mark}</Text>
-              <Text bold>{row.name.padEnd(9)}</Text>
-              <Text>{(isBusy ? 'working…' : row.state).padEnd(10)}</Text>
-              <Text dimColor>{(row.port ? `:${row.port}` : '').padEnd(6)}</Text>
-              <Text dimColor>{uptime(row.uptimeMs).padEnd(6)}</Text>
-              <Button
-                key={`toggle-${row.name}`}
-                label={isUp ? 'Stop' : 'Start'}
-                hotkey={index < 9 ? String(index + 1) : undefined}
+              <Text bold mono>
+                {row.name.padEnd(nameWidth)}
+              </Text>
+              <Text color={isBusy ? 'warning' : lamp.color} mono>
+                {(isBusy ? 'working…' : row.state).padEnd(10)}
+              </Text>
+              <Text dimColor mono>
+                {(row.port ? String(row.port) : '—').padEnd(6)}
+              </Text>
+              <Text dimColor mono>
+                {(uptime(row.uptimeMs) || '—').padEnd(6)}
+              </Text>
+              <Icon
+                id={`toggle-${row.name}`}
+                glyph={isUp ? '■' : '▶'}
+                dim={isBusy}
                 onPress={() => act($, isUp ? 'stop' : 'start', row.name)}
               />
-              <Button key={`restart-${row.name}`} label="Restart" onPress={() => act($, 'restart', row.name)} />
-              <Button key={`logs-${row.name}`} label="Logs" onPress={() => showLogs($, row.name)} />
-              {row.detail ? <Text dimColor>{row.detail}</Text> : null}
+              <Icon id={`restart-${row.name}`} glyph="↻" dim={isBusy || !isUp} onPress={() => act($, 'restart', row.name)} />
+              <Icon id={`logs-${row.name}`} glyph="≡" onPress={() => showLogs($, row.name)} />
+              {row.detail ? (
+                <Text dimColor wrap="truncate-end">
+                  {row.detail}
+                </Text>
+              ) : null}
             </Box>
           )
         })}
-        <Text dimColor>
-          ctrl+x tab focuses · arrows move · Enter presses · 1-{Math.max(1, Math.min(9, list.length))} start/stop · r refresh · q close
-        </Text>
-        <Box flexDirection="row" gap={1}>
-          <Button key="refresh" label="Refresh" hotkey="r" onPress={() => refresh($)} />
-          <Button key="close" label="Close" hotkey="q" onPress={() => closePane($)} />
-        </Box>
+        <Text dimColor>▶ start  ■ stop  ↻ restart  ≡ logs  ⟳ refresh  ✕ close · ctrl+x tab to focus, arrows, Enter</Text>
       </Box>
     )
   })
