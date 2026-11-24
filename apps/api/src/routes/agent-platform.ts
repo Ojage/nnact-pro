@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
-import { db, agentRuns, conversations, messages } from "@nnact/db";
+import { and, eq, sql } from "drizzle-orm";
+import { db, agentRuns, aiUsageRecords, conversations, messages } from "@nnact/db";
 import { heartbeatBody, logsBody, recordHeartbeat, recordLogs, recordStep, stepBody } from "../agent-office/ingest.js";
 import {
   AGENT_SCOPES,
@@ -23,6 +23,8 @@ const createRunBody = z.object({
   messageId: uuid.optional(),
   jobId: uuid.optional(),
   promptVersion: z.string().trim().max(120).optional(),
+  /** The queue lease this run works on; lets the owner retry a failed run. */
+  leaseId: uuid.optional(),
 });
 
 const updateRunBody = z.object({
@@ -170,8 +172,9 @@ export async function agentPlatformRoutes(app: FastifyInstance) {
         task: body.task,
         input: body.input,
         attempts: 1,
-        agentId: claims.agent_id ?? claims.agentId ?? null,
+        agentId: claimAgent(claims) ?? claims.agent_id ?? claims.agentId ?? null,
         promptVersion: body.promptVersion,
+        leaseId: body.leaseId,
       })
       .returning();
     return reply.code(201).send(row);
@@ -187,6 +190,18 @@ export async function agentPlatformRoutes(app: FastifyInstance) {
     const body = parsed.data;
     if (!(await ensureOrg(claims, body.orgId, reply))) return;
 
+    // When the agent does not state a cost, charge the run what its model
+    // calls recorded, so the office's cost-versus-cap stays truthful.
+    const costCents =
+      body.costCents ??
+      Number(
+        (
+          await db
+            .select({ total: sql<number>`coalesce(sum(${aiUsageRecords.costCents}), 0)::int` })
+            .from(aiUsageRecords)
+            .where(and(eq(aiUsageRecords.runId, params.data.runId), eq(aiUsageRecords.orgId, body.orgId)))
+        )[0]?.total ?? 0,
+      );
     const [row] = await db
       .update(agentRuns)
       .set({
@@ -194,7 +209,7 @@ export async function agentPlatformRoutes(app: FastifyInstance) {
         output: body.output,
         provider: body.provider,
         model: body.model,
-        costCents: body.costCents,
+        costCents,
         error: body.error,
         jobId: body.jobId,
         latencyMs: body.latencyMs,
