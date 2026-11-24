@@ -50,7 +50,7 @@ export interface AgentRunLogger {
 export type AgentLogSink = (event: AgentRunLogEvent) => void | Promise<void>;
 
 function normalize(event: AgentRunLogEvent["event"], fields: AgentRunLogFields, clock: () => Date): AgentRunLogEvent {
-  const level = event === "finish" && fields.outcome !== "success" ? "warn" : "info";
+  const level = event === "agent.run.finish" && fields.outcome !== "success" ? "warn" : "info";
   return {
     event,
     level,

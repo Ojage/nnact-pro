@@ -35,6 +35,9 @@ importers:
 
   apps/agents:
     dependencies:
+      '@nnact/agent-kit':
+        specifier: workspace:*
+        version: link:../../packages/agent-kit
       '@nnact/db':
         specifier: workspace:*
         version: link:../../packages/db
