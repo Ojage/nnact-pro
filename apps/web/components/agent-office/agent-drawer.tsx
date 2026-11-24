@@ -620,6 +620,7 @@ function LogsPanel({ agentId, polling }: { agentId: string; polling: boolean }) 
           </label>
           <FormSelect
             id={levelId}
+            native
             value={minLevel}
             onChange={(value) => setMinLevel(value as AgentLogLevel)}
             className="min-w-40"

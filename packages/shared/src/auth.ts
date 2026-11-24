@@ -58,6 +58,10 @@ export interface AgentJwtClaims {
 
 const AGENT_SCOPE_VALUES = Object.values(AGENT_SCOPES) as string[];
 
+const LEGACY_AGENT_ID_ALIASES: Record<string, string> = {
+  "quote-agent": "quoting-agent",
+};
+
 // Must match each agent's scopes in AGENT_REGISTRY; test/agent-registry.test.mjs
 // fails if the two drift. (A value import of the registry here would break the
 // package's tsx-free test run.)
@@ -104,7 +108,8 @@ function resolveClaimAgentId(value: unknown): string | null {
   const trimmed = value.trim();
   if (Object.hasOwn(AGENT_CLAIM_SCOPE_GRANTS, trimmed)) return trimmed;
   const canonical = trimmed.startsWith("nnact-") ? trimmed.slice("nnact-".length) : trimmed;
-  return Object.hasOwn(AGENT_CLAIM_SCOPE_GRANTS, canonical) ? canonical : null;
+  const aliased = LEGACY_AGENT_ID_ALIASES[canonical] ?? canonical;
+  return Object.hasOwn(AGENT_CLAIM_SCOPE_GRANTS, aliased) ? aliased : null;
 }
 
 function claimAgentScopeAllowed(agentId: string, scope: AgentScope): boolean {

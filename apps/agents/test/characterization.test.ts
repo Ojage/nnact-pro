@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AGENT_ID, AGENT_SCOPES } from "@nnact/shared";
 import { createAgentToken, detectSafety, quotePrompt, rejectModelPrices, serviceAreaFromAddress } from "../src/lib/helpers.js";
-import { resolveSelectedAgentIds } from "../src/lib/runtime.js";
+import { legacyAgentId, resolveSelectedAgentIds } from "../src/lib/runtime.js";
 
 function decodeJwt(token: string): Record<string, unknown> {
   const payload = token.split(".")[1];
@@ -65,8 +65,17 @@ test("agent token carries canonical id and narrow scopes", () => {
 });
 
 test("agent selection supports default all and legacy names", () => {
-  assert.deepEqual(resolveSelectedAgentIds({}), [AGENT_ID.intake, AGENT_ID.quoting]);
+  assert.deepEqual(resolveSelectedAgentIds({}), [
+    AGENT_ID.intake,
+    AGENT_ID.quoting,
+    AGENT_ID.dispatch,
+    AGENT_ID.pricebook,
+    AGENT_ID.triage,
+    AGENT_ID.sourcing,
+    AGENT_ID.payments,
+  ]);
   assert.deepEqual(resolveSelectedAgentIds({ AGENT_NAME: "quoting" }), [AGENT_ID.quoting]);
   assert.deepEqual(resolveSelectedAgentIds({ AGENT_ID: "nnact-intake-agent" }), [AGENT_ID.intake]);
   assert.deepEqual(resolveSelectedAgentIds({ AGENT_ID: "nnact-quote-agent" }), [AGENT_ID.quoting]);
+  assert.equal(legacyAgentId(AGENT_ID.quoting), "nnact-quoting-agent");
 });

@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const artifactDir = path.resolve("artifacts");
-const API = "http://127.0.0.1:3001";
+const API = process.env.NNPWEB_E2E_API ?? "http://127.0.0.1:3001";
 
 function minutesAgo(minutes: number) {
   return new Date(Date.now() - minutes * 60_000).toISOString();
@@ -150,9 +150,11 @@ async function mockOfficeApi(page: Page, onControl?: (path: string, body: unknow
         ],
       });
     }
-    if (p.endsWith("/pause") && request.method() === "POST") {
-      onControl?.(p, request.postDataJSON());
-      return fulfillJson(route, { ok: true });
+    if (request.method() === "POST" && ["/pause", "/start", "/restart"].some((suffix) => p.endsWith(suffix))) {
+      const raw = request.postData();
+      const body = raw ? JSON.parse(raw) : undefined;
+      onControl?.(p, body);
+      return fulfillJson(route, { ok: true, started: true });
     }
     return fulfillJson(route, {});
   });
@@ -169,7 +171,7 @@ test("floor plan shows live and vacant offices and applies streamed updates", as
   const intake = page.getByRole("button", { name: "Intake agent" });
   await expect(intake).toContainText("Working");
   await expect(intake).toContainText("Drafting job from WhatsApp, step 2 of 4");
-  await expect(page.getByRole("button", { name: "Payments agent" })).toContainText("Coming soon");
+  await expect(page.getByRole("button", { name: "Payments agent" })).toContainText("Offline");
   await expect(page.getByRole("link", { name: /Draft jobs to review/ })).toContainText("2");
   // Spend at 85% of the cap raises a warning in words, not only color.
   await expect(page.getByRole("region", { name: "Alerts" })).toContainText("85% of its daily cost cap");
@@ -210,6 +212,22 @@ test("drawer tabs work from the keyboard and pausing needs a reason and confirma
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
   await expect(page.getByRole("button", { name: "Intake agent" })).toBeFocused();
+});
+
+test("agent process callout starts and restarts the worker from the drawer", async ({ page }) => {
+  const controls: Array<{ path: string; body: unknown }> = [];
+  await mockOfficeApi(page, (p, body) => controls.push({ path: p, body }));
+  await page.goto("/agents");
+
+  await page.getByRole("button", { name: "Intake agent" }).click();
+  const drawer = page.getByRole("dialog", { name: "Intake agent" });
+  await drawer.getByRole("button", { name: "Start", exact: true }).click();
+  await drawer.getByRole("button", { name: "Restart", exact: true }).click();
+  await expect.poll(() => controls.length).toBe(2);
+  expect(controls).toEqual([
+    { path: "/api/agent-office/agents/intake-agent/start", body: undefined },
+    { path: "/api/agent-office/agents/intake-agent/restart", body: undefined },
+  ]);
 });
 
 test("logs tab filters by level and search", async ({ page }) => {

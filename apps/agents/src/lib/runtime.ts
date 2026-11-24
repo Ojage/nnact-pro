@@ -2,7 +2,7 @@ import { AGENT_ID, AGENT_REGISTRY, resolveAgentId, type AgentId } from "@nnact/s
 
 const LEGACY_AGENT_IDS: Record<AgentId, string> = {
   [AGENT_ID.intake]: "nnact-intake-agent",
-  [AGENT_ID.quoting]: "nnact-quote-agent",
+  [AGENT_ID.quoting]: "nnact-quoting-agent",
   [AGENT_ID.dispatch]: "nnact-dispatch-agent",
   [AGENT_ID.pricebook]: "nnact-pricebook-agent",
   [AGENT_ID.triage]: "nnact-triage-agent",

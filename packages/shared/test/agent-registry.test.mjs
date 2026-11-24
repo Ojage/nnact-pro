@@ -85,6 +85,14 @@ test("old agentId and canonical agent_id claims both validate", () => {
   assert.ok(isAgentClaims(canonical));
   assert.ok(requireAgentScope(legacy, AGENT_ID.intake, AGENT_SCOPES.draftJobsCreate));
   assert.ok(requireAgentScope(canonical, AGENT_ID.intake, AGENT_SCOPES.draftJobsCreate));
+
+  const legacyQuoting = {
+    ...base,
+    agentId: "nnact-quote-agent",
+    scope: AGENT_SCOPES.jobsRead,
+  };
+  assert.ok(isAgentClaims(legacyQuoting));
+  assert.ok(requireAgentScope(legacyQuoting, AGENT_ID.quoting, AGENT_SCOPES.jobsRead));
   assert.equal(isAgentClaims({ ...canonical, aud: "staff" }), false);
   assert.equal(isAgentClaims({ ...canonical, agentId: "unknown-agent" }), false);
   assert.equal(isAgentClaims({ ...canonical, scope: "jobs:assign" }), false);
