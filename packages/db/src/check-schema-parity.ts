@@ -11,6 +11,7 @@ import * as customerPortalSchema from "./customer-portal.js";
 import * as agentSchema from "./agent.js";
 import * as priceBookSchema from "./price-book.js";
 import * as dispatchSchema from "./dispatch.js";
+import * as agentOfficeSchema from "./agent-office.js";
 
 const url = process.env.DATABASE_URL?.trim();
 if (!url) throw new Error("DATABASE_URL is required for schema parity checks");
@@ -22,7 +23,7 @@ try {
     where table_schema = 'public'
   `;
   const actualColumns = new Map(actual.map((row) => [`${row.table_name}.${row.column_name}`, row.udt_name]));
-  const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...financeSchema, ...growthSchema, ...customerPortalSchema, ...agentSchema, ...priceBookSchema, ...dispatchSchema };
+  const schema = { ...coreSchema, ...servicePlanSchema, ...diagnosticSchema, ...financeSchema, ...growthSchema, ...customerPortalSchema, ...agentSchema, ...priceBookSchema, ...dispatchSchema, ...agentOfficeSchema };
   const tables = Object.values(schema).filter((value): value is PgTable => is(value, PgTable));
   const problems: string[] = [];
 

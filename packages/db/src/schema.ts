@@ -224,6 +224,8 @@ export const jobs = pgTable(
     agentRejectedAt: timestamp("agent_rejected_at", { withTimezone: true }),
     agentRejectionReason: text("agent_rejection_reason"),
     agentConversationId: uuid("agent_conversation_id"),
+    /** Set when a dispatcher approved an intake draft: whether they changed its fields first. */
+    agentDraftEdited: boolean("agent_draft_edited"),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     total: integer("total").default(0).notNull(),
     laborCostCents: integer("labor_cost_cents").default(0).notNull(),

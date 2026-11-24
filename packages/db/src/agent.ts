@@ -183,6 +183,7 @@ export const agentRuns = pgTable(
   (t) => ({
     orgTask: index("agent_runs_org_task_created_idx").on(t.orgId, t.task, t.createdAt),
     conversation: index("agent_runs_conversation_idx").on(t.conversationId, t.createdAt),
+    agentCreated: index("agent_runs_agent_created_idx").on(t.agentId, t.createdAt),
   }),
 );
 

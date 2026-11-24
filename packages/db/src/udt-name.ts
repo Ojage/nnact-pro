@@ -19,6 +19,9 @@
 const SCALAR_TYPE_TO_UDT: Record<string, string> = {
   boolean: "bool",
   integer: "int4",
+  // Serial types are integer columns with a default sequence in the catalog.
+  bigserial: "int8",
+  serial: "int4",
   "double precision": "float8",
   "timestamp with time zone": "timestamptz",
 };
