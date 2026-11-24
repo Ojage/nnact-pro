@@ -143,3 +143,15 @@ test("registry scopes are valid and never grant forbidden actions", () => {
     assert.ok(!forbidden.includes(scope.split(":")[1] ?? ""), scope);
   }
 });
+
+test("every registry agent, triage included, can hold a token for its own scopes", () => {
+  for (const id of AGENT_IDS) {
+    for (const scope of AGENT_REGISTRY[id].scopes) {
+      const claims = { aud: "agent", agent_id: id, orgId: "org-1", scope, scopes: [scope] };
+      assert.equal(isAgentClaims(claims), true, `${id} ${scope}`);
+      assert.equal(requireAgentScope(claims, id, scope), true, `${id} ${scope}`);
+    }
+  }
+  const borrowed = { aud: "agent", agent_id: "triage-agent", orgId: "org-1", scope: AGENT_SCOPES.draftJobsCreate };
+  assert.equal(isAgentClaims(borrowed), false);
+});

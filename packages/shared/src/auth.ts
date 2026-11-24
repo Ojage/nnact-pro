@@ -57,6 +57,9 @@ export interface AgentJwtClaims {
 
 const AGENT_SCOPE_VALUES = Object.values(AGENT_SCOPES) as string[];
 
+// Must match each agent's scopes in AGENT_REGISTRY; test/agent-registry.test.mjs
+// fails if the two drift. (A value import of the registry here would break the
+// package's tsx-free test run.)
 const AGENT_CLAIM_SCOPE_GRANTS: Record<string, readonly AgentScope[]> = {
   "intake-agent": [
     AGENT_SCOPES.draftJobsCreate,
@@ -80,6 +83,7 @@ const AGENT_CLAIM_SCOPE_GRANTS: Record<string, readonly AgentScope[]> = {
     AGENT_SCOPES.agentRunsWrite,
   ],
   "pricebook-agent": [AGENT_SCOPES.priceBookRead, AGENT_SCOPES.priceObservationsCreate, AGENT_SCOPES.agentRunsWrite],
+  "triage-agent": [AGENT_SCOPES.jobsRead, AGENT_SCOPES.agentRunsWrite],
   "sourcing-agent": [
     AGENT_SCOPES.priceBookRead,
     AGENT_SCOPES.sourcingSuggestionsCreate,
