@@ -24,3 +24,6 @@ data/pg/
 data/redis/
 data/uploads/
 .ofp-uploads/
+
+# Local service supervisor state and logs (may hold customer data)
+.services/

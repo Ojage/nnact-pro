@@ -29,7 +29,9 @@
     "install:verified": "pnpm lock:prepare && pnpm install --frozen-lockfile --reporter=silent",
     "release:safety": "node scripts/release-safety-check.mjs && node scripts/verify-lockfile.mjs && pnpm test:release",
     "infra:up": "docker compose -f infra/compose.yml up -d",
-    "infra:down": "docker compose -f infra/compose.yml down"
+    "infra:down": "docker compose -f infra/compose.yml down",
+    "services": "tools/services/services.sh",
+    "test:services": "cd tools/services && node --disable-warning=ExperimentalWarning --test 'test/*.test.ts'"
   },
   "pnpm": {
     "overrides": {

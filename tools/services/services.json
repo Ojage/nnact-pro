@@ -1,0 +1,70 @@
+{
+  "root": "../..",
+  "logs": { "maxBytes": 5242880, "keep": 3 },
+  "services": [
+    {
+      "name": "postgres",
+      "description": "PostGIS 16 from infra/compose.yml",
+      "cwd": ".",
+      "command": "docker",
+      "args": ["compose", "-f", "infra/compose.yml", "up", "postgres"],
+      "port": 5433,
+      "healthcheck": { "type": "tcp", "port": 5433 },
+      "stopSignal": "SIGINT",
+      "stopTimeoutMs": 30000
+    },
+    {
+      "name": "redis",
+      "description": "Redis 7 from infra/compose.yml",
+      "cwd": ".",
+      "command": "docker",
+      "args": ["compose", "-f", "infra/compose.yml", "up", "redis"],
+      "port": 6379,
+      "healthcheck": { "type": "tcp", "port": 6379 },
+      "stopSignal": "SIGINT",
+      "stopTimeoutMs": 30000
+    },
+    {
+      "name": "api",
+      "description": "Fastify API (tsx watch)",
+      "cwd": "apps/api",
+      "command": "pnpm",
+      "args": ["dev"],
+      "port": 3003,
+      "healthcheck": { "type": "http", "url": "http://127.0.0.1:3003/api/health/live" },
+      "envFile": ".env"
+    },
+    {
+      "name": "web",
+      "description": "Staff web app (next dev)",
+      "cwd": "apps/web",
+      "command": "pnpm",
+      "args": ["dev"],
+      "port": 3000,
+      "healthcheck": { "type": "http", "url": "http://127.0.0.1:3000/login" },
+      "envFile": ".env",
+      "dependsOn": ["api"]
+    },
+    {
+      "name": "customer",
+      "description": "Customer portal (next dev)",
+      "cwd": "apps/customer",
+      "command": "pnpm",
+      "args": ["dev"],
+      "port": 3002,
+      "healthcheck": { "type": "tcp", "port": 3002 },
+      "envFile": ".env",
+      "dependsOn": ["api"]
+    },
+    {
+      "name": "worker",
+      "description": "Background worker (tsx watch)",
+      "cwd": "apps/worker",
+      "command": "pnpm",
+      "args": ["dev"],
+      "port": 3020,
+      "healthcheck": { "type": "http", "url": "http://127.0.0.1:3020/internal/drain" },
+      "envFile": ".env"
+    }
+  ]
+}
