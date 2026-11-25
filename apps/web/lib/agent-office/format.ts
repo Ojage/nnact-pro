@@ -76,3 +76,10 @@ const TASK_LABELS: Record<string, string> = {
 export function taskLabel(task: string): string {
   return TASK_LABELS[task] ?? task.replace(/^agent\./, "").replace(/[_.-]+/g, " ");
 }
+
+/** Toast text after Start/Restart, worded for local and server-managed workers. */
+export function processActionMessage(name: string, mode: "start" | "restart", result: { started?: boolean; managed?: boolean }): string {
+  if (result.managed) return `${name} is running on the server and is now taking work`;
+  if (result.started === false) return `${name} is already running`;
+  return `${name} ${mode === "start" ? "started" : "restarted"}`;
+}

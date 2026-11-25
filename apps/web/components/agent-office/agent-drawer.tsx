@@ -37,6 +37,7 @@ import {
   formatClock,
   formatDuration,
   formatPercent,
+  processActionMessage,
   taskLabel,
 } from "@/lib/agent-office/format";
 import { AGENT_OFFICE_POLL_MS, useAgentOfficeConnection } from "@/lib/agent-office/stream";
@@ -44,7 +45,7 @@ import { explainRtkError } from "@/lib/redux/api";
 import { CostMeter, StatusLamp } from "./office-bits";
 import styles from "./office.module.css";
 
-const DETAIL_POLL_MS = 30_000;
+export const DETAIL_POLL_MS = 30_000;
 
 const TABS = [
   { id: "now", label: "Now" },
@@ -65,7 +66,7 @@ const RUN_STATE_ICON: Record<AgentRunState, typeof Check> = {
   skipped: CircleDashed,
 };
 
-function RunStateLabel({ state }: { state: AgentRunState }) {
+export function RunStateLabel({ state }: { state: AgentRunState }) {
   const Icon = RUN_STATE_ICON[state];
   return (
     <span className="inline-flex items-center gap-1 text-xs font-semibold">
@@ -75,7 +76,7 @@ function RunStateLabel({ state }: { state: AgentRunState }) {
   );
 }
 
-function QueryProblem({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+export function QueryProblem({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (
     <div role="alert" className="grid justify-items-start gap-2 rounded-lg border border-border p-3 text-sm">
       <p>{explainRtkError(error, "This could not be loaded.")}</p>
@@ -298,7 +299,7 @@ function StepTimeline({ steps }: { steps: readonly AgentRunStepDTO[] }) {
   );
 }
 
-function NowPanel({ room }: { room: AgentRoomDTO }) {
+export function NowPanel({ room }: { room: AgentRoomDTO }) {
   const current = room.current;
   const progressId = useId();
   const run = useAgentOfficeRunQuery(current?.runId ?? "", { skip: !current });
@@ -341,7 +342,7 @@ function NowPanel({ room }: { room: AgentRoomDTO }) {
 /* Runs                                                                */
 /* ------------------------------------------------------------------ */
 
-function RunsPanel({ agentId }: { agentId: string }) {
+export function RunsPanel({ agentId }: { agentId: string }) {
   const runs = useAgentOfficeRunsInfiniteQuery(agentId);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
   const rows = useMemo(() => runs.data?.pages.flatMap((page) => page.runs) ?? [], [runs.data]);
@@ -520,9 +521,7 @@ function AgentProcessCallout({ room, onOpenControls }: { room: AgentRoomDTO; onO
       const mutation = mode === "start" ? start : restart;
       const result = await mutation(room.id).unwrap();
       toast.success(
-        result.started === false
-          ? `${room.displayName} is already running`
-          : `${room.displayName} ${mode === "start" ? "started" : "restarted"}`,
+processActionMessage(room.displayName, mode, result)
       );
     } catch (error) {
       toast.error(explainRtkError(error, `Could not ${mode} ${room.displayName}`));
@@ -566,7 +565,7 @@ function AgentProcessCallout({ room, onOpenControls }: { room: AgentRoomDTO; onO
   );
 }
 
-function LogsPanel({ agentId, polling }: { agentId: string; polling: boolean }) {
+export function LogsPanel({ agentId, polling }: { agentId: string; polling: boolean }) {
   const logs = useAgentOfficeLogsQuery(agentId, { pollingInterval: polling ? AGENT_OFFICE_POLL_MS : 0 });
   const [minLevel, setMinLevel] = useState<AgentLogLevel>("info");
   const [search, setSearch] = useState("");
@@ -710,7 +709,7 @@ function RunsPerHourChart({ values }: { values: readonly number[] }) {
   );
 }
 
-function MetricsPanel({ detail, error, onRetry }: { detail: AgentDetailDTO | undefined; error: unknown; onRetry: () => void }) {
+export function MetricsPanel({ detail, error, onRetry }: { detail: AgentDetailDTO | undefined; error: unknown; onRetry: () => void }) {
   if (error) return <QueryProblem error={error} onRetry={onRetry} />;
   if (!detail) return <p className="text-sm text-fg-muted">Loading metrics…</p>;
   const { metrics } = detail;
@@ -762,7 +761,7 @@ function MetricsPanel({ detail, error, onRetry }: { detail: AgentDetailDTO | und
 /* Config                                                              */
 /* ------------------------------------------------------------------ */
 
-function ConfigPanel({
+export function ConfigPanel({
   room,
   detail,
   error,
@@ -880,7 +879,7 @@ function ConfirmDialog({
   );
 }
 
-function ControlsPanel({ room, detail }: { room: AgentRoomDTO; detail: AgentDetailDTO | undefined }) {
+export function ControlsPanel({ room, detail }: { room: AgentRoomDTO; detail: AgentDetailDTO | undefined }) {
   const [pause, pauseState] = usePauseAgentMutation();
   const [resume, resumeState] = useResumeAgentMutation();
   const [reason, setReason] = useState("");

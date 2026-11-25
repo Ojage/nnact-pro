@@ -1,29 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { LayoutGrid, List, Radio, RefreshCw, TriangleAlert, Unplug } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { LayoutGrid, Radio, RefreshCw, Rows3, TriangleAlert, Unplug } from "lucide-react";
 import { deriveAgentAlerts, type AgentOfficeAlert } from "@nnact/shared";
-import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAgentOfficeOverviewQuery } from "@/lib/agent-office/api";
-import { formatCents } from "@/lib/agent-office/format";
 import { useAgentsEnabled } from "@/lib/agent-office/preferences";
 import { AGENT_OFFICE_POLL_MS, useAgentOfficeConnection, type AgentOfficeConnection } from "@/lib/agent-office/stream";
 import { explainRtkError } from "@/lib/redux/api";
-import { AgentDrawer } from "./agent-drawer";
-import { OfficeFloor, OfficeList, OfficeSkeleton } from "./office-floor";
+import { cn } from "@/lib/utils";
+import { AgentsTable } from "./console/agents-table";
+import { OfficeSummary } from "./console/summary";
+import { OfficeFloor } from "./office-floor";
 import styles from "./office.module.css";
 
-type View = "floor" | "list";
+type View = "table" | "floor";
+const VIEW_KEY = "nnact.agentOffice.view";
 
 const CONNECTION_COPY: Record<AgentOfficeConnection, { label: string; icon: typeof Radio }> = {
   idle: { label: "Not connected", icon: Unplug },
   connecting: { label: "Connecting…", icon: RefreshCw },
   live: { label: "Live", icon: Radio },
   reconnecting: { label: "Reconnecting…", icon: RefreshCw },
-  polling: { label: `Polling every ${AGENT_OFFICE_POLL_MS / 1000} s`, icon: RefreshCw },
+  polling: { label: `Updating every ${AGENT_OFFICE_POLL_MS / 1000} s`, icon: RefreshCw },
 };
+
+const toolbarButton =
+  "inline-flex h-9 items-center gap-2 rounded-[6px] px-2.5 text-sm font-medium text-[var(--shell-accent-text)] hover:bg-[var(--shell-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-focus)] disabled:opacity-50";
 
 /** Re-render on a slow clock so "stalled" alerts appear without new data. */
 function useNow(intervalMs: number): number {
@@ -35,98 +41,106 @@ function useNow(intervalMs: number): number {
   return now;
 }
 
-function ConnectionPill({ state }: { state: AgentOfficeConnection }) {
+function ConnectionState({ state }: { state: AgentOfficeConnection }) {
   const { label, icon: Icon } = CONNECTION_COPY[state];
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-fg">
-      <Icon size={12} aria-hidden="true" />
+    <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+      <Icon className={cn("size-3.5", state === "live" && "text-[var(--color-success-fg)]")} aria-hidden="true" />
       <span className="sr-only">Connection: </span>
       {label}
     </span>
   );
 }
 
-function AlertList({ alerts, onOpen }: { alerts: readonly AgentOfficeAlert[]; onOpen: (agentId: string) => void }) {
+/** Console-style notification banners, one per alert, worst first. */
+function AlertBanners({ alerts }: { alerts: readonly AgentOfficeAlert[] }) {
   if (alerts.length === 0) return null;
   return (
-    <section aria-label="Alerts" className="rounded-lg border border-border bg-card p-3">
-      <h2 className="mb-2 text-sm font-semibold text-fg">
-        {alerts.length} alert{alerts.length === 1 ? "" : "s"}
-      </h2>
-      <ul className="grid gap-1.5">
-        {alerts.map((alert) => (
-          <li key={alert.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="inline-flex items-center gap-2">
-              <TriangleAlert
-                size={14}
-                aria-hidden="true"
-                className={alert.severity === "critical" ? "text-[var(--color-danger-fg)]" : "text-[var(--color-attention-fg)]"}
-              />
-              <span className="font-semibold">{alert.severity === "critical" ? "Critical" : "Warning"}:</span>
+    <ul className="grid gap-2" role="list" aria-label="Alerts">
+      {alerts.map((alert) => {
+        const critical = alert.severity === "critical";
+        return (
+          <li
+            key={alert.id}
+            className={cn(
+              "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[8px] border px-4 py-2.5 text-sm",
+              critical
+                ? "border-[color-mix(in_srgb,var(--color-danger-fg)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-danger-fg)_7%,var(--shell-panel))]"
+                : "border-[color-mix(in_srgb,var(--color-attention-fg)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-attention-fg)_7%,var(--shell-panel))]",
+            )}
+          >
+            <TriangleAlert
+              className={cn("size-4 shrink-0", critical ? "text-[var(--color-danger-fg)]" : "text-[var(--color-attention-fg)]")}
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 text-fg">
+              <span className="font-medium">{critical ? "Critical: " : "Warning: "}</span>
               {alert.message}
             </span>
-            <Button type="button" variant="ghost" size="sm" onClick={() => onOpen(alert.agentId)}>
-              Open office
-            </Button>
+            <Link href={`/agents/${alert.agentId}`} className="text-sm font-medium text-[var(--shell-accent-text)] hover:underline">
+              View agent
+            </Link>
           </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function OfficeLoading() {
+  return (
+    <div className="grid gap-4" aria-busy="true" aria-label="Loading agents">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} className="h-[6.5rem] rounded-[8px]" />
         ))}
-      </ul>
-    </section>
+      </div>
+      <div className="overflow-hidden rounded-[8px] border border-[var(--shell-border)]">
+        <Skeleton className="h-11 rounded-none" />
+        <Skeleton className="h-10 rounded-none opacity-60" />
+        {Array.from({ length: 6 }, (_, row) => (
+          <div key={row} className="flex h-14 items-center gap-6 border-t border-[var(--shell-border)] px-4">
+            <Skeleton className="h-4 w-20 rounded-[6px]" />
+            <Skeleton className="h-4 w-36 rounded-[6px]" />
+            <Skeleton className="h-4 flex-1 rounded-[6px]" />
+            <Skeleton className="h-4 w-24 rounded-[6px]" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
 export function AgentOfficePage() {
+  const router = useRouter();
   const { enabled, setEnabled } = useAgentsEnabled();
-  const toggle = (
-    <label className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-fg-muted">
-      <Switch
-        checked={enabled}
-        onCheckedChange={setEnabled}
-        aria-label="Agents enabled"
-        className="data-[state=checked]:!bg-accent"
-      />
-      Agents {enabled ? "on" : "off"}
-    </label>
-  );
-
-  if (!enabled) {
-    return (
-      <div className="grid gap-4">
-        <PageHeader
-          title="Agents"
-          description="Turn agents on or off from this page. No setup flag required."
-          actions={toggle}
-        />
-        <section className="apple-card grid justify-items-start gap-2 p-6">
-          <h2 className="text-lg font-semibold text-fg">Agents are paused</h2>
-          <p className="text-sm text-fg-muted">Turn agents back on above to see every desk and control.</p>
-        </section>
-      </div>
-    );
-  }
-
-  return <AgentOffice toggle={toggle} />;
-}
-
-function AgentOffice({ toggle }: { toggle: ReactNode }) {
   const connection = useAgentOfficeConnection();
   const overview = useAgentOfficeOverviewQuery(undefined, {
     pollingInterval: connection === "polling" ? AGENT_OFFICE_POLL_MS : 0,
+    skip: !enabled,
   });
-  const [view, setView] = useState<View>("floor");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [view, setView] = useState<View>("table");
   const now = useNow(30_000);
 
-  // The list is the default on small screens; the owner can switch either way.
   useEffect(() => {
-    if (window.matchMedia("(max-width: 767px)").matches) setView("list");
+    try {
+      if (window.localStorage.getItem(VIEW_KEY) === "floor") setView("floor");
+    } catch {
+      // Storage blocked: the table stays the default.
+    }
   }, []);
+  const chooseView = (next: View) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Storage blocked: the choice lasts for this visit.
+    }
+  };
 
   const rooms = overview.data?.agents;
   const alerts = useMemo(() => (rooms ? deriveAgentAlerts(rooms, now) : []), [rooms, now]);
-  const openRoom = rooms?.find((room) => room.id === openId) ?? null;
-  const onOpen = useCallback((agentId: string) => setOpenId(agentId), []);
-  const onClose = useCallback(() => setOpenId(null), []);
+  const openAgent = useCallback((agentId: string) => router.push(`/agents/${agentId}`), [router]);
 
   // One polite announcement when the alert count grows; never per update.
   const [announcement, setAnnouncement] = useState("");
@@ -140,64 +154,90 @@ function AgentOffice({ toggle }: { toggle: ReactNode }) {
   }, [alerts]);
 
   return (
-    <div className={`${styles.office} grid gap-4`}>
-      <PageHeader
-        title="Agents"
-        description="Every NNACT agent at its desk: what it is doing now, what it costs, and what is waiting for a person."
-        actions={
-          <>
-            {toggle}
-            <ConnectionPill state={connection} />
-            <span className="text-sm text-fg">
-              <span className="text-fg-muted">Cost today </span>
-              <span className="font-semibold tabular-nums">{formatCents(overview.data?.costTodayCents ?? 0)}</span>
+    <div className={cn(styles.office, "grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5")}>
+      <header className="grid gap-3 border-b border-[var(--shell-border)] pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-[22px] font-normal text-fg">Agent Office</h1>
+          {enabled ? <ConnectionState state={connection} /> : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-1" role="toolbar" aria-label="Agent Office actions">
+          <button type="button" className={toolbarButton} onClick={() => void overview.refetch()} disabled={!enabled || overview.isFetching}>
+            <RefreshCw className={cn("size-4", overview.isFetching && "motion-safe:animate-spin")} aria-hidden="true" />
+            Refresh
+          </button>
+          <span className="mx-1 h-5 w-px bg-[var(--shell-border)]" aria-hidden="true" />
+          <label className="inline-flex h-9 items-center gap-2 px-2.5 text-sm font-medium text-fg">
+            <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Agents enabled" />
+            Agents {enabled ? "on" : "off"}
+          </label>
+          {enabled ? (
+            <span className="ml-auto inline-flex rounded-[6px] border border-[var(--shell-border)] p-0.5" role="group" aria-label="View">
+              {([
+                ["table", "Table", Rows3],
+                ["floor", "Floor plan", LayoutGrid],
+              ] as const).map(([id, text, Icon]) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={view === id}
+                  onClick={() => chooseView(id)}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-[4px] px-2.5 text-sm",
+                    view === id ? "bg-[var(--shell-tint)] font-medium text-[var(--shell-accent-text)]" : "text-fg-muted hover:bg-[var(--shell-hover)]",
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden="true" />
+                  {text}
+                </button>
+              ))}
             </span>
-            <span className="inline-flex rounded-md border border-border p-0.5" role="group" aria-label="View">
-              <Button type="button" variant={view === "floor" ? "secondary" : "ghost"} size="sm" aria-pressed={view === "floor"} onClick={() => setView("floor")}>
-                <LayoutGrid size={14} aria-hidden="true" />
-                Floor plan
-              </Button>
-              <Button type="button" variant={view === "list" ? "secondary" : "ghost"} size="sm" aria-pressed={view === "list"} onClick={() => setView("list")}>
-                <List size={14} aria-hidden="true" />
-                List
-              </Button>
-            </span>
-          </>
-        }
-        className="mb-0"
-      />
+          ) : null}
+        </div>
+      </header>
 
       <p className="sr-only" role="status">
         {announcement}
       </p>
 
-      <AlertList alerts={alerts} onOpen={onOpen} />
+      {!enabled ? (
+        <section className="rounded-[8px] border border-[var(--shell-border)] px-6 py-10 text-center">
+          <h2 className="text-base font-medium text-fg">Agents are switched off in this browser</h2>
+          <p className="mt-1 text-sm text-fg-muted">Turn agents on above to see every agent, its work and its controls.</p>
+        </section>
+      ) : null}
 
-      {overview.isLoading ? <OfficeSkeleton /> : null}
+      {enabled && overview.isLoading ? <OfficeLoading /> : null}
 
-      {overview.error && !overview.data ? (
-        <div role="alert" className="grid justify-items-start gap-2 rounded-lg border border-border p-4 text-sm">
-          <p className="font-semibold text-fg">The Agent Office could not be loaded.</p>
+      {enabled && overview.error && !overview.data ? (
+        <div role="alert" className="grid justify-items-start gap-2 rounded-[8px] border border-[var(--shell-border)] p-4 text-sm">
+          <p className="font-medium text-fg">▲ The Agent Office could not be loaded.</p>
           <p className="text-fg-muted">{explainRtkError(overview.error)}</p>
-          <Button type="button" variant="outline" size="sm" onClick={() => void overview.refetch()}>
+          <button type="button" className={toolbarButton} onClick={() => void overview.refetch()}>
             Try again
-          </Button>
+          </button>
         </div>
       ) : null}
 
-      {overview.data && overview.data.agents.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-fg-muted">No agents are registered yet.</p>
+      {enabled && overview.data ? (
+        <>
+          <AlertBanners alerts={alerts} />
+          <OfficeSummary
+            rooms={overview.data.agents}
+            approvals={overview.data.approvals}
+            alerts={alerts}
+            costTodayCents={overview.data.costTodayCents}
+          />
+          {overview.data.agents.length === 0 ? (
+            <p className="rounded-[8px] border border-dashed border-[var(--shell-border)] p-6 text-center text-sm text-fg-muted">
+              No agents are registered yet.
+            </p>
+          ) : view === "table" ? (
+            <AgentsTable rooms={overview.data.agents} />
+          ) : (
+            <OfficeFloor rooms={overview.data.agents} approvals={overview.data.approvals} onOpen={openAgent} />
+          )}
+        </>
       ) : null}
-
-      {overview.data && overview.data.agents.length > 0 ? (
-        view === "floor" ? (
-          <OfficeFloor rooms={overview.data.agents} approvals={overview.data.approvals} onOpen={onOpen} />
-        ) : (
-          <OfficeList rooms={overview.data.agents} approvals={overview.data.approvals} onOpen={onOpen} />
-        )
-      ) : null}
-
-      <AgentDrawer room={openRoom} onClose={onClose} />
     </div>
   );
 }

@@ -36,6 +36,8 @@ export interface AgentProcessResult {
   ok: true;
   pid?: number;
   started?: boolean;
+  /** True when workers run as a server service (production): the action resumed the agent. */
+  managed?: boolean;
 }
 
 export interface RevealedRunContent {

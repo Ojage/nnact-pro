@@ -164,43 +164,55 @@ test.beforeAll(async () => {
   await mkdir(artifactDir, { recursive: true });
 });
 
-test("floor plan shows live and vacant offices and applies streamed updates", async ({ page }) => {
+test("table lists live and vacant agents, summarises the office and applies streamed updates", async ({ page }) => {
   await mockOfficeApi(page);
   await page.goto("/agents");
 
-  const intake = page.getByRole("button", { name: "Intake agent" });
+  const intake = page.getByRole("row", { name: /Intake agent/ });
   await expect(intake).toContainText("Working");
   await expect(intake).toContainText("Drafting job from WhatsApp, step 2 of 4");
-  await expect(page.getByRole("button", { name: "Payments agent" })).toContainText("Offline");
-  await expect(page.getByRole("link", { name: /Draft jobs to review/ })).toContainText("2");
+  await expect(page.getByRole("row", { name: /Payments agent/ })).toContainText("Offline");
+  await expect(page.getByRole("list", { name: "Agent Office summary" })).toContainText("2 drafts");
   // Spend at 85% of the cap raises a warning in words, not only color.
-  await expect(page.getByRole("region", { name: "Alerts" })).toContainText("85% of its daily cost cap");
-  // The streamed update lands within the 1 s throttle.
-  await expect(intake).toContainText("5 queued");
-  await page.screenshot({ path: path.join(artifactDir, "agent-office-floor.png"), fullPage: true });
+  await expect(page.getByRole("list", { name: "Alerts" })).toContainText("85% of its daily cost cap");
+  // The streamed update lands within the 1 s throttle: the queue becomes 5.
+  await expect(intake.getByRole("cell").nth(3)).toHaveText("5");
+  await page.screenshot({ path: path.join(artifactDir, "agent-office-table.png"), fullPage: true });
 });
 
-test("drawer tabs work from the keyboard and pausing needs a reason and confirmation", async ({ page }) => {
+test("the table filters and sorts, and the floor plan is still a view", async ({ page }) => {
+  await mockOfficeApi(page);
+  await page.goto("/agents");
+  await page.getByLabel("Filter", { exact: true }).fill("quoting");
+  await expect(page.getByRole("row")).toHaveCount(2);
+  await page.getByLabel("Filter", { exact: true }).fill("");
+  await page.getByRole("button", { name: "Name" }).click();
+  await expect(page.getByRole("columnheader", { name: "Name" })).toHaveAttribute("aria-sort", "ascending");
+
+  await page.getByRole("button", { name: "Floor plan" }).click();
+  await expect(page.getByRole("button", { name: "Floor plan" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Intake agent" })).toContainText("Working");
+});
+
+test("an agent's details page has section links; pausing needs a reason and confirmation", async ({ page }) => {
   const controls: Array<{ path: string; body: unknown }> = [];
   await mockOfficeApi(page, (p, body) => controls.push({ path: p, body }));
   await page.goto("/agents");
 
-  await page.getByRole("button", { name: "Intake agent" }).click();
-  const drawer = page.getByRole("dialog", { name: "Intake agent" });
-  await expect(drawer).toBeVisible();
-  await expect(drawer.getByRole("tab", { name: "Now" })).toHaveAttribute("aria-selected", "true");
-  await expect(drawer.getByText("Extract job fields")).toBeVisible();
+  await page.getByRole("link", { name: "Intake agent", exact: true }).click();
+  await page.waitForURL("**/agents/intake-agent");
+  await expect(page.getByRole("heading", { level: 1, name: "Intake agent" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("Extract job fields")).toBeVisible();
 
-  await drawer.getByRole("tab", { name: "Now" }).focus();
-  await page.keyboard.press("End");
-  await expect(drawer.getByRole("tab", { name: "Controls" })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(drawer.getByRole("tab", { name: "Controls" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("link", { name: "Controls" }).click();
+  await page.waitForURL("**/agents/intake-agent?tab=controls");
+  await expect(page.getByRole("link", { name: "Controls" })).toHaveAttribute("aria-current", "page");
 
-  await drawer.getByRole("button", { name: "Pause agent" }).click();
-  await expect(drawer.getByRole("alert")).toContainText("at least 5 characters");
-  await drawer.getByLabel("Reason").fill("Provider outage, holding new work");
-  await drawer.getByRole("button", { name: "Pause agent" }).click();
+  await page.getByRole("button", { name: "Pause agent" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "at least 5 characters" })).toBeVisible();
+  await page.getByLabel("Reason").fill("Provider outage, holding new work");
+  await page.getByRole("button", { name: "Pause agent" }).click();
 
   const confirm = page.getByRole("dialog", { name: "Pause Intake agent?" });
   await expect(confirm).toBeVisible();
@@ -209,20 +221,17 @@ test("drawer tabs work from the keyboard and pausing needs a reason and confirma
   await expect.poll(() => controls.length).toBe(1);
   expect(controls[0]).toEqual({ path: "/api/agent-office/agents/intake-agent/pause", body: { reason: "Provider outage, holding new work" } });
 
-  await page.keyboard.press("Escape");
-  await expect(drawer).toBeHidden();
-  await expect(page.getByRole("button", { name: "Intake agent" })).toBeFocused();
+  await page.getByRole("link", { name: "Agent Office" }).first().click();
+  await page.waitForURL("**/agents");
 });
 
-test("agent process callout starts and restarts the worker from the drawer", async ({ page }) => {
+test("the details toolbar starts and restarts the worker", async ({ page }) => {
   const controls: Array<{ path: string; body: unknown }> = [];
   await mockOfficeApi(page, (p, body) => controls.push({ path: p, body }));
-  await page.goto("/agents");
-
-  await page.getByRole("button", { name: "Intake agent" }).click();
-  const drawer = page.getByRole("dialog", { name: "Intake agent" });
-  await drawer.getByRole("button", { name: "Start", exact: true }).click();
-  await drawer.getByRole("button", { name: "Restart", exact: true }).click();
+  await page.goto("/agents/intake-agent");
+  const toolbar = page.getByRole("toolbar", { name: "Intake agent actions" });
+  await toolbar.getByRole("button", { name: "Start", exact: true }).click();
+  await toolbar.getByRole("button", { name: "Restart", exact: true }).click();
   await expect.poll(() => controls.length).toBe(2);
   expect(controls).toEqual([
     { path: "/api/agent-office/agents/intake-agent/start", body: undefined },
@@ -230,26 +239,24 @@ test("agent process callout starts and restarts the worker from the drawer", asy
   ]);
 });
 
-test("logs tab filters by level and search", async ({ page }) => {
+test("the logs section filters by level and search", async ({ page }) => {
   await mockOfficeApi(page);
-  await page.goto("/agents");
-  await page.getByRole("button", { name: "Intake agent" }).click();
-  const drawer = page.getByRole("dialog", { name: "Intake agent" });
-  await drawer.getByRole("tab", { name: "Logs" }).click();
-  const lines = drawer.getByRole("list", { name: "Log lines" });
+  await page.goto("/agents/intake-agent?tab=logs");
+  const lines = page.getByRole("list", { name: "Log lines" });
   await expect(lines.getByRole("listitem")).toHaveCount(2);
-  await drawer.getByLabel("Level").selectOption("warn");
+  const content = page.locator("#main-content");
+  await content.getByLabel("Level").selectOption("warn");
   await expect(lines.getByRole("listitem")).toHaveCount(1);
-  await drawer.getByLabel("Level").selectOption("debug");
-  await drawer.getByLabel("Search").fill("received");
+  await content.getByLabel("Level").selectOption("debug");
+  await content.getByLabel("Search", { exact: true }).fill("received");
   await expect(lines.getByRole("listitem")).toHaveCount(1);
 });
 
-test("small screens default to the list view", async ({ page }) => {
+test("on a phone the table scrolls inside its frame, not the page", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockOfficeApi(page);
   await page.goto("/agents");
-  await expect(page.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("table")).toContainText("Intake agent");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
   await page.screenshot({ path: path.join(artifactDir, "agent-office-mobile.png"), fullPage: true });
 });
