@@ -670,3 +670,65 @@ html:has(.welcome-page) {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * App shell (console layout): a grey canvas holds the top bar and the
+ * navigation; page content sits on a white panel. Selected navigation uses a
+ * faint brand tint plus an amber bar, never tint alone. Contrast for every
+ * pair is in docs/design/palette-preview.html.
+ * ------------------------------------------------------------------------- */
+:root {
+  --shell-sidebar-width: 17rem;
+  --shell-canvas: #f1f3f4;
+  --shell-panel: #ffffff;
+  --shell-border: #dadce0;
+  --shell-hover: #e4e6e8;
+  --shell-tint: #fff8d1;
+  --shell-accent-text: #7a5b00;
+  --shell-accent-bar: #a37a00;
+  --shell-focus: #9c7400;
+}
+
+.dark {
+  --shell-canvas: #131314;
+  --shell-panel: #1e1f20;
+  --shell-border: #3c4043;
+  --shell-hover: #2d2f31;
+  --shell-tint: #3a3418;
+  --shell-accent-text: #ffd95c;
+  --shell-accent-bar: #e0b400;
+  --shell-focus: #ffd95c;
+}
+
+.shell-drawer::backdrop,
+.branch-dialog::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+
+.shell-drawer:modal {
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell-drawer {
+    transition:
+      translate 0.22s ease-out,
+      display 0.22s allow-discrete,
+      overlay 0.22s allow-discrete;
+    translate: -100% 0;
+  }
+  .shell-drawer[open] {
+    translate: 0 0;
+  }
+  @starting-style {
+    .shell-drawer[open] {
+      translate: -100% 0;
+    }
+  }
+  .shell-main {
+    transition: margin-left 0.2s ease-out;
+  }
+  .shell-main {
+    scroll-behavior: smooth;
+  }
+}

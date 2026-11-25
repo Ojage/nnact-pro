@@ -30,8 +30,20 @@ export function CommandPalette() {
         setOpen(false);
       }
     };
+    // Opened from the top bar's search button on small screens.
+    const openFromButton = () => {
+      setOpen(true);
+      setQuery("");
+      setResults(null);
+      setHighlightIdx(-1);
+      setError(null);
+    };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("nnact:open-search", openFromButton);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      window.removeEventListener("nnact:open-search", openFromButton);
+    };
   }, [open]);
 
   // Auto-focus input when opened

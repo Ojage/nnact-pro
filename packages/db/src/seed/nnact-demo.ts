@@ -123,6 +123,7 @@ export async function seedNnactDemo(): Promise<void> {
       .values({
         id: NNACT_ORG_ID,
         name: NNACT_ORG.name,
+        shortName: NNACT_ORG.shortName,
         timezone: NNACT_ORG.timezone,
         publicEmail: NNACT_ORG.publicEmail,
         publicPhone: NNACT_ORG.publicPhone,
@@ -135,6 +136,7 @@ export async function seedNnactDemo(): Promise<void> {
         target: orgs.id,
         set: {
           name: NNACT_ORG.name,
+          shortName: NNACT_ORG.shortName,
           timezone: NNACT_ORG.timezone,
           publicEmail: NNACT_ORG.publicEmail,
           publicPhone: NNACT_ORG.publicPhone,

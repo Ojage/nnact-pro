@@ -68,6 +68,10 @@ const updatedAt = () => timestamp("updated_at", { withTimezone: true }).defaultN
 export const orgs = pgTable("orgs", {
   id: id(),
   name: text("name").notNull(),
+  /** Short display name, for example "NHARM"; the full name is shown where it fits. */
+  shortName: text("short_name"),
+  /** Google-style numeric organization id shown in place of the internal uuid. */
+  publicId: text("public_id").default(sql`nnact_new_org_public_id()`).notNull(),
   timezone: text("timezone").default("America/New_York").notNull(),
   logoUrl: text("logo_url"),
   brandColor: text("brand_color").default("#22C55E").notNull(),
@@ -106,6 +110,8 @@ export const users = pgTable(
     /** Avatar served from /api/public/:orgId/avatar/:userId; null until uploaded. */
     profilePictureUrl: text("profile_picture_url"),
     passwordHash: text("password_hash"),
+    /** 'all': every branch of the organization; 'specific': only its branch_memberships. */
+    branchAccess: text("branch_access").$type<"all" | "specific">().default("all").notNull(),
     active: boolean("active").default(true).notNull(),
     mustChangePassword: boolean("must_change_password").default(false).notNull(),
     /** Per-user guided-walkthrough progress, keyed by walkthrough id. */

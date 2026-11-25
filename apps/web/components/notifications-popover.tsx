@@ -91,7 +91,7 @@ export function NotificationsPopover() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="relative rounded-lg border-none bg-surface-300 p-1.5 text-fg-muted transition-colors hover:bg-surface-400 hover:text-fg"
+          className="relative grid size-10 place-items-center rounded-full border-none bg-transparent text-fg-muted transition-colors hover:bg-[var(--shell-hover,var(--surface-200))] hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-focus,var(--ring))]"
           aria-label="Notifications"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

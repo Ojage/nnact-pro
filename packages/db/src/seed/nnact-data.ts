@@ -2,6 +2,7 @@ import { NNACT_USER_IDS, nnactCustomerId, nnactEquipmentId, nnactEquipmentModelI
 
 export const NNACT_ORG = {
   name: "NNACT Home Appliance and Maintenance Services",
+  shortName: "NHARM",
   timezone: "Africa/Douala",
   publicEmail: "nnactrepairs@gmail.com",
   publicPhone: "+237651385746",
