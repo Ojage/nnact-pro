@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { isPublicPath } from "@/lib/public-routes";
 import { useSessionUser } from "@/lib/use-session-user";
 import { RequiredPasswordChange } from "@/components/required-password-change";
+import { BrandLoader } from "@/components/brand-loader";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -28,9 +29,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (!mounted || loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-100 text-sm text-fg-muted">
-        Verifying session…
-      </div>
+      <BrandLoader label="Verifying your session…" />
     );
   }
 

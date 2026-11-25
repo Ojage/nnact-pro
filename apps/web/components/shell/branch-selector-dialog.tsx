@@ -36,7 +36,7 @@ export function BranchSelectorDialog() {
     <dialog
       ref={ref}
       aria-label="Change branch"
-      className="branch-dialog m-auto max-h-[min(36rem,calc(100dvh-2rem))] w-[min(32rem,calc(100vw-2rem))] max-w-none overflow-hidden rounded-[18px] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-0 text-fg shadow-2xl"
+      className="branch-dialog m-auto max-h-[min(36rem,calc(100dvh-2rem))] w-[min(32rem,calc(100vw-2rem))] max-w-none overflow-hidden rounded-[12px] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-0 text-fg shadow-2xl"
       onClose={() => setQuery("")}
       onClick={(event) => {
         if (event.target === event.currentTarget) ref.current?.close();
@@ -63,7 +63,7 @@ export function BranchSelectorDialog() {
         <label htmlFor="branch-search" className="mb-2 block text-xs font-medium text-fg-muted">
           Search branches
         </label>
-        <div className="flex h-11 items-center gap-2 rounded-xl border border-[var(--shell-border)] bg-[var(--shell-canvas)] px-3">
+        <div className="flex h-11 items-center gap-2 rounded-[8px] border border-[var(--shell-border)] bg-[var(--shell-canvas)] px-3">
           <Search className="size-4 shrink-0 text-fg-muted" aria-hidden="true" />
           <input
             ref={inputRef}
@@ -87,7 +87,7 @@ export function BranchSelectorDialog() {
                     ref.current?.close();
                   }}
                   className={cn(
-                    "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm transition-colors",
+                    "flex min-h-12 w-full items-center gap-3 rounded-[8px] px-3 text-left text-sm transition-colors",
                     "hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--shell-focus)]",
                     active ? "bg-[var(--shell-tint)] text-[var(--shell-accent-text)]" : "text-fg",
                   )}
@@ -112,7 +112,7 @@ export function BranchSelectorDialog() {
         <button
           type="button"
           disabled
-          className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-dashed border-[var(--shell-border)] px-3 text-sm text-fg-muted opacity-70"
+          className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-[8px] border border-dashed border-[var(--shell-border)] px-3 text-sm text-fg-muted opacity-70"
         >
           <Plus className="size-4 shrink-0" aria-hidden="true" />
           <span className="flex-1 text-left">Add branch</span>

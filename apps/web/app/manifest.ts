@@ -16,8 +16,14 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["business", "productivity", "utilities"],
     icons: [
       {
-        src: SITE_CONFIG.logoPath,
+        src: SITE_CONFIG.productLogoPath,
         sizes: "512x512",
+        type: "image/webp",
+        purpose: "any",
+      },
+      {
+        src: SITE_CONFIG.productAppleIconPath,
+        sizes: "180x180",
         type: "image/png",
         purpose: "any",
       },

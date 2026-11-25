@@ -732,3 +732,89 @@ html:has(.welcome-page) {
     scroll-behavior: smooth;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Brand loader: the NNACT Pro logo anticipates (squash), jumps (stretch),
+ * lands (squash) with a small rebound, shakes, then rests. Motion runs only
+ * when the person has not asked for reduced motion; otherwise it fades.
+ * ------------------------------------------------------------------------- */
+.brand-loader-stage {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: 96px;
+  height: 140px;
+  align-content: end;
+}
+
+.brand-loader-logo {
+  display: block;
+  width: 96px;
+  height: 96px;
+  transform-origin: 50% 100%;
+}
+
+.brand-loader-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.brand-loader-shadow {
+  display: block;
+  width: 64px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.14);
+  transform-origin: 50% 50%;
+}
+
+.dark .brand-loader-shadow {
+  background: rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brand-loader-logo {
+    animation: brand-loader-hop 2.2s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+  }
+  .brand-loader-shadow {
+    animation: brand-loader-shadow 2.2s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader-logo {
+    animation: brand-loader-fade 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes brand-loader-hop {
+  0%   { transform: translateY(0) scale(1, 1) rotate(0); }
+  10%  { transform: translateY(0) scale(1.14, 0.84) rotate(0); }      /* anticipation squash */
+  22%  { transform: translateY(-30px) scale(0.9, 1.12) rotate(0); }   /* launch stretch */
+  34%  { transform: translateY(-42px) scale(1, 1) rotate(0); }        /* apex */
+  46%  { transform: translateY(0) scale(0.94, 1.06) rotate(0); }      /* falling */
+  52%  { transform: translateY(0) scale(1.16, 0.82) rotate(0); }      /* landing squash */
+  60%  { transform: translateY(-6px) scale(0.97, 1.04) rotate(0); }   /* rebound */
+  66%  { transform: translateY(0) scale(1.03, 0.97) rotate(0); }
+  70%  { transform: translateY(0) scale(1, 1) rotate(0); }
+  74%  { transform: translateY(0) scale(1, 1) rotate(-7deg); }        /* shake */
+  78%  { transform: translateY(0) scale(1, 1) rotate(6deg); }
+  82%  { transform: translateY(0) scale(1, 1) rotate(-4deg); }
+  86%  { transform: translateY(0) scale(1, 1) rotate(2deg); }
+  90%  { transform: translateY(0) scale(1, 1) rotate(0); }
+  100% { transform: translateY(0) scale(1, 1) rotate(0); }
+}
+
+@keyframes brand-loader-shadow {
+  0%, 70%, 100% { transform: scale(1, 1); opacity: 1; }
+  10%  { transform: scale(1.12, 1); opacity: 1; }
+  34%  { transform: scale(0.55, 0.8); opacity: 0.45; }
+  52%  { transform: scale(1.18, 1); opacity: 1; }
+}
+
+@keyframes brand-loader-fade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}

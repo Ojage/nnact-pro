@@ -28,7 +28,7 @@ function BrandContent({ size = "md", showSubtitle = true }: Pick<BrandMarkProps,
         )}
       >
         <Image
-          src={SITE_CONFIG.logoPath}
+          src={SITE_CONFIG.productLogoPath}
           alt={`${SITE_CONFIG.productName} logo`}
           fill
           sizes={size === "lg" ? "40px" : "32px"}

@@ -12,7 +12,6 @@ import {
   ClipboardCheck,
   FileText,
   GitBranch,
-  GraduationCap,
   LayoutGrid,
   MoreHorizontal,
   Plus,
@@ -27,7 +26,9 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import Image from "next/image";
 import { PrefetchLink as Link } from "@/components/prefetch-link";
+import { SITE_CONFIG } from "@/lib/site-metadata";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -129,9 +130,9 @@ function ScopeChips({ org, branch }: { org: WorkingOrgDTO; branch: BranchDTO }) 
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem onSelect={() => void copy("Project ID", branch.id)}>
+              <DropdownMenuItem onSelect={() => void copy("Branch ID", branch.id)}>
                 <GitBranch aria-hidden="true" />
-                Copy project ID
+                Copy branch ID
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={requestBranchSelector}>
                 <GitBranch aria-hidden="true" />
@@ -146,7 +147,7 @@ function ScopeChips({ org, branch }: { org: WorkingOrgDTO; branch: BranchDTO }) 
           Organization ID <code className="font-mono text-fg">{org.publicId}</code>
         </span>
         <span>
-          Project ID <code className="font-mono text-fg">{branch.id}</code>
+          Branch ID <code className="font-mono text-fg">{branch.id}</code>
         </span>
         <span role="status">{message}</span>
       </div>
@@ -163,11 +164,22 @@ export function Welcome() {
 
   return (
     <section aria-labelledby="welcome-title" className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
-        <div className="space-y-3">
-          <h1 id="welcome-title" className="text-[32px] font-normal tracking-[-0.01em] text-fg">
-            Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
-          </h1>
+      {/* Left: where you are and what you can do. Right: a learning card as tall as the left column. */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-stretch">
+        <div className="min-w-0 space-y-4">
+          <div className="flex items-center gap-3">
+            <Image
+              src={SITE_CONFIG.productLogoPath}
+              alt="NNACT Pro"
+              width={48}
+              height={48}
+              priority
+              className="size-11 shrink-0 sm:size-12"
+            />
+            <h1 id="welcome-title" className="text-[32px] font-normal tracking-[-0.01em] text-fg">
+              Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+            </h1>
+          </div>
           {org && branch ? (
             <ScopeChips org={org} branch={branch} />
           ) : (
@@ -181,43 +193,56 @@ export function Welcome() {
               Help and FAQ
             </Link>
           </p>
+          {actions.length ? (
+            <nav aria-label="Quick actions" className="pt-2">
+              <ul className="flex flex-wrap gap-2" role="list">
+                {actions.map((action) => {
+                  const Icon = HOME_ICONS[action.icon];
+                  return (
+                    <li key={action.href}>
+                      <Link
+                        href={action.href}
+                        className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-[var(--shell-border)] px-3 text-sm font-medium text-fg no-underline transition-colors hover:border-[var(--shell-accent-bar)] hover:bg-[var(--shell-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-focus)]"
+                      >
+                        <Icon className="size-4 text-fg-muted" aria-hidden="true" />
+                        {action.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          ) : null}
         </div>
 
-        <aside aria-labelledby="learn-title" className="rounded-[8px] border border-[var(--shell-border)] p-5">
-          <GraduationCap className="size-6 text-fg-muted" aria-hidden="true" />
-          <h2 id="learn-title" className="mt-3 text-base font-medium text-fg">
-            Learn NNACT Pro with short guided walkthroughs.
-          </h2>
-          <button
-            type="button"
-            onClick={() => requestLearn()}
-            className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--shell-accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-focus)]"
-          >
-            Start a walkthrough <ChevronRight className="size-4" aria-hidden="true" />
-          </button>
+        <aside
+          aria-labelledby="learn-title"
+          className="flex min-w-0 flex-col overflow-hidden rounded-[8px] border border-[var(--shell-border)] bg-[var(--shell-panel)]"
+        >
+          {/* The illustration takes whatever height the left column leaves. */}
+          <div className="relative h-36 shrink-0 lg:h-auto lg:min-h-28 lg:flex-1">
+            <Image
+              src="/illustrations/learn-walkthroughs.webp"
+              alt=""
+              fill
+              sizes="(min-width: 1024px) 19rem, 100vw"
+              className="object-cover object-[45%_35%]"
+            />
+          </div>
+          <div className="border-t border-[var(--shell-border)] px-4 py-3">
+            <h2 id="learn-title" className="text-sm font-medium leading-snug text-fg">
+              Learn NNACT Pro with short guided walkthroughs.
+            </h2>
+            <button
+              type="button"
+              onClick={() => requestLearn()}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-[var(--shell-accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-focus)]"
+            >
+              Start a walkthrough <ChevronRight className="size-4" aria-hidden="true" />
+            </button>
+          </div>
         </aside>
       </div>
-
-      {actions.length ? (
-        <nav aria-label="Quick actions">
-          <ul className="flex flex-wrap gap-2" role="list">
-            {actions.map((action) => {
-              const Icon = HOME_ICONS[action.icon];
-              return (
-                <li key={action.href}>
-                  <Link
-                    href={action.href}
-                    className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-[var(--shell-border)] px-3 text-sm font-medium text-fg no-underline transition-colors hover:border-[var(--shell-accent-bar)] hover:bg-[var(--shell-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-focus)]"
-                  >
-                    <Icon className="size-4 text-fg-muted" aria-hidden="true" />
-                    {action.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      ) : null}
 
       {canSeeModules ? (
         <section aria-labelledby="quick-access-title" className="space-y-3">
