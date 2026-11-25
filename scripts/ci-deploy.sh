@@ -84,6 +84,7 @@ export ALLOW_SCHEMA_PUSH=true
 API_IMG="${NNPAPI_IMAGE:-nnact/api:prod}"
 WEB_IMG="${NNPWEB_IMAGE:-nnact/web:prod}"
 WORKER_IMG="${NNPWORKER_IMAGE:-nnact/worker:prod}"
+AGENTS_IMG="${NNPAGENTS_IMAGE:-nnact/agents:prod}"
 
 DEPLOY_MARKER="data/.deployed-sha"
 mkdir -p "$(dirname "$DEPLOY_MARKER")"
@@ -93,6 +94,7 @@ build_all=false
 needs_api=false
 needs_web=false
 needs_worker=false
+needs_agents=false
 needs_migrate=false
 
 if [ "${CI_DEPLOY_SKIP_GIT:-}" = "true" ] || [ -z "$LAST_SHA" ]; then
@@ -114,6 +116,8 @@ else
     needs_api="$API"
     needs_web="$WEB"
     needs_worker="$WORKER"
+    # Older classifiers did not print AGENTS; rebuild it whenever the worker is.
+    needs_agents="${AGENTS:-$WORKER}"
     needs_migrate="$MIGRATE"
     if [ "$ALL" = "true" ]; then
       echo "Everything changed — rebuilding all images."
@@ -125,12 +129,13 @@ if [ "$build_all" = true ]; then
   needs_api=true
   needs_web=true
   needs_worker=true
+  needs_agents=true
   needs_migrate=true
   echo "No previous deploy marker — building all images."
 fi
 
 # A missing image must always be (re)built even when nothing changed on disk.
-for pair in "api:$API_IMG" "web:$WEB_IMG" "worker:$WORKER_IMG"; do
+for pair in "api:$API_IMG" "web:$WEB_IMG" "worker:$WORKER_IMG" "agents:$AGENTS_IMG"; do
   key="${pair%%:*}"; img="${pair#*:}"
   if ! docker image inspect "$img" >/dev/null 2>&1; then
     echo "Image $img missing — forcing a rebuild."
@@ -138,6 +143,7 @@ for pair in "api:$API_IMG" "web:$WEB_IMG" "worker:$WORKER_IMG"; do
       api) needs_api=true ;;
       web) needs_web=true ;;
       worker) needs_worker=true ;;
+      agents) needs_agents=true ;;
     esac
   fi
 done
@@ -146,6 +152,7 @@ TO_BUILD=()
 [ "$needs_api" = true ] && TO_BUILD+=(api)
 [ "$needs_web" = true ] && TO_BUILD+=(web)
 [ "$needs_worker" = true ] && TO_BUILD+=(worker)
+[ "$needs_agents" = true ] && TO_BUILD+=(agents)
 
 echo "Affected images: ${TO_BUILD[*]:-none} (previous commit: ${LAST_SHA:-none})"
 if [ "${#TO_BUILD[@]}" -gt 0 ]; then
@@ -178,7 +185,7 @@ else
 fi
 
 echo "Starting application stack..."
-"${COMPOSE[@]}" -f infra/compose.prod.yml up -d api web worker caddy --remove-orphans
+"${COMPOSE[@]}" -f infra/compose.prod.yml up -d api web worker agents caddy --remove-orphans
 
 # `up -d` will not recreate Caddy for a config-only change: the image and the
 # mount spec are unchanged, so Docker considers the existing container current.
@@ -196,7 +203,7 @@ healthy=false
 for _attempt in $(seq 1 60); do
   any_unhealthy=false
   all_ready=true
-  for svc in api web worker; do
+  for svc in api web worker agents; do
     cid="$(${COMPOSE[@]} -f infra/compose.prod.yml ps -q "$svc" 2>/dev/null | tr -d '[:space:]')"
     if [ -z "$cid" ]; then
       all_ready=false

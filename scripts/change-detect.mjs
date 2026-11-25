@@ -7,14 +7,14 @@
  * CLI:
  *   node scripts/change-detect.mjs <lastSha>
  *     diffs <lastSha>..HEAD (must run inside the repo) and prints:
- *       API=true|false  WEB=...  WORKER=...  MIGRATE=...  ALL=true|false
+ *       API=true|false  WEB=...  WORKER=...  AGENTS=...  MIGRATE=...  ALL=true|false
  *   node scripts/change-detect.mjs            # no sha -> everything rebuilds
  */
 import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Returns { api, web, worker, migrate } booleans from a changed-file list. */
+/** Returns { api, web, worker, agents, migrate } booleans from a changed-file list. */
 export function classify(files) {
   const list = Array.isArray(files) ? files : [files];
   const startsWithAny = (...prefixes) => list.some((f) => prefixes.some((p) => f === p || f.startsWith(p)));
@@ -38,9 +38,12 @@ export function classify(files) {
   // The worker imports api source modules directly (../../api/src/...) and is
   // therefore rebuilt whenever apps/api changes, not just apps/worker.
   const worker = shared || anyPackage || startsWithAny("apps/worker/") || startsWithAny("apps/api/");
+  // The agents image also bundles apps/api source (AI registry, WhatsApp
+  // transport, media storage), so api changes rebuild it too.
+  const agents = shared || anyPackage || startsWithAny("apps/agents/") || startsWithAny("apps/api/");
   const migrate = startsWithAny("packages/db/");
 
-  return { api, web, worker, migrate };
+  return { api, web, worker, agents, migrate };
 }
 
 function changedSince(lastSha) {
@@ -53,11 +56,12 @@ function changedSince(lastSha) {
 }
 
 function render(decision) {
-  const all = decision.api && decision.web && decision.worker && decision.migrate;
+  const all = decision.api && decision.web && decision.worker && decision.agents && decision.migrate;
   return [
     `API=${decision.api}`,
     `WEB=${decision.web}`,
     `WORKER=${decision.worker}`,
+    `AGENTS=${decision.agents}`,
     `MIGRATE=${decision.migrate}`,
     `ALL=${all}`,
   ].join("\n");
@@ -82,7 +86,7 @@ if (isMain) {
   } else {
     const files = changedSince(lastSha);
     // No previous deploy marker (or missing ref): force a full rebuild.
-    const decision = files === null ? { api: true, web: true, worker: true, migrate: true } : classify(files);
+    const decision = files === null ? { api: true, web: true, worker: true, agents: true, migrate: true } : classify(files);
     process.stdout.write(`${render(decision)}\n`);
   }
 }

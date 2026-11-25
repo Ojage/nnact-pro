@@ -161,6 +161,9 @@ services:
       AGENT_WHATSAPP_ACCESS_TOKEN: ${AGENT_WHATSAPP_ACCESS_TOKEN:-}
       AGENT_WHATSAPP_APP_SECRET: ${AGENT_WHATSAPP_APP_SECRET:-}
       AGENT_WHATSAPP_VERIFY_TOKEN: ${AGENT_WHATSAPP_VERIFY_TOKEN:-}
+      # Agent workers run in the `agents` service below; the API must not
+      # spawn its own copies (that supervisor is for local development).
+      AGENT_SUPERVISOR: external
     volumes:
       - ../data/uploads:/uploads
       - operations_state:/var/lib/nnactpro-ops/state:ro
@@ -198,6 +201,41 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 5
+    restart: unless-stopped
+
+  agents:
+    image: ${NNPAGENTS_IMAGE:-nnact/agents:prod}
+    build:
+      context: ..
+      dockerfile: apps/agents/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://ofp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ofp
+      # Each agent mints its own short-lived scoped token with the API secret.
+      JWT_SECRET: ${JWT_SECRET:?Set a unique JWT_SECRET of at least 32 characters}
+      AGENT_API_URL: http://api:3001
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
+      CONTENT_PUBLISHING_KEY: ${CONTENT_PUBLISHING_KEY:-}
+      NNPUPLOAD_DIR: /uploads
+      NTFY_URL: ${NTFY_URL:-}
+      AGENT_POLL_MS: ${AGENT_POLL_MS:-15000}
+      AGENT_DAILY_COST_CAP_CENTS: ${AGENT_DAILY_COST_CAP_CENTS:-200}
+      QUOTE_AGENT_DAILY_COST_CAP_CENTS: ${QUOTE_AGENT_DAILY_COST_CAP_CENTS:-200}
+      AGENT_MEDIA_RETENTION_DAYS: ${AGENT_MEDIA_RETENTION_DAYS:-30}
+      AGENT_STT_MODEL: ${AGENT_STT_MODEL:-whisper-1}
+      AGENT_WHATSAPP_PHONE_NUMBER_ID: ${AGENT_WHATSAPP_PHONE_NUMBER_ID:-}
+      AGENT_WHATSAPP_BUSINESS_ACCOUNT_ID: ${AGENT_WHATSAPP_BUSINESS_ACCOUNT_ID:-}
+      AGENT_WHATSAPP_ACCESS_TOKEN: ${AGENT_WHATSAPP_ACCESS_TOKEN:-}
+      AGENT_WHATSAPP_APP_SECRET: ${AGENT_WHATSAPP_APP_SECRET:-}
+      AGENT_WHATSAPP_VERIFY_TOKEN: ${AGENT_WHATSAPP_VERIFY_TOKEN:-}
+    volumes:
+      - ../data/uploads:/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
   worker:

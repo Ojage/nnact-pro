@@ -56,8 +56,11 @@ async function startManagedAgent(
   const agentId = agentParam(req, reply);
   if (!agentId) return;
 
-  const result =
-    mode === "restart"
+  // In production the workers run in their own container (AGENT_SUPERVISOR=
+  // external) and are always up; Start/Restart then means "resume work".
+  const result = workersManagedExternally()
+    ? { ok: true as const, started: false, pid: undefined, error: undefined }
+    : mode === "restart"
       ? await restartAgentProcess(agentId, app.log)
       : await startAgentProcess(agentId, app.log);
   if (!result.ok) {
@@ -67,7 +70,7 @@ async function startManagedAgent(
 
   const reason = `${mode === "restart" ? "Restarted" : "Started"} from Agent Office by ${actor.name ?? actor.userId}`;
   await setAgentEnabled(agentId, true, reason, actor);
-  return { ok: true as const, pid: result.pid, started: result.started };
+  return { ok: true as const, pid: result.pid, started: result.started, managed: workersManagedExternally() };
 }
 
 function parseCursor(req: FastifyRequest): number | null {
@@ -79,13 +82,20 @@ function parseCursor(req: FastifyRequest): number | null {
 
 let retentionStarted = false;
 
+/** True when agent workers run as their own service (production), not as API children. */
+function workersManagedExternally(): boolean {
+  return process.env.AGENT_SUPERVISOR === "external";
+}
+
 export async function agentOfficeRoutes(app: FastifyInstance) {
   if (!retentionStarted && process.env.NODE_ENV !== "test") {
     retentionStarted = true;
     const stop = startRetentionTimer((message) => app.log.info(message));
-    void startDefaultAgentProcesses(app.log).catch((error: unknown) => {
-      app.log.error(`[agents] could not start default workers: ${error instanceof Error ? error.message : String(error)}`);
-    });
+    if (!workersManagedExternally()) {
+      void startDefaultAgentProcesses(app.log).catch((error: unknown) => {
+        app.log.error(`[agents] could not start default workers: ${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
     app.addHook("onClose", async () => {
       stop();
       officeBroadcaster.stop();
