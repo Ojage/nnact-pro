@@ -40,7 +40,7 @@ test("every template uses its required variables", () => {
 
 test("audience is valid and at least one staff and one customer template exist", () => {
   for (const entry of SMS_TEMPLATE_CATALOG) {
-    assert.ok(entry.audience === "customer" || entry.audience === "staff", `${entry.slug} has bad audience`);
+    assert.ok(["customer", "staff", "supplier"].includes(entry.audience), `${entry.slug} has bad audience`);
   }
   assert.ok(SMS_TEMPLATE_CATALOG.some((entry) => entry.audience === "staff"));
   assert.ok(SMS_TEMPLATE_CATALOG.some((entry) => entry.audience === "customer"));

@@ -150,7 +150,7 @@ export function ShellTopBar({ navOpen, onMenu }: { navOpen: boolean; onMenu: () 
       <div className="flex shrink-0 items-center gap-0.5">
         <AgentStatus />
         <NotificationsPopover />
-        <Link href="/help" className={cn(iconButton, "hidden sm:grid")} aria-label="Help and FAQ" title="Help">
+        <Link href="/help/faq" className={cn(iconButton, "hidden sm:grid")} aria-label="Help and FAQ" title="Help">
           <CircleHelp className="size-5" strokeWidth={1.8} aria-hidden="true" />
         </Link>
         <AccountMenu />

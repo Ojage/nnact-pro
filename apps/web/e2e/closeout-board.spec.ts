@@ -48,6 +48,8 @@ async function mockCloseoutApi(
   capture: { patches: Array<{ id: string; body: Record<string, unknown> }>; invoices: Record<string, unknown>[] },
 ) {
   const data = fixtures();
+  // Mark the first-run tour prompt as seen so it does not cover the page.
+  await page.addInitScript(() => window.localStorage.setItem("nnact:walkthrough:banner-dismissed:learn", "1"));
   await page.route("http://127.0.0.1:3001/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -107,7 +109,9 @@ test("desktop closeout moves completed work into invoicing", async ({ page }) =>
   await expect(page.getByText("Needs pricing").first()).toBeVisible();
   await expect(page.getByText("Dishwasher leaking")).toBeVisible();
   await expect(page.getByText("FCFA 0")).toBeVisible();
+  await page.getByRole("button", { name: "Show navigation" }).click();
   await expect(page.getByRole("link", { name: /Job Closeout/ })).toHaveAttribute("aria-current", "page");
+  await page.getByRole("button", { name: "Hide navigation" }).click();
 
   await page.screenshot({ path: path.join(artifactDir, "closeout-board-desktop.png"), fullPage: true });
 

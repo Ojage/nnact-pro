@@ -189,7 +189,7 @@ export function Welcome() {
             <a href="#today" className={link}>
               Today at a glance
             </a>
-            <Link href="/help" className={link}>
+            <Link href="/help/faq" className={link}>
               Help and FAQ
             </Link>
           </p>
