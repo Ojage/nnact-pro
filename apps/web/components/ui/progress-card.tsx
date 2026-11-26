@@ -16,13 +16,13 @@ const formatFileSize = (bytes: number): string => {
 };
 
 const cardVariants = cva(
-  "relative flex w-full items-center space-x-4 overflow-hidden rounded-lg border bg-card p-4 text-card-foreground shadow-sm transition-all",
+  "relative flex w-full items-center gap-4 overflow-hidden rounded-[14px] border bg-card/85 p-4 text-card-foreground shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-[border-color,background-color,box-shadow]",
   {
     variants: {
       status: {
-        uploading: "border-border",
-        complete: "border-green-500/50",
-        error: "border-destructive/50",
+        uploading: "border-border/80",
+        complete: "border-[--color-success-emphasis]/30 bg-[--color-success-subtle]/20",
+        error: "border-destructive/30 bg-destructive/5",
       },
     },
     defaultVariants: {
@@ -56,23 +56,29 @@ const UploadProgressCard = React.forwardRef<HTMLDivElement, UploadProgressCardPr
       >
         <div className="shrink-0 text-muted-foreground">
           {isComplete ? (
-            <CheckCircle2 className="h-8 w-8 text-green-500" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[--color-success-subtle] text-[--color-success-fg]">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
           ) : (
-            icon || <File className="h-8 w-8" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/70 text-muted-foreground">
+              {icon || <File className="h-5 w-5" />}
+            </div>
           )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{fileName}</p>
-          <div className="mt-2 space-y-1">
-            <Progress value={progress} className="h-2" />
+          <p className="truncate text-sm font-medium text-foreground">{fileName}</p>
+          <div className="mt-2 space-y-1.5">
+            <Progress value={progress} className="h-2 bg-muted/80 [&_[data-slot=progress-indicator]]:bg-accent" />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>
                 {isComplete
                   ? formatFileSize(fileSize)
                   : `${formatFileSize(uploadedSize)} of ${formatFileSize(fileSize)}`}
               </span>
-              <span>{isComplete ? "Complete" : `${Math.round(progress)}%`}</span>
+              <span className={cn("tabular-nums", isComplete && "font-medium text-[--color-success-fg]")}>
+                {isComplete ? "Complete" : `${Math.round(progress)}%`}
+              </span>
             </div>
           </div>
         </div>
@@ -82,7 +88,7 @@ const UploadProgressCard = React.forwardRef<HTMLDivElement, UploadProgressCardPr
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7 shrink-0"
+            className="h-9 w-9 shrink-0 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
             onClick={onCancel}
             aria-label="Cancel upload"
           >

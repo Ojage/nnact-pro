@@ -34,6 +34,7 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 import type { PortalLinkScope, PricingSnapshot, WalkthroughProgressMap } from "@nnact/shared";
 
 export const jobStatus = pgEnum("job_status", [
+  "draft",
   "lead",
   "scheduled",
   "in_progress",
@@ -53,7 +54,7 @@ export const estimateStatus = pgEnum("estimate_status", [
   "declined",
   "expired",
 ]);
-export const userRole = pgEnum("user_role", ["owner", "dispatcher", "secretary", "technician"]);
+export const userRole = pgEnum("user_role", ["owner", "dispatcher", "secretary", "technician", "agent"]);
 
 const id = () => uuid("id").primaryKey().defaultRandom();
 const orgId = () =>
@@ -67,6 +68,10 @@ const updatedAt = () => timestamp("updated_at", { withTimezone: true }).defaultN
 export const orgs = pgTable("orgs", {
   id: id(),
   name: text("name").notNull(),
+  /** Short display name, for example "NHARM"; the full name is shown where it fits. */
+  shortName: text("short_name"),
+  /** Google-style numeric organization id shown in place of the internal uuid. */
+  publicId: text("public_id").default(sql`nnact_new_org_public_id()`).notNull(),
   timezone: text("timezone").default("America/New_York").notNull(),
   logoUrl: text("logo_url"),
   brandColor: text("brand_color").default("#22C55E").notNull(),
@@ -105,6 +110,8 @@ export const users = pgTable(
     /** Avatar served from /api/public/:orgId/avatar/:userId; null until uploaded. */
     profilePictureUrl: text("profile_picture_url"),
     passwordHash: text("password_hash"),
+    /** 'all': every branch of the organization; 'specific': only its branch_memberships. */
+    branchAccess: text("branch_access").$type<"all" | "specific">().default("all").notNull(),
     active: boolean("active").default(true).notNull(),
     mustChangePassword: boolean("must_change_password").default(false).notNull(),
     /** Per-user guided-walkthrough progress, keyed by walkthrough id. */
@@ -150,6 +157,8 @@ export const customers = pgTable(
     name: text("name").notNull(),
     email: text("email"),
     phone: text("phone"),
+    /** Normalized digits for WhatsApp/customer matching. Not unique: two customers may share a phone. */
+    phoneE164: text("phone_e164"),
     company: text("company"),
     address: text("address"),
     notes: text("notes"),
@@ -157,7 +166,10 @@ export const customers = pgTable(
     updatedAt: updatedAt(),
     createdAt: ts(),
   },
-  (t) => ({ orgIdx: index("customers_org_idx").on(t.orgId) }),
+  (t) => ({
+    orgIdx: index("customers_org_idx").on(t.orgId),
+    orgPhone: index("customers_org_phone_e164_idx").on(t.orgId, t.phoneE164),
+  }),
 );
 
 export const properties = pgTable("properties", {
@@ -205,10 +217,21 @@ export const jobs = pgTable(
     originalJobId: uuid("original_job_id"),
     serviceCategory: text("service_category"),
     serviceAddress: text("service_address"),
+    town: text("town"),
+    neighborhood: text("neighborhood"),
+    landmark: text("landmark"),
+    zone: text("zone"),
     preferredDate: text("preferred_date"),
     preferredTime: text("preferred_time"),
     /** SHA-256 of the customer-facing tracking token. Never stored in plain text. */
     trackingTokenHash: text("tracking_token_hash"),
+    /** True while a job is an unreviewed AI intake draft. Drafts have no job number. */
+    agentDraft: boolean("agent_draft").default(false).notNull(),
+    agentRejectedAt: timestamp("agent_rejected_at", { withTimezone: true }),
+    agentRejectionReason: text("agent_rejection_reason"),
+    agentConversationId: uuid("agent_conversation_id"),
+    /** Set when a dispatcher approved an intake draft: whether they changed its fields first. */
+    agentDraftEdited: boolean("agent_draft_edited"),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     total: integer("total").default(0).notNull(),
     laborCostCents: integer("labor_cost_cents").default(0).notNull(),
@@ -224,6 +247,7 @@ export const jobs = pgTable(
   },
   (t) => ({
     orgStatus: index("jobs_org_status_idx").on(t.orgId, t.status),
+    orgAssigned: index("jobs_org_assigned_idx").on(t.orgId, t.assignedTo, t.scheduledAt),
     sched: index("jobs_scheduled_idx").on(t.scheduledAt),
     tracking: uniqueIndex("jobs_tracking_hash_idx").on(t.trackingTokenHash),
     orgNumber: uniqueIndex("jobs_org_number_idx").on(t.orgId, t.number),
@@ -423,6 +447,7 @@ export const appointments = pgTable(
   },
   (t) => ({
     orgStart: index("appointments_org_starts_idx").on(t.orgId, t.startsAt),
+    orgTechnicianStart: index("appointments_org_technician_starts_idx").on(t.orgId, t.technicianId, t.startsAt),
     job: index("appointments_job_idx").on(t.jobId),
   }),
 );

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { canAccessRoute } from "@/lib/nav";
 import type { NavRole } from "@/lib/nav";
 import { useSessionUser } from "@/lib/use-session-user";
+import { BrandLoader } from "@/components/brand-loader";
 
 /**
  * Guards page content by staff role. The sidebar already hides links a role
@@ -29,9 +30,7 @@ export function RoleGate({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-fg-muted">
-        Checking access…
-      </div>
+      <BrandLoader label="Checking access…" inline />
     );
   }
 

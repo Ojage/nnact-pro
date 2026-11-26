@@ -1,35 +1,34 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function DashboardLoading() {
+/**
+ * Generic page skeleton, shown while any page without its own loading state
+ * opens: a title, a toolbar and a table-like body, in the console style.
+ * The home page has its own skeleton in app/(home)/loading.tsx.
+ */
+export default function PageLoading() {
   return (
-    <div>
-      {/* Header skeleton */}
-      <div className="flex items-end justify-between mb-8">
-        <div>
-          <Skeleton className="h-8 w-40 mb-2" />
-          <Skeleton className="h-4 w-56" />
+    <div className="min-w-0 space-y-6" aria-busy="true" aria-label="Loading page">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-56 rounded-[6px]" />
+        <Skeleton className="h-4 w-80 max-w-full rounded-[6px]" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Skeleton className="h-9 w-64 max-w-full rounded-[8px]" />
+        <Skeleton className="h-9 w-28 rounded-[8px]" />
+        <Skeleton className="h-9 w-28 rounded-[8px]" />
+      </div>
+      <div className="overflow-hidden rounded-[8px] border border-[var(--shell-border)]">
+        <Skeleton className="h-10 rounded-none" />
+        <div className="divide-y divide-[var(--shell-border)]">
+          {Array.from({ length: 8 }, (_, row) => (
+            <div key={row} className="flex items-center gap-4 px-4 py-3">
+              <Skeleton className="h-4 w-1/4 rounded-[6px]" />
+              <Skeleton className="h-4 w-1/3 rounded-[6px]" />
+              <Skeleton className="ml-auto h-4 w-20 rounded-[6px]" />
+            </div>
+          ))}
         </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-28 rounded-lg" />
-          <Skeleton className="h-10 w-32 rounded-lg" />
-        </div>
       </div>
-
-      {/* Stat cards skeleton */}
-      <div className="flex gap-4 mb-8">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="flex-1 h-24 rounded-xl" />
-        ))}
-      </div>
-
-      {/* Two-column grid skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <Skeleton className="h-64 rounded-xl" />
-        <Skeleton className="h-64 rounded-xl" />
-      </div>
-
-      {/* Bottom full-width skeleton */}
-      <Skeleton className="h-72 rounded-xl" />
     </div>
   );
 }

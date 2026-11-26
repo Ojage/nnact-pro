@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "./job-visibility.js";
 /**
  * NNACT Institutional Repair Brain — business logic.
  */
@@ -697,7 +698,7 @@ export async function getJobRepairBrainContext(orgId: string, jobId: string) {
   const [job] = await db
     .select()
     .from(jobs)
-    .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+    .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))));
   if (!job) return null;
 
   const [linkRow] = await db

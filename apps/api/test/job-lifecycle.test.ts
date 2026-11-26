@@ -52,6 +52,17 @@ test("same-status patches are a no-op for every role", () => {
   }
 });
 
+test("office roles may approve or cancel agent drafts; technicians cannot", () => {
+  for (const office of ["owner", "dispatcher"] as const) {
+    assert.equal(nextJobStatus("draft", "lead", office), true);
+    assert.equal(nextJobStatus("draft", "scheduled", office), false);
+    assert.equal(nextJobStatus("draft", "canceled", office), true);
+    assert.equal(nextJobStatus("draft", "in_progress", office), false);
+  }
+  assert.equal(nextJobStatus("draft", "lead", "technician"), false);
+  assert.equal(nextJobStatus("draft", "canceled", "technician"), false);
+});
+
 test("jobStatusLabel turns enum keys into display text", () => {
   assert.equal(jobStatusLabel("in_progress"), "in progress");
   assert.equal(jobStatusLabel("canceled"), "canceled");

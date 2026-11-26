@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "./job-visibility.js";
 // Durable PDF documents. HTML is assembled in @nnact/shared (same as web preview),
 // rendered to PDF with Puppeteer, then stored immutably in the documents table.
 import { createHash } from "node:crypto";
@@ -125,7 +126,7 @@ export function documentView(row: typeof documents.$inferSelect): StoredDocument
 }
 
 async function customerForJob(orgId: string, jobId: string) {
-  const [job] = await db.select().from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+  const [job] = await db.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))));
   if (!job) return null;
   const [customer] = await db
     .select()
@@ -205,7 +206,7 @@ export async function ensureInvoiceDocument(orgId: string, invoiceId: string): P
 
   const [customer, job, org] = await Promise.all([
     customerForJob(orgId, invoice.jobId),
-    db.select().from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, invoice.jobId))).then((rows) => rows[0] ?? null),
+    db.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, invoice.jobId)))).then((rows) => rows[0] ?? null),
     orgContext(orgId),
   ]);
   const items = await db
@@ -244,7 +245,7 @@ export async function ensureEstimateDocument(orgId: string, estimateId: string):
 
   const [customer, job, org] = await Promise.all([
     customerForJob(orgId, estimate.jobId),
-    db.select().from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, estimate.jobId))).then((rows) => rows[0] ?? null),
+    db.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, estimate.jobId)))).then((rows) => rows[0] ?? null),
     orgContext(orgId),
   ]);
   const options = await db
@@ -327,7 +328,7 @@ export async function listDocumentHub(orgId: string): Promise<DocumentHubEntry[]
     db.select().from(estimates).where(eq(estimates.orgId, orgId)),
     db.select().from(documents).where(eq(documents.orgId, orgId)),
     db.select().from(messageLogs).where(and(eq(messageLogs.orgId, orgId), inArray(messageLogs.kind, ["invoice", "estimate"]))),
-    db.select({ id: jobs.id, title: jobs.title, customerId: jobs.customerId }).from(jobs).where(eq(jobs.orgId, orgId)),
+    db.select({ id: jobs.id, title: jobs.title, customerId: jobs.customerId }).from(jobs).where(visibleJobsWhere(eq(jobs.orgId, orgId))),
     db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.orgId, orgId)),
   ]);
 

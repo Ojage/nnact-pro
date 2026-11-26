@@ -18,8 +18,8 @@ import Fastify from "fastify";
 import fjwt from "@fastify/jwt";
 import { AUTH_AUDIENCES } from "@nnact/shared";
 
-const ORG = "11111111-1111-1111-1111-111111111111";
-const USER = "22222222-2222-2222-2222-222222222222";
+const ORG = "11111111-1111-4111-8111-111111111111";
+const USER = "22222222-2222-4222-8222-222222222222";
 
 /** Args the engine's runNowQueued was called with. */
 const triggered: { isoDate?: string; slot?: string } = {};

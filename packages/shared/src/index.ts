@@ -1,4 +1,20 @@
 export * from "./auth.js";
+export {
+  AGENT_ID,
+  AGENT_IDS,
+  AGENT_AUTONOMY_TIERS,
+  AGENT_REGISTRY,
+  getAgentDefinition,
+  resolveAgentId,
+  isAgentId,
+  scopeBelongsToAgent,
+  type AgentId,
+  type AgentAutonomyTier,
+  type AgentDefinition,
+  AGENT_STAGES,
+  type AgentStage,
+} from "./agent-registry.js";
+export * from "./agent-office.js";
 export * from "./team-credentials.js";
 export * from "./portal.js";
 export * from "./customer-portal.js";
@@ -24,10 +40,17 @@ export * from "./publishing.js";
 export * from "./ai.js";
 export * from "./phone.js";
 export * from "./api-error.js";
+export * from "./agent.js";
+export * from "./price-book.js";
+export * from "./dispatch.js";
+export * from "./triage.js";
+export * from "./sourcing.js";
+export * from "./payments.js";
 
 // Shared domain enums + DTO types used by api, web, and mobile.
 
 export const JOB_STATUS = [
+  "draft",
   "lead",
   "scheduled",
   "in_progress",
@@ -36,7 +59,15 @@ export const JOB_STATUS = [
 ] as const;
 export type JobStatus = (typeof JOB_STATUS)[number];
 
-export const JOB_SOURCE = ["staff", "customer_request"] as const;
+/** Roles that can log into the staff product. The agent is a service identity, not a team member. */
+export const STAFF_ROLES = ["owner", "dispatcher", "secretary", "technician"] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+export const AGENT_ROLE = "agent" as const;
+export const USER_ROLES = [...STAFF_ROLES, AGENT_ROLE] as const;
+export type UserRoleName = (typeof USER_ROLES)[number];
+
+export const JOB_SOURCE = ["staff", "customer_request", "agent"] as const;
 export type JobSource = (typeof JOB_SOURCE)[number];
 
 export const INVOICE_STATUS = ["draft", "sent", "paid", "void"] as const;

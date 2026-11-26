@@ -348,8 +348,8 @@ export function GlobalSearch({ variant = "bar", className }: { variant?: "bar" |
     >
       <div
         className={cn(
-          "flex h-10 items-center gap-2 rounded-xl border px-3 transition-colors",
-          focused ? "border-accent bg-surface-50 ring-2 ring-accent/20" : "border-border bg-surface-300/40",
+          "flex h-11 items-center gap-2 rounded-2xl border px-3 transition-all duration-200",
+          focused ? "border-accent bg-card shadow-[0_8px_24px_rgba(0,0,0,0.08)] ring-4 ring-accent/15" : "border-border bg-card/80 backdrop-blur-xl hover:border-border-light",
         )}
       >
         <span className="shrink-0 text-sm text-fg-dim" aria-hidden="true">
@@ -378,7 +378,7 @@ export function GlobalSearch({ variant = "bar", className }: { variant?: "bar" |
 
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-2 w-[min(640px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface-50 shadow-2xl"
+          className="absolute right-0 top-full z-50 mt-2 w-[min(640px,calc(100vw-2rem))] overflow-hidden rounded-[22px] border border-border bg-card p-1.5 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
           onMouseDown={(e) => e.preventDefault()}
         >
           <div className="max-h-[28rem] overflow-y-auto p-1.5">

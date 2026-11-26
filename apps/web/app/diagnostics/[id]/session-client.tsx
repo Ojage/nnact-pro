@@ -44,7 +44,7 @@ function StepButton({
       <div className="flex items-start gap-3">
         <span
           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-            completed ? "bg-green/15 text-green" : active ? "bg-accent text-white" : "bg-surface-400 text-fg-muted"
+            completed ? "bg-green/15 text-green" : active ? "bg-accent text-[#141414]" : "bg-surface-400 text-fg-muted"
           }`}
         >
           {completed ? "✓" : step.sequence + 1}
@@ -202,7 +202,7 @@ export function DiagnosticSessionClient({ initialDetail }: { initialDetail: Diag
             <ToggleGroupItem
               key={item}
               value={item}
-              className="rounded-md px-3 py-1.5 text-xs capitalize data-[state=on]:bg-accent data-[state=on]:text-white"
+              className="rounded-md px-3 py-1.5 text-xs capitalize data-[state=on]:bg-accent data-[state=on]:text-[#141414]"
             >
               {item} mode
             </ToggleGroupItem>

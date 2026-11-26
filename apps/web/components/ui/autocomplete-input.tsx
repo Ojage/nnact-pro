@@ -197,18 +197,18 @@ export function AutocompleteInput<T = unknown>({
 
   const defaultRenderOption = (option: AutocompleteOption<T>) => (
     <div className="flex items-start gap-3">
-      <Search className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <Search className="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-3">
-          <span className="truncate font-medium">{option.label}</span>
+          <span className="truncate font-medium text-fg">{option.label}</span>
           {option.badge && (
-            <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
+            <span className="rounded-lg bg-accent-muted px-2 py-0.5 text-xs text-fg">
               {option.badge}
             </span>
           )}
         </div>
         {option.subtitle && (
-          <span className="mt-0.5 text-xs text-muted-foreground">
+          <span className="mt-0.5 text-xs text-fg-muted">
             {option.subtitle}
           </span>
         )}
@@ -233,10 +233,10 @@ export function AutocompleteInput<T = unknown>({
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            'h-12 border-slate-200 bg-white pr-12 text-[15px] shadow-[0_14px_32px_-24px_rgba(15,23,42,0.45)] transition-all focus-visible:ring-2 focus-visible:ring-indigo-400 dark:border-slate-700 dark:bg-slate-950',
+            'h-11 border border-input bg-input-background pr-12 text-sm text-fg shadow-none transition-all focus-visible:border-accent focus-visible:ring-4 focus-visible:ring-accent/15',
             isOpen
-              ? 'rounded-t-[32px] rounded-b-none border-b-transparent shadow-[0_18px_40px_-28px_rgba(15,23,42,0.4)]'
-              : 'rounded-[32px]',
+              ? 'rounded-t-xl rounded-b-none border-b-transparent'
+              : 'rounded-xl',
             leadingIcon ? 'pl-16' : '',
             inputClassName,
           )}
@@ -251,20 +251,20 @@ export function AutocompleteInput<T = unknown>({
         )}
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {isLoading && (
-            <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
+            <Loader2 className="h-4 w-4 animate-spin text-fg-muted" />
           )}
           {!isLoading && query && (
             <button
               type="button"
               onClick={handleClear}
-              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800"
+              className="rounded-full p-1.5 text-fg-muted transition-colors hover:bg-accent-muted hover:text-fg focus-visible:ring-4 focus-visible:ring-accent/15"
               aria-label="Clear"
             >
               <X className="h-4 w-4" />
             </button>
           )}
           {!isLoading && !query && (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="h-4 w-4 text-fg-muted" />
           )}
         </div>
       </div>
@@ -273,20 +273,20 @@ export function AutocompleteInput<T = unknown>({
         <div
           ref={dropdownRef}
           className={cn(
-            'absolute z-50 top-full mt-0 max-h-80 w-full overflow-auto rounded-b-[32px] rounded-t-none border border-t-0 border-slate-200 bg-white p-2 shadow-[0_28px_80px_-28px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-950',
+            'absolute z-50 top-full mt-0 max-h-80 w-full overflow-auto rounded-b-[18px] rounded-t-none border border-t-0 border-border bg-card p-2 text-fg shadow-[0_18px_50px_rgba(0,0,0,0.16)]',
             dropdownClassName,
           )}
           role="listbox"
         >
           {isLoading && (
-            <div className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 px-4 py-4 text-sm text-fg-muted">
               <Loader2 className="h-4 w-4 animate-spin" />
               {loadingMessage}
             </div>
           )}
 
           {!isLoading && options.length === 0 && query.length >= minQueryLength && (
-            <div className="px-4 py-4 text-sm text-muted-foreground">
+            <div className="px-4 py-4 text-sm text-fg-muted">
               {emptyMessage}
             </div>
           )}
@@ -299,10 +299,10 @@ export function AutocompleteInput<T = unknown>({
                   onClick={() => handleSelect(option)}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={cn(
-                    'cursor-pointer rounded-2xl px-4 py-3 text-sm transition-all',
+                    'cursor-pointer rounded-xl px-3 py-2.5 text-sm text-fg transition-colors',
                     highlightedIndex === index
-                      ? 'bg-indigo-50 text-indigo-950 shadow-sm dark:bg-indigo-950/50 dark:text-indigo-50'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-900/70',
+                      ? 'bg-accent-muted text-fg'
+                      : 'hover:bg-accent-muted hover:text-fg',
                     optionClassName,
                   )}
                   role="option"

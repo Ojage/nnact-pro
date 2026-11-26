@@ -144,7 +144,7 @@ export function CustomerAccount() {
           <CardDescription>View appointments, estimates, invoices, documents and service plans.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Link href="/login" className="rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white no-underline">
+          <Link href="/login" className="rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-[#141414] no-underline">
             Sign in
           </Link>
           <Link href="/signup" className="rounded-lg border border-border px-5 py-2.5 text-sm font-bold text-fg no-underline">
@@ -244,7 +244,7 @@ function CustomerWorkspace({
             onClick={() => setTab(item.id)}
             className={cn(
               "relative shrink-0 cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
-              tab === item.id ? "bg-accent text-white" : "text-fg-muted hover:bg-surface-200 hover:text-fg",
+              tab === item.id ? "bg-accent text-[#141414]" : "text-fg-muted hover:bg-surface-200 hover:text-fg",
             )}
           >
             {item.label}

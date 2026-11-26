@@ -1,0 +1,6 @@
+{
+  "name": "nnact-services",
+  "version": "0.1.0",
+  "description": "Start, stop and watch NNACT Pro's local services from a Services pane, a /services command and the status line.",
+  "types": "./types/index.d.ts"
+}

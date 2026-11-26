@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -25,7 +26,7 @@ export async function reviewRoutes(app: FastifyInstance) {
     const orgId = await resolveOrgId(req);
     const parsed = createBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    const [job] = await db.select().from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
+    const [job] = await db.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
     if (!job) return reply.code(404).send({ error: "job not found" });
     const [row] = await db.insert(reviews).values({ orgId, ...parsed.data }).returning();
     return reply.code(201).send(row);

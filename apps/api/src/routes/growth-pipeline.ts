@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 // Stage 4 — opportunities, meetings, and conversion to customers/jobs/estimates/agreements.
 
 import { and, desc, eq } from "drizzle-orm";
@@ -167,7 +168,7 @@ export async function growthPipelineRoutes(app: FastifyInstance) {
     const [job] = await db
       .select({ id: jobs.id })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)))
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))))
       .limit(1);
     if (!job) return reply.code(404).send({ error: "job not found" });
     const [row] = await db

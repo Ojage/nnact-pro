@@ -39,7 +39,7 @@ const DialogOverlay = React.forwardRef<
         ref={ref}
         data-slot="dialog-overlay"
         className={cn(
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-40 bg-black/60 dark:bg-black/70 backdrop-blur-sm",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-40 bg-black/50 dark:bg-black/70 backdrop-blur-md",
           className,
         )}
       {...props}
@@ -65,7 +65,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           // Centered like standard modals; max-height keeps tall dialogs inside the viewport (scroll inside).
-          "bg-background text-foreground border border-border data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 flex w-full max-h-[min(92vh,calc(100dvh-2rem))] flex-col translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-lg shadow-xl duration-200 max-w-none gap-0 p-5",
+          "bg-card text-foreground border border-border data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 flex w-full max-h-[min(92vh,calc(100dvh-2rem))] flex-col translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-[26px] shadow-[0_32px_90px_rgba(0,0,0,0.24)] duration-200 max-w-none gap-0 p-6",
           className,
         )}
         {...props}
@@ -110,7 +110,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={cn("text-xl font-bold leading-tight tracking-[-0.02em]", className)}
       {...props}
     />
   );

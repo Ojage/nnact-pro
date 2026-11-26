@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq, and, asc, desc, ne, sql } from "drizzle-orm";
@@ -20,6 +21,7 @@ import { resolveOrgId } from "./org.js";
 import { safeEmitActivity } from "../activities.js";
 import { safeEmitEvent } from "../plugins/bus.js";
 import { isApproverRole, verifiedClaims } from "../operational-authorization.js";
+import { patchOf } from "../zod-patch.js";
 
 const createBody = z.object({ jobId: z.string().uuid(), dueAt: z.string().datetime().optional(), discountId: z.string().trim().min(1).max(80).optional() });
 const statusBody = z.object({ status: z.enum(["sent", "void"]) });
@@ -29,7 +31,7 @@ const lineBody = z.object({
   unitPrice: z.number().int().nonnegative(),
   unitCost: z.number().int().nonnegative().default(0),
 });
-const linePatchBody = lineBody.partial().refine((value) => Object.keys(value).length > 0, "at least one field is required");
+const linePatchBody = patchOf(lineBody).refine((value) => Object.keys(value).length > 0, "at least one field is required");
 const payBody = z.object({
   amount: z.number().int().positive(),
   method: z.enum(["manual", "cash", "check", "card"]).default("manual"),
@@ -111,7 +113,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`invoice-job:${parsed.data.jobId}`}))`);
-      const [job] = await tx.select().from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
+      const [job] = await tx.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
       if (!job) return { kind: "not-found" as const };
 
       const [existing] = await tx

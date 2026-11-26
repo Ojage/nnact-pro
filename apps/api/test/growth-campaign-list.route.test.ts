@@ -14,9 +14,9 @@ import Fastify from "fastify";
 import fjwt from "@fastify/jwt";
 import { AUTH_AUDIENCES } from "@nnact/shared";
 
-const ORG = "11111111-1111-1111-1111-111111111111";
-const USER = "22222222-2222-2222-2222-222222222222";
-const CAMPAIGN = "33333333-3333-3333-3333-333333333333";
+const ORG = "11111111-1111-4111-8111-111111111111";
+const USER = "22222222-2222-4222-8222-222222222222";
+const CAMPAIGN = "33333333-3333-4333-8333-333333333333";
 
 const ROW = {
   id: CAMPAIGN,
@@ -128,8 +128,8 @@ test("GET /growth/campaigns returns [] (not an object) when nothing matches", as
 // The recipient table and the outbound log were wrapped the same way as the
 // campaign list and would have thrown the identical error on the detail page.
 for (const [label, url] of [
-  ["recipients", "/growth/campaigns/33333333-3333-3333-3333-333333333333/recipients"],
-  ["outbound log", "/growth/campaigns/33333333-3333-3333-3333-333333333333/outbound"],
+  ["recipients", "/growth/campaigns/33333333-3333-4333-8333-333333333333/recipients"],
+  ["outbound log", "/growth/campaigns/33333333-3333-4333-8333-333333333333/outbound"],
 ] as const) {
   test(`GET ${label} returns a bare array, not an envelope`, async (t) => {
     currentRows = [{ id: "row-1" }];

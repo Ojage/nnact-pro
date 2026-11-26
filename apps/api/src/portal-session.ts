@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "./job-visibility.js";
 import type { FastifyReply } from "fastify";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import {
@@ -64,7 +65,7 @@ async function customerJobIds(orgId: string, customerId: string) {
   const rows = await db
     .select({ id: jobs.id })
     .from(jobs)
-    .where(and(eq(jobs.orgId, orgId), eq(jobs.customerId, customerId)));
+    .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.customerId, customerId))));
   return rows.map((row) => row.id);
 }
 
@@ -212,7 +213,7 @@ export async function buildPortalSession(input: ActivePortalLink): Promise<Porta
         total: jobs.total,
       })
       .from(jobs)
-      .where(and(eq(jobs.orgId, link.orgId), eq(jobs.customerId, link.customerId)))
+      .where(visibleJobsWhere(and(eq(jobs.orgId, link.orgId), eq(jobs.customerId, link.customerId))))
       .orderBy(desc(jobs.createdAt))
       .limit(50);
 
@@ -276,7 +277,7 @@ export async function assertEstimateBelongsToCustomer(orgId: string, customerId:
     .select({ estimateId: estimates.id })
     .from(estimates)
     .innerJoin(jobs, eq(estimates.jobId, jobs.id))
-    .where(and(eq(estimates.orgId, orgId), eq(estimates.id, estimateId), eq(jobs.customerId, customerId)))
+    .where(visibleJobsWhere(and(eq(estimates.orgId, orgId), eq(estimates.id, estimateId), eq(jobs.customerId, customerId))))
     .limit(1);
   return row ?? null;
 }

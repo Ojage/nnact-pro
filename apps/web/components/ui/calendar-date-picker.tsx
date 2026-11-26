@@ -41,9 +41,9 @@ export function CalendarDatePicker({
   return (
     <div className="flex flex-col gap-2">
       {label && (
-        <Label htmlFor={id} className="px-1">
+        <Label htmlFor={id} className="px-1 text-fg-muted">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="ml-1 text-destructive">*</span>}
         </Label>
       )}
       <Input
@@ -56,7 +56,7 @@ export function CalendarDatePicker({
         placeholder={placeholder || t("datePicker.placeholder", "Pick a date")}
         disabled={disabled}
         required={required}
-        className="h-10 font-normal text-sm"
+        className="h-11 rounded-xl border-input bg-input-background text-sm font-normal text-fg focus-visible:ring-4 focus-visible:ring-accent/15"
         onChange={(event) => {
           const next = event.target.value;
           onChange?.(next);

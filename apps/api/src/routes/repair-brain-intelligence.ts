@@ -62,6 +62,7 @@ import {
   listSystemOptions,
   linkModelCategory,
 } from "../repair-brain-intelligence.js";
+import { patchOf } from "../zod-patch.js";
 
 const templateSectionSchema = z.object({
   key: z.string().min(1),
@@ -177,7 +178,7 @@ const edgeSchema = z.object({
   relationship: z.string().min(1),
   targetType: z.string().min(1),
   targetId: z.string().min(1),
-  meta: z.record(z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 async function resolveUserId(req: Parameters<typeof resolveOrgId>[0]): Promise<string | undefined> {
@@ -215,7 +216,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/categories/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = categorySchema.partial().safeParse(req.body);
+    const parsed = patchOf(categorySchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateCategory(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "category not found" });
@@ -266,7 +267,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/manufacturers/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = manufacturerSchema.partial().safeParse(req.body);
+    const parsed = patchOf(manufacturerSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateManufacturer(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "manufacturer not found" });
@@ -297,7 +298,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/systems/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = systemSchema.partial().safeParse(req.body);
+    const parsed = patchOf(systemSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateSystem(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "system not found" });
@@ -328,7 +329,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/subsystems/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = subsystemSchema.partial().safeParse(req.body);
+    const parsed = patchOf(subsystemSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateSubsystem(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "subsystem not found" });
@@ -359,7 +360,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/components/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = componentSchema.partial().safeParse(req.body);
+    const parsed = patchOf(componentSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateComponent(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "component not found" });
@@ -429,7 +430,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/measurement-points/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = measurementPointSchema.partial().safeParse(req.body);
+    const parsed = patchOf(measurementPointSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateMeasurementPoint(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "measurement point not found" });
@@ -467,7 +468,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/errors/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = errorCodeSchema.partial().safeParse(req.body);
+    const parsed = patchOf(errorCodeSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateErrorCode(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "error code not found" });
@@ -496,7 +497,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/sequences/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = sequenceSchema.partial().safeParse(req.body);
+    const parsed = patchOf(sequenceSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateSequence(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "sequence not found" });
@@ -527,7 +528,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/service-modes/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = serviceModeSchema.partial().safeParse(req.body);
+    const parsed = patchOf(serviceModeSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateServiceMode(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "service mode not found" });
@@ -563,7 +564,7 @@ export async function repairBrainIntelligenceRoutes(app: FastifyInstance) {
 
   app.patch("/articles/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
-    const parsed = articleSchema.partial().safeParse(req.body);
+    const parsed = patchOf(articleSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const updated = await updateArticle(orgId, (req.params as { id: string }).id, parsed.data);
     if (!updated) return reply.code(404).send({ error: "article not found" });

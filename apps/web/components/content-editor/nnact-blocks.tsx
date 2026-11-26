@@ -10,6 +10,7 @@ import {
   useUploadContentMediaMutation,
 } from "@/lib/redux/api";
 import { mediaUrl } from "@/lib/media-url";
+import { FormSelect } from "@/components/ui/form-select";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NNACT custom blocks shared with the server-side transformer
@@ -38,17 +39,11 @@ function FieldEditor({
     <label className="grid gap-1 text-xs">
       <span className="font-medium text-fg-muted">{label}</span>
       {kind === "select" ? (
-        <select
+        <FormSelect
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-fg outline-none focus:ring-2 focus:ring-primary/30"
-        >
-          {(options ?? []).map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
+          onChange={onChange}
+          options={(options ?? []).map((option) => ({ value: option, label: option }))}
+        />
       ) : kind === "textarea" ? (
         <textarea
           value={value}

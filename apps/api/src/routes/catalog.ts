@@ -3,6 +3,7 @@ import { z } from "zod";
 import { and, desc, eq, ilike } from "drizzle-orm";
 import { db, catalogCategories, catalogItems } from "@nnact/db";
 import { resolveOrgId } from "./org.js";
+import { patchOf } from "../zod-patch.js";
 
 const categoryBody = z.object({
   name: z.string().min(1),
@@ -19,7 +20,7 @@ const itemBody = z.object({
   active: z.boolean().default(true),
 });
 
-const patchItemBody = itemBody.partial();
+const patchItemBody = patchOf(itemBody);
 
 export async function catalogRoutes(app: FastifyInstance) {
   app.get("/categories", async (req) => {

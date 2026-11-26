@@ -48,6 +48,7 @@ import {
   enrollProspectsFromRules,
   parseProspectSelectionRules,
 } from "../growth/campaign-enrollment.js";
+import { patchOf } from "../zod-patch.js";
 
 const EDITABLE_CAMPAIGN_STATUSES = new Set([
   "DRAFT",
@@ -106,9 +107,8 @@ const prospectRulesBody = z.object({
   limit: z.number().int().min(1).max(500).optional(),
 });
 
-const updateCampaignBody = createCampaignBody
-  .omit({ purpose: true, senderIdentityId: true })
-  .partial()
+const updateCampaignBody = patchOf(createCampaignBody
+  .omit({ purpose: true, senderIdentityId: true }))
   .extend({
     scheduledStartAt: z.string().datetime().nullish(),
     sectorId: uuid.nullish(),

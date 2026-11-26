@@ -76,35 +76,36 @@ export function MultiSelect({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className={cn("w-full justify-between h-auto min-h-10 hover:bg-transparent", className)}
+                    className={cn("h-auto min-h-11 w-full justify-between rounded-xl border-input bg-input-background px-4 py-2 text-fg hover:bg-accent-muted hover:text-fg focus-visible:ring-4 focus-visible:ring-accent/15", className)}
                     onClick={() => setOpen(!open)}
                 >
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                         {selected.length === 0 && (
-                            <span className="text-muted-foreground font-normal">{placeholder}</span>
+                            <span className="font-normal text-fg-muted">{placeholder}</span>
                         )}
                         {selected.map((item) => {
                             const option = options.find((o) => o.value === item)
                             return (
-                                <Badge variant="secondary" key={item} className="mr-1 mb-1" onClick={(e) => {
+                                <Badge variant="secondary" key={item} className="mb-1 mr-1 rounded-lg border-transparent bg-accent-muted px-2.5 py-1 text-fg hover:bg-accent-hover" onClick={(e) => {
                                     e.stopPropagation();
                                     handleUnselect(item);
                                 }}>
                                     {option?.label || item}
-                                    <X className="ml-1 h-3 w-3 text-muted-foreground hover:text-foreground" />
+                                    <X className="ml-1 h-3 w-3 text-fg-muted hover:text-fg" />
                                 </Badge>
                             )
                         })}
                     </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-fg-muted opacity-70" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
-                <Command shouldFilter={false}>
+            <PopoverContent className="w-full rounded-[18px] border-border bg-card p-2 text-fg shadow-[0_18px_50px_rgba(0,0,0,0.16)]" align="start">
+                <Command shouldFilter={false} className="rounded-[18px] bg-card text-fg">
                     <CommandInput
                         placeholder={searchPlaceholder}
                         value={search}
                         onValueChange={setSearch}
+                        className="text-fg placeholder:text-fg-muted"
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && canCreate) {
                                 e.preventDefault()
@@ -113,17 +114,18 @@ export function MultiSelect({
                         }}
                     />
                     <CommandList>
-                        <CommandEmpty>
+                        <CommandEmpty className="text-fg-muted">
                             {canCreate
                                 ? `Press Enter to create "${search.trim()}"`
                                 : "No results found."}
                         </CommandEmpty>
                         {matches.length > 0 && (
-                            <CommandGroup className="max-h-64 overflow-auto">
+                            <CommandGroup className="max-h-64 overflow-auto p-1.5">
                                 {matches.map((option) => (
                                     <CommandItem
                                         key={option.value}
                                         value={option.label}
+                                        className="rounded-xl px-3 py-2.5 text-fg data-[selected=true]:bg-accent-muted data-[selected=true]:text-fg [&_svg]:text-fg"
                                         onSelect={() => {
                                             if (selected.includes(option.value)) handleUnselect(option.value)
                                             else onChange([...selected, option.value])
@@ -132,7 +134,7 @@ export function MultiSelect({
                                     >
                                         <Check
                                             className={cn(
-                                                "mr-2 h-4 w-4",
+                                                "mr-2 h-4 w-4 text-fg",
                                                 selected.includes(option.value)
                                                     ? "opacity-100"
                                                     : "opacity-0"
@@ -145,9 +147,9 @@ export function MultiSelect({
                         )}
                         {canCreate && (
                             <>
-                                {matches.length > 0 && <CommandSeparator />}
-                                <CommandGroup>
-                                    <CommandItem value="__create__" onSelect={createValue}>
+                                {matches.length > 0 && <CommandSeparator className="-mx-1.5 my-1.5 bg-border" />}
+                                <CommandGroup className="p-1.5">
+                                    <CommandItem value="__create__" onSelect={createValue} className="rounded-xl px-3 py-2.5 text-fg data-[selected=true]:bg-accent-muted data-[selected=true]:text-fg [&_svg]:text-fg">
                                         <Plus className="mr-2 h-4 w-4" />
                                         Create "{search.trim()}"
                                     </CommandItem>

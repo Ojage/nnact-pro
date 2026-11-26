@@ -358,6 +358,69 @@
       "when": 1790000160000,
       "tag": "0052_customer_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1790000200000,
+      "tag": "0053_agent_intake",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1790000300000,
+      "tag": "0054_price_book_quoting",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1790000400000,
+      "tag": "0055_dispatch_agent",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790000500000,
+      "tag": "0056_agent_platform",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1790000600000,
+      "tag": "0057_agent_controls",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1790000700000,
+      "tag": "0058_agent_office",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790000800000,
+      "tag": "0059_agent_workflows",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790000900000,
+      "tag": "0060_branches",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1790001000000,
+      "tag": "0061_org_identity",
+      "breakpoints": true
     }
   ]
 }

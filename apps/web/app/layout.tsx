@@ -4,6 +4,7 @@ import "./globals.css";
 import { ReduxProvider } from "@/components/redux-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/app-shell";
+import { Toaster } from "@/components/ui/sonner";
 import { SiteJsonLd } from "@/components/json-ld";
 import { buildRootMetadata } from "@/lib/site-metadata";
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ReduxProvider>
           <ThemeProvider>
             <AppShell>{children}</AppShell>
+            <Toaster />
           </ThemeProvider>
         </ReduxProvider>
       </body>

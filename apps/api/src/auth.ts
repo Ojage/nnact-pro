@@ -2,7 +2,7 @@
 // Format stored in users.password_hash:  "<saltHex>:<hashHex>".
 import { scrypt, randomBytes, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { AUTH_AUDIENCES } from "@nnact/shared";
+import { AUTH_AUDIENCES, type AgentJwtClaims } from "@nnact/shared";
 
 const scryptAsync = promisify(scrypt);
 const KEYLEN = 64;
@@ -59,7 +59,7 @@ export function isCustomerClaims(claims: unknown): claims is CustomerJwtClaims {
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {
-    payload: StaffJwtClaims | CustomerJwtClaims;
-    user: StaffJwtClaims | CustomerJwtClaims;
+    payload: StaffJwtClaims | CustomerJwtClaims | AgentJwtClaims;
+    user: StaffJwtClaims | CustomerJwtClaims | AgentJwtClaims;
   }
 }

@@ -1,4 +1,4 @@
-import { and, eq, max, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
@@ -9,9 +9,11 @@ import type {
   SyncOpTable,
   SyncErrorKind,
 } from "@nnact/shared";
-import { mergeBusinessSettings, type JobStatus } from "@nnact/shared";
+import type { JobStatus } from "@nnact/shared";
 import type { UserRole } from "../operational-authorization.js";
-import { jobNumber, nextJobStatus } from "../job-lifecycle.js";
+import { nextJobStatus } from "../job-lifecycle.js";
+import { createJobInOrg } from "../job-creation.js";
+import { patchOf } from "../zod-patch.js";
 
 type Db = NodePgDatabase<typeof dbSchema>;
 type Tx = any;
@@ -96,10 +98,10 @@ const PaymentCreate = z.object({
 }).strict();
 
 function nonEmptyPartial<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
-  return schema.partial().refine((value) => Object.keys(value).length > 0, "update payload cannot be empty");
+  return patchOf(schema).refine((value) => Object.keys(value).length > 0, "update payload cannot be empty");
 }
 
-const CREATE_SCHEMAS: Record<SyncOpTable, z.ZodTypeAny> = {
+const CREATE_SCHEMAS: Record<SyncOpTable, z.ZodType<Record<string, unknown>>> = {
   jobs: JobCreate,
   line_items: LineItemCreate,
   invoices: InvoiceCreate,
@@ -109,7 +111,7 @@ const CREATE_SCHEMAS: Record<SyncOpTable, z.ZodTypeAny> = {
   payments: PaymentCreate,
 };
 
-const UPDATE_SCHEMAS: Record<SyncOpTable, z.ZodTypeAny> = {
+const UPDATE_SCHEMAS: Record<SyncOpTable, z.ZodType<Record<string, unknown>>> = {
   jobs: nonEmptyPartial(JobCreate),
   line_items: nonEmptyPartial(LineItemCreate),
   invoices: nonEmptyPartial(InvoiceCreate),
@@ -210,40 +212,12 @@ async function createJobWithNumber(
   actor: SyncActor,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'job-number:' + orgId}))`);
-  const [{ maxNum }] = await tx
-    .select({ maxNum: max(dbSchema.jobs.number) })
-    .from(dbSchema.jobs)
-    .where(eq(dbSchema.jobs.orgId, orgId));
-  const [org] = await tx
-    .select({ businessSettings: dbSchema.orgs.businessSettings })
-    .from(dbSchema.orgs)
-    .where(eq(dbSchema.orgs.id, orgId))
-    .limit(1);
-  const settings = mergeBusinessSettings(org?.businessSettings);
-  const parsed = typeof maxNum === "string" ? Number(maxNum.match(/(\d+)\s*$/)?.[1]) : NaN;
-  const highest = Number.isFinite(parsed) ? parsed : settings.numbering.jobNextNumber - 1;
-  const next = Math.max(highest + 1, settings.numbering.jobNextNumber);
-  const number = jobNumber(
-    next - settings.numbering.jobNextNumber,
-    settings.numbering.jobPrefix,
-    settings.numbering.jobNextNumber,
-  );
-  await tx
-    .insert(dbSchema.jobs)
-    .values({ id: entityId, orgId, number, ...payload })
-    .execute();
-  await tx
-    .insert(dbSchema.jobStatusHistory)
-    .values({
-      orgId,
-      jobId: entityId,
-      fromStatus: null,
-      toStatus: (payload.status as string | undefined) ?? "lead",
-      changedBy: actor.userId,
-      reason: "job created",
-    })
-    .execute();
+  await createJobInOrg(tx, {
+    orgId,
+    actorUserId: actor.userId,
+    id: entityId,
+    values: payload as Parameters<typeof createJobInOrg>[1]["values"],
+  });
 }
 
 export async function applyOps(

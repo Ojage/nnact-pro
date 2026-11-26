@@ -29,14 +29,16 @@
     "install:verified": "pnpm lock:prepare && pnpm install --frozen-lockfile --reporter=silent",
     "release:safety": "node scripts/release-safety-check.mjs && node scripts/verify-lockfile.mjs && pnpm test:release",
     "infra:up": "docker compose -f infra/compose.yml up -d",
-    "infra:down": "docker compose -f infra/compose.yml down"
+    "infra:down": "docker compose -f infra/compose.yml down",
+    "services": "tools/services/services.sh",
+    "test:services": "cd tools/services && node --disable-warning=ExperimentalWarning --test 'test/*.test.ts'"
   },
   "pnpm": {
     "overrides": {
       "brace-expansion": "5.0.12",
-      "fast-jwt": "6.2.4",
+      "fast-jwt": "6.3.7",
       "fast-uri": "3.1.7",
-      "find-my-way": "9.7.0",
+      "find-my-way": "9.10.2",
       "browserslist": "4.28.9",
       "js-yaml@^3": "3.15.2",
       "js-yaml@^4": "4.3.2",
@@ -44,11 +46,18 @@
       "postcss": "8.5.23",
       "sharp": "0.35.5",
       "tar": "6.2.1",
-      "undici": "6.29.0",
+      "undici": "6.29.1",
       "@xmldom/xmldom": "0.8.15",
       "uuid": "11.1.1",
       "esbuild": "0.25.12",
-      "joi": "17.13.8"
+      "joi": "17.13.9",
+      "@fastify/busboy": "3.2.6",
+      "compression": "1.8.2",
+      "shell-quote": "1.12.0",
+      "source-map-js": "1.2.4",
+      "node-forge": "1.4.4",
+      "@grpc/grpc-js": "1.14.7",
+      "get-uri": "8.0.2"
     },
     "patchedDependencies": {
       "brace-expansion@5.0.12": "patches/brace-expansion@5.0.12.patch"

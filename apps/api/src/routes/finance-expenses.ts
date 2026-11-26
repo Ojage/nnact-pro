@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sql, eq, and, inArray } from "drizzle-orm";
@@ -82,7 +83,7 @@ export async function hydrate(
       ? db.select({ id: costCenters.id, name: costCenters.name }).from(costCenters).where(inArray(costCenters.id, [...centerIds]))
       : Promise.resolve([] as { id: string; name: string }[]),
     jobIds.size
-      ? db.select({ id: jobs.id, number: jobs.number }).from(jobs).where(and(eq(jobs.orgId, orgId), inArray(jobs.id, [...jobIds])))
+      ? db.select({ id: jobs.id, number: jobs.number }).from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), inArray(jobs.id, [...jobIds]))))
       : Promise.resolve([] as { id: string; number: string | null }[]),
   ]);
 

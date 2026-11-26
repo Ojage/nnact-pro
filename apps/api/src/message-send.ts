@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "./job-visibility.js";
 // Real send workflow. Every outbound customer email is recorded as a
 // message_logs row: recipient, rendered subject/body snapshot, delivery
 // attempts, timestamps, and the SMTP result. Failed deliveries can be retried
@@ -240,7 +241,7 @@ export type EmailDraft =
   | { ok: false; statusCode: number; error: string };
 
 async function customerForJob(orgId: string, jobId: string) {
-  const [job] = await db.select().from(jobs).where(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId)));
+  const [job] = await db.select().from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, jobId))));
   if (!job) return null;
   const [customer] = await db
     .select()

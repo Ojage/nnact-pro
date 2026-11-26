@@ -21,13 +21,13 @@ import { cn } from "./utils";
  */
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 cursor-pointer disabled:cursor-not-allowed",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-bold tracking-[-0.01em] transition-all duration-200 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer disabled:cursor-not-allowed",
   {
     variants: {
       variant: {
         // Primary - Main CTAs (GitHub's primary button style)
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 border border-primary shadow-sm " +
+          "bg-primary text-primary-foreground font-extrabold hover:bg-accent-hover active:bg-accent-hover/90 border border-primary/80 shadow-sm " +
           "focus-visible:ring-ring",
 
         // Secondary - Less prominent actions
@@ -66,10 +66,10 @@ const buttonVariants = cva(
           "underline-offset-4",
       },
       size: {
-        sm: "h-7 px-3 text-xs gap-1.5",
-        default: "h-8 px-4 text-sm gap-2",
-        lg: "h-10 px-6 text-base gap-2",
-        icon: "size-8 p-0",
+      sm: "h-9 px-4 text-xs gap-2",
+      default: "h-11 px-5 text-sm gap-2",
+      lg: "h-12 px-7 text-base gap-2.5",
+      icon: "size-10 p-0",
       },
     },
     defaultVariants: {

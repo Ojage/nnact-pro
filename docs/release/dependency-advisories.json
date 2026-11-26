@@ -102,7 +102,7 @@
     "ghsa": "GHSA-3ppc-4f35-3m26",
     "package": "minimatch",
     "version": "3.1.5",
-    "rationale": "minimatch ReDoS via repeated wildcards with non-matching literal. minimatch@3.1.5 is the latest 3.x release; no patched 3.x version exists. This version is pulled transitively by @expo/cli, @expo/fingerprint, @expo/metro-config, glob, and node-dir — all mobile-toolchain packages. minimatch@5+/9+/10+ do not carry this advisory. Production API and web runtimes do not load minimatch.",
+    "rationale": "minimatch ReDoS via repeated wildcards with non-matching literal. minimatch@3.1.5 is the latest 3.x release; no patched 3.x version exists. This version is pulled transitively by @expo/cli, @expo/fingerprint, @expo/metro-config, glob, and node-dir \u2014 all mobile-toolchain packages. minimatch@5+/9+/10+ do not carry this advisory. Production API and web runtimes do not load minimatch.",
     "compensatingControl": "minimatch is only used by Expo/Metro build tooling on developer-controlled glob patterns during local development and CI builds. The ReDoS requires crafted input with repeated wildcards, which is not possible through any production API input path.",
     "owner": "Nikolas Marconcini",
     "expiresAt": "2027-03-04"
@@ -122,24 +122,6 @@
     "version": "3.1.5",
     "rationale": "minimatch ReDoS via nested *() extglobs. minimatch@3.1.5 is latest 3.x; no fix in 3.x line. Transitive dependency of Expo/Metro mobile toolchain only.",
     "compensatingControl": "Only reachable through Expo/Metro build tooling on developer-controlled glob patterns. Not in production runtime paths.",
-    "owner": "Nikolas Marconcini",
-    "expiresAt": "2027-03-04"
-  },
-  {
-    "ghsa": "GHSA-jmr9-qjv8-65gv",
-    "package": "extract-zip",
-    "version": "2.0.1",
-    "rationale": "extract-zip unvalidated symlink path traversal. extract-zip@2.0.1 is the latest and only maintained release; no patched version exists. It is a transitive dependency of Playwright (used only for e2e test execution) and is not in any production runtime.",
-    "compensatingControl": "extract-zip is only invoked by Playwright during local development and CI e2e test runs to unpack browser downloads. It operates on trusted archives from official Playwright CDN endpoints. Production API and web services never load or execute extract-zip.",
-    "owner": "Nikolas Marconcini",
-    "expiresAt": "2027-03-04"
-  },
-  {
-    "ghsa": "GHSA-7pqw-9j4j-h8q3",
-    "package": "extract-zip",
-    "version": "2.0.1",
-    "rationale": "extract-zip allows arbitrary file writes through symlink archive entries. This is a second advisory against the same unfixed symlink-handling defect already tracked by GHSA-jmr9-qjv8-65gv; extract-zip@2.0.1 remains the latest and only maintained release, so no patched version exists. It is a transitive dependency of @puppeteer/browsers (used only for browser downloads during e2e test execution) and is not in any production runtime.",
-    "compensatingControl": "extract-zip is only invoked by Playwright and Puppeteer browser-download tooling during local development and CI e2e runs, to unpack archives fetched from official browser CDNs. Exploitation requires an attacker to supply the archive that is extracted, and no product code path extracts an untrusted or user-supplied zip. Production API, web, worker, and mobile services never load or execute extract-zip. CI runs in an ephemeral sandboxed filesystem.",
     "owner": "Nikolas Marconcini",
     "expiresAt": "2027-03-04"
   }

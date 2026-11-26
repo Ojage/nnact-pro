@@ -26,6 +26,7 @@ import {
   type ServiceChecklistDTO,
 } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
+import { patchOf } from "../zod-patch.js";
 
 type PlanInsert = typeof servicePlans.$inferInsert;
 function planValues(orgId: string, data: Record<string, unknown>): PlanInsert {
@@ -102,7 +103,7 @@ const planBody = z.object({
   benefits: z.array(benefitConfigBody).default([]),
 });
 
-const patchPlanBody = planBody.partial();
+const patchPlanBody = patchOf(planBody);
 
 const categoryBody = z.object({
   name: z.string().min(1),
@@ -112,7 +113,7 @@ const categoryBody = z.object({
   active: z.boolean().default(true),
 });
 
-const patchCategoryBody = categoryBody.partial();
+const patchCategoryBody = patchOf(categoryBody);
 
 const checklistBody = z.object({
   name: z.string().min(1),
@@ -121,7 +122,7 @@ const checklistBody = z.object({
   active: z.boolean().default(true),
 });
 
-const patchChecklistBody = checklistBody.partial();
+const patchChecklistBody = patchOf(checklistBody);
 
 export async function servicePlanRoutes(app: FastifyInstance) {
   app.get("/", async (req) => {

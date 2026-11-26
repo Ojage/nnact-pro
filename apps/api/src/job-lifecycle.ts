@@ -12,6 +12,7 @@ export type JobRole = "owner" | "dispatcher" | "technician";
  * straight to `completed` from a `lead`; allows office reopen/reschedule paths.
  */
 const OFFICE_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
+  draft: ["lead", "canceled"],
   lead: ["scheduled", "in_progress", "canceled"],
   scheduled: ["in_progress", "canceled", "lead"],
   in_progress: ["completed", "canceled"],
@@ -21,6 +22,7 @@ const OFFICE_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
 
 /** Strictly the two field transitions a technician may perform. */
 const TECHNICIAN_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
+  draft: [],
   lead: [],
   scheduled: ["in_progress"],
   in_progress: ["completed"],

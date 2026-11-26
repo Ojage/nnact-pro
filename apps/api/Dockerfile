@@ -25,6 +25,9 @@ RUN apt-get update \
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+# Puppeteer 22+ reads PUPPETEER_SKIP_DOWNLOAD; keep both so the system
+# Chromium above is used and no browser is downloaded during install.
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 WORKDIR /app
@@ -41,6 +44,7 @@ RUN node scripts/verify-lockfile.mjs \
 # Source after deps: edits to app/package code reuse the store layer above.
 COPY packages ./packages
 COPY apps/api ./apps/api
+COPY apps/agents ./apps/agents
 RUN pnpm install --frozen-lockfile --offline --reporter=silent \
   && pnpm --filter @nnact/api build \
   && mkdir -p /uploads \

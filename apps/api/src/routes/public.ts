@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -226,8 +227,8 @@ const newsletterSubscribeBody = z.object({
   email: z.string().trim().email().max(320),
   name: z.string().trim().min(1).max(200).optional(),
   phone: z.string().trim().max(50).optional(),
-  channels: z.array(z.enum(["email", "whatsapp"])).default(["email"]).optional(),
-  source: z.string().trim().max(50).default("footer").optional(),
+  channels: z.array(z.enum(["email", "whatsapp"])).optional(),
+  source: z.string().trim().max(50).optional(),
 });
 
 const newsletterSubscribeBodySchema = {
@@ -569,7 +570,7 @@ export async function publicRoutes(app: FastifyInstance) {
       const [job] = await db
         .select()
         .from(jobs)
-        .where(eq(jobs.trackingTokenHash, hashPortalToken(raw)))
+        .where(visibleJobsWhere(eq(jobs.trackingTokenHash, hashPortalToken(raw))))
         .limit(1);
       if (!job) return reply.code(404).send({ error: "request not found" });
 

@@ -247,7 +247,7 @@ export default function SchedulePage() {
                   onClick={() => setView(mode)}
                   className={`rounded-none px-4 py-1.5 text-xs capitalize ${
                     view === mode
-                      ? "bg-accent text-white"
+                      ? "bg-accent text-[#141414]"
                       : "text-fg-muted hover:text-fg"
                   }`}
                 >
@@ -317,7 +317,7 @@ export default function SchedulePage() {
                     <div
                       className={`text-center py-2 rounded-t-lg text-xs font-semibold ${
                         col.isToday
-                          ? "bg-accent text-white"
+                          ? "bg-accent text-[#141414]"
                           : "bg-surface-300 text-fg-muted"
                       }`}
                     >
@@ -354,7 +354,7 @@ export default function SchedulePage() {
                   <section key={col.label} className="mb-4">
                     <div
                       className={`flex items-center justify-between px-3 py-2 rounded-t-lg text-xs font-semibold ${
-                        col.isToday ? "bg-accent text-white" : "bg-surface-300 text-fg-muted"
+                        col.isToday ? "bg-accent text-[#141414]" : "bg-surface-300 text-fg-muted"
                       }`}
                     >
                       <span>

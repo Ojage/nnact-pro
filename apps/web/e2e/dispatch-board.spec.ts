@@ -133,6 +133,8 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
 async function mockOperationsApi(page: Page, onPatch?: (body: Record<string, unknown>) => void) {
   const fixtures = createFixtures();
 
+  // Mark the first-run tour prompt as seen so it does not cover the page.
+  await page.addInitScript(() => window.localStorage.setItem("nnact:walkthrough:banner-dismissed:learn", "1"));
   await page.route("http://127.0.0.1:3001/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());

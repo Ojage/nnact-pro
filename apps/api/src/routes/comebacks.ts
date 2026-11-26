@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 // NNACT Pro — Comeback / "Retour" quality management routes.
 //
 // Case-centric API surface: intake, triage, scheduling, investigation,
@@ -337,7 +338,7 @@ async function assembleList(orgId: string, rows: CaseRow[]): Promise<ListItem[]>
   const ids = rows.map((r) => r.id);
   const [jobRows, customerRows, equipmentRows, buckets, stamps, names] = await Promise.all([
     rows.some((r) => r.originalJobId)
-      ? db.select({ id: jobs.id, number: jobs.number }).from(jobs).where(inArray(jobs.id, rows.map((r) => r.originalJobId).filter(Boolean) as string[]))
+      ? db.select({ id: jobs.id, number: jobs.number }).from(jobs).where(visibleJobsWhere(inArray(jobs.id, rows.map((r) => r.originalJobId).filter(Boolean) as string[])))
       : Promise.resolve([] as { id: string; number: string | null }[]),
     rows.some((r) => r.customerId)
       ? db.select({ id: customers.id, name: customers.name }).from(customers).where(inArray(customers.id, rows.map((r) => r.customerId).filter(Boolean) as string[]))
@@ -391,7 +392,7 @@ async function assembleDetail(orgId: string, row: CaseRow): Promise<Detail> {
         ? db
             .select({ id: jobs.id, number: jobs.number, title: jobs.title, status: jobs.status, description: jobs.description, updatedAt: jobs.updatedAt })
             .from(jobs)
-            .where(eq(jobs.id, row.originalJobId))
+            .where(visibleJobsWhere(eq(jobs.id, row.originalJobId)))
             .limit(1)
             .then((r) => r[0] ?? null)
         : Promise.resolve(null),
@@ -551,7 +552,7 @@ async function snapshotWarrantyForOriginalJob(
     const [jobRow] = await db
       .select({ status: jobs.status, updatedAt: jobs.updatedAt })
       .from(jobs)
-      .where(eq(jobs.id, originalJobId))
+      .where(visibleJobsWhere(eq(jobs.id, originalJobId)))
       .limit(1);
     if (jobRow?.status === "completed") completedAt = jobRow.updatedAt;
   }
@@ -624,7 +625,7 @@ export async function createComebackCaseCore(
       source: jobs.source,
     })
     .from(jobs)
-    .where(and(eq(jobs.orgId, orgId), eq(jobs.id, body.originalJobId)))
+    .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, body.originalJobId))))
     .limit(1);
   if (!originalJob) {
     throw new HttpError(404, "original job not found in this organization");
@@ -766,7 +767,7 @@ async function createComebackJob(
     ? await db
         .select({ customerId: jobs.customerId, propertyId: jobs.propertyId, serviceCategory: jobs.serviceCategory, serviceAddress: jobs.serviceAddress, number: jobs.number })
         .from(jobs)
-        .where(eq(jobs.id, row.originalJobId))
+        .where(visibleJobsWhere(eq(jobs.id, row.originalJobId)))
         .limit(1)
     : [];
   const customerId = (row.customerId ?? originalJob?.customerId) ?? null;
@@ -1572,7 +1573,7 @@ export async function comebackRoutes(app: FastifyInstance) {
       db
         .select({ id: jobs.id })
         .from(jobs)
-        .where(and(eq(jobs.orgId, orgId), eq(jobs.status, "completed"), gteLike(jobs.updatedAt, since))),
+        .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.status, "completed"), gteLike(jobs.updatedAt, since)))),
     ]);
     const allHistory = historyRows;
     const completedById = new Map(completedJobs.map((j) => [j.id, j.id]));

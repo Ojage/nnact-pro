@@ -55,7 +55,8 @@ function ChartContainer({
         data-slot="chart"
         data-chart={chartId}
         className={cn(
-          "flex justify-center text-xs w-full h-full",
+          "flex h-full w-full justify-center rounded-[14px] border border-border/70 bg-card/80 p-3 text-xs shadow-[0_1px_0_rgba(0,0,0,0.02)]",
+          "[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/60 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border/60 [&_.recharts-radial-bar-background-sector]:fill-muted/60 [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted/40 [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border/60 [&_.recharts-sector[stroke='#fff']]:stroke-background [&_.recharts-surface]:outline-none",
           className,
         )}
         style={{
@@ -201,7 +202,7 @@ function ChartTooltipContent({
   return (
     <div
       className={cn(
-        "border-border/50 bg-background grid min-w-[8rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl",
+        "grid min-w-[8rem] items-start gap-1.5 rounded-xl border border-border/70 bg-popover/95 px-3 py-2 text-xs text-popover-foreground shadow-[0_12px_30px_rgba(0,0,0,0.08)] backdrop-blur-sm",
         className,
       )}
     >

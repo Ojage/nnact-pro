@@ -77,7 +77,7 @@ export function SidebarSearch() {
   };
 
   return (
-    <div className="px-3 pb-2 pt-1">
+    <div className="px-4 pb-3 pt-1">
       <div className="relative">
         <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-fg-dim" aria-hidden="true">
           ⌕
@@ -96,7 +96,7 @@ export function SidebarSearch() {
           }}
           onKeyDown={onKeyDown}
           onFocus={() => query.trim() && setHighlightIdx(0)}
-          className="h-9 rounded-lg border-border bg-surface-300/50 pl-7 pr-3 text-sm text-fg placeholder:text-fg-dim focus-visible:ring-accent"
+          className="h-11 rounded-xl border-border bg-surface-100 pl-8 pr-3 text-sm text-fg placeholder:text-fg-dim focus-visible:ring-4 focus-visible:ring-accent/15"
         />
       </div>
 
@@ -104,7 +104,7 @@ export function SidebarSearch() {
         <div
           id="sidebar-search-results"
           role="listbox"
-          className="fixed z-50 overflow-hidden rounded-xl border border-border bg-surface-50 shadow-2xl"
+          className="fixed z-50 overflow-hidden rounded-[20px] border border-border bg-card p-1 shadow-[0_20px_60px_rgba(0,0,0,0.2)]"
           style={{ top: rect.top, left: rect.left, width: rect.width }}
         >
           <div className="max-h-96 overflow-y-auto p-1">

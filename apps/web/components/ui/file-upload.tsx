@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
 import { Button } from './button';
+import { cn } from './utils';
 
 interface FileUploadProps {
   value?: File[];
@@ -32,7 +33,6 @@ export function FileUpload({
       }
       onChange([...value, ...fileArray]);
     }
-    // Reset input value to allow selecting the same file again
     if (inputRef.current) {
       inputRef.current.value = '';
     }
@@ -50,9 +50,9 @@ export function FileUpload({
 
   const getFileIcon = (file: File) => {
     if (file.type.startsWith('image/')) {
-      return <ImageIcon className="w-4 h-4" />;
+      return <ImageIcon className="h-4 w-4" />;
     }
-    return <FileText className="w-4 h-4" />;
+    return <FileText className="h-4 w-4" />;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -60,19 +60,19 @@ export function FileUpload({
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   return (
     <div className="space-y-3">
-      {/* Upload Area */}
       <div
         onClick={disabled ? undefined : handleClick}
-        className={`border-2 border-dashed rounded-md p-6 transition-colors ${
+        className={cn(
+          'group rounded-[14px] border border-dashed border-input bg-input-background/70 p-6 transition-[border-color,background-color,box-shadow] sm:p-7',
           disabled
-            ? 'border-border bg-muted cursor-not-allowed opacity-50'
-            : 'border-border hover:border-primary cursor-pointer'
-        }`}
+            ? 'cursor-not-allowed opacity-50'
+            : 'cursor-pointer hover:border-accent/60 hover:bg-accent/5 hover:shadow-[0_1px_0_rgba(0,0,0,0.02)]',
+        )}
       >
         <input
           ref={inputRef}
@@ -83,50 +83,51 @@ export function FileUpload({
           onChange={handleFileChange}
           disabled={disabled}
         />
-        <div className="flex flex-col items-center gap-2 text-center">
-          <Upload className="w-8 h-8 text-muted-foreground" />
-          <div>
-            <p className="text-sm text-muted-foreground">{placeholder}</p>
-            {maxFiles && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Max {maxFiles} file{maxFiles > 1 ? 's' : ''}
-              </p>
-            )}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border/70 bg-background/80 text-muted-foreground transition-colors group-hover:text-foreground">
+            <Upload className="h-5 w-5" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground/90">{placeholder}</p>
+            <p className="text-xs text-muted-foreground">
+              {accept.replace(/\./g, '').toUpperCase()}
+              {maxFiles ? ` · Max ${maxFiles} file${maxFiles > 1 ? 's' : ''}` : ''}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* File List */}
       {value.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm">
+          <p className="text-xs font-medium text-muted-foreground">
             {value.length} file{value.length > 1 ? 's' : ''} selected
           </p>
           <div className="space-y-2">
             {value.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center gap-3 p-3 border border-border rounded-md bg-card"
+                className="flex items-center gap-3 rounded-xl border border-border/80 bg-card/80 p-3 shadow-[0_1px_0_rgba(0,0,0,0.02)]"
               >
-                <div className="text-muted-foreground">{getFileIcon(file)}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatFileSize(file.size)}
-                  </p>
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground">
+                  {getFileIcon(file)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
                 </div>
                 {!disabled && (
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRemoveFile(index);
                     }}
-                    className="h-8 w-8 p-0"
+                    className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Remove ${file.name}`}
                   >
-                    <X className="w-4 h-4 text-destructive" />
+                    <X className="h-4 w-4" />
                   </Button>
                 )}
               </div>

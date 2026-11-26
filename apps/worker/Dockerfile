@@ -2,6 +2,9 @@ FROM node:22-alpine
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 WORKDIR /app
+# These images never render PDFs; skip the browser that puppeteer (an API
+# dependency) would otherwise download during install.
+ENV PUPPETEER_SKIP_DOWNLOAD=true PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Lockfile-first: populate the pnpm store once (see apps/api/Dockerfile).
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml pnpm-lock.expected.sha256 ./

@@ -30,7 +30,12 @@ export const SITE_CONFIG = {
   serviceAreas: [...NNACT_COMPANY.serviceAreas],
   twitterHandle: "@nnactrepairs",
   ogImagePath: "/nnact-logo.png",
+  /** NNACT the organization (public site, structured data, white label). */
   logoPath: "/nnact-logo.png",
+  /** NNACT Pro, the product: the app's own logo. */
+  productLogoPath: "/brand/nnact-pro-logo.webp",
+  productIconPath: "/brand/nnact-pro-logo-128.webp",
+  productAppleIconPath: "/brand/nnact-pro-apple-touch.png",
 } as const;
 
 export function absoluteUrl(path = ""): string {
@@ -54,8 +59,8 @@ export function buildRootMetadata(): Metadata {
     keywords: [...SITE_CONFIG.keywords],
     applicationName: SITE_CONFIG.productName,
     icons: {
-      icon: SITE_CONFIG.logoPath,
-      apple: SITE_CONFIG.logoPath,
+      icon: [{ url: SITE_CONFIG.productIconPath, type: "image/webp" }],
+      apple: SITE_CONFIG.productAppleIconPath,
     },
     authors: [{ name: NNACT_COMPANY.shortName, url: NNACT_COMPANY.contact.website }],
     creator: NNACT_COMPANY.shortName,

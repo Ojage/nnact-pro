@@ -6,5 +6,10 @@
     "test": "node --test test/*.test.mjs"
   },
   "main": "src/index.ts",
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
 }

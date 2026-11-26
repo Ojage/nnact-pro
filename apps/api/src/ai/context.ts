@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 // AI context assembly — the sanitized business picture, curated brand facts,
 // and approved-media inventory that every generation run sees. All data sent to
 // external providers is passed through sanitizeForAi (no emails, phones, or
@@ -66,7 +67,7 @@ export async function buildBusinessContext(orgId: string): Promise<BusinessConte
   const jobRows = await db
     .select({ title: jobs.title })
     .from(jobs)
-    .where(eq(jobs.orgId, orgId))
+    .where(visibleJobsWhere(eq(jobs.orgId, orgId)))
     .orderBy(desc(jobs.createdAt))
     .limit(6)
     .catch(() => []);

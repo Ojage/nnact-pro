@@ -4,6 +4,14 @@
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
+export interface HttpFormOptions {
+  fields?: Record<string, string>;
+  file?: { name: string; fileName: string; contentType: string; data: Uint8Array };
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
 export interface HttpJsonOptions {
   method?: "GET" | "POST";
   headers?: Record<string, string>;
@@ -35,6 +43,44 @@ export async function postJson(url: string, options: HttpJsonOptions): Promise<H
 
 export async function getJson(url: string, options: HttpJsonOptions): Promise<HttpResponse> {
   return request("GET", url, options);
+}
+
+/** Multipart transport for audio transcription. The AI layer keeps one HTTP boundary. */
+export async function postMultipart(url: string, options: HttpFormOptions): Promise<HttpResponse> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const form = new FormData();
+  for (const [name, value] of Object.entries(options.fields ?? {})) form.append(name, value);
+  if (options.file) {
+    const bytes = new Uint8Array(options.file.data);
+    form.append(options.file.name, new Blob([bytes], { type: options.file.contentType }), options.file.fileName);
+  }
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { accept: "application/json", ...(options.headers ?? {}) },
+      body: form,
+      signal: options.signal ?? controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw new TransportError(`request timed out after ${timeoutMs}ms`, "TIMEOUT", undefined, undefined, true);
+    throw new TransportError((error as Error).message, "NETWORK", undefined, undefined, true);
+  } finally {
+    clearTimeout(timeout);
+  }
+  const contentLength = Number(response.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_RESPONSE_BYTES) throw new TransportError("response body too large", "TOO_LARGE", response.status);
+  const text = await response.text();
+  if (Buffer.byteLength(text) > MAX_RESPONSE_BYTES) throw new TransportError("response body too large", "TOO_LARGE", response.status);
+  let json: unknown;
+  try {
+    json = text.length ? JSON.parse(text) : null;
+  } catch {
+    throw new TransportError("invalid JSON response", "INVALID_JSON", response.status);
+  }
+  return { status: response.status, json };
 }
 
 async function request(method: "GET" | "POST", url: string, options: HttpJsonOptions): Promise<HttpResponse> {

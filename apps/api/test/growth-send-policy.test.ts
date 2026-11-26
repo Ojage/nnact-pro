@@ -18,14 +18,14 @@ import {
 } from "../src/growth/send-policy.js";
 
 const verifiedIdentity: SenderIdentity = {
-  id: "11111111-1111-1111-1111-111111111111",
+  id: "11111111-1111-4111-8111-111111111111",
   displayName: "Dana Reeves",
   email: "dana@nnact.com",
   role: "Owner",
   verificationState: "VERIFIED",
   isActive: true,
   coldApproved: true,
-  approvedBy: "22222222-2222-2222-2222-222222222222",
+  approvedBy: "22222222-2222-4222-8222-222222222222",
   approvedAt: "2026-01-05T00:00:00.000Z",
 };
 

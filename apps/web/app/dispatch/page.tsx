@@ -94,17 +94,17 @@ function DispatchCard({
     <article
       draggable={!saving}
       onDragStart={(event) => onDragStart(event, appointment.id)}
-      className={`rounded-xl border p-3 shadow-sm transition-all ${
-        hasConflict ? "border-red/50 bg-red/5" : "border-border bg-surface-200"
+      className={`rounded-[18px] border p-4 shadow-[0_4px_16px_rgba(0,0,0,0.04)] transition-all duration-200 ${
+        hasConflict ? "border-red/50 bg-red/5" : "border-border bg-card"
       } ${
-        saving ? "opacity-60" : "cursor-grab hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md active:cursor-grabbing"
+        saving ? "opacity-60" : "cursor-grab hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] active:cursor-grabbing"
       }`}
       data-testid={`dispatch-card-${appointment.id}`}
       data-conflict={hasConflict ? "true" : "false"}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={`text-xs font-bold ${hasConflict ? "text-red" : "text-accent"}`}>
+          <p className={`text-xs font-bold tabular-nums ${hasConflict ? "text-red" : "text-fg-link"}`}>
             {formatTime(appointment.startsAt)}–{formatTime(appointment.endsAt)}
           </p>
           <Link
@@ -190,9 +190,9 @@ function DispatchLane({
 
   return (
     <section
-      className={`min-w-0 rounded-2xl border bg-surface-100 transition-colors ${
+      className={`min-w-0 rounded-[24px] border bg-card/60 p-2 shadow-[var(--card-shadow)] backdrop-blur-xl transition-colors ${
         dragOver
-          ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+          ? "border-accent bg-accent/5 ring-4 ring-accent/15"
           : conflictCount > 0
             ? "border-red/35"
             : "border-border"
@@ -203,7 +203,7 @@ function DispatchLane({
       onDrop={onDrop}
       data-testid={`dispatch-lane-${column.id}`}
     >
-      <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+      <header className="flex items-start justify-between gap-3 border-b border-border px-3 py-3">
         <div>
           <h2 className="text-sm font-bold text-fg">{column.title}</h2>
           <p className="mt-0.5 text-[11px] text-fg-dim">{column.subtitle}</p>
@@ -218,9 +218,9 @@ function DispatchLane({
         </span>
       </header>
 
-      <div className="space-y-3 p-3">
+      <div className="space-y-2.5 p-2 pt-3">
         {column.appointments.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border px-3 py-8 text-center">
+          <div className="rounded-[18px] border border-dashed border-border bg-surface-100/60 px-3 py-8 text-center">
             <p className="text-xs font-medium text-fg-muted">No visits assigned</p>
             <p className="mt-1 text-[11px] text-fg-dim">Drop an appointment here</p>
           </div>
@@ -421,7 +421,7 @@ export default function DispatchPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-5">
       <p className="sr-only" aria-live="polite" aria-atomic="true" data-testid="dispatch-live-status">
         {announcement}
       </p>
@@ -454,42 +454,42 @@ export default function DispatchPage() {
         </Card>
       ) : null}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Card className="p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">Visits</p>
-          <p className="mt-2 text-2xl font-black text-fg">{dayAppointments.length}</p>
-          <p className="mt-1 text-xs text-fg-muted">On the selected day</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Card className="apple-tile">
+          <p className="apple-eyebrow">Visits</p>
+          <p className="mt-3 text-[28px] font-bold leading-none tracking-[-0.03em] text-fg tabular-nums">{dayAppointments.length}</p>
+          <p className="mt-2 text-xs text-fg-muted">On the selected day</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">Unassigned</p>
-          <p className={`mt-2 text-2xl font-black ${columns[0]?.appointments.length ? "text-yellow" : "text-green"}`}>
+        <Card className="apple-tile">
+          <p className="apple-eyebrow">Unassigned</p>
+          <p className={`mt-3 text-[28px] font-bold leading-none tracking-[-0.03em] tabular-nums ${columns[0]?.appointments.length ? "text-yellow" : "text-green"}`}>
             {columns[0]?.appointments.length ?? 0}
           </p>
-          <p className="mt-1 text-xs text-fg-muted">Needs dispatcher action</p>
+          <p className="mt-2 text-xs text-fg-muted">Needs dispatcher action</p>
         </Card>
-        <Card className={`p-4 ${conflictPairCount > 0 ? "border-red/35 bg-red/5" : ""}`}>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">
-          Schedule conflicts
-          <InfoTip label="About schedule conflicts" side="top">Two visits that overlap for the same technician. Conflicting assignments are blocked at dispatch time so each tech only has one job at a time.</InfoTip>
-        </p>
-          <p className={`mt-2 text-2xl font-black ${conflictPairCount > 0 ? "text-red" : "text-green"}`}>
+        <Card className={`apple-tile ${conflictPairCount > 0 ? "border-red/35 bg-red/5" : ""}`}>
+          <p className="apple-eyebrow inline-flex items-center gap-1">
+            Schedule conflicts
+            <InfoTip label="About schedule conflicts" side="top">Two visits that overlap for the same technician. Conflicting assignments are blocked at dispatch time so each tech only has one job at a time.</InfoTip>
+          </p>
+          <p className={`mt-3 text-[28px] font-bold leading-none tracking-[-0.03em] tabular-nums ${conflictPairCount > 0 ? "text-red" : "text-green"}`}>
             {conflictPairCount}
           </p>
-          <p className="mt-1 text-xs text-fg-muted">Overlapping technician visits</p>
+          <p className="mt-2 text-xs text-fg-muted">Overlapping technician visits</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">Technicians</p>
-          <p className="mt-2 text-2xl font-black text-fg">{technicians.length}</p>
-          <p className="mt-1 text-xs text-fg-muted">Active field staff</p>
+        <Card className="apple-tile">
+          <p className="apple-eyebrow">Technicians</p>
+          <p className="mt-3 text-[28px] font-bold leading-none tracking-[-0.03em] text-fg tabular-nums">{technicians.length}</p>
+          <p className="mt-2 text-xs text-fg-muted">Active field staff</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-dim">Highest load</p>
-          <p className="mt-2 text-2xl font-black text-fg">{busiestCount}</p>
-          <p className="mt-1 text-xs text-fg-muted">Visits on one lane</p>
+        <Card className="apple-tile">
+          <p className="apple-eyebrow">Highest load</p>
+          <p className="mt-3 text-[28px] font-bold leading-none tracking-[-0.03em] text-fg tabular-nums">{busiestCount}</p>
+          <p className="mt-2 text-xs text-fg-muted">Visits on one lane</p>
         </Card>
       </div>
 
-      <Card className="mb-5 p-4">
+      <Card className="apple-surface p-4 sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => setSelectedDate((current) => addDays(current, -1))}>← Previous</Button>
@@ -512,11 +512,42 @@ export default function DispatchPage() {
         </div>
       </Card>
 
+      {visibleAppointments.length > 0 ? (
+        <Card className="overflow-hidden p-4 sm:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="apple-eyebrow">Day timeline</p>
+              <p className="mt-1 text-sm font-semibold text-fg">
+                {visibleAppointments.length} visit{visibleAppointments.length === 1 ? "" : "s"} across {technicians.length + 1} lanes
+              </p>
+            </div>
+            <p className="text-xs text-fg-muted">Select a visit to open its work order.</p>
+          </div>
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+            {visibleAppointments.map((appointment) => {
+              const job = jobsById.get(appointment.jobId);
+              const technician = technicians.find((item) => item.id === appointment.technicianId);
+              return (
+                <Link
+                  key={appointment.id}
+                  href={`/jobs/${appointment.jobId}`}
+                  className="min-w-44 shrink-0 rounded-2xl border border-border bg-surface-100 p-3 no-underline transition-colors hover:border-accent hover:bg-accent-muted"
+                >
+                  <p className="text-xs font-bold text-fg-link tabular-nums">{formatTime(appointment.startsAt)}</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-fg">{job?.title ?? "Service job"}</p>
+                  <p className="mt-1 truncate text-[11px] text-fg-muted">{technician?.name ?? "Unassigned"}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+
       {visibleAppointments.length === 0 ? (
-        <Card className="py-16 text-center">
+        <Card className="apple-empty py-16">
           <p className="text-base font-semibold text-fg">No visits on this day</p>
           <p className="mt-2 text-sm text-fg-muted">Choose another date or create an appointment from the calendar.</p>
-          <Link href="/schedule" className="mt-4 inline-block text-sm font-semibold text-accent no-underline hover:underline">
+          <Link href="/schedule" className="mt-4 inline-block text-sm font-semibold text-fg-link no-underline hover:underline">
             Open calendar
           </Link>
         </Card>

@@ -62,6 +62,8 @@ async function mockIntakeApi(
     },
   ];
 
+  // Mark the first-run tour prompt as seen so it does not cover the page.
+  await page.addInitScript(() => window.localStorage.setItem("nnact:walkthrough:banner-dismissed:learn", "1"));
   await page.route("http://127.0.0.1:3001/api/**", async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
@@ -99,6 +101,20 @@ async function mockIntakeApi(
       }, 201);
     }
 
+    // The job page loads after a successful create: answer its reads with
+    // the created records and empty lists, as the real API would.
+    if (request.method() === "GET") {
+      if (pathname === "/api/jobs/job-created") {
+        return fulfillJson(route, { id: "job-created", total: 0, createdAt: "2026-07-11T12:00:00.000Z", ...capture.job });
+      }
+      if (pathname === "/api/appointments") {
+        return fulfillJson(route, capture.appointment ? [{ id: "appointment-created", ...capture.appointment }] : []);
+      }
+      if (pathname === "/api/activities" || pathname.includes("diagnostic") || /^\/api\/jobs\/[^/]+\/[a-z-]+$/.test(pathname)) {
+        return fulfillJson(route, []);
+      }
+    }
+
     return fulfillJson(route, {});
   });
 }
@@ -122,8 +138,11 @@ test("dispatcher creates and schedules a job for an existing customer", async ({
   await expect(page.getByRole("heading", { name: "New job" })).toBeVisible();
   await expect(page.getByText("Create the work order, customer record, and appointment in one intake flow.")).toBeVisible();
   await expect(page.getByLabel("Customer", { exact: true })).toHaveValue("customer-1");
+  // The console sidebar is closed by default; open it to check the current page.
+  await page.getByRole("button", { name: "Show navigation" }).click();
   await expect(page.getByRole("link", { name: "New Job" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("link", { name: "Jobs", exact: true })).not.toHaveAttribute("aria-current", "page");
+  await page.getByRole("button", { name: "Hide navigation" }).click();
 
   await page.getByLabel("Job title").fill("Refrigerator not cooling");
   await page.getByLabel("Customer complaint and access notes").fill("Fresh-food section is warm. Call before arrival; dog will be secured.");
@@ -162,10 +181,10 @@ test("mobile intake creates a new customer and clearly supports unscheduled lead
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/jobs/new");
 
-  await page.getByRole("button", { name: "Open navigation menu" }).click();
+  await page.getByRole("button", { name: "Show navigation" }).click();
   await expect(page.getByRole("link", { name: "New Job" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("link", { name: "Jobs", exact: true })).not.toHaveAttribute("aria-current", "page");
-  await page.getByRole("button", { name: "Close navigation menu" }).click();
+  await page.getByRole("button", { name: "Close navigation" }).click();
 
   await page.getByRole("button", { name: "new customer" }).click();
   await page.getByLabel("Customer name").fill("Casey Nguyen");

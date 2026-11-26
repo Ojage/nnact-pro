@@ -41,6 +41,7 @@ import { DbMediaProvider } from "../publishing/infra/media.js";
 import { assertContentTransition } from "../publishing/application/content-status.js";
 import { contentAudit } from "../publishing/infra/audit.js";
 import { saveContentMedia } from "../content-media.js";
+import { patchOf } from "../zod-patch.js";
 
 function publicApiBase() {
   return process.env.PUBLIC_API_URL ?? process.env.PUBLIC_WEB_URL ?? "http://localhost:3003";
@@ -190,7 +191,7 @@ export async function contentRoutes(app: FastifyInstance) {
     const actorId = await staffUser(req);
     const current = await getContentItem(orgId, req.params.id);
     if (!current) return reply.code(404).send({ error: "content not found" });
-    const body = createSchema.partial().parse(req.body);
+    const body = patchOf(createSchema).parse(req.body);
     const derived = body.bodyDocument !== undefined ? await transform.derive(body.bodyDocument) : null;
     let tagIds = body.tagNames ? await ensureTags(orgId, body.tagNames) : undefined;
     const updated = await updateContent({

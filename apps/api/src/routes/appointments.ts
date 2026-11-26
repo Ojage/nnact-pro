@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq, and, gte, lte, asc, lt, gt, ne, inArray } from "drizzle-orm";
@@ -131,7 +132,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
     const [job] = await db
       .select({ id: jobs.id })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, rest.jobId)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, rest.jobId))));
     if (!job) return reply.code(404).send({ error: "job not found" });
 
     if (rest.technicianId && !(await technicianIsAssignable(orgId, rest.technicianId))) {
@@ -168,7 +169,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
         scheduledAt: window.startsAt,
         assignedTo: rest.technicianId ?? null,
       })
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, rest.jobId)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, rest.jobId))));
 
     safeEmitActivity(
       orgId,
@@ -181,7 +182,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
       const [jobRow] = await db
         .select({ title: jobs.title })
         .from(jobs)
-        .where(and(eq(jobs.orgId, orgId), eq(jobs.id, rest.jobId)))
+        .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, rest.jobId))))
         .limit(1);
       void safeNotifyUser(orgId, rest.technicianId, {
         type: "appointment.assigned",
@@ -277,7 +278,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
         const [jobRow] = await db
           .select({ title: jobs.title })
           .from(jobs)
-          .where(and(eq(jobs.orgId, orgId), eq(jobs.id, current.jobId)))
+          .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, current.jobId))))
           .limit(1);
         void safeNotifyUser(orgId, technicianId, {
           type: "appointment.assigned",
@@ -296,7 +297,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
         const [jobRow] = await db
           .select({ title: jobs.title })
           .from(jobs)
-          .where(and(eq(jobs.orgId, orgId), eq(jobs.id, current.jobId)))
+          .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, current.jobId))))
           .limit(1);
         void safeNotifyUser(orgId, targetTechnicianId, {
           type: "appointment.rescheduled",

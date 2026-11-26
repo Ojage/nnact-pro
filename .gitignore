@@ -24,3 +24,8 @@ data/pg/
 data/redis/
 data/uploads/
 .ofp-uploads/
+
+# Local service supervisor state and logs (may hold customer data)
+.services/
+# Personal Claude Code settings (for example a plugin disabled locally)
+.claude/settings.local.json

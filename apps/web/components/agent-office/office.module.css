@@ -1,0 +1,657 @@
+/* Agent Office: a warm, top-down floor plan. Colors come from the app theme
+   tokens; only the timber, walls and brass are local, with a dark variant. */
+
+.office {
+  --office-floor: #f3e6d0;
+  --office-plank: #e8d6b8;
+  --office-wall: #a8875f;
+  --office-room: #fffaf1;
+  --office-desk: #d8b98c;
+  --office-desk-edge: #b8946a;
+  --office-brass-top: #f0d796;
+  --office-brass-bottom: #c9a257;
+  --office-brass-ink: #3a2a0e;
+  --office-shadow: 0 1px 0 rgb(80 50 20 / 0.12);
+  --status-working: var(--color-success-fg);
+  --status-idle: var(--color-accent-fg);
+  --status-waiting: var(--color-attention-fg);
+  --status-paused: var(--fg-muted);
+  --status-error: var(--color-danger-fg);
+  --status-offline: var(--fg-dim);
+}
+
+:global(.dark) .office {
+  --office-floor: #211a13;
+  --office-plank: #2a2118;
+  --office-wall: #6e5a43;
+  --office-room: #18140f;
+  --office-desk: #4d3c2a;
+  --office-desk-edge: #6b543b;
+  --office-brass-top: #e2c47e;
+  --office-brass-bottom: #b48c44;
+  --office-shadow: 0 1px 0 rgb(0 0 0 / 0.4);
+}
+
+/* ---------- Floor ---------- */
+
+.floor {
+  display: grid;
+  gap: 0.75rem;
+  padding: clamp(0.5rem, 2vw, 1rem);
+  border: 10px solid var(--office-wall);
+  border-radius: 18px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 46px, var(--office-plank) 46px 48px),
+    repeating-linear-gradient(0deg, var(--office-floor) 0 118px, var(--office-plank) 118px 120px);
+}
+
+.rooms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.room {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  gap: 0.5rem;
+  inline-size: 100%;
+  min-block-size: 13.5rem;
+  padding: 0.875rem 0.875rem 1rem;
+  border: 6px solid var(--office-wall);
+  border-radius: 6px;
+  background: var(--office-room);
+  box-shadow: var(--office-shadow);
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+
+  /* The doorway: a gap in the bottom wall. */
+  &::after {
+    content: "";
+    position: absolute;
+    inset-block-end: -6px;
+    inset-inline-start: 1.25rem;
+    inline-size: 2.75rem;
+    block-size: 6px;
+    background: var(--office-room);
+  }
+
+  &:hover {
+    border-color: color-mix(in oklab, var(--office-wall) 80%, var(--fg));
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 3px;
+  }
+}
+
+.vacant {
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in oklab, var(--office-wall) 10%, transparent) 10px 12px),
+    color-mix(in oklab, var(--office-room) 70%, transparent);
+  color: var(--fg-muted);
+
+  &::after {
+    background: color-mix(in oklab, var(--office-room) 70%, var(--office-floor));
+  }
+}
+
+.roomHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.nameplate {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 3px;
+  background: linear-gradient(var(--office-brass-top), var(--office-brass-bottom));
+  box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.18);
+  color: var(--office-brass-ink);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.tier {
+  margin-inline-start: 0.375rem;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Top-down desk, chair and screen. Decorative. */
+.desk {
+  flex: none;
+  inline-size: 4.25rem;
+  block-size: 3rem;
+  color: var(--office-desk);
+}
+
+.deskTop {
+  fill: var(--office-desk);
+  stroke: var(--office-desk-edge);
+  stroke-width: 1.5;
+}
+
+.chair {
+  fill: color-mix(in oklab, var(--office-wall) 55%, var(--office-room));
+}
+
+.occupant {
+  fill: var(--fg-muted);
+}
+
+.screen {
+  fill: color-mix(in oklab, var(--fg) 70%, var(--office-room));
+}
+
+.room[data-status="working"] .screen {
+  fill: var(--status-working);
+  opacity: 0.85;
+
+  /* A brief glow when work starts; four half-cycles, under five seconds. */
+  @media (prefers-reduced-motion: no-preference) {
+    animation: screen-glow 1.2s ease-in-out 4 alternate;
+  }
+}
+
+.room[data-status="error"] .screen {
+  fill: var(--status-error);
+}
+
+@keyframes screen-glow {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0.95;
+  }
+}
+
+.task {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+.taskIdle {
+  color: var(--fg-muted);
+}
+
+.roomFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+.queue {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.vacantSign {
+  align-self: center;
+  justify-self: start;
+  padding: 0.25rem 0.625rem;
+  border: 1px dashed var(--office-wall);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* ---------- Status lamp ---------- */
+
+.lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.lampIcon {
+  flex: none;
+  color: var(--lamp-color);
+}
+
+.lamp[data-status="working"] {
+  --lamp-color: var(--status-working);
+}
+.lamp[data-status="idle"] {
+  --lamp-color: var(--status-idle);
+}
+.lamp[data-status="waiting"] {
+  --lamp-color: var(--status-waiting);
+}
+.lamp[data-status="paused"] {
+  --lamp-color: var(--status-paused);
+}
+.lamp[data-status="error"] {
+  --lamp-color: var(--status-error);
+}
+.lamp[data-status="offline"] {
+  --lamp-color: var(--status-offline);
+}
+
+/* ---------- Sparkline and cost meter ---------- */
+
+.sparkline {
+  display: block;
+  inline-size: 100%;
+  block-size: 1.75rem;
+  overflow: visible;
+}
+
+.sparkLine {
+  fill: none;
+  stroke: var(--fg-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.sparkNow {
+  stroke: var(--color-accent-fg);
+  stroke-width: 7;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.meter {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+.meterLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.meterTrack {
+  --meter-fill: var(--color-accent-fg);
+  block-size: 6px;
+  overflow: clip;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--meter-fill) 20%, transparent);
+}
+
+.meterTrack[data-level="warn"] {
+  --meter-fill: var(--color-attention-emphasis);
+}
+
+.meterTrack[data-level="over"] {
+  --meter-fill: var(--color-danger-fg);
+}
+
+.meterFill {
+  block-size: 100%;
+  border-radius: 999px;
+  background: var(--meter-fill);
+}
+
+/* ---------- Approval desk ---------- */
+
+.approvalDesk {
+  display: grid;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border: 6px solid var(--office-wall);
+  border-radius: 6px;
+  background:
+    linear-gradient(var(--office-desk), var(--office-desk)) bottom / 100% 10px no-repeat,
+    var(--office-room);
+}
+
+.approvalItems {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.approvalLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-block-size: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--fg);
+  text-decoration: none;
+
+  &:hover {
+    border-color: var(--office-wall);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+.approvalCount {
+  font-size: 1.25rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Drawer (native modal dialog) ---------- */
+
+.drawer {
+  margin: 0 0 0 auto;
+  padding: 0;
+  inline-size: min(42rem, 100vw);
+  max-inline-size: 100vw;
+  block-size: 100dvh;
+  max-block-size: 100dvh;
+  border: 0;
+  border-inline-start: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+
+  &:modal {
+    overscroll-behavior: contain;
+  }
+
+  &::backdrop {
+    overflow: hidden;
+    overscroll-behavior: contain;
+    background: rgb(15 23 42 / 0.45);
+  }
+
+  &[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    translate: 100% 0;
+    transition:
+      translate 0.25s ease-out,
+      display 0.25s,
+      overlay 0.25s;
+    transition-behavior: allow-discrete;
+
+    &[open] {
+      translate: 0 0;
+
+      @starting-style {
+        translate: 100% 0;
+      }
+    }
+  }
+}
+
+.drawerHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0.75rem;
+  border-block-end: 1px solid var(--border);
+}
+
+.drawerBody {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ---------- Tabs ---------- */
+
+.tablist {
+  display: flex;
+  gap: 0.125rem;
+  padding-inline: 0.75rem;
+  overflow-x: auto;
+  border-block-end: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+
+.tab {
+  position: relative;
+  flex: none;
+  min-block-size: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  background: none;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+
+  &[aria-selected="true"] {
+    color: var(--fg);
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      border-block-end: 3px solid var(--color-accent-fg);
+    }
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: -3px;
+  }
+}
+
+.panelBody {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.5rem;
+}
+
+/* ---------- Logs ---------- */
+
+.logToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.logList {
+  max-block-size: 60dvh;
+  margin: 0;
+  padding: 0.25rem 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  list-style: none;
+}
+
+.logRow {
+  display: grid;
+  grid-template-columns: 5.5rem 3.25rem minmax(0, 1fr);
+  gap: 0.5rem;
+  padding: 0.125rem 0.625rem;
+  line-height: 1.5;
+
+  /* Rows above the visible tail skip rendering until scrolled to. */
+  &:not(:nth-last-child(-n + 40)) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 1.5rem;
+  }
+}
+
+.logMessage {
+  overflow-wrap: anywhere;
+}
+
+.logLevel {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.logLevel[data-level="warn"] {
+  color: var(--color-attention-fg);
+}
+
+.logLevel[data-level="error"] {
+  color: var(--color-danger-fg);
+}
+
+.logLevel[data-level="debug"] {
+  color: var(--fg-dim);
+}
+
+.copy {
+  position: relative;
+  display: inline-flex;
+}
+
+.copyTip {
+  position: absolute;
+  inset-block-end: calc(100% + 0.25rem);
+  inset-inline-end: 0;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  background: var(--fg);
+  color: var(--background);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+
+  &:not(:empty) {
+    opacity: 1;
+  }
+}
+
+/* ---------- Timeline and metrics ---------- */
+
+.timeline {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timelineStep {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.timelineStep[data-status="running"] {
+  border-color: var(--status-working);
+}
+
+.timelineStep[data-status="failed"] {
+  border-color: var(--status-error);
+}
+
+.stepProgress {
+  inline-size: 100%;
+  accent-color: var(--color-accent-fg);
+}
+
+.barChart {
+  display: block;
+  inline-size: 100%;
+  block-size: 7rem;
+}
+
+.bar {
+  fill: var(--color-accent-fg);
+}
+
+.barAxis {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.metric {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+
+  & dt {
+    color: var(--fg-muted);
+    font-size: 0.75rem;
+  }
+
+  & dd {
+    margin: 0.125rem 0 0;
+    font-size: 1.125rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ---------- Confirmation dialog ---------- */
+
+.confirm {
+  inline-size: min(28rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--fg);
+
+  &:modal {
+    overscroll-behavior: contain;
+  }
+
+  &::backdrop {
+    overflow: hidden;
+    overscroll-behavior: contain;
+    background: rgb(15 23 42 / 0.5);
+  }
+}

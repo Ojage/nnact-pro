@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -31,6 +32,7 @@ import {
   STEP_TEMPLATES,
   UNITS,
 } from "../diagnostic-meta.js";
+import { patchOf } from "../zod-patch.js";
 
 export const workflowProductTypes = PRODUCT_TYPES;
 export const workflowRouteKinds = ROUTE_KINDS;
@@ -80,7 +82,7 @@ const workflowCreateSchema = z.object({
   limitations: z.array(z.string()).optional(),
 });
 
-const workflowPatchSchema = workflowCreateSchema.partial();
+const workflowPatchSchema = patchOf(workflowCreateSchema);
 
 const stepCreateSchema = z.object({
   stepKey: z.string().min(1),
@@ -104,15 +106,14 @@ const stepCreateSchema = z.object({
   unit: z.string().optional(),
   passInterpretation: z.string().optional(),
   failInterpretation: z.string().optional(),
-  branchRules: z.record(z.unknown()).optional(),
-  sourceRefs: z.array(z.record(z.unknown())).optional(),
+  branchRules: z.record(z.string(), z.unknown()).optional(),
+  sourceRefs: z.array(z.record(z.string(), z.unknown())).optional(),
   accessibilityNote: z.string().optional(),
   validationStatus: z.enum(["unreviewed", "validated"]).optional(),
 });
 
-const stepPatchSchema = stepCreateSchema
-  .omit({ stepKey: true })
-  .partial()
+const stepPatchSchema = patchOf(stepCreateSchema
+  .omit({ stepKey: true }))
 
 const routeCreateSchema = z.object({
   label: z.string().min(1),
@@ -128,7 +129,7 @@ const routeCreateSchema = z.object({
   validationNotes: z.string().optional(),
 });
 
-const routePatchSchema = routeCreateSchema.partial();
+const routePatchSchema = patchOf(routeCreateSchema);
 
 const linkSchema = z.object({
   jobId: z.string().uuid(),
@@ -660,7 +661,7 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     const [job] = await db
       .select({ id: jobs.id })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
     const [appliance] = await db
       .select({ id: equipment.id })
       .from(equipment)
@@ -719,7 +720,7 @@ export async function diagnosticRoutes(app: FastifyInstance) {
     const [job] = await db
       .select({ id: jobs.id })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, parsed.data.jobId))));
     const [appliance] = await db
       .select({ id: equipment.id })
       .from(equipment)

@@ -1,0 +1,18 @@
+{
+  "name": "@nnact/agent-kit",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@nnact/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

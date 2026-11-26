@@ -11,6 +11,7 @@ export interface NavLink {
 
 export interface NavSection {
   label: string;
+  home: string;
   links: NavLink[];
 }
 
@@ -40,6 +41,10 @@ const ROUTE_ROLES: ReadonlyArray<readonly [string, readonly NavRole[]]> = [
   ["/newsletter", ["owner"]],
   ["/integrations", ["owner"]],
   ["/settings", ["owner"]],
+  ["/agents", ["owner"]],
+  ["/agent/drafts", ["owner", "dispatcher"]],
+  ["/agent/quotes", ["owner", "dispatcher"]],
+  ["/agent/price-book", ["owner", "dispatcher"]],
   ["/dispatch", ["owner", "dispatcher"]],
   ["/schedule", ["owner", "dispatcher"]],
   ["/pipeline", ["owner", "dispatcher"]],
@@ -95,6 +100,7 @@ export function navSectionsForRole(role: NavRole | null | undefined): NavSection
 export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Field",
+    home: "/",
     links: [
       { href: "/", label: "Today", icon: "◈" },
       { href: "/jobs/new", label: "New Job", icon: "＋", tour: "jobs-add" },
@@ -103,7 +109,18 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: "Agents",
+    home: "/agents",
+    links: [
+      { href: "/agents", label: "Agent Office", icon: "⌂" },
+      { href: "/agent/drafts", label: "Draft jobs", icon: "◎" },
+      { href: "/agent/quotes", label: "Quote proposals", icon: "◇" },
+      { href: "/agent/price-book", label: "Quoting prices", icon: "⊞" },
+    ],
+  },
+  {
     label: "Operations",
+    home: "/dispatch",
     links: [
       { href: "/dispatch", label: "Dispatch Board", icon: "⇄", tour: "nav-dispatch" },
       { href: "/schedule", label: "Schedule", icon: "◐" },
@@ -117,6 +134,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Finance",
+    home: "/finance",
     links: [
       { href: "/finance", label: "Overview", icon: "⟡", tour: "nav-finance" },
       { href: "/invoices", label: "Invoices & Payments", icon: "◎", tour: "nav-invoices" },
@@ -135,6 +153,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Marketing",
+    home: "/content",
     links: [
       { href: "/content", label: "Content Studio", icon: "✎", tour: "nav-content" },
       { href: "/content/gallery", label: "Image Gallery", icon: "▣", tour: "nav-gallery" },
@@ -146,6 +165,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Quality",
+    home: "/repair-brain",
     links: [
       { href: "/repair-brain", label: "Repair Brain", icon: "◉", tour: "nav-repair-brain" },
       { href: "/repair-brain/workspace", label: "Model Workspace", icon: "▣" },
@@ -158,6 +178,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Growth",
+    home: "/growth",
     links: [
       { href: "/growth/intelligence", label: "Growth Intelligence", icon: "◎" },
       { href: "/growth/knowledge", label: "Project Knowledge", icon: "▤" },
@@ -173,6 +194,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "System",
+    home: "/settings",
     links: [
       { href: "/help/faq", label: "FAQ", icon: "?" },
       { href: "/integrations", label: "Integrations", icon: "⧉" },

@@ -34,6 +34,8 @@ function collectRuntimeErrors(page: Page) {
 }
 
 async function mockSessionApi(page: Page) {
+  // Mark the first-run tour prompt as seen so it does not cover the page.
+  await page.addInitScript(() => window.localStorage.setItem("nnact:walkthrough:banner-dismissed:learn", "1"));
   await page.route("http://127.0.0.1:3001/api/**", async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
@@ -109,9 +111,11 @@ test("desktop login uses an HTTP-only session and exposes sign out", async ({ pa
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page).toHaveURL("/");
-  const accountPanel = page.getByRole("complementary");
+  // The console top bar's account menu holds the signed-in user and Sign out.
+  await page.getByRole("button", { name: "Account and preferences" }).click();
+  const accountPanel = page.getByRole("menu");
   await expect(accountPanel.getByText("Morgan Owner")).toBeVisible();
-  await expect(accountPanel.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(accountPanel.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("NNPtoken"))).toBeNull();
 
   const cookies = await page.context().cookies("http://127.0.0.1:3001");
@@ -125,13 +129,13 @@ test("desktop login uses an HTTP-only session and exposes sign out", async ({ pa
     fullPage: true,
   });
 
-  await accountPanel.getByRole("button", { name: "Sign out" }).click();
+  await accountPanel.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/login");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });
 
-test("mobile drawer shows the authenticated user and secure sign out", async ({ page }) => {
+test("mobile account menu shows the authenticated user and secure sign out", async ({ page }) => {
   const runtimeErrors = collectRuntimeErrors(page);
   await mockSessionApi(page);
   await page.context().addCookies([
@@ -146,12 +150,12 @@ test("mobile drawer shows the authenticated user and secure sign out", async ({ 
   ]);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/jobs/new");
-  await page.getByRole("button", { name: "Open navigation menu" }).click();
+  await page.getByRole("button", { name: "Account and preferences" }).click();
 
-  const accountPanel = page.getByRole("complementary");
+  const accountPanel = page.getByRole("menu");
   await expect(accountPanel.getByText("Morgan Owner")).toBeVisible();
   await expect(accountPanel.getByText("owner", { exact: true })).toBeVisible();
-  await expect(accountPanel.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(accountPanel.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -163,7 +167,7 @@ test("mobile drawer shows the authenticated user and secure sign out", async ({ 
     fullPage: true,
   });
 
-  await accountPanel.getByRole("button", { name: "Sign out" }).click();
+  await accountPanel.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/login");
   expect(await page.evaluate(() => localStorage.getItem("NNPtoken"))).toBeNull();
   expect(runtimeErrors).toEqual([]);

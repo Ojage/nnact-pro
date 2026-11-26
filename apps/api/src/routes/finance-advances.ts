@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sql, eq, and, inArray, desc, lt } from "drizzle-orm";
@@ -94,7 +95,7 @@ async function hydrateAdvances(orgId: string, rows: AdvanceRow[]): Promise<CashA
       .orderBy(desc(advanceSettlements.settledAt)),
     db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, [...employeeIds])),
     jobIds.size
-      ? db.select({ id: jobs.id, number: jobs.number }).from(jobs).where(and(eq(jobs.orgId, orgId), inArray(jobs.id, [...jobIds])))
+      ? db.select({ id: jobs.id, number: jobs.number }).from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), inArray(jobs.id, [...jobIds]))))
       : Promise.resolve([] as { id: string; number: string | null }[]),
   ]);
 
@@ -491,7 +492,7 @@ async function hydrateReimbursements(orgId: string, rows: ReimbursementRow[]): P
   const [employeeRows, jobRows] = await Promise.all([
     db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, [...employeeIds])),
     jobIds.size
-      ? db.select({ id: jobs.id, number: jobs.number }).from(jobs).where(and(eq(jobs.orgId, orgId), inArray(jobs.id, [...jobIds])))
+      ? db.select({ id: jobs.id, number: jobs.number }).from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, orgId), inArray(jobs.id, [...jobIds]))))
       : Promise.resolve([] as { id: string; number: string | null }[]),
   ]);
   const employeeName = new Map(employeeRows.map((r) => [r.id, r.name]));

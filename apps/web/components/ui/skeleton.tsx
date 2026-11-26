@@ -19,7 +19,7 @@ function Skeleton({ className, style, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
-      className={cn("animate-shimmer rounded-md", className)}
+      className={cn("animate-shimmer rounded-xl", className)}
       style={{ ...SHIMMER_BASE, ...style }}
       {...props}
     />

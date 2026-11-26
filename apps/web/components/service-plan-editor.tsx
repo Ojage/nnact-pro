@@ -681,7 +681,7 @@ export function PlanEditor({ plan, categories, checklists, onCancel, onSaved }: 
                       onClick={() => togglePreset(preset)}
                       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                         active
-                          ? "border-accent bg-accent text-white"
+                          ? "border-accent bg-accent text-[#141414]"
                           : "border-border bg-surface-200 text-fg-muted hover:border-accent/40"
                       }`}
                     >

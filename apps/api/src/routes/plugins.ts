@@ -16,13 +16,13 @@ import { generateToken, generateWebhookSecret } from "../plugins/crypto.js";
 const installBody = z.object({
   pluginId: z.string().uuid(),
   webhookUrl: z.string().url().optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });
 
 const patchBody = z.object({
   enabled: z.boolean().optional(),
   webhookUrl: z.string().url().nullable().optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function pluginRoutes(app: FastifyInstance) {

@@ -28,22 +28,22 @@ const RESEND_ENV = {
 } as NodeJS.ProcessEnv;
 
 const identity: SenderIdentity = {
-  id: "11111111-1111-1111-1111-111111111111",
+  id: "11111111-1111-4111-8111-111111111111",
   displayName: "Dana Reeves",
   email: "dana@nnact.com",
   role: "Owner",
   verificationState: "VERIFIED",
   isActive: true,
   coldApproved: true,
-  approvedBy: "22222222-2222-2222-2222-222222222222",
+  approvedBy: "22222222-2222-4222-8222-222222222222",
   approvedAt: "2026-01-05T00:00:00.000Z",
 };
 
-const approvedBy: CampaignLike["approvedBy"] = "22222222-2222-2222-2222-222222222222";
+const approvedBy: CampaignLike["approvedBy"] = "22222222-2222-4222-8222-222222222222";
 
 function campaign(overrides: Partial<CampaignLike> = {}): CampaignLike {
   return {
-    id: "33333333-3333-3333-3333-333333333333",
+    id: "33333333-3333-4333-8333-333333333333",
     purpose: "PERMISSION_MARKETING",
     status: "SCHEDULED",
     approvedAt: "2026-01-06T00:00:00.000Z",
@@ -53,7 +53,7 @@ function campaign(overrides: Partial<CampaignLike> = {}): CampaignLike {
 }
 
 function recipient(overrides: Partial<RecipientState> = {}): RecipientState {
-  return { id: "44444444-4444-4444-4444-444444444444", followUpsSent: 0, ...overrides };
+  return { id: "44444444-4444-4444-8444-444444444444", followUpsSent: 0, ...overrides };
 }
 
 test("an unapproved or unscheduled campaign cannot send", () => {

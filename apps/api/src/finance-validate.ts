@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "./job-visibility.js";
 // Finance domain referential-integrity checks. Every user-supplied FK is
 // validated against the org before insert/update so finance records can never
 // reference rows from another tenant (IDOR/tenant-isolation guard).
@@ -41,7 +42,7 @@ export async function validateOrgIds(orgId: string, refs: RefIds): Promise<Valid
     const [job] = await db
       .select({ id: jobs.id })
       .from(jobs)
-      .where(and(eq(jobs.orgId, orgId), eq(jobs.id, refs.jobId)));
+      .where(visibleJobsWhere(and(eq(jobs.orgId, orgId), eq(jobs.id, refs.jobId))));
     if (!job) return { ok: false, error: "jobId does not exist in this org" };
   }
   if (refs.equipmentId) {

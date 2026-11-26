@@ -197,7 +197,7 @@ export default function ServicePlansPage() {
                 <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
                   <Link
                     href={`/agreements/new?plan=${plan.id}`}
-                    className="inline-flex h-8 items-center rounded-md bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90"
+                    className="inline-flex h-8 items-center rounded-md bg-accent px-3 text-xs font-medium text-[#141414] hover:bg-accent/90"
                   >
                     Subscribe customer
                   </Link>

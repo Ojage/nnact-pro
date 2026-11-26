@@ -1,3 +1,4 @@
+import { visibleJobsWhere } from "../job-visibility.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
@@ -206,7 +207,7 @@ async function loadInvoiceRows(ctx: CustomerContext) {
     .select({ invoice: invoices, jobTitle: jobs.title, jobNumber: jobs.number })
     .from(invoices)
     .innerJoin(jobs, eq(invoices.jobId, jobs.id))
-    .where(and(eq(invoices.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id), ne(invoices.status, "draft")))
+    .where(visibleJobsWhere(and(eq(invoices.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id), ne(invoices.status, "draft"))))
     .orderBy(desc(invoices.createdAt));
   const paid = await paidByInvoice(ctx.org.id, rows.map((row) => row.invoice.id));
   return rows.map(({ invoice, jobTitle, jobNumber }) => {
@@ -268,7 +269,7 @@ async function loadEstimateRows(ctx: CustomerContext) {
     .select({ estimate: estimates, jobTitle: jobs.title })
     .from(estimates)
     .innerJoin(jobs, eq(estimates.jobId, jobs.id))
-    .where(and(eq(estimates.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id), ne(estimates.status, "draft")))
+    .where(visibleJobsWhere(and(eq(estimates.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id), ne(estimates.status, "draft"))))
     .orderBy(desc(estimates.createdAt));
   const optionRows = rows.length
     ? await db
@@ -357,7 +358,7 @@ async function loadAppointmentRows(ctx: CustomerContext) {
     .from(appointments)
     .innerJoin(jobs, eq(appointments.jobId, jobs.id))
     .leftJoin(users, eq(appointments.technicianId, users.id))
-    .where(and(eq(appointments.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id)))
+    .where(visibleJobsWhere(and(eq(appointments.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id))))
     .orderBy(desc(appointments.startsAt));
   const requests = rows.length
     ? await db
@@ -398,7 +399,7 @@ async function loadJobRows(ctx: CustomerContext) {
   const rows = await db
     .select()
     .from(jobs)
-    .where(and(eq(jobs.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id)))
+    .where(visibleJobsWhere(and(eq(jobs.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id))))
     .orderBy(desc(jobs.createdAt));
   return rows;
 }
@@ -452,7 +453,7 @@ async function loadReviewRows(ctx: CustomerContext) {
     .select({ review: reviews, jobTitle: jobs.title })
     .from(reviews)
     .innerJoin(jobs, eq(reviews.jobId, jobs.id))
-    .where(and(eq(reviews.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id)))
+    .where(visibleJobsWhere(and(eq(reviews.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id))))
     .orderBy(desc(reviews.createdAt));
   return rows.map(({ review, jobTitle }) => ({
     id: review.id,
@@ -658,7 +659,7 @@ async function loadDocumentRows(ctx: CustomerContext) {
       .select()
       .from(photos)
       .innerJoin(jobs, eq(photos.jobId, jobs.id))
-      .where(and(eq(photos.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id)))
+      .where(visibleJobsWhere(and(eq(photos.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id))))
       .orderBy(desc(photos.uploadedAt)),
   ]);
   return [
@@ -767,7 +768,7 @@ async function loadJobDetail(ctx: CustomerContext, jobId: string) {
   const [job] = await db
     .select()
     .from(jobs)
-    .where(and(eq(jobs.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id), eq(jobs.id, jobId)))
+    .where(visibleJobsWhere(and(eq(jobs.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id), eq(jobs.id, jobId))))
     .limit(1);
   if (!job) return null;
   const [timelineRows, photoRows, itemRows, appointmentRows, equipmentRows, reviewRows] = await Promise.all([
@@ -970,13 +971,13 @@ export async function customerPortalRoutes(app: FastifyInstance) {
       .select({ appointment: appointments, job: jobs })
       .from(appointments)
       .innerJoin(jobs, eq(appointments.jobId, jobs.id))
-      .where(
+      .where(visibleJobsWhere(
         and(
           eq(appointments.orgId, ctx.org.id),
           eq(appointments.id, appointmentId),
           eq(jobs.customerId, ctx.customer.id),
         ),
-      )
+      ))
       .limit(1);
     if (!row) return reply.code(404).send({ error: "appointment not found" });
     if (parsed.data.type === "reschedule" && !parsed.data.requestedStartsAt) {
@@ -1159,7 +1160,7 @@ export async function customerPortalRoutes(app: FastifyInstance) {
       .select({ id: photos.id })
       .from(photos)
       .innerJoin(jobs, eq(photos.jobId, jobs.id))
-      .where(and(eq(photos.orgId, ctx.org.id), eq(photos.id, photoId), eq(jobs.customerId, ctx.customer.id)))
+      .where(visibleJobsWhere(and(eq(photos.orgId, ctx.org.id), eq(photos.id, photoId), eq(jobs.customerId, ctx.customer.id))))
       .limit(1);
     if (!row) return reply.code(404).send({ error: "photo not found" });
     const file = await getPhotoFile(photoId, ctx.org.id);
@@ -1188,7 +1189,7 @@ export async function customerPortalRoutes(app: FastifyInstance) {
       .orderBy(desc(properties.createdAt));
     const [equipmentRows, jobRows] = await Promise.all([
       db.select({ propertyId: equipment.propertyId }).from(equipment).where(and(eq(equipment.orgId, ctx.org.id), eq(equipment.customerId, ctx.customer.id))),
-      db.select({ propertyId: jobs.propertyId }).from(jobs).where(and(eq(jobs.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id))),
+      db.select({ propertyId: jobs.propertyId }).from(jobs).where(visibleJobsWhere(and(eq(jobs.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id)))),
     ]);
     return rows.map((property) => ({
       id: property.id,
@@ -1292,7 +1293,7 @@ export async function customerPortalRoutes(app: FastifyInstance) {
     const [job] = await db
       .select()
       .from(jobs)
-      .where(and(eq(jobs.orgId, ctx.org.id), eq(jobs.id, parsed.data.jobId), eq(jobs.customerId, ctx.customer.id)))
+      .where(visibleJobsWhere(and(eq(jobs.orgId, ctx.org.id), eq(jobs.id, parsed.data.jobId), eq(jobs.customerId, ctx.customer.id))))
       .limit(1);
     if (!job) return reply.code(404).send({ error: "job not found" });
     if (job.status !== "completed") return reply.code(409).send({ error: "only completed jobs can be reviewed" });
@@ -1341,7 +1342,7 @@ export async function customerPortalRoutes(app: FastifyInstance) {
       const [job] = await db
         .select({ id: jobs.id })
         .from(jobs)
-        .where(and(eq(jobs.orgId, ctx.org.id), eq(jobs.id, parsed.data.jobId), eq(jobs.customerId, ctx.customer.id)))
+        .where(visibleJobsWhere(and(eq(jobs.orgId, ctx.org.id), eq(jobs.id, parsed.data.jobId), eq(jobs.customerId, ctx.customer.id))))
         .limit(1);
       if (!job) return reply.code(404).send({ error: "job not found" });
       jobId = job.id;
@@ -1515,7 +1516,7 @@ export async function customerPortalRoutes(app: FastifyInstance) {
         .from(payments)
         .innerJoin(invoices, eq(payments.invoiceId, invoices.id))
         .innerJoin(jobs, eq(invoices.jobId, jobs.id))
-        .where(and(eq(payments.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id)))
+        .where(visibleJobsWhere(and(eq(payments.orgId, ctx.org.id), eq(jobs.customerId, ctx.customer.id))))
         .orderBy(desc(payments.paidAt)),
     ]);
     return {
