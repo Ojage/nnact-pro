@@ -27,6 +27,7 @@ import {
   type ServiceAgreementAssetDTO,
 } from "@nnact/shared";
 import { resolveOrgId } from "./org.js";
+import { patchOf } from "../zod-patch.js";
 
 const AGREEMENT_PREFIX = "NNACT-SVC";
 const VISIT_PREFIX = "VISIT";
@@ -193,7 +194,7 @@ const locationBody = z.object({
   active: z.boolean().default(true),
 });
 
-const patchLocationBody = locationBody.partial();
+const patchLocationBody = patchOf(locationBody);
 
 function equipmentLabel(e: { type: string; make: string | null; model: string | null }): string {
   return [e.type, e.make, e.model].filter((v): v is string => Boolean(v)).join(" ");

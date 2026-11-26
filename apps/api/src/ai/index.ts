@@ -17,7 +17,7 @@ const providerBody = z.object({
   defaultImageModel: z.string().nullable().optional(),
   timeoutMs: z.number().int().min(1_000).max(120_000).optional(),
   priority: z.number().int().min(0).max(999).optional(),
-  options: z.record(z.unknown()).optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
 });
 
 const settingsBody = z.object({

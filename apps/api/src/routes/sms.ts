@@ -6,6 +6,7 @@ import { etechKeysSettingsStore } from "../sms/etech-keys-store.js";
 import { etechKeysService } from "../sms/etech-keys.js";
 import { sendTestSms, isSmsConfigured } from "../sms/sms.js";
 import { SmsError } from "../sms/types.js";
+import { patchOf } from "../zod-patch.js";
 
 const settingsSchema = z.object({
   name: z.string().trim().min(1).max(80).default("default"),
@@ -89,7 +90,7 @@ export async function smsAdminRoutes(app: FastifyInstance) {
     const claims = await requireOwner(req, reply);
     if (!claims) return;
 
-    const parsed = settingsSchema.partial().safeParse(req.body);
+    const parsed = patchOf(settingsSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
     const row = await etechKeysSettingsStore.findById(req.params.id);

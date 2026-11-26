@@ -227,8 +227,8 @@ const newsletterSubscribeBody = z.object({
   email: z.string().trim().email().max(320),
   name: z.string().trim().min(1).max(200).optional(),
   phone: z.string().trim().max(50).optional(),
-  channels: z.array(z.enum(["email", "whatsapp"])).default(["email"]).optional(),
-  source: z.string().trim().max(50).default("footer").optional(),
+  channels: z.array(z.enum(["email", "whatsapp"])).optional(),
+  source: z.string().trim().max(50).optional(),
 });
 
 const newsletterSubscribeBodySchema = {

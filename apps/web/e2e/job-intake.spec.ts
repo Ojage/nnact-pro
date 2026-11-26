@@ -101,6 +101,20 @@ async function mockIntakeApi(
       }, 201);
     }
 
+    // The job page loads after a successful create: answer its reads with
+    // the created records and empty lists, as the real API would.
+    if (request.method() === "GET") {
+      if (pathname === "/api/jobs/job-created") {
+        return fulfillJson(route, { id: "job-created", total: 0, createdAt: "2026-07-11T12:00:00.000Z", ...capture.job });
+      }
+      if (pathname === "/api/appointments") {
+        return fulfillJson(route, capture.appointment ? [{ id: "appointment-created", ...capture.appointment }] : []);
+      }
+      if (pathname === "/api/activities" || pathname.includes("diagnostic") || /^\/api\/jobs\/[^/]+\/[a-z-]+$/.test(pathname)) {
+        return fulfillJson(route, []);
+      }
+    }
+
     return fulfillJson(route, {});
   });
 }

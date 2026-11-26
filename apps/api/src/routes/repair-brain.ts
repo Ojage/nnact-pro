@@ -66,6 +66,7 @@ import {
   suggestLookup,
 } from "../repair-brain-cache.js";
 import { semanticSearch, warmSemanticIndex } from "../repair-brain-semantic.js";
+import { patchOf } from "../zod-patch.js";
 
 const modelCreateSchema = z.object({
   manufacturer: z.string().min(1),
@@ -77,7 +78,7 @@ const modelCreateSchema = z.object({
   subcategory: z.string().optional(),
   productFamily: z.string().optional(),
   manufactureYears: z.object({ from: z.number().optional(), to: z.number().optional() }).optional(),
-  specifications: z.record(z.unknown()).optional(),
+  specifications: z.record(z.string(), z.unknown()).optional(),
   aliases: z.array(z.string()).optional(),
   notes: z.string().optional(),
 });
@@ -143,7 +144,7 @@ const proposalSchema = z.object({
   equipmentModelId: z.string().uuid().optional(),
   proposalType: z.enum(KNOWLEDGE_PROPOSAL_TYPE),
   title: z.string().min(1),
-  payload: z.record(z.unknown()).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
 });
 
 async function resolveUserId(req: Parameters<typeof resolveOrgId>[0]): Promise<string | undefined> {
@@ -320,7 +321,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
   app.patch("/models/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const { id } = req.params as { id: string };
-    const parsed = modelCreateSchema.partial().safeParse(req.body);
+    const parsed = patchOf(modelCreateSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
     const [existing] = await db
@@ -636,7 +637,7 @@ export async function repairBrainRoutes(app: FastifyInstance) {
   app.patch("/faults/:id", async (req, reply) => {
     const orgId = await resolveOrgId(req);
     const { id } = req.params as { id: string };
-    const parsed = faultCreateSchema.partial().safeParse(req.body);
+    const parsed = patchOf(faultCreateSchema).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const [existing] = await db
       .select()

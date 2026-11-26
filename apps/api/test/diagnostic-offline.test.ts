@@ -82,7 +82,7 @@ test("accepts a valid session.create op with optional fields", () => {
           payload: {
             id: "ca3d5f1e-2b4c-4e6f-8a9b-0c1d2e3f4a5b",
             sessionId: validCreate.payload.id,
-            stepId: "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e",
+            stepId: "7b8c9d0e-1f2a-4b4c-8d6e-7f8a9b0c1d2e",
             result: "pass" as const,
             recordedAt: "2026-09-15T10:00:00.000Z",
           },
@@ -94,7 +94,7 @@ test("accepts a valid session.create op with optional fields", () => {
             id: "da3d5f1e-2b4c-4e6f-8a9b-0c1d2e3f4a5c",
             workflowId: "8a7b6c5d-4e3f-2a1b-9c8d-7e6f5a4b3c20",
             workflowVersion: 1,
-            stepId: "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e",
+            stepId: "7b8c9d0e-1f2a-4b4c-8d6e-7f8a9b0c1d2e",
             category: "step.correction",
             severity: "low",
             description: "wrong unit",

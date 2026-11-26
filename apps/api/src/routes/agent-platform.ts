@@ -13,7 +13,7 @@ import {
 } from "@nnact/shared";
 
 const uuid = z.string().uuid();
-const json = z.record(z.unknown());
+const json = z.record(z.string(), z.unknown());
 
 const createRunBody = z.object({
   orgId: uuid,

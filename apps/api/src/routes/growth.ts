@@ -41,6 +41,7 @@ import {
   normalizeEmail,
   normalizePhone,
 } from "../growth/send-policy.js";
+import { patchOf } from "../zod-patch.js";
 
 const uuid = z.string().uuid();
 const trimmed = z.string().trim().min(1);
@@ -82,7 +83,7 @@ const createProspectBody = z.object({
   force: z.boolean().optional(),
 });
 
-const updateProspectBody = createProspectBody.omit({ force: true, countryCallingCode: true }).partial();
+const updateProspectBody = patchOf(createProspectBody.omit({ force: true, countryCallingCode: true }));
 
 const listProspectsQuery = z.object({
   q: z.string().trim().max(200).optional(),

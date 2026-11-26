@@ -9,7 +9,7 @@ import { redactLine, redactText } from "./redact.js";
 import { logDTO, stepDTO } from "./service.js";
 
 const label = z.string().trim().min(1).max(120);
-const fields = z.record(z.unknown()).optional();
+const fields = z.record(z.string(), z.unknown()).optional();
 
 export const heartbeatBody = z.object({
   instanceId: z.string().trim().min(1).max(120),

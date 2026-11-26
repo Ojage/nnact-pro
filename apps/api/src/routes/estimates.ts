@@ -24,6 +24,7 @@ import { safeEmitActivity } from "../activities.js";
 import { isApproverRole, verifiedClaims } from "../operational-authorization.js";
 
 import { createDepositInvoiceTx } from "../estimate-approval.js";
+import { patchOf } from "../zod-patch.js";
 
 type EstimateLifecycle = "draft" | "sent" | "approved" | "declined" | "expired";
 
@@ -51,7 +52,7 @@ const lineBody = z.object({
   unitCost: z.number().int().nonnegative().default(0),
   unit: z.string().trim().max(80).nullable().optional(),
 });
-const linePatchBody = lineBody.partial().refine((value) => Object.keys(value).length > 0, "at least one field is required");
+const linePatchBody = patchOf(lineBody).refine((value) => Object.keys(value).length > 0, "at least one field is required");
 const decisionBody = z.object({ optionId: z.string().uuid(), signatureName: z.string().trim().max(160).optional() });
 
 export function estimateOptionTotal(lines: { quantity: number; unitPrice: number }[]) {

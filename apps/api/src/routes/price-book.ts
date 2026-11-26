@@ -27,6 +27,7 @@ import {
   rateDTO,
 } from "../price-book/service.js";
 import { matchItemByName } from "../price-book/pricing.js";
+import { patchOf } from "../zod-patch.js";
 
 const uuid = z.string().uuid();
 const categoryBody = z.object({
@@ -191,7 +192,7 @@ export async function priceBookRoutes(app: FastifyInstance) {
     const claims = await requireRole(req, reply, ["owner", "dispatcher"]);
     if (!claims) return;
     const { id } = req.params as { id: string };
-    const parsed = categoryBody.partial().safeParse(req.body);
+    const parsed = patchOf(categoryBody).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const [row] = await db
       .update(priceBookCategories)
@@ -223,7 +224,7 @@ export async function priceBookRoutes(app: FastifyInstance) {
     const claims = await requireRole(req, reply, ["owner", "dispatcher"]);
     if (!claims) return;
     const { id } = req.params as { id: string };
-    const parsed = itemBody.partial().safeParse(req.body);
+    const parsed = patchOf(itemBody).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const [row] = await db
       .update(priceBookItems)
@@ -300,7 +301,7 @@ export async function priceBookRoutes(app: FastifyInstance) {
     const claims = await requireRole(req, reply, ["owner"]);
     if (!claims) return;
     const { id } = req.params as { id: string };
-    const parsed = rateBody.partial().safeParse(req.body);
+    const parsed = patchOf(rateBody).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const [row] = await db
       .update(priceBookRates)

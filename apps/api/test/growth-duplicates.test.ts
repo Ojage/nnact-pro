@@ -12,7 +12,7 @@ import {
 } from "../src/growth/duplicates.js";
 
 const acme: DuplicateCandidate = {
-  id: "a1111111-1111-1111-1111-111111111111",
+  id: "a1111111-1111-4111-8111-111111111111",
   companyName: "Acme Air Conditioning",
   websiteDomain: "acmeair.co.za",
   contacts: [
@@ -89,7 +89,7 @@ test("an unrelated record is not a duplicate", () => {
 
 test("matches are ranked strongest first", () => {
   const weak: DuplicateCandidate = {
-    id: "b2222222-2222-2222-2222-222222222222",
+    id: "b2222222-2222-4222-8222-222222222222",
     companyName: "Acme Airconditioning",
     websiteDomain: null,
   };
@@ -105,7 +105,7 @@ test("matches are ranked strongest first", () => {
 
 test("a similar name alone is a suggestion, not an automatic merge", () => {
   const similarNameOnly: DuplicateCandidate = {
-    id: "c3333333-3333-3333-3333-333333333333",
+    id: "c3333333-3333-4333-8333-333333333333",
     companyName: "Acme Airconditioning",
     websiteDomain: null,
   };

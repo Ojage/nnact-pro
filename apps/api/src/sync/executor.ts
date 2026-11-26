@@ -13,6 +13,7 @@ import type { JobStatus } from "@nnact/shared";
 import type { UserRole } from "../operational-authorization.js";
 import { nextJobStatus } from "../job-lifecycle.js";
 import { createJobInOrg } from "../job-creation.js";
+import { patchOf } from "../zod-patch.js";
 
 type Db = NodePgDatabase<typeof dbSchema>;
 type Tx = any;
@@ -97,10 +98,10 @@ const PaymentCreate = z.object({
 }).strict();
 
 function nonEmptyPartial<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
-  return schema.partial().refine((value) => Object.keys(value).length > 0, "update payload cannot be empty");
+  return patchOf(schema).refine((value) => Object.keys(value).length > 0, "update payload cannot be empty");
 }
 
-const CREATE_SCHEMAS: Record<SyncOpTable, z.ZodTypeAny> = {
+const CREATE_SCHEMAS: Record<SyncOpTable, z.ZodType<Record<string, unknown>>> = {
   jobs: JobCreate,
   line_items: LineItemCreate,
   invoices: InvoiceCreate,
@@ -110,7 +111,7 @@ const CREATE_SCHEMAS: Record<SyncOpTable, z.ZodTypeAny> = {
   payments: PaymentCreate,
 };
 
-const UPDATE_SCHEMAS: Record<SyncOpTable, z.ZodTypeAny> = {
+const UPDATE_SCHEMAS: Record<SyncOpTable, z.ZodType<Record<string, unknown>>> = {
   jobs: nonEmptyPartial(JobCreate),
   line_items: nonEmptyPartial(LineItemCreate),
   invoices: nonEmptyPartial(InvoiceCreate),
