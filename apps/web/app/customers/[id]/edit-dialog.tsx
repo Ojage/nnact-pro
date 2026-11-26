@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Pencil } from "lucide-react";
+import { toolbarButton } from "@/components/console/styles";
 import type { CustomerDTO } from "@nnact/shared";
 import { usePatchCustomerMutation } from "@/lib/redux/api";
 import { Button } from "@/components/ui/button";
@@ -34,9 +36,10 @@ export function EditCustomerDialog({ customer }: { customer: CustomerDTO }) {
 
   return (
     <>
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+      <button type="button" className={toolbarButton} onClick={() => setOpen(true)}>
+        <Pencil className="size-4" aria-hidden="true" />
         Edit customer
-      </Button>
+      </button>
       {open && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <button

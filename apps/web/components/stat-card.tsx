@@ -1,5 +1,6 @@
-import { Card } from "@/components/ui/card";
+import { PrefetchLink as Link } from "@/components/prefetch-link";
 
+/** Console summary card: small label, large number, optional trend in words. */
 export function StatCard({
   label,
   value,
@@ -16,39 +17,35 @@ export function StatCard({
   href?: string;
 }) {
   const content = (
-    <Card
-      className={`flex-1 min-w-0 transition-all duration-200 ${
-        href ? "hover:bg-surface-400 cursor-pointer hover:shadow-md" : ""
+    <div
+      className={`h-full min-w-0 flex-1 rounded-[8px] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-4 ${
+        href ? "transition-colors hover:bg-[var(--shell-canvas)]" : ""
       }`}
     >
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs text-fg-muted font-medium tracking-wide uppercase">
-          {label}
-        </p>
+      <p className="flex items-center gap-2 text-xs font-medium text-fg-muted">
         {icon && (
-          <span className="text-lg opacity-60">{icon}</span>
+          <span className="text-sm" aria-hidden="true">
+            {icon}
+          </span>
         )}
-      </div>
-      <p className="text-2xl font-bold tracking-tight" style={{ color: color ?? "var(--color-fg)" }}>
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-normal tabular-nums text-fg" style={color ? { color } : undefined}>
         {value}
       </p>
       {trend && (
-        <p
-          className={`text-xs mt-1.5 font-medium ${
-            trend.direction === "up" ? "text-green" : "text-red"
-          }`}
-        >
-          {trend.direction === "up" ? "↑" : "↓"} {trend.label}
+        <p className={`mt-1 text-xs font-medium ${trend.direction === "up" ? "text-[var(--console-success-fg)]" : "text-[var(--console-danger-fg)]"}`}>
+          {trend.direction === "up" ? "▲" : "▼"} {trend.label}
         </p>
       )}
-    </Card>
+    </div>
   );
 
   if (href) {
     return (
-      <a href={href} className="no-underline hover:no-underline flex-1 min-w-0">
+      <Link href={href} className="block min-w-0 flex-1 rounded-[8px] no-underline hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-focus)]">
         {content}
-      </a>
+      </Link>
     );
   }
 

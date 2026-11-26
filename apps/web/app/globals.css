@@ -818,3 +818,69 @@ html:has(.welcome-page) {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
+
+/* ---------------------------------------------------------------------------
+ * Console pages (components/console): status chip inks and a soft info blue
+ * for "scheduled / in progress" states. Status is always icon + words; these
+ * colours only reinforce it. Text inks meet 4.5:1 on --shell-panel.
+ * ------------------------------------------------------------------------- */
+:root {
+  --console-info-fg: #1967d2;
+  --console-success-fg: #137333;
+  --console-warning-fg: #9a5b00;
+  --console-danger-fg: #c5221f;
+  --console-neutral-fg: #5f6368;
+  --console-chip-bg: #f1f3f4;
+}
+
+.dark {
+  --console-info-fg: #8ab4f8;
+  --console-success-fg: #81c995;
+  --console-warning-fg: #fdd663;
+  --console-danger-fg: #f28b82;
+  --console-neutral-fg: #bdc1c6;
+  --console-chip-bg: #2d2f31;
+}
+
+/* Wide tables scroll inside their own frame; keyboard users can focus it. */
+.console-scroll:focus-visible {
+  outline: 2px solid var(--shell-focus);
+  outline-offset: -2px;
+}
+
+/* Sticky form action bar sits flush with the white panel's edges. */
+.console-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin-inline: -1rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--shell-border);
+  background: var(--shell-panel);
+}
+
+@media (min-width: 768px) {
+  .console-action-bar {
+    margin-inline: -2rem;
+    padding-inline: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .console-action-bar {
+    margin-inline: -2.5rem;
+    padding-inline: 2.5rem;
+  }
+}
+
+/* Console charts: one validated single-series mark colour per mode (dataviz
+ * validator: lightness band, chroma floor and 3:1 vs the panel all pass). */
+:root {
+  --console-chart-mark: #a37a00;
+  --console-chart-grid: #e8eaed;
+}
+
+.dark {
+  --console-chart-mark: #b08a12;
+  --console-chart-grid: #3c4043;
+}

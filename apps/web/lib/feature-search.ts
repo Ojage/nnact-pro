@@ -65,6 +65,7 @@ export const FEATURE_COMMANDS: FeatureCommand[] = [
   { id: "importKnowledge", title: "Import Repair Knowledge", group: "Quality", href: "/repair-brain", icon: "＋", description: "Bulk add models, faults and parts", keywords: ["import", "bulk add", "csv", "json", "upload knowledge"] },
   { id: "checkCoverage", title: "Check Coverage", group: "Quality", href: "/coverage", icon: "◇", description: "See service area coverage", keywords: ["coverage", "territory", "area", "zones"] },
   { id: "exportReport", title: "Export a Report", group: "Quality", href: "/reports", icon: "◫", description: "Download analytics or KPI reports", keywords: ["export", "download", "pdf", "csv", "kpi", "analytics"] },
+  { id: "allModules", title: "Browse All Modules", group: "System", href: "/modules", icon: "▦", description: "Search every module available to you", keywords: ["modules", "products", "features", "catalog", "navigation"] },
   { id: "manageTeam", title: "Manage Team Members", group: "System", href: "/settings", icon: "⚙", description: "Invite, edit or remove staff", keywords: ["invite member", "add user", "team", "staff", "roles", "permissions"] },
   { id: "managePriceList", title: "Manage the Price Book", group: "Billing", href: "/price-book", icon: "⊡", description: "Update labor and part pricing", keywords: ["prices", "rate card", "rates", "update pricing"] },
 ];

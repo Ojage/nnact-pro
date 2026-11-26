@@ -25,24 +25,30 @@ export default function GrowthLayout({ children }: { children: React.ReactNode }
   return (
     <RoleGate>
       <div className="space-y-6">
-        <nav className="flex flex-wrap gap-2 border-b border-border pb-3">
-          {LINKS.map(({ href, label }) => {
-            const active =
-              href === "/growth"
-                ? pathname === "/growth"
-                : pathname === href || pathname?.startsWith(`${href}/`);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  active ? "bg-primary/10 text-primary" : "text-fg-muted hover:bg-muted hover:text-fg"
-                }`}
-              >
-                {label}
-              </Link>
-            );
-          })}
+        <nav aria-label="Growth sections" className="overflow-x-auto border-b border-[var(--shell-border)]">
+          <ul className="flex min-w-max gap-1" role="list">
+            {LINKS.map(({ href, label }) => {
+              const active =
+                href === "/growth"
+                  ? pathname === "/growth"
+                  : pathname === href || pathname?.startsWith(`${href}/`);
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative inline-flex h-11 items-center px-3 text-sm no-underline hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--shell-focus)] ${
+                      active
+                        ? "font-medium text-[var(--shell-accent-text)] after:absolute after:inset-x-0 after:bottom-0 after:border-b-[3px] after:border-[var(--shell-accent-bar)]"
+                        : "text-fg-muted hover:bg-[var(--shell-hover)] hover:text-fg"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </nav>
         {children}
       </div>

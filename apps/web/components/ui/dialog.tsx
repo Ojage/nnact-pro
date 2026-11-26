@@ -65,7 +65,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           // Centered like standard modals; max-height keeps tall dialogs inside the viewport (scroll inside).
-          "bg-card text-foreground border border-border data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 flex w-full max-h-[min(92vh,calc(100dvh-2rem))] flex-col translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-[26px] shadow-[0_32px_90px_rgba(0,0,0,0.24)] duration-200 max-w-none gap-0 p-6",
+          "bg-card text-foreground border border-border data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 flex w-full max-h-[min(92vh,calc(100dvh-2rem))] flex-col translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-[8px] shadow-[0_12px_40px_rgba(0,0,0,0.22)] duration-200 max-w-none gap-0 p-6",
           className,
         )}
         {...props}

@@ -1,70 +1,51 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, Clock, CircleDashed, Download, ExternalLink, Eye, FilePlus2, FileText, RefreshCw, Send, XCircle } from "lucide-react";
 import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { usePrefetchListDetails } from "@/hooks/use-prefetch-list-details";
-import { useCreateEstimateMutation, useCustomersQuery, useEstimatesQuery, useJobsQuery } from "@/lib/redux/api";
+import { explainRtkError, useCreateEstimateMutation, useCustomersQuery, useEstimatesQuery, useJobsQuery } from "@/lib/redux/api";
+import type { Estimate } from "@/lib/api";
 import { formatMoney } from "@nnact/shared";
 import type { JobDTO, CustomerDTO } from "@nnact/shared";
 import { Card } from "@/components/ui/card";
-import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
 import { Label } from "@/components/ui/label";
-import { EmptyState } from "@/components/empty-state";
-import { Table, TableHeader, TableHead, TableBody, TableRow } from "@/components/ui/table";
+import { EstimateStatusBadge } from "@/components/status-badge";
+import {
+  Banner,
+  ConsoleHeader,
+  ConsolePage,
+  ResourceTable,
+  ToolbarButton,
+  downloadCsv,
+  primaryButton,
+  resourceLink,
+  type Column,
+  type Facet,
+} from "@/components/console";
+import { cn } from "@/lib/utils";
 
-type StatusFilter = "all" | "pending" | "accepted";
-type SortField = "job" | "total" | "status" | "date";
-
-const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "accepted", label: "Accepted" },
-];
-
-function SortHead({
-  field,
-  label,
-  sort,
-  dir,
-  onSort,
-  className,
-}: {
-  field: SortField;
-  label: string;
-  sort: SortField;
-  dir: "asc" | "desc";
-  onSort: (f: SortField) => void;
-  className?: string;
-}) {
-  const active = sort === field;
-  return (
-    <TableHead
-      onClick={() => onSort(field)}
-      className={`cursor-pointer select-none hover:text-fg transition-colors ${className ?? ""}`}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        <span className="text-[10px] w-3 text-center">
-          {active ? (dir === "asc" ? "↑" : "↓") : ""}
-        </span>
-      </span>
-    </TableHead>
-  );
-}
+const STAGES = [
+  { status: "draft", label: "Draft", icon: CircleDashed },
+  { status: "sent", label: "Sent", icon: Send },
+  { status: "approved", label: "Approved", icon: CheckCircle2 },
+  { status: "declined", label: "Declined", icon: XCircle },
+  { status: "expired", label: "Expired", icon: Clock },
+] as const;
 
 export default function EstimatesPage() {
-  const { data: estimates = [], isLoading, isError, error: queryError } = useEstimatesQuery();
+  const router = useRouter();
+  const estimatesQuery = useEstimatesQuery();
+  const { data: estimates = [], isLoading, isError } = estimatesQuery;
   const { data: jobs = [] } = useJobsQuery();
   const { data: customers = [] } = useCustomersQuery();
   const [createEstimate, { isLoading: createSubmitting }] = useCreateEstimateMutation();
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortField>("date");
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [facetValues, setFacetValues] = useState<Record<string, string[]>>({});
+  const [visible, setVisible] = useState<Estimate[]>([]);
 
   // ── Create estimate modal ──
   const [showCreate, setShowCreate] = useState(false);
@@ -86,7 +67,7 @@ export default function EstimatesPage() {
       setShowCreate(false);
       setCreateJobId("");
     } catch (e) {
-      setCreateError(String(e));
+      setCreateError(explainRtkError(e, "Could not create the estimate"));
     }
   };
 
@@ -106,108 +87,143 @@ export default function EstimatesPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [showCreate]);
 
-  const jobMap = useMemo(() => {
-    const m = new Map<string, JobDTO>();
-    for (const j of jobs) m.set(j.id, j);
-    return m;
-  }, [jobs]);
-
-  const customerMap = useMemo(() => {
-    const m = new Map<string, CustomerDTO>();
-    for (const c of customers) m.set(c.id, c);
-    return m;
-  }, [customers]);
-
-  const handleSort = (field: SortField) => {
-    if (sort === field) {
-      setDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSort(field);
-      setDir("desc");
-    }
+  const jobMap = useMemo(() => new Map<string, JobDTO>(jobs.map((j) => [j.id, j])), [jobs]);
+  const customerMap = useMemo(() => new Map<string, CustomerDTO>(customers.map((c) => [c.id, c])), [customers]);
+  const customerOf = (estimate: Estimate) => {
+    const job = jobMap.get(estimate.jobId);
+    return job ? customerMap.get(job.customerId) ?? null : null;
   };
 
-  const filteredSorted = useMemo(() => {
-    let list = [...estimates];
-
-    // Status filter
-    if (statusFilter === "pending") list = list.filter((e) => e.status === "draft" || e.status === "sent");
-    if (statusFilter === "accepted") list = list.filter((e) => e.status === "approved");
-
-    // Search
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((e) => {
-        const job = jobMap.get(e.jobId);
-        const jobTitle = job?.title?.toLowerCase() ?? "";
-        const custName = (job ? customerMap.get(job.customerId)?.name : "")?.toLowerCase() ?? "";
-        return jobTitle.includes(q) || custName.includes(q);
-      });
+  const stageTotals = useMemo(() => {
+    const totals: Record<string, { count: number; value: number }> = {};
+    for (const estimate of estimates) {
+      const entry = (totals[estimate.status] ??= { count: 0, value: 0 });
+      entry.count += 1;
+      entry.value += estimate.total;
     }
-
-    // Sort
-    list.sort((a, b) => {
-      const mult = dir === "asc" ? 1 : -1;
-      switch (sort) {
-        case "job": {
-          const tA = jobMap.get(a.jobId)?.title ?? "";
-          const tB = jobMap.get(b.jobId)?.title ?? "";
-          return mult * tA.localeCompare(tB);
-        }
-        case "total":
-          return mult * (a.total - b.total);
-        case "status":
-          return mult * (Number(a.accepted) - Number(b.accepted));
-        case "date":
-        default:
-          return mult * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      }
-    });
-
-    return list;
-  }, [estimates, search, sort, dir, statusFilter, jobMap, customerMap]);
+    return totals;
+  }, [estimates]);
+  const decided = (stageTotals.approved?.count ?? 0) + (stageTotals.declined?.count ?? 0);
+  const winRate = decided ? Math.round(((stageTotals.approved?.count ?? 0) / decided) * 100) : null;
 
   usePrefetchListDetails(
     "estimates",
-    useMemo(() => filteredSorted.slice(0, 40).map((e) => e.id), [filteredSorted]),
+    useMemo(() => visible.slice(0, 40).map((e) => e.id), [visible]),
   );
+  const onFilteredChange = useCallback((rows: Estimate[]) => setVisible(rows), []);
+
+  const exportRows = (rows: readonly Estimate[]) =>
+    downloadCsv(`estimates-${new Date().toISOString().slice(0, 10)}.csv`, rows, [
+      ["Number", (e) => e.number],
+      ["Status", (e) => e.status],
+      ["Job", (e) => jobMap.get(e.jobId)?.title ?? ""],
+      ["Customer", (e) => customerOf(e)?.name ?? ""],
+      ["Total", (e) => (e.total / 100).toFixed(2)],
+      ["Created", (e) => e.createdAt],
+      ["Expires", (e) => e.expiresAt ?? ""],
+    ]);
+
+  const columns: Column<Estimate>[] = [
+    {
+      id: "number",
+      header: "Estimate",
+      sortValue: (e) => e.number,
+      cell: (e) => (
+        <span className="grid">
+          <Link href={`/estimates/${e.id}`} className={`${resourceLink} font-mono`}>
+            {e.number}
+          </Link>
+          {e.revision && e.revision > 1 ? <span className="text-[11px] text-fg-muted">Revision {e.revision}</span> : null}
+        </span>
+      ),
+    },
+    { id: "status", header: "Status", sortValue: (e) => e.status, cell: (e) => <EstimateStatusBadge status={e.status} /> },
+    {
+      id: "job",
+      header: "Job",
+      sortValue: (e) => jobMap.get(e.jobId)?.title ?? "",
+      cell: (e) => {
+        const job = jobMap.get(e.jobId);
+        return job ? (
+          <Link href={`/jobs/${job.id}`} className="block max-w-[18rem] truncate text-fg hover:text-[var(--shell-accent-text)] hover:underline">
+            {job.title}
+          </Link>
+        ) : (
+          <span className="text-fg-muted">—</span>
+        );
+      },
+    },
+    {
+      id: "customer",
+      header: "Customer",
+      hideBelow: "md",
+      sortValue: (e) => customerOf(e)?.name ?? "",
+      cell: (e) => <span className="text-fg-muted">{customerOf(e)?.name ?? "—"}</span>,
+    },
+    {
+      id: "expires",
+      header: "Expires",
+      hideBelow: "lg",
+      sortValue: (e) => e.expiresAt ?? "",
+      cell: (e) => {
+        if (!e.expiresAt) return <span className="text-fg-muted">No expiry</span>;
+        const past = new Date(e.expiresAt).getTime() < Date.now();
+        return (
+          <span className={cn("whitespace-nowrap", past ? "text-[var(--console-danger-fg)]" : "text-fg-muted")}>
+            {past ? "Expired " : ""}
+            {new Date(e.expiresAt).toLocaleDateString()}
+          </span>
+        );
+      },
+    },
+    {
+      id: "date",
+      header: "Created",
+      hideBelow: "sm",
+      sortValue: (e) => e.createdAt,
+      cell: (e) => <span className="whitespace-nowrap text-fg-muted">{new Date(e.createdAt).toLocaleDateString()}</span>,
+    },
+    {
+      id: "total",
+      header: "Total",
+      align: "right",
+      sortValue: (e) => e.total,
+      cell: (e) => <span className="whitespace-nowrap font-mono text-fg">{formatMoney(e.total)}</span>,
+    },
+  ];
+
+  const facets: Facet<Estimate>[] = [
+    { id: "status", label: "Status", options: STAGES.map((stage) => ({ value: stage.status, label: stage.label })), value: (e) => e.status },
+  ];
+  const statusFilter = facetValues.status ?? [];
 
   if (isLoading) {
     return (
-      <div>
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-44" />
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <Skeleton className="h-10 w-80 rounded-lg" />
-          <Skeleton className="h-10 w-36 rounded-lg" />
-        </div>
-        <div className="hidden md:block">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 rounded-xl mb-2" />
-          ))}
-        </div>
-        <div className="md:hidden flex flex-col gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))}
-        </div>
+      <div className="grid gap-4" aria-busy="true" aria-label="Loading estimates">
+        <Skeleton className="h-8 w-40 rounded-[6px]" />
+        <Skeleton className="h-20 rounded-[8px]" />
+        <Skeleton className="h-80 rounded-[8px]" />
       </div>
     );
   }
 
   return (
-    <div>
-      <PageHeader
+    <ConsolePage>
+      <ConsoleHeader
         title="Estimates"
-        description={`${estimates.length} estimate${estimates.length !== 1 ? "s" : ""} · ${estimates.filter((e) => e.accepted).length} accepted`}
-        actions={
-          <Button onClick={openCreate} size="sm" data-tour="estimates-add">
-            ⊕ Create Estimate
-          </Button>
+        meta={winRate !== null ? <span>Win rate {winRate}% of decided estimates</span> : null}
+        toolbar={
+          <>
+            <ToolbarButton icon={FilePlus2} onClick={openCreate} data-tour="estimates-add">
+              Create Estimate
+            </ToolbarButton>
+            <ToolbarButton icon={Download} onClick={() => exportRows(visible.length ? visible : estimates)} disabled={estimates.length === 0}>
+              Export CSV
+            </ToolbarButton>
+            <ToolbarButton icon={RefreshCw} spinning={estimatesQuery.isFetching} disabled={estimatesQuery.isFetching} onClick={() => void estimatesQuery.refetch()}>
+              Refresh
+            </ToolbarButton>
+          </>
         }
       />
 
@@ -225,7 +241,7 @@ export default function EstimatesPage() {
                 className="p-6"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-fg">Create Estimate</h3>
+                  <h2 className="text-base font-medium text-fg">Create Estimate</h2>
                   <Button
                     type="button"
                     variant="ghost"
@@ -239,15 +255,15 @@ export default function EstimatesPage() {
                 </div>
 
                 {createError && (
-                  <p className="text-red text-xs mb-3 p-2 rounded bg-red/5">{createError}</p>
+                  <p role="alert" className="mb-3 rounded-[6px] bg-[color-mix(in_srgb,var(--console-danger-fg)_8%,transparent)] p-2 text-sm text-[var(--console-danger-fg)]">{createError}</p>
                 )}
 
-                <p className="text-xs text-fg-muted mb-3">
+                <p className="mb-3 text-sm text-fg-muted">
                   Generates an estimate that snapshots the job&rsquo;s current total.
                 </p>
 
                 <div>
-                  <Label htmlFor="create-job" className="mb-1.5 block text-xs font-semibold text-fg-muted">
+                  <Label htmlFor="create-job" className="mb-1.5 block text-sm font-medium text-fg">
                     Job *
                   </Label>
                   <FormSelect
@@ -284,189 +300,85 @@ export default function EstimatesPage() {
         </>
       )}
 
-      {isError && (
-        <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">We couldn't load this page. Check your connection and try again.</p>
-        </Card>
-      )}
 
-      {estimates.length === 0 && !isError ? (
-        <Card>
-          <EmptyState
-            title="No estimates yet"
-            description="Create an estimate from a job to send to your customer."
-          />
-        </Card>
-      ) : (
-        <>
-          {/* Search + filter */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            <Input
-              type="search"
-              placeholder="Search by job title or customer..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-xs flex-1"
-            />
-            <FormSelect
-              value={statusFilter}
-              onChange={(value) => setStatusFilter(value as StatusFilter)}
-              options={STATUS_OPTIONS}
-              className="sm:w-48"
-            />
-          </div>
+      {isError ? (
+        <Banner tone="danger" title="Estimates could not be loaded.">
+          Check your connection and try again.
+        </Banner>
+      ) : null}
 
-          {/* Desktop table */}
-          <div className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="px-3 py-2 text-left text-xs font-semibold text-fg-dim uppercase tracking-wider">
-                    Estimate
-                  </TableHead>
-                  <SortHead field="job" label="Job" sort={sort} dir={dir} onSort={handleSort} />
-                  <TableHead className="px-3 py-2 text-left text-xs font-semibold text-fg-dim uppercase tracking-wider">
-                    Customer
-                  </TableHead>
-                  <SortHead field="total" label="Total" sort={sort} dir={dir} onSort={handleSort} className="text-right" />
-                  <SortHead field="status" label="Status" sort={sort} dir={dir} onSort={handleSort} />
-                  <SortHead field="date" label="Created" sort={sort} dir={dir} onSort={handleSort} />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSorted.length === 0 ? (
-                  <TableRow>
-                    <td colSpan={6} className="text-center py-10">
-                      <p className="text-sm text-fg-muted">No estimates match your filters</p>
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="mt-1 h-auto p-0 text-xs"
-                        onClick={() => { setSearch(""); setStatusFilter("all"); }}
-                      >
-                        Clear filters
-                      </Button>
-                    </td>
-                  </TableRow>
-                ) : (
-                  filteredSorted.map((e) => {
-                    const job = jobMap.get(e.jobId);
-                    const cust = job ? customerMap.get(job.customerId) : null;
-                    const expired = e.expiresAt ? new Date(e.expiresAt).getTime() < Date.now() : false;
-                    return (
-                      <TableRow key={e.id}>
-                        <td className="px-3 py-3">
-                          <Link href={`/estimates/${e.id}`} className="text-sm font-medium text-fg-link hover:text-fg transition-colors no-underline">
-                            {e.number}
-                          </Link>
-                          {e.expiresAt ? <p className="text-[11px] text-fg-dim">Expires {new Date(e.expiresAt).toLocaleDateString()}</p> : null}
-                        </td>
-                        <td className="px-3 py-3">
-                          <Link
-                            href={`/jobs/${e.jobId}`}
-                            className="text-sm font-medium text-fg-link hover:text-fg transition-colors no-underline"
-                          >
-                            {job?.title ?? e.jobId.slice(0, 8)}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-3 text-sm text-fg-muted">
-                          {cust?.name ?? "—"}
-                        </td>
-                        <td className="px-3 py-3 text-sm text-fg text-right font-mono tabular-nums">
-                          {formatMoney(e.total)}
-                        </td>
-                        <td className="px-3 py-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                              e.accepted
-                                ? "bg-green/15 text-green"
-                                : expired
-                                  ? "bg-red/15 text-red"
-                                : "bg-yellow/15 text-yellow"
-                            }`}
-                          >
-                            {e.status === "approved" ? "Approved" : expired ? "Expired" : e.status}
-                          </span>
-                          {e.acceptedByName ? <p className="mt-1 text-[11px] text-fg-dim">by {e.acceptedByName}</p> : null}
-                        </td>
-                        <td className="px-3 py-3 text-sm text-fg-muted">
-                          {new Date(e.createdAt).toLocaleDateString()}
-                        </td>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="md:hidden flex flex-col gap-3">
-            {filteredSorted.length === 0 ? (
-              <Card>
-                <div className="text-center py-10">
-                  <p className="text-sm text-fg-muted">No estimates match your filters</p>
-                  <Button
+      {estimates.length > 0 ? (
+        <nav aria-label="Estimates by stage">
+          <ol className="grid grid-cols-2 gap-px overflow-hidden rounded-[8px] border border-[var(--shell-border)] bg-[var(--shell-border)] sm:grid-cols-3 xl:grid-cols-5" role="list">
+            {STAGES.map(({ status, label, icon: Icon }) => {
+              const entry = stageTotals[status];
+              const active = statusFilter.length === 1 && statusFilter[0] === status;
+              return (
+                <li key={status} className="min-w-0 bg-[var(--shell-panel)]">
+                  <button
                     type="button"
-                    variant="link"
-                    size="sm"
-                    className="mt-1 h-auto p-0 text-xs"
-                    onClick={() => { setSearch(""); setStatusFilter("all"); }}
+                    aria-pressed={active}
+                    onClick={() => setFacetValues(active ? {} : { status: [status] })}
+                    className={cn(
+                      "relative grid h-full w-full gap-1 px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--shell-focus)]",
+                      active
+                        ? "bg-[var(--shell-tint)] after:absolute after:inset-x-0 after:bottom-0 after:border-b-[3px] after:border-[var(--shell-accent-bar)]"
+                        : "hover:bg-[var(--shell-canvas)]",
+                    )}
                   >
-                    Clear filters
-                  </Button>
-                </div>
-              </Card>
-            ) : (
-              filteredSorted.map((e) => {
-                const job = jobMap.get(e.jobId);
-                const cust = job ? customerMap.get(job.customerId) : null;
-                const expired = e.expiresAt ? new Date(e.expiresAt).getTime() < Date.now() : false;
-                return (
-                  <Link
-                    key={e.id}
-                    href={`/jobs/${e.jobId}`}
-                    className="block no-underline"
-                  >
-                    <Card className="hover:bg-surface-300 transition-colors">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-fg truncate">
-                            {e.number} · {job?.title ?? e.jobId.slice(0, 8)}
-                          </p>
-                          {cust && (
-                            <p className="text-xs text-fg-muted mt-0.5">{cust.name}</p>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                              e.accepted
-                                ? "bg-green/15 text-green"
-                                : expired
-                                  ? "bg-red/15 text-red"
-                                  : "bg-yellow/15 text-yellow"
-                            }`}
-                          >
-                              {e.status === "approved" ? "Approved" : expired ? "Expired" : e.status}
-                            </span>
-                            <span className="text-xs text-fg-dim">
-                              {new Date(e.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="text-sm font-semibold text-fg font-mono tabular-nums shrink-0">
-                          {formatMoney(e.total)}
-                        </span>
-                      </div>
-                    </Card>
-                  </Link>
-                );
-              })
-            )}
-          </div>
-        </>
-      )}
-    </div>
+                    <span className="flex items-center gap-2 text-xs font-medium text-fg-muted">
+                      <Icon className="size-4" aria-hidden="true" />
+                      {label}
+                    </span>
+                    <span className="text-2xl font-normal tabular-nums text-fg">{entry?.count ?? 0}</span>
+                    <span className="text-xs tabular-nums text-fg-muted">{formatMoney(entry?.value ?? 0)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+      ) : null}
+
+      <div data-tour="estimates-list" className="min-w-0">
+        <ResourceTable
+          caption="Estimates"
+          rows={estimates}
+          columns={columns}
+          getRowId={(e) => e.id}
+          rowLabel={(e) => e.number}
+          searchText={(e) => [e.number, jobMap.get(e.jobId)?.title, customerOf(e)?.name, e.status].filter(Boolean).join(" ")}
+          filterPlaceholder="Search by estimate number, job or customer"
+          facets={facets}
+          facetValues={facetValues}
+          onFacetValuesChange={setFacetValues}
+          defaultSort={{ id: "date", dir: "desc" }}
+          minWidth="44rem"
+          selectable
+          bulkActions={(selected) => (
+            <ToolbarButton icon={Download} onClick={() => exportRows(selected)}>
+              Export selected
+            </ToolbarButton>
+          )}
+          onFilteredChange={onFilteredChange}
+          rowMenu={(e) => [
+            { label: "View estimate", icon: ExternalLink, onSelect: () => router.push(`/estimates/${e.id}`) },
+            { label: "Preview document", icon: Eye, onSelect: () => router.push(`/estimates/${e.id}/preview`) },
+            "separator",
+            { label: "Open job", icon: FileText, onSelect: () => router.push(`/jobs/${e.jobId}`) },
+          ]}
+          empty={
+            <div className="grid justify-items-center gap-2 px-6 py-12 text-center">
+              <p className="text-base font-medium text-fg">No estimates yet</p>
+              <p className="max-w-md text-sm text-fg-muted">Create an estimate from a job to send good, better and best options for approval.</p>
+              <button type="button" className={`${primaryButton} mt-2`} onClick={openCreate}>
+                <FilePlus2 className="size-4" aria-hidden="true" />
+                Create Estimate
+              </button>
+            </div>
+          }
+        />
+      </div>
+    </ConsolePage>
   );
 }
