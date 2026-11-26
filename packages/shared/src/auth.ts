@@ -28,6 +28,7 @@ export const AGENT_SCOPES = {
   techniciansRead: "technicians:read",
   dispatchSuggestionsCreate: "dispatch-suggestions:create",
   triageSuggestionsCreate: "triage-suggestions:create",
+  copilotSuggestionsCreate: "copilot-suggestions:create",
   priceBookRead: "price-book:read",
   quoteProposalsCreate: "quote-proposals:create",
   messagesRead: "messages:read",
@@ -95,7 +96,13 @@ const AGENT_CLAIM_SCOPE_GRANTS: Record<string, readonly AgentScope[]> = {
     AGENT_SCOPES.supplierMessagesTemplatedSend,
     AGENT_SCOPES.agentRunsWrite,
   ],
-  "copilot-agent": [AGENT_SCOPES.jobsRead, AGENT_SCOPES.messagesRead, AGENT_SCOPES.conversationsRead, AGENT_SCOPES.agentRunsWrite],
+  "copilot-agent": [
+    AGENT_SCOPES.jobsRead,
+    AGENT_SCOPES.messagesRead,
+    AGENT_SCOPES.conversationsRead,
+    AGENT_SCOPES.copilotSuggestionsCreate,
+    AGENT_SCOPES.agentRunsWrite,
+  ],
   "payments-agent": [AGENT_SCOPES.jobsRead, AGENT_SCOPES.invoicesRead, AGENT_SCOPES.paymentRemindersSend, AGENT_SCOPES.agentRunsWrite],
 };
 

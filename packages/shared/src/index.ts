@@ -44,6 +44,7 @@ export * from "./agent.js";
 export * from "./price-book.js";
 export * from "./dispatch.js";
 export * from "./triage.js";
+export * from "./copilot.js";
 export * from "./sourcing.js";
 export * from "./payments.js";
 

@@ -11,6 +11,7 @@ import {
   agentLogLines,
   agentRunSteps,
   agentRuns,
+  copilotSuggestions,
   db,
   dispatchSuggestions,
   jobs,
@@ -290,6 +291,17 @@ export async function approvalCounts(orgId: string, agentId: AgentId, now = new 
       })
       .from(dispatchSuggestions)
       .where(and(eq(dispatchSuggestions.orgId, orgId), gte(dispatchSuggestions.createdAt, since)));
+    return { accepted: row?.accepted ?? 0, edited: row?.edited ?? 0, rejected: row?.rejected ?? 0 };
+  }
+  if (agentId === "copilot-agent") {
+    const [row] = await db
+      .select({
+        accepted: sql<number>`count(*) filter (where ${copilotSuggestions.state} = 'accepted')::int`,
+        edited: sql<number>`count(*) filter (where ${copilotSuggestions.state} = 'changed')::int`,
+        rejected: sql<number>`count(*) filter (where ${copilotSuggestions.state} in ('rejected', 'ignored'))::int`,
+      })
+      .from(copilotSuggestions)
+      .where(and(eq(copilotSuggestions.orgId, orgId), gte(copilotSuggestions.createdAt, since)));
     return { accepted: row?.accepted ?? 0, edited: row?.edited ?? 0, rejected: row?.rejected ?? 0 };
   }
   return { accepted: 0, edited: 0, rejected: 0 };

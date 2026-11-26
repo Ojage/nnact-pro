@@ -19,6 +19,7 @@ export const RUNNABLE_AGENT_IDS: readonly AgentId[] = [
   AGENT_ID.pricebook,
   AGENT_ID.triage,
   AGENT_ID.sourcing,
+  AGENT_ID.copilot,
   AGENT_ID.payments,
 ];
 
@@ -31,6 +32,7 @@ const SHORT_NAMES: Record<string, AgentId> = {
   "price-book": AGENT_ID.pricebook,
   triage: AGENT_ID.triage,
   sourcing: AGENT_ID.sourcing,
+  copilot: AGENT_ID.copilot,
   payments: AGENT_ID.payments,
 };
 

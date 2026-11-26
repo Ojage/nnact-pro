@@ -72,6 +72,38 @@ export const triageSuggestions = pgTable(
   }),
 );
 
+export const copilotSuggestions = pgTable(
+  "copilot_suggestions",
+  {
+    id: id(),
+    orgId: orgId(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    runId: uuid("run_id").references(() => agentRuns.id, { onDelete: "set null" }),
+    state: text("state").$type<SuggestionState>().default("shadow").notNull(),
+    current: integer("current").default(1).notNull(),
+    shadow: integer("shadow").default(1).notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    summary: text("summary").notNull(),
+    recommendedActions: jsonb("recommended_actions").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    draftReply: text("draft_reply"),
+    risks: jsonb("risks").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    missingInformation: jsonb("missing_information").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    confidence: doublePrecision("confidence").default(0).notNull(),
+    outcomeReason: text("outcome_reason"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    currentByJob: uniqueIndex("copilot_suggestions_current_job_idx").on(t.orgId, t.jobId).where(sql`${t.current} = 1`),
+    job: index("copilot_suggestions_job_created_idx").on(t.jobId, t.createdAt),
+    orgState: index("copilot_suggestions_org_state_idx").on(t.orgId, t.state),
+    run: index("copilot_suggestions_run_idx").on(t.runId),
+  }),
+);
+
 export const supplierContacts = pgTable(
   "supplier_contacts",
   {
@@ -194,6 +226,7 @@ export const paymentReminders = pgTable(
 );
 
 export type TriageSuggestion = typeof triageSuggestions.$inferSelect;
+export type CopilotSuggestion = typeof copilotSuggestions.$inferSelect;
 export type SourcingSuggestion = typeof sourcingSuggestions.$inferSelect;
 export type SupplierContact = typeof supplierContacts.$inferSelect;
 export type SupplierMessage = typeof supplierMessages.$inferSelect;
