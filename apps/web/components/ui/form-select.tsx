@@ -61,7 +61,7 @@ export function FormSelect({
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          "mt-1.5 h-11 w-full rounded-xl border border-input bg-input-background px-4 text-sm text-fg outline-none focus:border-accent focus:ring-4 focus:ring-accent/15 disabled:cursor-not-allowed disabled:opacity-50",
+          "mt-1.5 h-10 w-full rounded-[6px] border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 text-sm text-fg outline-none focus:border-[var(--shell-focus)] focus:ring-1 focus:ring-[var(--shell-focus)] disabled:cursor-not-allowed disabled:opacity-50",
           triggerClassName,
           className,
         )}

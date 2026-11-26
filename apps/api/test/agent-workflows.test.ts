@@ -8,9 +8,12 @@ const { buildServer } = await import("../src/server.js");
 const {
   db,
   closeDb,
+  conversations,
+  copilotSuggestions,
   customers,
   invoices,
   jobs,
+  messages,
   orgs,
   paymentReminders,
   payments,
@@ -41,6 +44,8 @@ const ids = {
   owner: randomUUID(),
   customer: randomUUID(),
   job: randomUUID(),
+  conversation: randomUUID(),
+  message: randomUUID(),
   invoice: randomUUID(),
   category: randomUUID(),
   item: randomUUID(),
@@ -52,7 +57,7 @@ const agentToken = (agentId: string, scopes: string[]) => ({
 });
 const staff = (role = "owner") => ({ authorization: `Bearer ${app.jwt.sign({ aud: "staff", userId: ids.owner, orgId: ORG, role })}` });
 
-describe("agent triage, sourcing and payments", { skip: reachable ? false : "no migrated Postgres in DATABASE_URL" }, () => {
+describe("agent triage, copilot, sourcing and payments", { skip: reachable ? false : "no migrated Postgres in DATABASE_URL" }, () => {
   before(async () => {
     await app.ready();
     await db.insert(orgs).values({ id: ORG, name: "Agent workflows test org" });
@@ -64,6 +69,22 @@ describe("agent triage, sourcing and payments", { skip: reachable ? false : "no 
       role: "owner",
     });
     await db.insert(customers).values({ id: ids.customer, orgId: ORG, name: "No Phone Customer" });
+    const messageAt = new Date();
+    await db.insert(conversations).values({
+      id: ids.conversation,
+      orgId: ORG,
+      externalId: `copilot-${ORG}`,
+      participantPhone: "670000001",
+      lastMessageAt: messageAt,
+    });
+    await db.insert(messages).values({
+      id: ids.message,
+      orgId: ORG,
+      conversationId: ids.conversation,
+      direction: "inbound",
+      text: "The compressor runs but the cabinet is still warm.",
+      createdAt: messageAt,
+    });
     await db.insert(jobs).values({
       id: ids.job,
       orgId: ORG,
@@ -73,6 +94,7 @@ describe("agent triage, sourcing and payments", { skip: reachable ? false : "no 
       status: "scheduled",
       serviceCategory: "refrigeration",
       neighborhood: "Molyko",
+      agentConversationId: ids.conversation,
     });
     await db.insert(priceBookCategories).values({
       id: ids.category,
@@ -190,6 +212,96 @@ describe("agent triage, sourcing and payments", { skip: reachable ? false : "no 
     assert.equal(rejected.json().state, "rejected");
     const [row] = await db.select().from(triageSuggestions).where(eq(triageSuggestions.id, suggestionId));
     assert.equal(row!.state, "rejected", "the suggestion never touches the job record");
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, ids.job));
+    assert.equal(job!.status, "scheduled");
+  });
+
+  test("copilot suggestions guide staff without sending or mutating", async () => {
+    const contextRes = await app.inject({
+      method: "POST",
+      url: `/api/agent/copilot/jobs/${ids.job}/context`,
+      headers: agentToken("copilot-agent", ["jobs:read", "messages:read", "conversations:read"]),
+      payload: {},
+    });
+    assert.equal(contextRes.statusCode, 200);
+    const context = contextRes.json() as { fingerprint: string; messages: Array<{ text: string | null }> };
+    assert.ok(context.fingerprint);
+    assert.ok(context.messages.some((message) => message.text?.includes("compressor")));
+
+    const wrongAgent = await app.inject({
+      method: "POST",
+      url: `/api/agent/copilot/jobs/${ids.job}/context`,
+      headers: agentToken("quoting-agent", ["jobs:read", "price-book:read"]),
+      payload: {},
+    });
+    assert.equal(wrongAgent.statusCode, 403);
+
+    const payload = {
+      jobId: ids.job,
+      fingerprint: context.fingerprint,
+      summary: "The reported symptoms point to the start circuit.",
+      recommendedActions: ["Ask whether the compressor clicks on startup", "Inspect the start relay before quoting a compressor"],
+      draftReply: "We will check the start circuit before confirming the repair.",
+      risks: ["A failed compressor can mimic a relay fault"],
+      missingInformation: ["Whether the compressor clicks"],
+      confidence: 0.72,
+    };
+    const stale = await app.inject({
+      method: "POST",
+      url: "/api/agent/copilot/suggestions",
+      headers: agentToken("copilot-agent", ["copilot-suggestions:create"]),
+      payload: { ...payload, fingerprint: "stale" },
+    });
+    assert.equal(stale.statusCode, 409);
+
+    const noScope = await app.inject({
+      method: "POST",
+      url: "/api/agent/copilot/suggestions",
+      headers: agentToken("copilot-agent", ["jobs:read"]),
+      payload,
+    });
+    assert.equal(noScope.statusCode, 403);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/agent/copilot/suggestions",
+      headers: agentToken("copilot-agent", ["copilot-suggestions:create"]),
+      payload,
+    });
+    assert.equal(created.statusCode, 201);
+    const suggestionId = created.json().id as string;
+    assert.equal(created.json().draftReply, payload.draftReply);
+
+    const repeated = await app.inject({
+      method: "POST",
+      url: "/api/agent/copilot/suggestions",
+      headers: agentToken("copilot-agent", ["copilot-suggestions:create"]),
+      payload,
+    });
+    assert.equal(repeated.statusCode, 200);
+    assert.equal(repeated.json().id, suggestionId);
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/api/copilot/suggestions",
+      headers: staff("technician"),
+    });
+    assert.equal(listed.statusCode, 200);
+    assert.ok((listed.json().suggestions as Array<{ id: string }>).some((item) => item.id === suggestionId));
+
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/api/copilot/suggestions/${suggestionId}/reject`,
+      headers: staff("technician"),
+      payload: { reason: "Technician already inspected the relay." },
+    });
+    assert.equal(rejected.statusCode, 200);
+    assert.equal(rejected.json().state, "rejected");
+
+    const [row] = await db.select().from(copilotSuggestions).where(eq(copilotSuggestions.id, suggestionId));
+    assert.equal(row!.state, "rejected", "the suggestion never touches the job record");
+    assert.equal(row!.shadow, 0);
+    assert.equal(row!.outcomeReason, "Technician already inspected the relay.");
     const [job] = await db.select().from(jobs).where(eq(jobs.id, ids.job));
     assert.equal(job!.status, "scheduled");
   });

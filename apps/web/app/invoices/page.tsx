@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Banknote, Download, ExternalLink, Eye, FilePlus2, FileText, RefreshCw, TriangleAlert, Wallet } from "lucide-react";
 import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { formatMoney } from "@nnact/shared";
-import type { JobDTO, CustomerDTO } from "@nnact/shared";
+import type { JobDTO } from "@nnact/shared";
+import type { Invoice as InvoiceDTO } from "@/lib/api";
 import { usePrefetchListDetails } from "@/hooks/use-prefetch-list-details";
-import { useCreateInvoiceMutation, useCustomersQuery, useInvoicesQuery, useJobsQuery, useOrgQuery } from "@/lib/redux/api";
+import { explainRtkError, useCreateInvoiceMutation, useCustomersQuery, useInvoicesQuery, useJobsQuery, useOrgQuery } from "@/lib/redux/api";
 import { Card } from "@/components/ui/card";
-import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,34 +17,41 @@ import { FormSelect } from "@/components/ui/form-select";
 import { Label } from "@/components/ui/label";
 import { InfoTip } from "@/components/ui/info-tip";
 import { InvoiceStatusBadge } from "@/components/status-badge";
-import { EmptyState } from "@/components/empty-state";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Pagination } from "@/components/pagination";
+import {
+  Banner,
+  ConsoleHeader,
+  ConsolePage,
+  ResourceTable,
+  SummaryCards,
+  ToolbarButton,
+  downloadCsv,
+  primaryButton,
+  resourceLink,
+  type Column,
+  type Facet,
+} from "@/components/console";
 
-type SortField = "number" | "status" | "total";
-type SortDir = "asc" | "desc";
-type StatusFilter = "all" | "draft" | "sent" | "paid" | "void";
-
-const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All statuses" },
+const STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
   { value: "sent", label: "Sent" },
   { value: "paid", label: "Paid" },
   { value: "void", label: "Void" },
 ];
 
+function isOverdue(invoice: InvoiceDTO, now: number): boolean {
+  return invoice.status === "sent" && !!invoice.dueAt && new Date(invoice.dueAt).getTime() < now;
+}
+
 export default function InvoicesPage() {
-  const { data: invoices = [], isLoading: loading, isError, error: queryError } = useInvoicesQuery();
+  const router = useRouter();
+  const invoicesQuery = useInvoicesQuery();
+  const { data: invoices = [], isLoading: loading, isError } = invoicesQuery;
   const { data: jobs = [] } = useJobsQuery();
   const { data: customers = [] } = useCustomersQuery();
   const { data: org } = useOrgQuery();
   const [createInvoice, { isLoading: createSubmitting }] = useCreateInvoiceMutation();
-  const [search, setSearch] = useState("");
-  const [sortField, setSortField] = useState<SortField>("number");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [skip, setSkip] = useState(0);
-  const take = 50;
+  const [visible, setVisible] = useState<InvoiceDTO[]>([]);
+  const [facetValues, setFacetValues] = useState<Record<string, string[]>>({});
 
   // ── Create invoice modal ──
   const [showCreate, setShowCreate] = useState(false);
@@ -74,7 +83,7 @@ export default function InvoicesPage() {
       setCreateDueAt("");
       setCreateDiscountId("");
     } catch (e) {
-      setCreateError(String(e));
+      setCreateError(explainRtkError(e, "Could not create the invoice"));
     }
   };
 
@@ -86,155 +95,202 @@ export default function InvoicesPage() {
     setShowCreate(true);
   };
 
-  // Reset pagination when filters change
-  useEffect(() => { setSkip(0); }, [search, statusFilter]);
-
   // ── Lookups ──
-  const jobMap = useMemo(() => {
-    const m = new Map<string, JobDTO>();
-    for (const j of jobs) m.set(j.id, j);
-    return m;
-  }, [jobs]);
-
-  const customerMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const c of customers) m.set(c.id, c.name);
-    return m;
-  }, [customers]);
+  const jobMap = useMemo(() => new Map<string, JobDTO>(jobs.map((j) => [j.id, j])), [jobs]);
+  const customerMap = useMemo(() => new Map<string, string>(customers.map((c) => [c.id, c.name])), [customers]);
+  const customerOf = (invoice: InvoiceDTO) => {
+    const job = jobMap.get(invoice.jobId);
+    return job ? customerMap.get(job.customerId) ?? "" : "";
+  };
 
   // ── Metrics ──
-  const outstanding = useMemo(
-    () =>
-      invoices
-        .filter((i) => i.status === "sent" || i.status === "draft")
-        .reduce((a, i) => a + i.total, 0),
-    [invoices],
-  );
-
-  // ── Filter + sort ──
-  const filteredSorted = useMemo(() => {
-    let list = [...invoices];
-
-    // Status filter
-    if (statusFilter !== "all") {
-      list = list.filter((i) => i.status === statusFilter);
-    }
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((inv) => {
-        const job = jobMap.get(inv.jobId);
-        const custName = job ? customerMap.get(job.customerId) : undefined;
-        return (
-          inv.number.toLowerCase().includes(q) ||
-          (custName?.toLowerCase().includes(q) ?? false) ||
-          (job?.title.toLowerCase().includes(q) ?? false)
-        );
-      });
-    }
-
-    list.sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case "number":
-          cmp = a.number.localeCompare(b.number);
-          break;
-        case "status":
-          cmp = a.status.localeCompare(b.status);
-          break;
-        case "total":
-          cmp = a.total - b.total;
-          break;
+  const now = Date.now();
+  const metrics = useMemo(() => {
+    let outstanding = 0;
+    let overdue = 0;
+    let overdueCount = 0;
+    let paid = 0;
+    let drafts = 0;
+    for (const invoice of invoices) {
+      if (invoice.status === "sent" || invoice.status === "draft") outstanding += invoice.total;
+      if (invoice.status === "paid") paid += invoice.total;
+      if (invoice.status === "draft") drafts += 1;
+      if (isOverdue(invoice, now)) {
+        overdue += invoice.total;
+        overdueCount += 1;
       }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-
-    return list;
-  }, [invoices, search, sortField, sortDir, jobMap, customers, statusFilter]);
-
-  const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
+    }
+    return { outstanding, overdue, overdueCount, paid, drafts };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices]);
 
   usePrefetchListDetails(
     "invoices",
-    useMemo(() => filteredSorted.slice(0, 40).map((inv) => inv.id), [filteredSorted]),
+    useMemo(() => visible.slice(0, 40).map((inv) => inv.id), [visible]),
   );
+  const onFilteredChange = useCallback((rows: InvoiceDTO[]) => setVisible(rows), []);
 
-  // ── Sort helpers ──
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortDir("asc");
-    }
-  };
+  const exportRows = (rows: readonly InvoiceDTO[]) =>
+    downloadCsv(`invoices-${new Date().toISOString().slice(0, 10)}.csv`, rows, [
+      ["Number", (inv) => inv.number],
+      ["Status", (inv) => inv.status],
+      ["Customer", (inv) => customerOf(inv)],
+      ["Job", (inv) => jobMap.get(inv.jobId)?.title ?? ""],
+      ["Due", (inv) => inv.dueAt ?? ""],
+      ["Total", (inv) => (inv.total / 100).toFixed(2)],
+    ]);
 
-  const SortHead = ({ field, label }: { field: SortField; label: string }) => {
-    const active = sortField === field;
-    return (
-      <TableHead
-        className="cursor-pointer select-none hover:text-fg transition-colors"
-        onClick={() => handleSort(field)}
-      >
-        <span className="inline-flex items-center gap-1">
-          {label}
-          <span className="text-fg-dim text-[10px] w-3 text-center">
-            {active ? (sortDir === "asc" ? "↑" : "↓") : " "}
-          </span>
+  const columns: Column<InvoiceDTO>[] = [
+    {
+      id: "number",
+      header: "Invoice",
+      sortValue: (inv) => inv.number,
+      cell: (inv) => (
+        <Link href={`/invoices/${inv.id}`} className={`${resourceLink} font-mono`}>
+          {inv.number}
+        </Link>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      sortValue: (inv) => inv.status,
+      cell: (inv) => (
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <InvoiceStatusBadge status={inv.status} />
+          {isOverdue(inv, now) ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--console-danger-fg)]">
+              <TriangleAlert className="size-3.5" aria-hidden="true" />
+              Overdue
+            </span>
+          ) : null}
         </span>
-      </TableHead>
-    );
-  };
+      ),
+    },
+    {
+      id: "customer",
+      header: "Customer",
+      sortValue: (inv) => customerOf(inv),
+      cell: (inv) => {
+        const job = jobMap.get(inv.jobId);
+        return job ? (
+          <Link href={`/customers/${job.customerId}`} className="text-fg hover:text-[var(--shell-accent-text)] hover:underline">
+            {customerMap.get(job.customerId) ?? "—"}
+          </Link>
+        ) : (
+          <span className="text-fg-muted">—</span>
+        );
+      },
+    },
+    {
+      id: "job",
+      header: "Job",
+      hideBelow: "md",
+      sortValue: (inv) => jobMap.get(inv.jobId)?.title ?? "",
+      cell: (inv) => {
+        const job = jobMap.get(inv.jobId);
+        return job ? (
+          <Link href={`/jobs/${job.id}`} className="block max-w-[18rem] truncate text-fg-muted hover:text-[var(--shell-accent-text)] hover:underline">
+            {job.title}
+          </Link>
+        ) : (
+          <span className="text-fg-muted">—</span>
+        );
+      },
+    },
+    {
+      id: "due",
+      header: "Due",
+      hideBelow: "sm",
+      sortValue: (inv) => inv.dueAt ?? "",
+      cell: (inv) => <span className="whitespace-nowrap text-fg-muted">{inv.dueAt ? new Date(inv.dueAt).toLocaleDateString() : "No due date"}</span>,
+    },
+    {
+      id: "total",
+      header: "Total",
+      align: "right",
+      sortValue: (inv) => inv.total,
+      cell: (inv) => <span className="whitespace-nowrap font-mono text-fg">{formatMoney(inv.total)}</span>,
+    },
+  ];
+
+  const facets: Facet<InvoiceDTO>[] = [{ id: "status", label: "Status", options: STATUS_OPTIONS, value: (inv) => inv.status }];
 
   // ── Loading ──
   if (loading) {
     return (
-      <div>
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-        </div>
-        <Skeleton className="h-10 w-80 rounded-lg mb-4" />
-        {/* Desktop skeleton */}
-        <div className="hidden md:block rounded-xl border border-border overflow-hidden">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 rounded-none border-b border-border last:border-b-0" />
+      <div className="grid gap-4" aria-busy="true" aria-label="Loading invoices">
+        <Skeleton className="h-8 w-40 rounded-[6px]" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-24 rounded-[8px]" />
           ))}
         </div>
-        {/* Mobile skeleton */}
-        <div className="md:hidden flex flex-col gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))}
-        </div>
+        <Skeleton className="h-80 rounded-[8px]" />
       </div>
     );
   }
 
   return (
-    <div>
-      <PageHeader
+    <ConsolePage>
+      <ConsoleHeader
         title="Invoices"
-        description={
-          invoices.length > 0
-            ? `${filteredSorted.length} of ${invoices.length} total · ${formatMoney(outstanding)} outstanding`
-            : undefined
-        }
-        actions={
-          <Button onClick={openCreate} size="sm" data-tour="invoices-add">
-            ⊕ Create Invoice
-          </Button>
+        toolbar={
+          <>
+            <ToolbarButton icon={FilePlus2} onClick={openCreate} data-tour="invoices-add">
+              Create Invoice
+            </ToolbarButton>
+            <ToolbarButton icon={Download} onClick={() => exportRows(visible.length ? visible : invoices)} disabled={invoices.length === 0}>
+              Export CSV
+            </ToolbarButton>
+            <ToolbarButton icon={RefreshCw} spinning={invoicesQuery.isFetching} disabled={invoicesQuery.isFetching} onClick={() => void invoicesQuery.refetch()}>
+              Refresh
+            </ToolbarButton>
+          </>
         }
       />
 
-      {/* ── Error ── */}
-      {isError && (
-        <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">We couldn't load this page. Check your connection and try again.</p>
-        </Card>
-      )}
+      {isError ? (
+        <Banner tone="danger" title="Invoices could not be loaded.">
+          Check your connection and try again.
+        </Banner>
+      ) : null}
+
+      {metrics.overdueCount > 0 ? (
+        <Banner
+          tone="warning"
+          title={`${metrics.overdueCount} invoice${metrics.overdueCount === 1 ? " is" : "s are"} past the due date`}
+          action={
+            <button
+              type="button"
+              className="text-sm font-medium text-[var(--shell-accent-text)] hover:underline"
+              onClick={() => setFacetValues({ status: ["sent"] })}
+            >
+              Show sent invoices
+            </button>
+          }
+        >
+          {formatMoney(metrics.overdue)} is overdue. Send a reminder or record the payment from each invoice.
+        </Banner>
+      ) : null}
+
+      {invoices.length > 0 ? (
+        <SummaryCards
+          label="Billing summary"
+          items={[
+            { label: "Outstanding", icon: Wallet, value: formatMoney(metrics.outstanding), note: "Draft and sent invoices" },
+            {
+              label: "Overdue",
+              icon: TriangleAlert,
+              value: formatMoney(metrics.overdue),
+              note: metrics.overdueCount ? `${metrics.overdueCount} past due` : "Nothing overdue",
+              attention: metrics.overdueCount > 0,
+            },
+            { label: "Collected", icon: Banknote, value: formatMoney(metrics.paid), note: "Invoices marked paid" },
+            { label: "Drafts", icon: FileText, value: metrics.drafts, note: metrics.drafts ? "Not yet sent to customers" : "No drafts waiting" },
+          ]}
+        />
+      ) : null}
 
       {/* ── Create Invoice modal ── */}
       {showCreate && (
@@ -251,7 +307,7 @@ export default function InvoicesPage() {
                 className="p-6"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-fg">Create Invoice</h3>
+                  <h2 className="text-base font-medium text-fg">Create Invoice</h2>
                   <Button
                     type="button"
                     variant="ghost"
@@ -265,13 +321,14 @@ export default function InvoicesPage() {
                 </div>
 
                 {createError && (
-                  <p className="text-red text-xs mb-3 p-2 rounded bg-red/5">{createError}</p>
+                  <p role="alert" className="mb-3 rounded-[6px] bg-[color-mix(in_srgb,var(--console-danger-fg)_8%,transparent)] p-2 text-sm text-[var(--console-danger-fg)]">{createError}</p>
                 )}
 
                 <div className="space-y-4">
                   <div>
-                    <Label className="mb-1.5 block text-xs font-semibold text-fg-muted">Job *</Label>
+                    <Label htmlFor="invoice-create-job" className="mb-1.5 block text-sm font-medium text-fg">Job *</Label>
                     <FormSelect
+                      id="invoice-create-job"
                       value={createJobId}
                       onChange={setCreateJobId}
                       allowEmpty
@@ -311,10 +368,11 @@ export default function InvoicesPage() {
                   )}
 
                   <div>
-                    <label className="block text-xs font-semibold text-fg-muted mb-1.5">
+                    <label htmlFor="invoice-create-due" className="mb-1.5 block text-sm font-medium text-fg">
                       Due date (optional)
                     </label>
                     <Input
+                      id="invoice-create-due"
                       type="date"
                       value={createDueAt}
                       onChange={(e) => setCreateDueAt(e.target.value)}
@@ -344,188 +402,45 @@ export default function InvoicesPage() {
         </>
       )}
 
-      {/* ── Search + filter ── */}
-      {invoices.length > 0 && (
-        <div className="mb-4 flex flex-col sm:flex-row gap-3">
-          <Input
-            type="search"
-            placeholder="Search by invoice number, customer, or job title..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-md"
-          />
-          <FormSelect
-            value={statusFilter}
-            onChange={(value) => setStatusFilter(value as StatusFilter)}
-            options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-            className="sm:w-48"
-          />
-        </div>
-      )}
-
-      {/* ── Content ── */}
-      {invoices.length === 0 && !isError ? (
-        <Card>
-          <EmptyState
-            title="No invoices yet"
-            description="Click 'Create Invoice' above to generate one from a job."
-          />
-        </Card>
-      ) : (
-        <>
-          {/* ═══ Desktop table ═══ */}
-          <Card className="p-0 overflow-hidden hidden md:block" data-tour="invoices-list">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortHead field="number" label="Number" />
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Job</TableHead>
-                  <SortHead field="status" label="Status" />
-                  <TableHead className="text-right">
-                    <span
-                      className="inline-flex items-center gap-1 cursor-pointer select-none hover:text-fg transition-colors"
-                      onClick={() => handleSort("total")}
-                    >
-                      Total
-                      <span className="text-fg-dim text-[10px] w-3 text-center">
-                        {sortField === "total" ? (sortDir === "asc" ? "↑" : "↓") : " "}
-                      </span>
-                    </span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginated.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10">
-                      <p className="text-sm text-fg-muted">
-                        No invoices match your filters
-                      </p>
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="mt-1 h-auto p-0 text-xs"
-                        onClick={() => { setSearch(""); setStatusFilter("all"); }}
-                      >
-                        Clear search
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginated.map((inv) => {
-                    const job = jobMap.get(inv.jobId);
-                    const cust = job ? customerMap.get(job.customerId) : undefined;
-                    return (
-                      <TableRow key={inv.id}>
-                        <TableCell className="font-medium text-fg font-mono text-xs">
-                          <Link
-                            href={`/invoices/${inv.id}`}
-                            className="hover:text-fg-link transition-colors"
-                          >
-                            {inv.number}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="text-fg-muted">
-                          {cust ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-fg-muted">
-                          {job ? (
-                            <Link
-                              href={`/jobs/${job.id}`}
-                              className="hover:text-fg transition-colors"
-                            >
-                              {job.title}
-                            </Link>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <InvoiceStatusBadge status={inv.status} />
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums text-fg">
-                          {formatMoney(inv.total)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-
-          {/* ═══ Mobile cards ═══ */}
-          <div className="md:hidden flex flex-col gap-3">
-            {paginated.length === 0 ? (
-              <Card>
-                <div className="text-center py-10">
-                  <p className="text-sm text-fg-muted">
-                    No invoices match &ldquo;{search}&rdquo;
-                  </p>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="mt-1 h-auto p-0 text-xs"
-                    onClick={() => setSearch("")}
-                  >
-                    Clear search
-                  </Button>
-                </div>
-              </Card>
-            ) : (
-                  paginated.map((inv) => {
-                    const job = jobMap.get(inv.jobId);
-                    const cust = job ? customerMap.get(job.customerId) : undefined;
-                    return (
-                  <Card key={inv.id} className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Link
-                        href={`/invoices/${inv.id}`}
-                        className="font-mono text-xs text-fg font-medium hover:text-fg-link transition-colors no-underline"
-                      >
-                          {inv.number}
-                      </Link>
-                        <InvoiceStatusBadge status={inv.status} />
-                      </div>
-                      <span className="text-base font-bold text-fg tabular-nums">
-                        {formatMoney(inv.total)}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {cust && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-fg-dim w-16 shrink-0">Customer</span>
-                          <Link
-                            href={`/customers/${job?.customerId}`}
-                            className="text-xs text-fg-link hover:text-fg transition-colors"
-                          >
-                            {cust}
-                          </Link>
-                        </div>
-                      )}
-                      {job && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-fg-dim w-16 shrink-0">Job</span>
-                          <Link
-                            href={`/jobs/${job.id}`}
-                            className="text-xs text-fg-link hover:text-fg transition-colors truncate"
-                          >
-                            {job.title}
-                          </Link>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })
-            )}
-          </div>
-        </>
-      )}
-
-      <Pagination skip={skip} take={take} total={filteredSorted.length} onSkipChange={setSkip} />
-    </div>
+      <div data-tour="invoices-list" className="min-w-0">
+        <ResourceTable
+          caption="Invoices"
+          rows={invoices}
+          columns={columns}
+          getRowId={(inv) => inv.id}
+          rowLabel={(inv) => inv.number}
+          searchText={(inv) => [inv.number, customerOf(inv), jobMap.get(inv.jobId)?.title, inv.status].filter(Boolean).join(" ")}
+          filterPlaceholder="Search by invoice number, customer or job"
+          facets={facets}
+          facetValues={facetValues}
+          onFacetValuesChange={setFacetValues}
+          defaultSort={{ id: "number", dir: "desc" }}
+          minWidth="42rem"
+          selectable
+          bulkActions={(selected) => (
+            <ToolbarButton icon={Download} onClick={() => exportRows(selected)}>
+              Export selected
+            </ToolbarButton>
+          )}
+          onFilteredChange={onFilteredChange}
+          rowMenu={(inv) => [
+            { label: "View invoice", icon: ExternalLink, onSelect: () => router.push(`/invoices/${inv.id}`) },
+            { label: "Preview document", icon: Eye, onSelect: () => router.push(`/invoices/${inv.id}/preview`) },
+            "separator",
+            { label: "Open job", icon: FileText, onSelect: () => router.push(`/jobs/${inv.jobId}`) },
+          ]}
+          empty={
+            <div className="grid justify-items-center gap-2 px-6 py-12 text-center">
+              <p className="text-base font-medium text-fg">No invoices yet</p>
+              <p className="max-w-md text-sm text-fg-muted">Create an invoice from a finished job. Its line items and pricing carry over.</p>
+              <button type="button" className={`${primaryButton} mt-2`} onClick={openCreate}>
+                <FilePlus2 className="size-4" aria-hidden="true" />
+                Create Invoice
+              </button>
+            </div>
+          }
+        />
+      </div>
+    </ConsolePage>
   );
 }

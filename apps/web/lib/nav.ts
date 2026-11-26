@@ -31,6 +31,7 @@ const ROUTE_ROLES: ReadonlyArray<readonly [string, readonly NavRole[]]> = [
   // can read it — including roles that cannot open most of the screens it
   // describes.
   ["/help", ALL_ROLES],
+  ["/modules", ALL_ROLES],
   ["/repair-brain/workspace", ["owner", "dispatcher"]],
   ["/repair-brain", ALL_ROLES],
   ["/ai/usage", ["owner"]],
@@ -45,6 +46,7 @@ const ROUTE_ROLES: ReadonlyArray<readonly [string, readonly NavRole[]]> = [
   ["/agent/drafts", ["owner", "dispatcher"]],
   ["/agent/quotes", ["owner", "dispatcher"]],
   ["/agent/price-book", ["owner", "dispatcher"]],
+  ["/agent/copilot", ["owner", "dispatcher", "technician"]],
   ["/dispatch", ["owner", "dispatcher"]],
   ["/schedule", ["owner", "dispatcher"]],
   ["/pipeline", ["owner", "dispatcher"]],
@@ -113,6 +115,7 @@ export const NAV_SECTIONS: NavSection[] = [
     home: "/agents",
     links: [
       { href: "/agents", label: "Agent Office", icon: "⌂" },
+      { href: "/agent/copilot", label: "Copilot suggestions", icon: "✦" },
       { href: "/agent/drafts", label: "Draft jobs", icon: "◎" },
       { href: "/agent/quotes", label: "Quote proposals", icon: "◇" },
       { href: "/agent/price-book", label: "Quoting prices", icon: "⊞" },
@@ -197,6 +200,7 @@ export const NAV_SECTIONS: NavSection[] = [
     home: "/settings",
     links: [
       { href: "/help/faq", label: "FAQ", icon: "?" },
+      { href: "/modules", label: "All modules", icon: "▦" },
       { href: "/integrations", label: "Integrations", icon: "⧉" },
       { href: "/settings", label: "Settings", icon: "⚙" },
     ],

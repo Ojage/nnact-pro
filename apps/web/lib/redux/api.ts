@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type {
+  CopilotSuggestionDTO,
   HistoricalImportReport,
   PriceBookCategoryDTO,
   PriceBookItemDTO,
@@ -385,6 +386,7 @@ export const apiSlice = createApi({
     "AgentDraft",
     "PriceBook",
     "QuoteProposal",
+    "CopilotSuggestion",
   ],
   endpoints: (builder) => ({
     priceBookCategories: builder.query<PriceBookCategoryDTO[], void>({
@@ -446,6 +448,24 @@ export const apiSlice = createApi({
     rejectQuoteProposal: builder.mutation<QuoteProposalDTO, string>({
       query: (id) => ({ url: `/api/quotes/proposals/${id}/reject`, method: "POST" }),
       invalidatesTags: ["QuoteProposal"],
+    }),
+    copilotSuggestions: builder.query<{ suggestions: CopilotSuggestionDTO[] }, void>({
+      query: () => "/api/copilot/suggestions",
+      providesTags: (result) => [
+        "CopilotSuggestion",
+        ...(result?.suggestions ?? []).map(({ id }) => ({ type: "CopilotSuggestion" as const, id })),
+      ],
+    }),
+    decideCopilotSuggestion: builder.mutation<
+      CopilotSuggestionDTO,
+      { id: string; state: "accepted" | "changed" | "ignored"; reason?: string }
+    >({
+      query: ({ id, state, reason }) => ({ url: `/api/copilot/suggestions/${id}/outcome`, method: "POST", body: { state, reason } }),
+      invalidatesTags: ["CopilotSuggestion"],
+    }),
+    rejectCopilotSuggestion: builder.mutation<CopilotSuggestionDTO, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/api/copilot/suggestions/${id}/reject`, method: "POST", body: { reason } }),
+      invalidatesTags: ["CopilotSuggestion"],
     }),
     // ── Jobs ──
     jobs: builder.query<JobDTO[], void>({
@@ -2401,6 +2421,9 @@ export const {
   useQuoteProposalQuery,
   useApproveQuoteProposalMutation,
   useRejectQuoteProposalMutation,
+  useCopilotSuggestionsQuery,
+  useDecideCopilotSuggestionMutation,
+  useRejectCopilotSuggestionMutation,
   useDraftJobsQuery,
   useDraftJobQuery,
   useApproveDraftJobMutation,

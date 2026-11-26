@@ -26,7 +26,7 @@ const TabsList = React.forwardRef<
     ref={ref}
     data-slot="tabs-list"
     className={cn(
-      "bg-surface-100 text-fg-muted inline-flex h-12 w-fit items-center justify-center rounded-xl p-1 flex",
+      "text-fg-muted flex h-11 w-fit max-w-full items-end justify-start gap-1 overflow-x-auto border-b border-[var(--shell-border)]",
       className,
     )}
     {...props}
@@ -42,7 +42,7 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     data-slot="tabs-trigger"
     className={cn(
-      "text-fg-muted inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-transparent px-4 py-1 text-sm font-semibold whitespace-nowrap transition-[color,background-color,box-shadow] hover:text-fg data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-sm focus-visible:border-accent focus-visible:ring-4 focus-visible:ring-accent/15 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "relative text-fg-muted inline-flex h-11 flex-none items-center justify-center gap-1.5 px-3 text-sm font-medium whitespace-nowrap transition-colors hover:bg-[var(--shell-hover)] hover:text-fg data-[state=active]:text-[var(--shell-accent-text)] data-[state=active]:after:absolute data-[state=active]:after:inset-x-0 data-[state=active]:after:bottom-0 data-[state=active]:after:border-b-[3px] data-[state=active]:after:border-[var(--shell-accent-bar)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--shell-focus)] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
     {...props}

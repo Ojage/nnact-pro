@@ -1,34 +1,42 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Copy, Download, ExternalLink, FileUp, Plus, RefreshCw, UserPlus, Users, Activity, Sparkles } from "lucide-react";
 import { PrefetchLink as Link } from "@/components/prefetch-link";
 import { usePrefetchListDetails } from "@/hooks/use-prefetch-list-details";
 import { useActivitiesQuery, useCreateCustomerMutation, useCustomersQuery } from "@/lib/redux/api";
 import { formatRelativeTime } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { Pagination } from "@/components/pagination";
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { InfoTip } from "@/components/ui/info-tip";
+import {
+  Banner,
+  ConsoleHeader,
+  ConsolePage,
+  ResourceTable,
+  SummaryCards,
+  ToolbarButton,
+  downloadCsv,
+  outlineButton,
+  primaryButton,
+  resourceLink,
+  type Column,
+} from "@/components/console";
 import CustomerImportDialog from "./import-dialog";
 import type { ActivityDTO, CustomerDTO } from "@nnact/shared";
 import { ADVANCE_TAG } from "@nnact/shared";
 import { emitWalkthroughDone } from "@/lib/walkthroughs/events";
 
-type SortField = "name" | "createdAt" | "lastActivity";
-type SortDir = "asc" | "desc";
+const DAY = 86_400_000;
 
 export default function CustomersPage() {
-  const { data: customers = [], isLoading, isError, error: queryError } = useCustomersQuery();
+  const router = useRouter();
+  const customersQuery = useCustomersQuery();
+  const { data: customers = [], isLoading, isError } = customersQuery;
   const { data: activities = [] } = useActivitiesQuery();
   const [createCustomer, { isLoading: creating }] = useCreateCustomerMutation();
-  const [skip, setSkip] = useState(0);
-  const take = 50;
 
   // ── Create-customer dialog ──
   const [showCreate, setShowCreate] = useState(false);
@@ -38,12 +46,7 @@ export default function CustomersPage() {
   const [createPhone, setCreatePhone] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [createErr, setCreateErr] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [sortField, setSortField] = useState<SortField>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
-
-  // Reset pagination when search changes
-  useEffect(() => { setSkip(0); }, [search]);
+  const [visible, setVisible] = useState<CustomerDTO[]>([]);
 
   // ── Last activity per customer ──
   const lastActivityMap = useMemo(() => {
@@ -58,63 +61,11 @@ export default function CustomersPage() {
     return map;
   }, [activities]);
 
-  const lastActivityDate = (customerId: string): Date | null => {
-    const a = lastActivityMap.get(customerId);
-    return a ? new Date(a.createdAt) : null;
-  };
-
-  // ── Filter + sort ──
-  const filteredSorted = useMemo(() => {
-    let list = [...customers];
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.email?.toLowerCase().includes(q) ||
-          c.phone?.includes(q),
-      );
-    }
-
-    list.sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case "name":
-          cmp = a.name.localeCompare(b.name);
-          break;
-        case "createdAt":
-          cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          break;
-        case "lastActivity": {
-          const da = lastActivityDate(a.id)?.getTime() ?? 0;
-          const db = lastActivityDate(b.id)?.getTime() ?? 0;
-          cmp = da - db;
-          break;
-        }
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-
-    return list;
-  }, [customers, search, sortField, sortDir, lastActivityMap]);
-
-  const paginated = useMemo(() => filteredSorted.slice(skip, skip + take), [filteredSorted, skip, take]);
-
   usePrefetchListDetails(
     "customers",
-    useMemo(() => filteredSorted.slice(0, 40).map((c) => c.id), [filteredSorted]),
+    useMemo(() => visible.slice(0, 40).map((c) => c.id), [visible]),
   );
-
-  // ── Sort header helper ──
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortDir("asc");
-    }
-  };
+  const onFilteredChange = useCallback((rows: CustomerDTO[]) => setVisible(rows), []);
 
   // ── Create customer handler ──
   const handleCreateCustomer = async () => {
@@ -138,293 +89,188 @@ export default function CustomersPage() {
     }
   };
 
-  const SortHeader = ({
-    field,
-    label,
-    className,
-  }: {
-    field: SortField;
-    label: string;
-    className?: string;
-  }) => {
-    const active = sortField === field;
-    return (
-      <TableHead
-        className={`cursor-pointer select-none hover:text-fg transition-colors ${className ?? ""}`}
-        onClick={() => handleSort(field)}
-      >
-        <span className="inline-flex items-center gap-1">
-          {label}
-          <span className="text-fg-dim text-[10px] w-3 text-center">
-            {active ? (sortDir === "asc" ? "↑" : "↓") : " "}
-          </span>
+  const exportCustomers = (rows: readonly CustomerDTO[]) =>
+    downloadCsv(`customers-${new Date().toISOString().slice(0, 10)}.csv`, rows, [
+      ["Name", (c) => c.name],
+      ["Email", (c) => c.email ?? ""],
+      ["Phone", (c) => c.phone ?? ""],
+      ["Address", (c) => c.primaryAddress ?? ""],
+      ["Added", (c) => c.createdAt],
+    ]);
+
+  const columns: Column<CustomerDTO>[] = [
+    {
+      id: "name",
+      header: "Name",
+      sortValue: (c) => c.name,
+      cell: (c) => (
+        <span className="grid">
+          <Link href={`/customers/${c.id}`} data-tour="customers-link" className={resourceLink}>
+            {c.name}
+          </Link>
+          {c.primaryAddress ? <span className="max-w-[18rem] truncate text-xs text-fg-muted">{c.primaryAddress}</span> : null}
         </span>
-      </TableHead>
-    );
-  };
+      ),
+    },
+    {
+      id: "contact",
+      header: "Contact",
+      sortValue: (c) => c.email ?? c.phone ?? "",
+      cell: (c) =>
+        c.email || c.phone ? (
+          <span className="grid text-sm">
+            {c.email ? (
+              <a href={`mailto:${c.email}`} className="text-fg hover:text-[var(--shell-accent-text)] hover:underline">
+                {c.email}
+              </a>
+            ) : null}
+            {c.phone ? (
+              <a href={`tel:${c.phone}`} className="text-fg-muted hover:text-[var(--shell-accent-text)] hover:underline">
+                {c.phone}
+              </a>
+            ) : null}
+          </span>
+        ) : (
+          <span className="text-fg-muted">No contact details</span>
+        ),
+    },
+    {
+      id: "lastActivity",
+      header: "Last activity",
+      hideBelow: "md",
+      sortValue: (c) => {
+        const last = lastActivityMap.get(c.id);
+        return last ? new Date(last.createdAt).getTime() : null;
+      },
+      cell: (c) => {
+        const last = lastActivityMap.get(c.id);
+        return last ? (
+          <span className="grid max-w-[22rem]">
+            <span className="truncate text-fg">{last.summary}</span>
+            <span className="text-xs text-fg-muted">{formatRelativeTime(last.createdAt)}</span>
+          </span>
+        ) : (
+          <span className="text-fg-muted">No activity</span>
+        );
+      },
+    },
+    {
+      id: "createdAt",
+      header: "Added",
+      hideBelow: "sm",
+      sortValue: (c) => new Date(c.createdAt).getTime(),
+      cell: (c) => <span className="whitespace-nowrap text-fg-muted">{new Date(c.createdAt).toLocaleDateString()}</span>,
+    },
+  ];
 
   // ── Loading ──
   if (isLoading) {
     return (
-      <div>
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <Skeleton className="h-8 w-40 mb-2" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        </div>
-        <Skeleton className="h-10 w-80 rounded-lg mb-4" />
-        {/* Desktop skeleton */}
-        <div className="hidden md:block rounded-xl border border-border overflow-hidden">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 rounded-none border-b border-border last:border-b-0" />
+      <div className="grid gap-4" aria-busy="true" aria-label="Loading customers">
+        <Skeleton className="h-8 w-48 rounded-[6px]" />
+        <div className="grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }, (_, i) => (
+            <Skeleton key={i} className="h-24 rounded-[8px]" />
           ))}
         </div>
-        {/* Mobile skeleton */}
-        <div className="md:hidden flex flex-col gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
+        <Skeleton className="h-80 rounded-[8px]" />
       </div>
     );
   }
 
-  // ── No results state ──
-  const noResults =
-    customers.length > 0 && search.trim() && filteredSorted.length === 0;
+  const newThisMonth = customers.filter((c) => new Date(c.createdAt).getTime() > Date.now() - 30 * DAY).length;
+  const activeShare = customers.length ? lastActivityMap.size / customers.length : 0;
 
   return (
-    <div>
-      <PageHeader
+    <ConsolePage>
+      <ConsoleHeader
         title="Customers"
-        description={
-          customers.length > 0
-            ? `${filteredSorted.length} of ${customers.length} total`
-            : undefined
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              data-tour="customers-import"
-              onClick={() => setShowImport(true)}
+        toolbar={
+          <>
+            <ToolbarButton icon={UserPlus} data-tour="customers-add" onClick={() => setShowCreate(true)}>
+              New Customer
+            </ToolbarButton>
+            <ToolbarButton icon={FileUp} data-tour="customers-import" onClick={() => setShowImport(true)}>
+              Import
+            </ToolbarButton>
+            <ToolbarButton icon={Download} onClick={() => exportCustomers(visible.length ? visible : customers)} disabled={customers.length === 0}>
+              Export CSV
+            </ToolbarButton>
+            <ToolbarButton
+              icon={RefreshCw}
+              spinning={customersQuery.isFetching}
+              disabled={customersQuery.isFetching}
+              onClick={() => void customersQuery.refetch()}
             >
-              ⤓ Import
-            </Button>
-            <Button size="sm" data-tour="customers-add" onClick={() => setShowCreate(true)}>
-              + New Customer
-            </Button>
-          </div>
+              Refresh
+            </ToolbarButton>
+          </>
         }
       />
 
-      {/* ── Quick stats ── */}
-      {customers.length > 0 && (
-        <div className="flex items-center gap-6 mb-4 text-xs">
-          <div>
-            <span className="text-fg-dim">Total</span>
-            <span className="ml-1.5 font-semibold text-fg">{customers.length}</span>
-          </div>
-          <div>
-            <span className="text-fg-dim">With activity</span>
-            <span className="ml-1.5 font-semibold text-fg">
-              {lastActivityMap.size}
-            </span>
-          </div>
-          <div>
-            <span className="text-fg-dim">New (30d)</span>
-            <span className="ml-1.5 font-semibold text-fg">
-              {customers.filter(
-                (c) => new Date(c.createdAt).getTime() > Date.now() - 30 * 86400000
-              ).length}
-            </span>
-          </div>
-        </div>
-      )}
+      {isError ? (
+        <Banner tone="danger" title="Customers could not be loaded.">
+          Check your connection and try again.
+        </Banner>
+      ) : null}
 
-      {/* ── Error ── */}
-      {isError && (
-        <Card className="mb-6 border-red/30 bg-red/5">
-          <p className="text-red text-sm">We couldn't load this page. Check your connection and try again.</p>
-        </Card>
-      )}
+      {customers.length > 0 ? (
+        <SummaryCards
+          label="Customer summary"
+          items={[
+            { label: "Customers", icon: Users, value: customers.length, note: "In this branch scope" },
+            {
+              label: "With activity",
+              icon: Activity,
+              value: lastActivityMap.size,
+              meter: activeShare,
+              note: `${Math.round(activeShare * 100)}% have jobs, invoices or messages`,
+            },
+            { label: "New in the last 30 days", icon: Sparkles, value: newThisMonth, note: newThisMonth ? "Added recently" : "No new customers" },
+          ]}
+        />
+      ) : null}
 
-      {/* ── Search bar ── */}
-      {customers.length > 0 && (
-        <div className="mb-4">
-          <Input
-            type="search"
-            placeholder="Search customers by name, email, or phone..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-md"
-          />
-        </div>
-      )}
-
-      {/* ── Empty state ── */}
-      {customers.length === 0 && !isError ? (
-        <Card>
-          <EmptyState
-            title="No customers yet"
-            description="Add your first customer to get started"
-          />
-          <div className="flex justify-center pb-6">
-            <Button size="sm" data-tour="customers-add" onClick={() => setShowCreate(true)}>
-              + New Customer
-            </Button>
-          </div>
-        </Card>
-      ) : (
-        <>
-          {/* ═══ Desktop table ═══ */}
-          <Card className="p-0 overflow-hidden hidden md:block" data-tour="customers-list">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortHeader field="name" label="Name" />
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <SortHeader field="lastActivity" label="Last activity" />
-                  <SortHeader field="createdAt" label="Added" />
-                  <TableHead className="text-right">Detail</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {noResults ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10">
-                      <p className="text-sm text-fg-muted">
-                        No customers match &ldquo;{search}&rdquo;
-                      </p>
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="mt-1 h-auto p-0 text-xs"
-                        onClick={() => setSearch("")}
-                      >
-                        Clear search
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginated.map((c) => {
-                    const last = lastActivityMap.get(c.id);
-                    return (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium text-fg">
-                          {c.name}
-                        </TableCell>
-                        <TableCell className="text-fg-muted">
-                          {c.email ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-fg-muted">
-                          {c.phone ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-fg-muted">
-                          {last ? (
-                            <div>
-                              <p className="text-xs text-fg leading-snug line-clamp-1">
-                                {last.summary}
-                              </p>
-                              <p className="text-[10px] text-fg-dim mt-0.5">
-                                {formatRelativeTime(last.createdAt)}
-                              </p>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-fg-dim">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-fg-muted text-xs">
-                          {new Date(c.createdAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Link
-                            href={`/customers/${c.id}`}
-                            data-tour="customers-link"
-                            className="text-xs text-fg-link hover:text-fg transition-colors"
-                          >
-                            View →
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-
-          {/* ═══ Mobile cards ═══ */}
-<div className="md:hidden flex flex-col gap-3" data-tour="customers-list">
-            {noResults ? (
-              <Card>
-                <div className="text-center py-10">
-                  <p className="text-sm text-fg-muted">
-                    No customers match &ldquo;{search}&rdquo;
-                  </p>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="mt-1 h-auto p-0 text-xs"
-                    onClick={() => setSearch("")}
-                  >
-                    Clear search
-                  </Button>
-                </div>
-              </Card>
-            ) : (
-              paginated.map((c) => {
-                const last = lastActivityMap.get(c.id);
-                return (
-                  <Link
-                    key={c.id}
-                    href={`/customers/${c.id}`}
-                    data-tour="customers-link"
-                    className="block no-underline hover:no-underline"
-                  >
-                    <Card className="p-4 hover:bg-surface-400 transition-colors cursor-pointer">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <p className="text-sm font-semibold text-fg">{c.name}</p>
-                          {(c.email || c.phone) && (
-                            <p className="text-xs text-fg-muted mt-0.5">
-                              {[c.email, c.phone].filter(Boolean).join(" · ") || "—"}
-                            </p>
-                          )}
-                        </div>
-                        <span className="text-fg-dim text-sm shrink-0 ml-2">→</span>
-                      </div>
-                      <div className="flex items-center gap-4 pt-2 border-t border-border">
-                        {last ? (
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-fg-muted">Last activity</p>
-                            <p className="text-xs text-fg leading-snug line-clamp-1 mt-0.5">
-                              {last.summary}
-                            </p>
-                            <p className="text-[10px] text-fg-dim mt-0.5">
-                              {formatRelativeTime(last.createdAt)}
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-fg-dim flex-1">No activity</p>
-                        )}
-                        <p className="text-xs text-fg-dim text-right shrink-0">
-                          Added {new Date(c.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </Card>
-                  </Link>
-                );
-              })
-            )}
-          </div>
-        </>
-      )}
+      <div data-tour="customers-list" className="min-w-0">
+        <ResourceTable
+          caption="Customers"
+          rows={customers}
+          columns={columns}
+          getRowId={(c) => c.id}
+          rowLabel={(c) => c.name}
+          searchText={(c) => [c.name, c.email, c.phone, c.primaryAddress].filter(Boolean).join(" ")}
+          filterPlaceholder="Search customers by name, email, phone or address"
+          defaultSort={{ id: "name", dir: "asc" }}
+          minWidth="40rem"
+          selectable
+          onFilteredChange={onFilteredChange}
+          bulkActions={(selected) => (
+            <ToolbarButton icon={Download} onClick={() => exportCustomers(selected)}>
+              Export selected
+            </ToolbarButton>
+          )}
+          rowMenu={(c) => [
+            { label: "View details", icon: ExternalLink, onSelect: () => router.push(`/customers/${c.id}`) },
+            { label: "Copy email", icon: Copy, disabled: !c.email, onSelect: () => void navigator.clipboard?.writeText(c.email ?? "") },
+          ]}
+          empty={
+            <div className="grid justify-items-center gap-2 px-6 py-12 text-center">
+              <p className="text-base font-medium text-fg">No customers yet</p>
+              <p className="max-w-md text-sm text-fg-muted">Add your first customer, or import a list from a spreadsheet.</p>
+              <div className="mt-2 flex flex-wrap justify-center gap-2">
+                <button type="button" className={primaryButton} data-tour="customers-add" onClick={() => setShowCreate(true)}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  New Customer
+                </button>
+                <button type="button" className={outlineButton} onClick={() => setShowImport(true)}>
+                  <FileUp className="size-4" aria-hidden="true" />
+                  Import
+                </button>
+              </div>
+            </div>
+          }
+        />
+      </div>
 
       {/* ── Create customer dialog ── */}
       <Dialog
@@ -453,10 +299,11 @@ export default function CustomersPage() {
             className="flex flex-col gap-4"
           >
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-fg-muted">Name *</label>
+              <label htmlFor="customer-create-name" className="text-sm font-medium text-fg">Name *</label>
               <input
+                id="customer-create-name"
                 data-tour="customer-create-name"
-                className="h-10 px-3 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                className="h-10 rounded-[6px] border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 text-sm text-fg focus:border-[var(--shell-focus)] focus:outline-none focus:ring-1 focus:ring-[var(--shell-focus)]"
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
                 placeholder="Jane Smith"
@@ -465,9 +312,10 @@ export default function CustomersPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-fg-muted">Email</label>
+              <label htmlFor="customer-create-email" className="text-sm font-medium text-fg">Email</label>
               <input
-                className="h-10 px-3 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                className="h-10 rounded-[6px] border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 text-sm text-fg focus:border-[var(--shell-focus)] focus:outline-none focus:ring-1 focus:ring-[var(--shell-focus)]"
+                id="customer-create-email"
                 type="email"
                 value={createEmail}
                 onChange={(e) => setCreateEmail(e.target.value)}
@@ -475,9 +323,10 @@ export default function CustomersPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-fg-muted">Phone</label>
+              <label htmlFor="customer-create-phone" className="text-sm font-medium text-fg">Phone</label>
               <input
-                className="h-10 px-3 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                className="h-10 rounded-[6px] border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 text-sm text-fg focus:border-[var(--shell-focus)] focus:outline-none focus:ring-1 focus:ring-[var(--shell-focus)]"
+                id="customer-create-phone"
                 type="tel"
                 value={createPhone}
                 onChange={(e) => setCreatePhone(e.target.value)}
@@ -485,19 +334,20 @@ export default function CustomersPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="inline-flex items-center gap-1.5 text-xs font-medium text-fg-muted">
+              <label htmlFor="customer-create-notes" className="inline-flex items-center gap-1.5 text-sm font-medium text-fg">
                 Notes
                 <InfoTip label="About customer notes">Visible only to your team — customers never see these notes.</InfoTip>
               </label>
               <textarea
-                className="min-h-[80px] px-3 py-2 rounded-lg border border-border bg-surface-300 text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
+                id="customer-create-notes"
+                className="min-h-[80px] resize-none rounded-[6px] border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3 py-2 text-sm text-fg focus:border-[var(--shell-focus)] focus:outline-none focus:ring-1 focus:ring-[var(--shell-focus)]"
                 value={createNotes}
                 onChange={(e) => setCreateNotes(e.target.value)}
                 placeholder="Optional notes..."
               />
             </div>
             {createErr && (
-              <p className="text-xs text-red">{createErr}</p>
+              <p role="alert" className="text-sm text-[var(--console-danger-fg)]">{createErr}</p>
             )}
             <DialogFooter>
               <Button type="button" variant="ghost" size="sm" disabled={creating} onClick={() => setShowCreate(false)}>
@@ -512,8 +362,6 @@ export default function CustomersPage() {
       </Dialog>
 
       <CustomerImportDialog open={showImport} onOpenChange={setShowImport} />
-
-      <Pagination skip={skip} take={take} total={filteredSorted.length} onSkipChange={setSkip} />
-    </div>
+    </ConsolePage>
   );
 }

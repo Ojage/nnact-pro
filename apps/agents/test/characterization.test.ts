@@ -72,9 +72,11 @@ test("agent selection supports default all and legacy names", () => {
     AGENT_ID.pricebook,
     AGENT_ID.triage,
     AGENT_ID.sourcing,
+    AGENT_ID.copilot,
     AGENT_ID.payments,
   ]);
   assert.deepEqual(resolveSelectedAgentIds({ AGENT_NAME: "quoting" }), [AGENT_ID.quoting]);
+  assert.deepEqual(resolveSelectedAgentIds({ AGENT_NAME: "copilot" }), [AGENT_ID.copilot]);
   assert.deepEqual(resolveSelectedAgentIds({ AGENT_ID: "nnact-intake-agent" }), [AGENT_ID.intake]);
   assert.deepEqual(resolveSelectedAgentIds({ AGENT_ID: "nnact-quote-agent" }), [AGENT_ID.quoting]);
   assert.equal(legacyAgentId(AGENT_ID.quoting), "nnact-quoting-agent");

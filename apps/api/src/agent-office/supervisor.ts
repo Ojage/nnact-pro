@@ -22,10 +22,11 @@ const WORKER_NAMES: Partial<Record<AgentId, string>> = {
   [AGENT_ID.pricebook]: "price-book",
   [AGENT_ID.triage]: "triage",
   [AGENT_ID.sourcing]: "sourcing",
+  [AGENT_ID.copilot]: "copilot",
   [AGENT_ID.payments]: "payments",
 };
 
-const DEFAULT_AGENT_IDS = Object.values(AGENT_ID).filter((agentId) => agentId !== AGENT_ID.copilot);
+const DEFAULT_AGENT_IDS = Object.values(AGENT_ID).filter((agentId) => WORKER_NAMES[agentId]);
 
 const repoRoot = resolve(fileURLToPath(new URL("../../../../", import.meta.url)));
 const children = new Map<AgentId, ChildProcess>();

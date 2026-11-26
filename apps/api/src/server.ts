@@ -61,6 +61,7 @@ import { branchRoutes } from "./routes/branches.js";
 import { agentDispatchRoutes } from "./routes/agent-dispatch.js";
 import { agentPricebookRoutes } from "./routes/agent-pricebook.js";
 import { agentTriageRoutes } from "./routes/agent-triage.js";
+import { agentCopilotRoutes } from "./routes/agent-copilot.js";
 import { agentSourcingRoutes } from "./routes/agent-sourcing.js";
 import { agentPaymentRoutes } from "./routes/agent-payments.js";
 import { agentAdminRoutes } from "./routes/agents-admin.js";
@@ -302,6 +303,7 @@ export function buildServer(
   app.register(agentDispatchRoutes, { prefix: withVersion("") });
   app.register(agentPricebookRoutes, { prefix: withVersion("") });
   app.register(agentTriageRoutes, { prefix: withVersion("") });
+  app.register(agentCopilotRoutes, { prefix: withVersion("") });
   app.register(agentSourcingRoutes, { prefix: withVersion("") });
   app.register(agentPaymentRoutes, { prefix: withVersion("") });
   app.register(agentAdminRoutes, { prefix: withVersion("/agents") });
@@ -402,6 +404,7 @@ export function buildServer(
   app.register(agentDispatchRoutes, { prefix: withLegacy("") });
   app.register(agentPricebookRoutes, { prefix: withLegacy("") });
   app.register(agentTriageRoutes, { prefix: withLegacy("") });
+  app.register(agentCopilotRoutes, { prefix: withLegacy("") });
   app.register(agentSourcingRoutes, { prefix: withLegacy("") });
   app.register(agentPaymentRoutes, { prefix: withLegacy("") });
   app.register(agentAdminRoutes, { prefix: withLegacy("/agents") });
